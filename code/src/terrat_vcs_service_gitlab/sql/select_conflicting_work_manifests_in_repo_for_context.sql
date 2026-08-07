@@ -42,10 +42,14 @@ wm as (
 work_manifests_for_dirspace as (
     select
         gwm.id,
--- Consider a work manifest as maybe stale if we have no run id after a minute
--- or it was created over 10 minutes ago
-        ((gwm.run_id is null and (now() - gwm.created_at > interval '1 minutes'))
-         or (gwm.run_id is not null and (now() - gwm.created_at > interval '1 hour'))) as maybe_stale
+-- Consider a work manifest as maybe stale if it was dispatched but has not
+-- started after a minute, or if it has been in flight for over an hour.  A work
+-- manifest that is still queued is not stale, it may legitimately be waiting on
+-- other work against its dirspaces.
+        ((gwm.state = 'running'
+          and gwm.run_id is null
+          and (now() - gwm.created_at > interval '1 minutes'))
+         or (now() - gwm.created_at > interval '1 hour')) as maybe_stale
     from dirspaces
     inner join work_manifest_dirspaceflows as gwmdsfs
         on dirspaces.dir = gwmdsfs.path and dirspaces.workspace = gwmdsfs.workspace
@@ -53,7 +57,7 @@ work_manifests_for_dirspace as (
         on gwmdsfs.work_manifest = gwm.id
     inner join context as c
       on c.repo = gwm.repository
-    group by gwm.id, gwm.run_id, gwm.created_at
+    group by gwm.id, gwm.state, gwm.run_id, gwm.created_at
 )
 select
     gwm.id,
@@ -76,7 +80,12 @@ where gwm.state in ('queued', 'running')
             and (latest_unlocks.unlocked_at is null or latest_unlocks.unlocked_at < gwm.created_at))
            or (gdwm.work_manifest is not null
                and (latest_drift_unlocks.unlocked_at is null or latest_drift_unlocks.unlocked_at < gwm.created_at)))
-      and ((gwm.pull_number is not distinct from c.pull_number)
-           or ($run_type in ('autoapply', 'apply', 'unsafe-apply'))
+-- A plan is never in conflict, it is queued behind whatever is already running
+-- or queued against its dirspaces.  An apply is in conflict with another apply
+-- against those dirspaces, because a second apply is not queued behind the
+-- first.  Either is in conflict with work that looks stale, because stale work
+-- blocks the queue until it is unlocked.
+      and (($run_type in ('autoapply', 'apply', 'unsafe-apply')
+            and gwm.run_type in ('autoapply', 'apply', 'unsafe-apply'))
            or work_manifests_for_dirspace.maybe_stale)
 order by gwm.created_at

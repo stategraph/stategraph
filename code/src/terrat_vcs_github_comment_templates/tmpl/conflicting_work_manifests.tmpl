@@ -1,8 +1,12 @@
-## Conflicting operations :heavy_multiplication_x:
-There are conflicting operations that are preventing this operation from being performed.  If there are other operations running, wait for them to complete and try again.  If you believe any operations are stuck for some reason, see the **Conflicting operations** section below for how to resolve them.
+## Apply already in progress :heavy_multiplication_x:
+An apply is already queued or running against directories and workspaces this operation touches, so it was not started.  Only one apply runs against a directory and workspace at a time, and a second apply is not queued behind the first.
+
+Wait for the apply below to finish, then comment `terrateam apply` again.  If that apply belongs to another pull request, plan again first, because an apply supersedes any plan made against those directories and workspaces before it ran.
+
+Plans do not have to wait like this.  A plan against those directories and workspaces is queued automatically and runs once the apply has completed.
 
 <details>
-   <summary><h3>Conflicting operations</h3></summary>
+   <summary><h3>Apply in progress</h3></summary>
 
 | Pull Request | Operation | State | Created At |
 | --- | --- | --- | --- |
@@ -10,7 +14,7 @@ There are conflicting operations that are preventing this operation from being p
 | @?is_pr-@ #@id@ @-/is_pr@@!is_pr-@ @id@ @-/is_pr@ | @run_type@ | @state@ | @created_at@ UTC |
 @/work_manifests-@
 
-If these appear to be stuck, unlock them by commenting in any pull request:
+If this appears to be stuck, unlock it by commenting in any pull request:
 
 ```
 terrateam unlock@-#work_manifests@ @id@@/work_manifests@

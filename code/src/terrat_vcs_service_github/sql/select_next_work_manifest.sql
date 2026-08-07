@@ -30,6 +30,7 @@ wms as (
         (case gwm.run_type
          when 'autoapply' then 0
          when 'apply' then 0
+         when 'unsafe-apply' then 0
          when 'autoplan' then 1
          when 'plan' then 1
          end) as priority
@@ -77,31 +78,52 @@ running_dirspaces_per_repo as (
         on gwmds.work_manifest = wms.id
     where wms.state = 'running'
 ),
--- Find all those queued dirspaces that have running instance where the running
--- instance is an apply.  These work manifests cannot be run because the apply
--- is blocking them
-apply_dirspaces_with_overlap as (
+-- The dirspaces a queued work manifest cannot be run against yet, along with
+-- the kind of work manifest that has to wait on it.  A plan and an apply never
+-- run against the same dirspace at the same time, and two applies never run
+-- against the same dirspace at the same time.
+blocked_dirspaces as (
+    -- An apply waits for every operation running against its dirspaces to
+    -- complete.  It does not cancel them.
+    select distinct
+        rds.repository as repository,
+        rds.path as path,
+        rds.workspace as workspace,
+        'apply' as unified_run_type
+    from running_dirspaces_per_repo as rds
+    union
+    -- A plan waits for an apply running against its dirspaces.
+    select distinct
+        rds.repository as repository,
+        rds.path as path,
+        rds.workspace as workspace,
+        'plan' as unified_run_type
+    from running_dirspaces_per_repo as rds
+    where rds.unified_run_type = 'apply'
+    union
+    -- A queued apply skips the line: every plan queued against its dirspaces,
+    -- those queued before it and those queued after it, runs only once the
+    -- apply has completed.  This is what bounds how long an apply waits, the
+    -- set of work it is waiting on can only shrink.
     select distinct
         qds.repository as repository,
         qds.path as path,
-        qds.workspace as workspace
+        qds.workspace as workspace,
+        'plan' as unified_run_type
     from queued_dirspaces_per_repo as qds
-    inner join running_dirspaces_per_repo as rds
-        on qds.repository = rds.repository
-           and qds.path = rds.path
-           and qds.workspace = rds.workspace
-    where rds.unified_run_type = 'apply'
+    where qds.unified_run_type = 'apply'
 ),
--- Reject all those work manifests that have a dirspace in the overlapping apply
--- table
+-- Reject all those work manifests that have a dirspace blocked for their kind
+-- of run
 rejected_work_manifests as (
     select distinct wms.id as id from wms
     inner join dirspaces_for_work_manifests as dswm
         on dswm.work_manifest = wms.id
-    inner join apply_dirspaces_with_overlap as adso
-        on adso.repository = wms.repository
-           and adso.path = dswm.path
-           and adso.workspace = dswm.workspace
+    inner join blocked_dirspaces as bds
+        on bds.repository = wms.repository
+           and bds.path = dswm.path
+           and bds.workspace = dswm.workspace
+           and bds.unified_run_type = wms.unified_run_type
 ),
 next_work_manifests as (
     select
