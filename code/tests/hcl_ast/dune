@@ -4,6 +4,7 @@
  (deps
   (source_tree files)
   ../hcl_native_shim/sg_hcl_shim)
+ (enabled_if false)   ; TEMP: disabled in OSS pending fixing the Go shim execution?
  (action
   (setenv
    SRC_DIR

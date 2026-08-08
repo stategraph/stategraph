@@ -52,8 +52,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: x-access-token
+          password: ${{ secrets.TERRATEAMIO_PACKAGES_TOKEN }}
 
       - name: Build and push ${{ matrix.arch }} image
         uses: docker/build-push-action@v6
@@ -63,7 +63,7 @@ jobs:
           push: true
           target: build-base
           tags: |
-            ghcr.io/${{ github.repository_owner }}/terrat-base:${{ env.VERSION_TAG }}-${{ matrix.arch }}
+            ghcr.io/terrateamio/terrat-base:${{ env.VERSION_TAG }}-${{ matrix.arch }}
 
   create-manifest:
     needs: [set-version-tag, build]
@@ -91,8 +91,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: x-access-token
+          password: ${{ secrets.TERRATEAMIO_PACKAGES_TOKEN }}
 
       - name: Create and push multi-arch manifest
         run: |
