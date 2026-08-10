@@ -341,6 +341,19 @@ val drain_notifications : t -> unit
     with --). This DOES NOT remove comments if they are not the very first entry on a line. *)
 val clean_string : string -> string
 
+(** Split a multi-statement SQL script into its individual statements, trimmed, with empties
+    dropped. PostgreSQL refuses to prepare a multi-statement string and {!Prepared_stmt.execute}
+    prepares each call as one statement, so scripts must be run a statement at a time. The boundary
+    is a semicolon followed by a blank line ([";\n\n"]) rather than a bare semicolon, so that
+    semicolons inside function bodies do not split them; SQL files meant to be run this way follow
+    that convention. *)
+val split_statements : string -> string list
+
+(** Run every statement of a multi-statement script in order, stopping at the first error. The
+    statements take no parameters; a script with a parameterized statement must be split with
+    {!split_statements} and executed by the caller. *)
+val execute_script : t -> string -> (unit, [> err ]) result Abb.Future.t
+
 module Copy_to : sig
   type t
 

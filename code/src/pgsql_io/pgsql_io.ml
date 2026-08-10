@@ -2024,3 +2024,14 @@ let clean_string s =
   |> CCString.split_on_char '\n'
   |> CCList.filter (fun line -> not (CCString.prefix ~pre:"--" (CCString.trim line)))
   |> CCString.concat "\n"
+
+let split_statements script =
+  script
+  |> CCString.split ~by:";\n\n"
+  |> CCList.map CCString.trim
+  |> CCList.filter (fun s -> not (CCString.is_empty s))
+
+let execute_script db script =
+  Abbs_future_combinators.List_result.iter
+    ~f:(fun stmt -> Prepared_stmt.execute db Typed_sql.(sql /^ stmt))
+    (split_statements script)
