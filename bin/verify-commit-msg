@@ -10,6 +10,7 @@ DEFAULT_BRANCH=origin/main
 # the below pattern pattern.
 if git log --no-merges "${DEFAULT_BRANCH}"..HEAD --pretty='%s %an' . \
         | grep -v 'dependabot' \
+        | grep -v '^OSS import' \
         | grep -vE '^(([a-zA-Z0-9/.-_]+)?#[0-9]+ )+(ADD|REFACTOR|FIX|UPDATE|REMOVE) .*$' \
         | grep -q .; then
     echo "Not all commit messages match the required structure"

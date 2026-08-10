@@ -949,6 +949,114 @@ let tap_det_error =
       Oth.Assert.true_ "!observed" !observed;
       Oth.Assert.true_ "Fut.state fut = `Det (Error `Boom)" (Fut.state fut = `Det (Error `Boom)))
 
+(* [while_] runs entirely on already-determined futures, so one [run_with_state]
+   drives the whole loop to completion. *)
+let while_state =
+  Oth.test
+    ~desc:"while_ threads state through iterations and returns the final state"
+    ~name:"while_ state"
+    (fun _ ->
+      let dummy_state = Abb_fut.State.create () in
+      (* Sum 1..5: the state is (next addend, running total), the value is the
+         addend just consumed. *)
+      let fut =
+        Fut_comb.while_
+          ~init:(1, 0)
+          ~f:(fun (i, total) -> Fut.return ((i + 1, total + i), i))
+          ~while_:(fun ((_, _), i) -> i < 5)
+          ~betwixt:(fun _ -> Fut.return ())
+      in
+      ignore (Fut.run_with_state fut dummy_state);
+      Oth.Assert.true_ "Fut.state fut = `Det ((6, 15), 5)" (Fut.state fut = `Det ((6, 15), 5)))
+
+let while_betwixt_sees_state =
+  Oth.test
+    ~desc:"while_ passes the state/value pair to betwixt, once per continuation"
+    ~name:"while_ betwixt"
+    (fun _ ->
+      let dummy_state = Abb_fut.State.create () in
+      let seen = ref [] in
+      let fut =
+        Fut_comb.while_
+          ~init:0
+          ~f:(fun i -> Fut.return (i + 1, i))
+          ~while_:(fun (_, i) -> i < 3)
+          ~betwixt:(fun pair ->
+            seen := pair :: !seen;
+            Fut.return ())
+      in
+      ignore (Fut.run_with_state fut dummy_state);
+      Oth.Assert.true_ "Fut.state fut = `Det (4, 3)" (Fut.state fut = `Det (4, 3));
+      (* betwixt runs between iterations, not after the last one. *)
+      Oth.Assert.true_
+        "betwixt saw [(1, 0); (2, 1); (3, 2)]"
+        (CCList.rev !seen = [ (1, 0); (2, 1); (3, 2) ]))
+
+let while_finite_tries =
+  Oth.test
+    ~desc:"finite_tries caps while_ at n + 1 iterations of f"
+    ~name:"while_ finite_tries"
+    (fun _ ->
+      let dummy_state = Abb_fut.State.create () in
+      let calls = ref 0 in
+      (* [while_] never says stop, so only finite_tries ends the loop. *)
+      let fut =
+        Fut_comb.while_
+          ~init:0
+          ~f:(fun i ->
+            incr calls;
+            Fut.return (i + 1, i))
+          ~while_:(Fut_comb.finite_tries 4 (fun _ -> true))
+          ~betwixt:(fun _ -> Fut.return ())
+      in
+      ignore (Fut.run_with_state fut dummy_state);
+      Oth.Assert.Eq.int ~expected:5 ~actual:!calls;
+      Oth.Assert.true_ "Fut.state fut = `Det (5, 4)" (Fut.state fut = `Det (5, 4)))
+
+let while_stops_immediately =
+  Oth.test
+    ~desc:"while_ runs f once when while_ is false from the start"
+    ~name:"while_ stops immediately"
+    (fun _ ->
+      let dummy_state = Abb_fut.State.create () in
+      let betwixt_ran = ref false in
+      let fut =
+        Fut_comb.while_
+          ~init:7
+          ~f:(fun i -> Fut.return (i + 1, i))
+          ~while_:(fun _ -> false)
+          ~betwixt:(fun _ ->
+            betwixt_ran := true;
+            Fut.return ())
+      in
+      ignore (Fut.run_with_state fut dummy_state);
+      Oth.Assert.true_ "Fut.state fut = `Det (8, 7)" (Fut.state fut = `Det (8, 7));
+      Oth.Assert.true_ "betwixt did not run" (not !betwixt_ran))
+
+let retry_over_while_ =
+  Oth.test
+    ~desc:"retry, now built on while_, still loops until while_ is false"
+    ~name:"retry over while_"
+    (fun _ ->
+      let dummy_state = Abb_fut.State.create () in
+      let calls = ref 0 in
+      let betwixt_calls = ref 0 in
+      let fut =
+        Fut_comb.retry
+          ~f:(fun () ->
+            incr calls;
+            Fut.return !calls)
+          ~while_:(fun n -> n < 3)
+          ~betwixt:(fun _ ->
+            incr betwixt_calls;
+            Fut.return ())
+      in
+      ignore (Fut.run_with_state fut dummy_state);
+      (* retry returns the bare value, not the (state, value) pair. *)
+      Oth.Assert.true_ "Fut.state fut = `Det 3" (Fut.state fut = `Det 3);
+      Oth.Assert.Eq.int ~expected:3 ~actual:!calls;
+      Oth.Assert.Eq.int ~expected:2 ~actual:!betwixt_calls)
+
 let tap_exn =
   Oth.test ~desc:"tap observes and propagates an exception" ~name:"tap exn" (fun _ ->
       let dummy_state = Abb_fut.State.create () in
@@ -1061,4 +1169,9 @@ let () =
             tap_exn;
             tap_aborted;
             tap_aborted_from_outside;
+            while_state;
+            while_betwixt_sees_state;
+            while_finite_tries;
+            while_stops_immediately;
+            retry_over_while_;
           ]))

@@ -123,9 +123,25 @@ module Make (Fut : Abb_intf.Future.S) : sig
   (** Wait for a future to complete and if it does not in a specified time, abort it *)
   val timeout : timeout:unit Fut.t -> 'a Fut.t -> [ `Ok of 'a | `Timeout ] Fut.t
 
+  (** Loop [f], threading a state through the iterations. [f] is applied to [init], and to the state
+      each subsequent iteration returns, so a loop that accumulates needs no mutable variable. Every
+      iteration produces a state paired with a value; that pair is what [while_] tests, what
+      [betwixt] runs against, and what the loop returns once [while_] says to stop -- so the final
+      state is available to the caller, not just the last value. Since the pair is a single
+      argument, {!finite_tries} composes with [while_] here exactly as it does with {!retry}.
+      Exceptions are not handled as part of the loop. *)
+  val while_ :
+    init:'s ->
+    f:('s -> ('s * 'a) Fut.t) ->
+    while_:('s * 'a -> bool) ->
+    betwixt:('s * 'a -> unit Fut.t) ->
+    ('s * 'a) Fut.t
+
   (** Perform an operation [f], and call [while_] on the result. If [while_] returns [true] it means
       to try again. If [false] then return the value. Otherwise run a function [betwixt] between
-      runs and then call [f] again. Exceptions are not handled as part of the retry process. *)
+      runs and then call [f] again. Exceptions are not handled as part of the retry process.
+
+      This is {!while_} with no state to thread. *)
   val retry : f:(unit -> 'a Fut.t) -> while_:('a -> bool) -> betwixt:('a -> unit Fut.t) -> 'a Fut.t
 
   (** Try, at most, the number of [tries] given. If there are remaining tries, call the test
