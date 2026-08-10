@@ -11,7 +11,6 @@
   str_template
   terrat_base_repo_config_v1
   terrat_comment
-  terrat_metrics
   terrat_storage
   terrat_user
   terrat_vcs_provider2)

@@ -206,28 +206,6 @@ This is the primary error counter used throughout the application. Different mod
 - **Labels:** `success`
 - **Description:** Count of Terraform workflow run results initiated from GitLab
 
-## Apply Operations
-
-### `terrat_apply_total`
-
-- **Type:** Counter
-- **Labels:** `force`
-- **Description:** Total number of apply operations initiated
-- **Label values:** `force="true"` for `terrateam apply-force` operations, `force="false"` for regular applies (including autoapply and stack auto-apply)
-
-**Example queries:**
-
-```promql
-# Rate of all apply operations
-rate(terrat_apply_total[5m])
-
-# Rate of force-apply operations only
-rate(terrat_apply_total{force="true"}[5m])
-
-# Ratio of force applies to total applies
-rate(terrat_apply_total{force="true"}[1h]) / rate(terrat_apply_total[1h])
-```
-
 ## Event Evaluator
 
 ### `terrat_evaluator_op_on_account_disabled_total`

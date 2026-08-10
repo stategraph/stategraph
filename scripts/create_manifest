@@ -20,18 +20,21 @@ fi
 for IMAGE_NAME in "$@"; do
   echo "Creating and pushing multi-architecture manifest for ${IMAGE_NAME}..."
 
-  # Create and push the multi-architecture manifest for the version tag
-  docker buildx imagetools create \
-    --tag "${CONTAINER_REGISTRY}/terrateamio/${IMAGE_NAME}:${VERSION_TAG}" \
-    "${CONTAINER_REGISTRY}/terrateamio/${IMAGE_NAME}:${VERSION_TAG}-amd64" \
-    "${CONTAINER_REGISTRY}/terrateamio/${IMAGE_NAME}:${VERSION_TAG}-arm64"
+  # Create the multi-architecture manifest for the version tag
+  docker manifest create "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}" \
+    --amend "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}-amd64" \
+    --amend "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}-arm64"
+
+  # Push the multi-architecture manifest for the version tag
+  docker manifest push "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}"
 
   # Optionally create and push the "latest" tag if conditions are met
   if [[ "${IS_LATEST_VERSION_TAG:-false}" == "true" && "${PUSH_LATEST}" == "true" && "${IMAGE_NAME}" != "terrat-base" ]]; then
     echo "Creating and pushing the 'latest' multi-architecture tag for ${IMAGE_NAME}..."
-    docker buildx imagetools create \
-      --tag "${CONTAINER_REGISTRY}/terrateamio/${IMAGE_NAME}:latest" \
-      "${CONTAINER_REGISTRY}/terrateamio/${IMAGE_NAME}:${VERSION_TAG}-amd64" \
-      "${CONTAINER_REGISTRY}/terrateamio/${IMAGE_NAME}:${VERSION_TAG}-arm64"
+    docker manifest create "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY_OWNER}/${IMAGE_NAME}:latest" \
+      --amend "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}-amd64" \
+      --amend "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}-arm64"
+
+    docker manifest push "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY_OWNER}/${IMAGE_NAME}:latest"
   fi
 done

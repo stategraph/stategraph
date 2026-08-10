@@ -260,7 +260,6 @@ module type S = sig
       request_id:string ->
       base_ref:Api.Ref.t ->
       branch_ref:Api.Ref.t ->
-      lock_policy:Terrat_base_repo_config_v1.Workflows.Entry.Lock_policy.t ->
       t ->
       Api.Repo.t ->
       (Terrat_base_repo_config_v1.Dirs.Dir.Branch_target.t

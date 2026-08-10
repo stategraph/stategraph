@@ -65,89 +65,12 @@ let test_to_version_1_round_trip =
           | _ -> failwith "Round-trip to Version_1 did not produce Engine_stategraph")
       | Error _ -> failwith "of_version_1_json failed in round-trip setup")
 
-(* Tests for the global [lock_policy] key.  A workflow entry that does not set
-   [lock_policy] inherits the global value, an entry that sets it overrides the
-   global value, and the global value round-trips through Version_1. *)
-
-let pp_lock_policy = function
-  | V1.Workflows.Entry.Lock_policy.Apply -> "apply"
-  | V1.Workflows.Entry.Lock_policy.Merge -> "merge"
-  | V1.Workflows.Entry.Lock_policy.None -> "none"
-  | V1.Workflows.Entry.Lock_policy.Strict -> "strict"
-
-let config_of_json json =
-  match V1.of_version_1_json json with
-  | Ok cfg -> cfg
-  | Error _ -> failwith "of_version_1_json failed"
-
-let assert_lock_policy expected actual =
-  if not (V1.Workflows.Entry.Lock_policy.equal expected actual) then
-    failwith
-      (Printf.sprintf
-         "Expected lock_policy %s, got %s"
-         (pp_lock_policy expected)
-         (pp_lock_policy actual))
-
-let test_lock_policy_default =
-  Oth.test ~name:"lock_policy: defaults to strict" (fun _ ->
-      assert_lock_policy
-        V1.Workflows.Entry.Lock_policy.Strict
-        (V1.lock_policy (config_of_json (`Assoc []))))
-
-let test_lock_policy_global =
-  Oth.test ~name:"lock_policy: global value is read" (fun _ ->
-      assert_lock_policy
-        V1.Workflows.Entry.Lock_policy.Merge
-        (V1.lock_policy (config_of_json (`Assoc [ ("lock_policy", `String "merge") ]))))
-
-let test_lock_policy_workflow_inherits =
-  Oth.test ~name:"lock_policy: workflow entry inherits the global value" (fun _ ->
-      let json =
-        `Assoc
-          [
-            ("lock_policy", `String "apply");
-            ("workflows", `List [ `Assoc [ ("tag_query", `String "") ] ]);
-          ]
-      in
-      match V1.workflows (config_of_json json) with
-      | [ { V1.Workflows.Entry.lock_policy; _ } ] ->
-          assert_lock_policy V1.Workflows.Entry.Lock_policy.Apply lock_policy
-      | _ -> failwith "Expected exactly one workflow entry")
-
-let test_lock_policy_workflow_overrides =
-  Oth.test ~name:"lock_policy: workflow entry overrides the global value" (fun _ ->
-      let json =
-        `Assoc
-          [
-            ("lock_policy", `String "apply");
-            ( "workflows",
-              `List [ `Assoc [ ("tag_query", `String ""); ("lock_policy", `String "none") ] ] );
-          ]
-      in
-      match V1.workflows (config_of_json json) with
-      | [ { V1.Workflows.Entry.lock_policy; _ } ] ->
-          assert_lock_policy V1.Workflows.Entry.Lock_policy.None lock_policy
-      | _ -> failwith "Expected exactly one workflow entry")
-
-let test_lock_policy_to_version_1_round_trip =
-  Oth.test ~name:"lock_policy: global value round-trips through Version_1" (fun _ ->
-      let cfg = config_of_json (`Assoc [ ("lock_policy", `String "none") ]) in
-      let v1 = V1.to_version_1 cfg in
-      match v1.Repo.Version_1.lock_policy with
-      | `None -> ()
-      | _ -> failwith "Round-trip to Version_1 did not preserve lock_policy")
-
 let test =
   Oth.parallel
     [
       test_of_version_1_json_minimal;
       test_of_version_1_json_with_version;
       test_to_version_1_round_trip;
-      test_lock_policy_default;
-      test_lock_policy_global;
-      test_lock_policy_workflow_inherits;
-      test_lock_policy_workflow_overrides;
-      test_lock_policy_to_version_1_round_trip;
     ]
 
 let () =

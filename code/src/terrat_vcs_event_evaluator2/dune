@@ -14,7 +14,6 @@
   terrat_base_repo_config_v1
   terrat_comment
   terrat_kv_store
-  terrat_metrics
   terrat_storage
   terrat_vcs_event_evaluator
   terrat_vcs_event_evaluator2_targets

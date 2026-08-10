@@ -112,7 +112,7 @@ The `terrateam unlock` command is very powerful.
 
 ## Locking Policies
 
-The `lock_policy` option instructs Terrateam under what situations it should acquire a lock. It can be set as a top-level key in your Terrateam configuration file, which applies to every directory, and it can be set on an individual workflow entry, which overrides the top-level value for the directories that match that workflow.
+The `lock_policy` option under workflows in your Terrateam configuration file instructs Terrateam under what situations it should acquire a lock.
 
 | Policy   | Description                                                                                                         | Recommended Use Case                |
 |----------|---------------------------------------------------------------------------------------------------------------------|-------------------------------------|
@@ -120,16 +120,6 @@ The `lock_policy` option instructs Terrateam under what situations it should acq
 | `apply`  | Acquire a lock only if the directory has been applied in Terrateam. Lock is released once the change is merged.     | Standard apply/merge workflows      |
 | `merge`  | Acquire a lock only if the directory has been merged. Lock is released when the change is applied.                  | Dev/playground branches             |
 | `none`   | Never acquire a lock.                                                                                               | Special cases, not recommended      |
-
-For example, to make `apply` the policy for the whole repository while keeping `strict` for production directories:
-
-```yaml
-lock_policy: apply
-
-workflows:
-  - tag_query: dir:production
-    lock_policy: strict
-```
 
 ## Best Practices
 

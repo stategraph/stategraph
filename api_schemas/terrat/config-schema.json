@@ -1628,16 +1628,6 @@
         "integrations": {
           "$ref": "#/definitions/integrations"
         },
-        "lock_policy": {
-          "default": "strict",
-          "enum": [
-            "apply",
-            "merge",
-            "none",
-            "strict"
-          ],
-          "type": "string"
-        },
         "notifications": {
           "$ref": "#/definitions/notifications"
         },
@@ -1773,6 +1763,7 @@
           "$ref": "#/definitions/integrations"
         },
         "lock_policy": {
+          "default": "strict",
           "enum": [
             "apply",
             "merge",

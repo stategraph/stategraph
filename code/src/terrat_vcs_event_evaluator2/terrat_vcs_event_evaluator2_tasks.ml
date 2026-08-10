@@ -2244,14 +2244,6 @@ struct
     let run_apply =
       run ~name:"run_apply" (fun s ({ Bs.Fetcher.fetch } as fetcher) ->
           let open Irm in
-          fetch Keys.job
-          >>= fun job ->
-          let force =
-            match job.Tjc.Job.type_ with
-            | Tjc.Job.Type_.Apply { force = true; _ } -> "true"
-            | _ -> "false"
-          in
-          Prmths.Counter.inc_one (Terrat_metrics.apply_total ~force);
           fetch Keys.dest_branch_ref
           >>= fun dest_branch_ref ->
           fetch Keys.working_branch_ref

@@ -28,7 +28,7 @@ type t = {
   engine : Terrat_repo_config_engine.t option; [@default None]
   environment : string option; [@default None]
   integrations : Terrat_repo_config_integrations.t option; [@default None]
-  lock_policy : Lock_policy.t option; [@default None]
+  lock_policy : Lock_policy.t; [@default `Strict]
   plan : Terrat_repo_config_workflow_op_list.t option; [@default None]
   runs_on : Terrat_repo_config_runs_on.t option; [@default None]
   tag_query : string;

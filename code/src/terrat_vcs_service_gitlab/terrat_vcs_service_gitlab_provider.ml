@@ -1314,7 +1314,7 @@ module Db = struct
         Logs.err (fun m -> m "%s: ERROR : %a" request_id Pgsql_io.pp_err err);
         Abb.Future.return (Error `Error)
 
-  let store_dirspaceflows ~request_id ~base_ref ~branch_ref ~lock_policy db repo dirspaceflows =
+  let store_dirspaceflows ~request_id ~base_ref ~branch_ref db repo dirspaceflows =
     let id = CCInt64.of_int (Api.Repo.id repo) in
     let run =
       Abbs_future_combinators.List_result.iter
@@ -1338,7 +1338,7 @@ module Db = struct
                      let module Dfwf = Terrat_change.Dirspaceflow.Workflow in
                      let module Wf = Terrat_base_repo_config_v1.Workflows.Entry in
                      CCOption.map_or
-                       ~default:lock_policy
+                       ~default:Terrat_base_repo_config_v1.Workflows.Entry.Lock_policy.Strict
                        (fun { Dfwf.workflow = { Wf.lock_policy; _ }; _ } -> lock_policy)
                        workflow)
                    dirspaceflows)

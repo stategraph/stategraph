@@ -849,7 +849,6 @@ module View : sig
     hooks : Hooks.t; [@default Hooks.make ()]
     indexer : Indexer.t; [@default Indexer.make ()]
     integrations : Integrations.t; [@default Integrations.make ()]
-    lock_policy : Workflows.Entry.Lock_policy.t; [@default Workflows.Entry.Lock_policy.Strict]
     notifications : Notifications.t; [@default Notifications.make ()]
     parallel_runs : int; [@default 3]
     stacks : Stacks.t; [@default Stacks.make ()]
@@ -957,7 +956,6 @@ val engine : 'a t -> Engine.t
 val hooks : 'a t -> Hooks.t
 val indexer : 'a t -> Indexer.t
 val integrations : 'a t -> Integrations.t
-val lock_policy : 'a t -> Workflows.Entry.Lock_policy.t
 val notifications : 'a t -> Notifications.t
 val parallel_runs : 'a t -> int
 val stacks : 'a t -> Stacks.t

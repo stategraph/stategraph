@@ -257,7 +257,6 @@ export default defineConfig({
                 { label: "hooks", link: "/reference/configuration/hooks" },
                 { label: "ignore-patterns", link: "/reference/configuration/ignore-patterns" },
                 { label: "indexer", link: "/reference/configuration/indexer" },
-                { label: "lock-policy", link: "/reference/configuration/lock-policy" },
                 { label: "notifications", link: "/reference/configuration/notifications" },
                 { label: "parallel-runs", link: "/reference/configuration/parallel-runs" },
                 { label: "stacks", link: "/reference/configuration/stacks" },

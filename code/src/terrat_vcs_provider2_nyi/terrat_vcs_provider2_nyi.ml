@@ -29,7 +29,7 @@ module Db = struct
   let store_repo_tree ~request_id db account ref_ files = raise (Failure "nyi")
   let store_flow_state ~request_id db work_manifest_id state = raise (Failure "nyi")
 
-  let store_dirspaceflows ~request_id ~base_ref ~branch_ref ~lock_policy db repo dirspaceflows =
+  let store_dirspaceflows ~request_id ~base_ref ~branch_ref db repo dirspaceflows =
     raise (Failure "nyi")
 
   let store_tf_operation_result ~request_id db work_manifest_id result = raise (Failure "nyi")

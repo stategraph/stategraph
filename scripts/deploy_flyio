@@ -2,7 +2,7 @@
 set -euf -o pipefail
 
 IMAGE_NAME="terrat-ee"
-GHCR_IMAGE="ghcr.io/terrateamio/${IMAGE_NAME}:${VERSION_TAG}"
+GHCR_IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}"
 FLY_APP_PREFIX="${FLY_APP_PREFIX:-terrateam-app}"
 
 flyctl deploy --strategy canary --access-token "${FLY_API_TOKEN}" --image "${GHCR_IMAGE}" -a "${FLY_APP_PREFIX}-${TERRATEAM_ENVIRONMENT}"

@@ -24,7 +24,7 @@ workflows:
 | --- | --- | --- |
 | environment | String | The GitHub Environment to associate the workflow with. Default is null. |
 | runs_on | Object | Object describing the runs-on configuration.  Default is `ubuntu-latest`. |
-| lock_policy | String | When the directory should have a lock acquired. Values are strict (acquire a lock if either it is merged or applied), apply (only acquire a lock when it is applied), merge (only acquire a lock when it is merged), and none (never acquire a lock). Defaults to the top-level [lock_policy](/reference/configuration/lock-policy), which itself defaults to strict. |
+| lock_policy | String | When the directory should have a lock acquired. Values are strict (acquire a lock if either it is merged or applied), apply (only acquire a lock when it is applied), merge (only acquire a lock when it is merged), and none (never acquire a lock). Default is strict. |
 
 ### Tag Query
 A [tag query](/advanced-workflows/tags) is a list of all tags that must be present in a tag set to match the workflow.
@@ -34,7 +34,7 @@ Each `tag_query` consists of a map with the following attributes:
 | plan | `plan` | `plan` steps. |
 | apply | `apply` | `apply` steps. |
 | terragrunt | Boolean | Override the `terraform` command with `terragrunt`. Default is `false`. |
-| lock_policy | String | When the directory should have a lock acquired. Values are `strict` (acquire a lock if either it is merged or applied), `apply` (only acquire a lock when it is applied), `merge` (only acquire a lock when it is merged), and `none` (never acquire a lock). Defaults to the top-level [`lock_policy`](/reference/configuration/lock-policy), which itself defaults to `strict`. |
+| lock_policy | String | When the directory should have a lock acquired. Values are `strict` (acquire a lock if either it is merged or applied), `apply` (only acquire a lock when it is applied), `merge` (only acquire a lock when it is merged), and `none` (never acquire a lock). Default is `strict`. |
 | engine | [Engine](/reference/configuration/engine) | Configuration to override which engine to use for operations. |
 | environment | String | GitHub environment to use for the operation. Default is `null`. |
 :::note

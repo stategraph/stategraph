@@ -1,18 +1,7 @@
--- The commit the current work manifest ran against.  Carried forward output
--- produced against a different commit describes code that is no longer in the
--- pull request, and any plan in it cannot be applied (an apply against it fails
--- the valid-plan check with "missing plans"), so it is not rendered.
-with current_commit as (
-  select
-    wm.sha,
-    wm.base_sha
-  from work_manifests wm
-  where wm.id = $work_manifest
-),
--- This CTE selects only the dirspaces which
+-- This CTE selects only the dirspaces which 
 -- changed in the current work manifest
 -- provided by Terrateam's server.
-currently_changed_dirspaces as (
+with currently_changed_dirspaces as (
   select
     cd.path as dir,
     cd.workspace
@@ -93,14 +82,6 @@ left join applied_dirspaces ad on (
         gwmc.dir = ad.dir
     and gwmc.workspace = ad.workspace
 )
-cross join current_commit cc
 where
     gwmc.comment_id = $comment_id
-    -- Output from the current commit is always shown.  Output from an earlier
-    -- commit is only kept when it records an apply that already happened, which
-    -- renders with the "Already applied" marker rather than as pending work.
-    and (
-        (wm.sha = cc.sha and wm.base_sha = cc.base_sha)
-        or coalesce(ad.applied_at > wm.created_at, false)
-    )
 order by wso.idx

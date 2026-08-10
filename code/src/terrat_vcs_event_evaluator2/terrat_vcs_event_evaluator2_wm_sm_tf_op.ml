@@ -365,7 +365,6 @@ struct
               ~request_id:(Builder.log_id s)
               ~base_ref:dest_branch_ref
               ~branch_ref
-              ~lock_policy:(Terrat_base_repo_config_v1.lock_policy repo_config)
               db
               repo
               all_dirspaceflows))

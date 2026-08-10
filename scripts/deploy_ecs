@@ -6,7 +6,7 @@ export AWS_PAGER=""
 CLUSTER_NAME="terrateam-app"
 SERVICE_NAME="terrateam-app-service"
 IMAGE_NAME="terrat-ee"
-GHCR_IMAGE="ghcr.io/terrateamio/${IMAGE_NAME}:${VERSION_TAG}"
+GHCR_IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}"
 
 # Fetch the current service information
 aws ecs describe-services --cluster "$CLUSTER_NAME" --services "$SERVICE_NAME" > service.json
