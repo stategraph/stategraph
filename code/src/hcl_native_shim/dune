@@ -5,4 +5,5 @@
   go.mod
   go.sum)
  (action
-  (run go build -o %{target} .)))
+  ; -buildvcs=false avoids "go" to do a git operation, that fails because of dubious ownership
+  (run go build -buildvcs=false -o %{target} .)))
