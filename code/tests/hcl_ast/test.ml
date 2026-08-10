@@ -275,6 +275,36 @@ let tofu_parity_skipped_fixtures =
     "ghfail_zheli_harmony-cloudwatch-synthetic-canary-scripts__terraform__expected_results_bad.hcl";
   ]
 
+(* The tag every test in this group carries, so a build that deliberately ships no
+   OpenTofu can turn the whole group off with
+   [OTH_EXCLUDE_TAGS=HCL_AST_TESTS_NEEDING_TOFU] instead of carrying known-red tests.
+   The terrateam image does exactly that. *)
+let tofu_tag = "HCL_AST_TESTS_NEEDING_TOFU"
+
+(* [tofu fmt] is the ground truth this group compares the shim against, so its
+   absence is a broken environment, not a verdict -- and [Sys.command] cannot tell
+   the two apart.
+
+   Probed once and memoised, and [lazy] rather than eager so the probe only fires if a
+   test in this group actually runs. *)
+let tofu_missing_msg =
+  Printf.sprintf
+    "[tofu] is not on PATH, so [tofu fmt] cannot provide the reference verdict the tofu_fmt_parity \
+     group compares the shim against. Install OpenTofu, or exclude the group with \
+     OTH_EXCLUDE_TAGS=%s."
+    tofu_tag
+
+let tofu_available =
+  lazy
+    (match Sys.command "command -v tofu >/dev/null 2>&1" with
+    | 0 -> true
+    | _ ->
+        prerr_endline ("hcl_ast tests: " ^ tofu_missing_msg);
+        false)
+
+let assert_tofu_available () =
+  if not (Lazy.force tofu_available) then Oth.Assert.false_ tofu_missing_msg
+
 (* [run_tofu_fmt content] writes [content] to a temp [.tf] file (tofu only
    accepts [.tf] / [.tfvars] / [.tftest.hcl] extensions) and runs
    [tofu fmt -write=false] on it. The [-write=false] flag tells tofu not to
@@ -303,7 +333,8 @@ let run_tofu_fmt content =
    independently. *)
 let make_tofu_parity_test path =
   let name = "tofu_fmt_parity: " ^ Filename.basename path in
-  Oth.test ~name (fun _ ->
+  Oth.test ~tags:[ tofu_tag ] ~name (fun _ ->
+      assert_tofu_available ();
       let contents = CCIO.with_in path CCIO.read_all in
       let chunks = CCString.split ~by:"\n---\n" contents in
       CCList.iteri

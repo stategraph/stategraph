@@ -105,8 +105,11 @@ RUN eval $(opam env) && cd mono/code && \
 # [[[cog emit("ocamlformat") ]]]
 RUN eval $(opam env) && opam pin add -y ocamlformat 0.29.0
 # [[[end]]]
+# OTH_EXCLUDE_TAGS: the hcl_ast `tofu_fmt_parity` group checks our HCL parser
+# against `tofu fmt` as its ground truth. This image deliberately does
+# not ship OpenTofu, so skip that group by tag.
 RUN eval $(opam env) && cd /tmp/mono && \
-    make -C code test-terrat terrat && \
+    OTH_EXCLUDE_TAGS=HCL_AST_TESTS_NEEDING_TOFU make -C code test-terrat terrat && \
     mv _build /build-cache
 
 # Use provided BASE_IMAGE if specified, otherwise use the build-base stage
