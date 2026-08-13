@@ -1,1 +1,3 @@
-(dirs code api_schemas)
+(dirs code api_schemas docker)
+
+(data_only_dirs docker)
