@@ -44,6 +44,10 @@ module type ASSERT = sig
   (** Asserts that the value is [true], otherwise fails the test displaying [msg]. *)
   val true_ : string -> bool -> unit
 
+  (** Asserts that the value is [false], otherwise fails the test displaying [msg]. Distinct from
+      {!false_}, which asserts nothing and always fails: this one takes the value to check. *)
+  val not_true : string -> bool -> unit
+
   (** Fails the test, displaying [msg] *)
   val false_ : string -> 'a
 
