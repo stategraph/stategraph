@@ -60,7 +60,7 @@ test-terrat:
 # the mechanism is purely a matter of editing its own dune file.
 #
 # This target just clears the previous output and dune directory target per pair
-# (promote-into does not delete modules the generator no longer produces, and
+# (promote-into does not delete files the generator no longer produces, and
 # dropping the target forces dune to re-run the promote rule on a warm tree),
 # then asks dune to regenerate + re-normalise everything via the alias in a
 # single invocation -- concurrent dune processes abort on dune's global build
@@ -71,7 +71,7 @@ generate-api-types:
 	cd $(ROOT) && $(DUNE) build code/codegen-manifest
 	@while read input dest; do \
 	  echo "regenerating $$dest from $$input"; \
-	  rm -f "$(ROOT)/$$dest"/*.ml; \
+	  rm -f "$(ROOT)/$$dest"/*.ml "$(ROOT)/$$dest"/*.sql; \
 	  rm -rf "$(ROOT)/_build/default/$$dest/gen"; \
 	done < $(CODEGEN_MANIFEST)
 	cd $(ROOT) && $(DUNE) build @code/generate-api-types
