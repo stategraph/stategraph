@@ -12,9 +12,10 @@ val of_yaml_string : string -> (Yojson.Safe.t, [> of_yaml_string_err ]) result
     - If a key is in [base] and [override] and has a scalar type, the value from [override] is
       taken.
 
-    - If a key is in [base] and [override] and it is a list then the items from [override] are
-      prepended to the items in [base]. If [~list_append:true] is passed, items from [override] are
-      appended instead.
+    - If a key is in [base] and [override] and it is a list, the two lists are concatenated as
+      directed by [~list]: [`Prepend] (the default) puts the items from [override] before the items
+      in [base]; [`Append] puts them after. Concatenation never deduplicates, so the same entry
+      arriving from two merged layers appears twice in the result.
 
     - If a key is in [base] and [override] and it is a dictionary, [merge] is recursively applied.
 
@@ -30,7 +31,7 @@ val of_yaml_string : string -> (Yojson.Safe.t, [> of_yaml_string_err ]) result
     Note that no deep merging of lists is performed. *)
 val merge :
   ?null_is_identity:bool ->
-  ?list_append:bool ->
+  ?list:[ `Prepend | `Append ] ->
   base:Yojson.Safe.t ->
   Yojson.Safe.t ->
   (Yojson.Safe.t, [> merge_err ]) result
