@@ -22,7 +22,7 @@
     "download-icons": "python3 scripts/download-icons.py"
   },
   "devDependencies": {
-    "@sveltejs/vite-plugin-svelte": "^3.0.0",
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "@tsconfig/svelte": "^5.0.4",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.0.7",
@@ -30,19 +30,19 @@
     "knip": "^5.61.3",
     "openapi-typescript": "^7.8.0",
     "postcss": "^8.4.32",
-    "svelte": "^4.0.5",
-    "svelte-check": "^4.2.2",
+    "svelte": "^5.56.9",
+    "svelte-check": "^4.7.6",
     "svelte-preprocess": "^6.0.3",
     "tailwindcss": "^3.3.6",
     "typescript": "^5.8.3",
-    "vite": "^5.4.21"
+    "vite": "^8.2.1"
   },
   "dependencies": {
     "@sentry/svelte": "^9.33.0",
     "highlight.js": "^11.11.1",
     "js-yaml": "^4.1.1",
     "posthog-js": "^1.257.0",
-    "svelte-spa-router": "^4.0.1",
+    "svelte-spa-router": "^5.1.1",
     "zod": "^3.25.67"
   }
 }

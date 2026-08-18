@@ -1,4 +1,5 @@
 import './app.css'
+import { mount } from 'svelte'
 import App from './App.svelte'
 
 // Helper function to get distinct ID from URL
@@ -27,7 +28,7 @@ function checkMaintenanceMode() {
 const isMaintenanceMode = checkMaintenanceMode();
 if (isMaintenanceMode) {
   // Start app immediately without Sentry or other initialization
-  const app = new App({
+  const app = mount(App, {
     target: document.getElementById('app'),
   });
 } else {
@@ -195,7 +196,7 @@ initializeAnalytics().then(async () => {
   // Also initialize the Sentry service reference
   const { initSentryReference } = await import('./lib/sentry.ts');
   await initSentryReference();
-  const app = new App({
+  const app = mount(App, {
     target: document.getElementById('app'),
   })
 
