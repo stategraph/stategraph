@@ -91,10 +91,12 @@ jobs:
 
       - name: Extract branch name and commit
         id: branch
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BRANCH_NAME=$(echo ${{ github.head_ref }} | sed 's/[^a-zA-Z0-9._-]/-/g')
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            BRANCH_NAME=$(printf '%s' "$HEAD_REF" | sed 's/[^a-zA-Z0-9._-]/-/g')
           else
             BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/} | sed 's/[^a-zA-Z0-9._-]/-/g')
           fi
