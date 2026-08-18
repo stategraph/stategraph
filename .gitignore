@@ -75,3 +75,6 @@ scripts/monorepo/copy.bara.sky.bak
 /diagnostics-analysis.md
 /facts.md
 /facts.json
+
+# Slide decks are not shipped; do not pin their transitive trees (see #1857)
+presentations/*/package-lock.json
