@@ -83,51 +83,9 @@ jobs:
           sarif_file: trivy.sarif
           category: trivy-${{ matrix.image }}
 
-  # A scan nobody reads is not a control. Scheduled-workflow failure emails go only
-  # to whoever last touched the cron line, which is not a dependable alerting path.
-  # So a failure opens (or updates) a tracking issue: no secrets needed, identical
-  # in every repo, and the issue is itself the record that a finding was detected
-  # and acted on. Alerting is wired off these issues separately.
-  notify-failure:
-    name: Open tracking issue
-    needs: scan
-    if: failure() && github.event_name == 'schedule'
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      issues: write
-    steps:
-      - name: Open or update the tracking issue
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          TITLE='Container scan: fixable HIGH/CRITICAL vulnerabilities in shipped images'
-          # Best-effort label so a missing label can never fail the alert itself.
-          gh label create container-scan --repo "$REPO" --color d73a4a \
-            --description 'Automated container image vulnerability scan findings' >/dev/null 2>&1 || true
-          EXISTING=$(gh issue list --repo "$REPO" --state open \
-            --search "\"$TITLE\" in:title" --json number --jq '.[0].number // empty')
-          if [ -n "$EXISTING" ]; then
-            gh issue comment "$EXISTING" --repo "$REPO" \
-              --body "Still failing on the scheduled run of $(date -u '+%Y-%m-%d %H:%M UTC'). $RUN_URL"
-            echo "Updated existing issue #$EXISTING"
-            exit 0
-          fi
-          # printf, not a heredoc: heredoc lines inside a YAML block scalar must stay
-          # indented, and that indentation would turn the body into a code block.
-          printf '%s\n' \
-            'The weekly container image scan found HIGH or CRITICAL vulnerabilities **with a fix available** in at least one image we ship.' \
-            '' \
-            "Run: $RUN_URL" \
-            '' \
-            'Per the Vulnerability Management Policy, remediation timelines run from confirmation. Triage the findings in the run output, then either bump the affected package / base image or record an explicit risk acceptance with justification.' \
-            '' \
-            'This issue is reused by later runs rather than reopened weekly, so it stays one thread until the scan is green. Close it once the scan passes.' \
-            > /tmp/scan-issue-body.md
-          gh issue create --repo "$REPO" --title "$TITLE" --label container-scan \
-            --body-file /tmp/scan-issue-body.md >/dev/null
-          echo "Opened a new tracking issue"
+# NOTE: deliberately NO issue-creating notify job here, unlike stategraph/mono.
+# This repo is public: an issue titled "fixable HIGH/CRITICAL vulnerabilities in
+# shipped images" -- and the public workflow-run logs it links to -- would disclose
+# unfixed vulnerabilities in released customer images. Findings go to code scanning
+# via the SARIF upload above instead, which is visible only to users with write,
+# maintain or admin access (and org owners), not to the public.
