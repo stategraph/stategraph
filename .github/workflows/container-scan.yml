@@ -1,0 +1,84 @@
+# Scan the released Terrateam images for known OS/library vulnerabilities.
+#
+# These are the images customers actually run, published by release.yml to
+# ghcr.io/terrateamio/{code-indexer,terrat-ee,terrat-oss,ttm}. A vulnerable layer
+# here ships to every self-hosted deployment.
+#
+# Scans PUBLISHED tags on a schedule rather than at build time: the point of
+# container scanning is catching advisories disclosed *after* an image was built,
+# which a build-time-only scan never sees. The per-PR *-dev images under the
+# stategraph org are ephemeral branch builds and are deliberately not scanned.
+#
+# NOTE: this file is listed in copybara's PUBLIC_OWNED (scripts/monorepo/copy.bara.sky
+# in stategraph/mono). Without that entry the monorepo export would DELETE it,
+# because copybara owns the whole public tree. If you rename or move this file,
+# update PUBLIC_OWNED in the same change.
+name: container scan
+
+on:
+  schedule:
+    # Mondays 06:30 UTC — offset from the mono and action scans.
+    - cron: '30 6 * * 1'
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - "main"
+    paths:
+      - 'docker/terrat/Dockerfile'
+      - '.github/workflows/container-scan.yml'
+
+jobs:
+  scan:
+    name: ${{ matrix.image }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        # The four release targets from release.yml, at :latest.
+        image:
+          - ghcr.io/terrateamio/terrat-oss:latest
+          - ghcr.io/terrateamio/terrat-ee:latest
+          - ghcr.io/terrateamio/ttm:latest
+          - ghcr.io/terrateamio/code-indexer:latest
+
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ignore-unfixed: a vulnerability with no upstream fix is not actionable by
+      # us, and failing on it would keep this check permanently red -- which trains
+      # everyone to ignore it. Unfixed findings still reach the Security tab below.
+      - name: Trivy scan (fail on fixable HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ matrix.image }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          format: table
+
+      - name: Trivy scan (full SARIF, all severities)
+        if: always()
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ matrix.image }}
+          scanners: vuln
+          format: sarif
+          output: trivy.sarif
+          exit-code: '0'
+
+      - name: Upload to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy.sarif
+          category: trivy-${{ matrix.image }}
