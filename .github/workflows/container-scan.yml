@@ -82,3 +82,28 @@ jobs:
         with:
           sarif_file: trivy.sarif
           category: trivy-${{ matrix.image }}
+
+  # A scan nobody reads is not a control. Scheduled-workflow failure emails go only
+  # to whoever last touched the cron line, which is not a dependable alerting path.
+  # SARIF lands in the Security tab, but nothing pushes it at anyone.
+  notify-failure:
+    name: Notify on scan failure
+    needs: scan
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-22.04
+    # This repo has no repo-level secrets: the only Slack webhook is
+    # SLACK_WEBHOOK_URL in the `production` environment, so the job has to declare
+    # that environment to read it. Verified `production` carries no protection
+    # rules, so this does not sit waiting for a reviewer. (mono uses a repo-level
+    # SLACK_ENGINEERING_WEBHOOK_URL instead -- the two repos differ here.)
+    environment: production
+    timeout-minutes: 3
+    steps:
+      - uses: slackapi/slack-github-action@v4
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": ":rotating_light: Container scan found fixable HIGH/CRITICAL vulnerabilities in a RELEASED customer image. ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
