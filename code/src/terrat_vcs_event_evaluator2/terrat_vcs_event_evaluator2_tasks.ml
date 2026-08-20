@@ -497,6 +497,22 @@ struct
                   | layer -> Some layer)
                 all_matches
             in
+            let unapplied_dirspaces =
+              all_unapplied_matches
+              |> CCList.flat_map (fun layer ->
+                  CCList.map (fun { Dc.dirspace; _ } -> dirspace) layer)
+              |> Terrat_data.Dirspace_set.of_list
+            in
+            let working_layer =
+              all_matches
+              |> CCList.filter (fun layer ->
+                  CCList.exists
+                    (fun { Dc.dirspace; _ } ->
+                      Terrat_data.Dirspace_set.mem dirspace unapplied_dirspaces)
+                    layer)
+              |> CCList.head_opt
+              |> CCOption.get_or ~default:[]
+            in
             let working_set_matches =
               match all_unapplied_matches with
               | layer :: _ -> (
@@ -544,6 +560,17 @@ struct
                        *)
                       CCList.filter (Terrat_change_match3.match_tag_query ~tag_query)
                       @@ CCList.flatten all_matches
+                  | Tjc.Job.Type_.Plan _
+                    when not (CCString.is_empty (Terrat_tag_query.to_string tag_query)) ->
+                      (* An explicit query names what the user wants planned.  A
+                         dirspace whose last plan found no changes is filtered out
+                         of the unapplied set, which made a scoped re-plan
+                         impossible: the working set came up empty and the user
+                         was told everything was applied.  Select from the working
+                         layer instead, applied or not, the same reasoning as the
+                         drift arm above.  Later layers stay excluded so plan
+                         ordering is preserved. *)
+                      CCList.filter (Terrat_change_match3.match_tag_query ~tag_query) working_layer
                   | Tjc.Job.Type_.Autoplan
                   | Tjc.Job.Type_.Plan _
                   | Tjc.Job.Type_.Gate_approval _
@@ -553,28 +580,22 @@ struct
                   | Tjc.Job.Type_.Unlock _
                   | Tjc.Job.Type_.Push ->
                       CCList.filter (Terrat_change_match3.match_tag_query ~tag_query) layer)
-              | [] -> []
+              | [] -> (
+                  (* Nothing is unapplied.  An explicit query is still a request:
+                     everything it names has been applied or planned clean, so
+                     re-planning any of it cannot violate layer ordering. *)
+                  match job.Tjc.Job.type_ with
+                  | Tjc.Job.Type_.Plan { tag_query = _; kind = None }
+                    when not (CCString.is_empty (Terrat_tag_query.to_string tag_query)) ->
+                      CCList.filter
+                        (Terrat_change_match3.match_tag_query ~tag_query)
+                        (CCList.flatten all_matches)
+                  | _ -> [])
             in
             let all_tag_query_matches =
               CCList.map
                 (CCList.filter (Terrat_change_match3.match_tag_query ~tag_query))
                 all_matches
-            in
-            let unapplied_dirspaces =
-              all_unapplied_matches
-              |> CCList.flat_map (fun layer ->
-                  CCList.map (fun { Dc.dirspace; _ } -> dirspace) layer)
-              |> Terrat_data.Dirspace_set.of_list
-            in
-            let working_layer =
-              all_matches
-              |> CCList.filter (fun layer ->
-                  CCList.exists
-                    (fun { Dc.dirspace; _ } ->
-                      Terrat_data.Dirspace_set.mem dirspace unapplied_dirspaces)
-                    layer)
-              |> CCList.head_opt
-              |> CCOption.get_or ~default:[]
             in
             Abbs_future_combinators.return_ok
               ( working_set_matches,
