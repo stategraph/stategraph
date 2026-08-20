@@ -1071,7 +1071,7 @@ struct
                   in
                   fetch Keys.publish_comment
                   >>= fun publish_comment ->
-                  let msg =
+                  let msg, all_changes_applied =
                     match
                       ( CCList.flatten all_matches,
                         CCList.flatten all_tag_query_matches,
@@ -1079,28 +1079,39 @@ struct
                     with
                     | [], _, _ ->
                         (* Nothing in the pull request to plan in the first place. *)
-                        Msg.Plan_no_matching_dirspaces tag_query
+                        (Msg.Plan_no_matching_dirspaces tag_query, false)
                     | _ :: _, [], _ ->
                         (* The query selected none of what is there.  This is where
                            the implicit and hint earns its keep. *)
-                        Msg.Plan_no_matching_dirspaces tag_query
+                        (Msg.Plan_no_matching_dirspaces tag_query, false)
                     | _ :: _, _ :: _, [] ->
                         (* The query selected something, and all of it has already
                            been applied. *)
-                        Msg.Plan_all_changes_applied
+                        (Msg.Plan_all_changes_applied, true)
                     | _ :: _, _ :: _, (_ :: _ as queued) ->
                         (* The query matches something unapplied, it is just not in
                            the layer that runs next.  Naming what it is waiting on
                            is the only answer that is not a riddle. *)
-                        Msg.Matches_in_later_layer
-                          (CCList.map
-                             (fun { Terrat_change_match3.Dirspace_config.dirspace; _ } -> dirspace)
-                             queued)
+                        ( Msg.Matches_in_later_layer
+                            (CCList.map
+                               (fun { Terrat_change_match3.Dirspace_config.dirspace; _ } ->
+                                 dirspace)
+                               queued),
+                          false )
                   in
                   Fc.Result.all2
                     (fetch Keys.maybe_create_completed_apply_check)
                     (publish_comment' publish_comment msg)
-                  >>= fun ((), ()) -> Abbs_future_combinators.return_err `Noop
+                  >>= fun ((), ()) ->
+                  (* Everything the query matched is applied, so automerge is the
+                     only work left.  The completion path that usually runs it is
+                     only reached by a job that had dirspaces to run, so without
+                     this a pull request whose automerge failed once can never be
+                     merged by any later command.  The no-match cases are left
+                     alone: a mistyped tag query must not merge a pull request. *)
+                  (if all_changes_applied then fetch Keys.maybe_automerge
+                   else Abbs_future_combinators.return_ok ())
+                  >>= fun () -> Abbs_future_combinators.return_err `Noop
               | _ :: _ ->
                   fetch Keys.repo
                   >>= fun repo ->
@@ -1143,6 +1154,8 @@ struct
               fetch Keys.working_set_matches
               >>= function
               | [] ->
+                  fetch Keys.all_tag_query_matches
+                  >>= fun all_tag_query_matches ->
                   fetch Keys.all_unapplied_matches
                   >>= fun all_unapplied_matches ->
                   let unapplied_matching_query =
@@ -1152,20 +1165,31 @@ struct
                   in
                   fetch Keys.publish_comment
                   >>= fun publish_comment ->
-                  let msg =
-                    match unapplied_matching_query with
-                    | [] ->
-                        (* Nothing matching is pending apply, either because
-                           nothing matched or because all of it is applied, which
-                           is what this message says. *)
-                        Msg.Apply_no_matching_dirspaces tag_query
-                    | _ :: _ as queued ->
-                        Msg.Matches_in_later_layer
-                          (CCList.map
-                             (fun { Terrat_change_match3.Dirspace_config.dirspace; _ } -> dirspace)
-                             queued)
+                  let msg, all_changes_applied =
+                    match (CCList.flatten all_tag_query_matches, unapplied_matching_query) with
+                    | [], _ ->
+                        (* The query matched nothing, so there is nothing this
+                           command could have applied. *)
+                        (Msg.Apply_no_matching_dirspaces tag_query, false)
+                    | _ :: _, [] ->
+                        (* The query matched, and all of it is applied, which is
+                           what this message says. *)
+                        (Msg.Apply_no_matching_dirspaces tag_query, true)
+                    | _ :: _, (_ :: _ as queued) ->
+                        ( Msg.Matches_in_later_layer
+                            (CCList.map
+                               (fun { Terrat_change_match3.Dirspace_config.dirspace; _ } ->
+                                 dirspace)
+                               queued),
+                          false )
                   in
                   publish_comment' publish_comment msg
+                  >>= fun () ->
+                  (* Same reason as [check_dirspaces_to_plan]: an explicit apply
+                     over dirspaces that are all applied is how a user retries a
+                     failed automerge, so it has to reach the automerge logic. *)
+                  (if all_changes_applied then fetch Keys.maybe_automerge
+                   else Abbs_future_combinators.return_ok ())
                   >>= fun () -> Abbs_future_combinators.return_err `Noop
               | _ :: _ -> Abbs_future_combinators.return_ok ())
           | _ -> Abbs_future_combinators.return_ok ())

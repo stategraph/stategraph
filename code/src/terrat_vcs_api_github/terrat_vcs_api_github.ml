@@ -898,8 +898,16 @@ let merge_pull_request' ?(retain_pr_title = false) request_id client pull_reques
     err -> Abbs_future_combinators.return_err err
 
 let merge_pull_request ~request_id ?retain_pr_title client pull_request merge_strategy =
-  let num_tries = 3 in
-  let sleep_time = Duration.(to_f (of_sec 2)) in
+  (* GitHub can still report a required status check as pending for a while after
+     the check has been set, so a merge that is going to succeed refuses the first
+     attempts.  A flat two second sleep gave that about eight seconds end to end,
+     short enough that ordinary propagation exhausted it and the pull request was
+     left unmerged with every check green.  Back off the way the rest of the
+     GitHub calls do, which measures at about fifty seconds against a real repo.
+     The cost is that a merge failing for a settled reason, a missing review say,
+     takes that long to be reported, which is the cheaper of the two mistakes.
+     Note [finite_tries] permits one attempt more than the count it is given. *)
+  let num_tries = 6 in
   Abbs_future_combinators.retry
     ~f:(fun () ->
       let open Abb.Future.Infix_monad in
@@ -928,7 +936,8 @@ let merge_pull_request ~request_id ?retain_pr_title client pull_request merge_st
       (Abbs_future_combinators.finite_tries num_tries (function
         | Error (`Merge_err _) -> true
         | Ok _ | Error _ -> false))
-    ~betwixt:(fun _ -> Abb.Sys.sleep sleep_time)
+    ~betwixt:
+      (Abbs_future_combinators.series ~start:1.5 ~step:(( *. ) 1.5) (fun n _ -> Abb.Sys.sleep n))
 
 let delete_branch' request_id client repo branch =
   let open Abbs_future_combinators.Infix_result_monad in

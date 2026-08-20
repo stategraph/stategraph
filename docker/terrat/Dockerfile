@@ -115,17 +115,24 @@ RUN eval $(opam env) && cd /tmp/mono && \
 # Use provided BASE_IMAGE if specified, otherwise use the build-base stage
 FROM ${BASE_IMAGE:-build-base} AS build-setup
 
-# Refresh source files on top of the (possibly prebuilt) base image. We do NOT
-# wipe /tmp/mono first: the base already carries a built tree, and COPY just
-# overlays changed sources so the incremental `make` below stays incremental.
+# Refresh source files on top of the (possibly prebuilt) base image.  The tree
+# is wiped first: overlaying sources on the base's tree and reusing its _build
+# produced hybrid binaries mixing object files from different tree states
+# (#1733).  The base still pays for what it is good for -- the opam switch and
+# system deps -- but every release compiles from exactly the checkout.
+RUN rm -rf /tmp/mono
 COPY ./ /tmp/mono
 
-# Single build stage restore the warm _build from build-base and
-# run the one `make -C code terrat` invocation,
-# the same invocation docker/stategraph/Dockerfile uses.
+# Single clean `make -C code terrat` invocation, the same invocation
+# docker/stategraph/Dockerfile uses.  GIT_SHA, when given, is stamped into the
+# binary via Terrat_build_info so a shipped image can be verified against the
+# source it claims to be built from.
 FROM build-setup AS terrat-build
+ARG GIT_SHA=""
 WORKDIR /tmp/mono
-RUN mv /build-cache ./_build && \
+RUN if [ -n "$GIT_SHA" ]; then \
+      printf 'let sha = "%s"\n' "$GIT_SHA" > code/src/terrat_build_info/terrat_build_info.ml; \
+    fi && \
     eval $(opam env) && \
     make -C code terrat
 

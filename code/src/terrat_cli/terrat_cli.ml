@@ -306,7 +306,7 @@ struct
     Cmdline.[ server_cmd server; migrate_cmd migrate; generate_auth_token_cmd generate_auth_token ]
 
   let () =
-    Printf.eprintf "Starting Terrateam Server CLI\n%!";
+    Printf.eprintf "Starting Terrateam Server CLI (build %s)\n%!" Terrat_build_info.sha;
     Mirage_crypto_rng_unix.use_default ();
     let info = Cmdliner.Cmd.info "terrat" in
     exit @@ Cmdliner.Cmd.eval @@ Cmdliner.Cmd.group ~default:Cmdline.default_cmd info cmds
