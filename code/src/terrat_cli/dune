@@ -1,3 +1,3 @@
 (library
  (name terrat_cli)
- (libraries logs.threaded terrat terrat_github))
+ (libraries logs.threaded terrat terrat_build_info terrat_github))
