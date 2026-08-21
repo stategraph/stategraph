@@ -1,0 +1,8 @@
+(test
+ (name test)
+ (libraries
+  containers
+  minijinja
+  oth
+  terrat_vcs_gitlab_comment_templates
+  yojson))
