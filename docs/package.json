@@ -12,13 +12,13 @@
   },
   "dependencies": {
     "@astrojs/check": "^0.9.3",
-    "@astrojs/starlight": "^0.36.2",
+    "@astrojs/starlight": "^0.41.7",
     "@expressive-code/plugin-line-numbers": "^0.35.6",
     "@fontsource/roboto": "^5.0.14",
-    "astro": "^5.18.1",
+    "astro": "^7.2.4",
     "playwright": "^1.56.1",
     "rehype-mermaid": "^3.0.0",
-    "sharp": "^0.32.5",
+    "sharp": "^0.35.0",
     "starlight-image-zoom": "^0.7.0",
     "typescript": "^5.5.4"
   }
