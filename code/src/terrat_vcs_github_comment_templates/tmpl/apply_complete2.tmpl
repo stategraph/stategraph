@@ -16,12 +16,12 @@
   {%- if account_status == 'trial_ending' %}
 
 > [!WARNING]
-> Your Terrateam trial ends in **{{ trial_end_days }} days**.  To avoid an interruption in service, please reach out to support@terrateam.io or contact us on [our Slack](https://terrateam.io/slack).
+> Your Stategraph trial ends in **{{ trial_end_days }} days**.  To avoid an interruption in service, please reach out to support@stategraph.com or contact us on [our Slack](https://stategraph.com/slack).
 
   {%- endif %}
   {%- if work_manifest_url is defined %}
 
-Outputs can be viewed in the Terrateam Console [here]({{ work_manifest_url }}).
+Outputs can be viewed in the Stategraph Console [here]({{ work_manifest_url }}).
 
   {%- endif %}
   {%- if denied_dirspaces %}
@@ -45,11 +45,11 @@ Not all [dirspaces](https://docs.terrateam.io/getting-started/concepts/#dirspace
 
 
 > [!IMPORTANT]
-> Any workspaces in the next layer that have autoplan enabled will be automatically be planned. Comment `terrateam plan` to explicitly plan the next layer.
+> Any workspaces in the next layer that have autoplan enabled will be automatically be planned. Comment `stategraph plan` to explicitly plan the next layer.
 
   {%- endif %}
 
-## Terrateam Apply Output{% if environment is defined %}: {{ environment }}{% endif %} :white_check_mark:
+## Stategraph Apply Output{% if environment is defined %}: {{ environment }}{% endif %} :white_check_mark:
 <details>
   <summary>Expand for apply output details</summary>
 
@@ -71,13 +71,13 @@ Not all [dirspaces](https://docs.terrateam.io/getting-started/concepts/#dirspace
   {%- endif %}
   {%- if work_manifest_url is defined %}
     
-Outputs can be viewed in the Terrateam Console [here]({{ work_manifest_url }}).
+Outputs can be viewed in the Stategraph Console [here]({{ work_manifest_url }}).
 
   {%- endif %}
 
-Running plans **FAILED**.  See **Terrateam Apply Output**.
+Running plans **FAILED**.  See **Stategraph Apply Output**.
 
-## Terrateam Apply Output{% if environment is defined %}: {{ environment }}{% endif %} :heavy_multiplication_x:
+## Stategraph Apply Output{% if environment is defined %}: {{ environment }}{% endif %} :heavy_multiplication_x:
 
 <details>
   <summary>Expand for apply output details</summary>

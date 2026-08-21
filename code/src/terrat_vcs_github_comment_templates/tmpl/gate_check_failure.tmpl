@@ -19,7 +19,7 @@ This pull request is blocked until  approvals are satisfied.
 | `{{ d.token }}` | {% if d.dir %}`{{ d.dir }}`{% endif %} | {% if d.workspace %}`{{ d.workspace }}`{% endif %} | {% for q in d.all_of %}`{{ q }}`{% endfor %} | {% for q in d.any_of %}`{{ q }}`{% endfor %} | {{ d.any_of_count }} |
 {%- endfor %}
 
-These gates are fulfilled by commenting `terrateam gate approve <token1> <token2> ... <tokenN>`.
+These gates are fulfilled by commenting `stategraph gate approve <token1> <token2> ... <tokenN>`.
 {%- endif %}
 {%- if approval_gates %}
 
@@ -40,7 +40,7 @@ To continue, users matching the `Required Approvers` and `Any Approvers` must ap
 To approve a gate with a token, comment the following:
 
 ```
-terrateam gate approve <token1> <token2> ... <tokenN>
+stategraph gate approve <token1> <token2> ... <tokenN>
 ```
 
 Where `<token>` is the token to be approved.
