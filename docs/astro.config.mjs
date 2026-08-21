@@ -117,17 +117,23 @@ export default defineConfig({
                 {
                   label: "AWS",
                   collapsed: true,
-                  autogenerate: { directory: "integrations/cloud-providers/aws" },
+                  items: [
+                    { autogenerate: { directory: "integrations/cloud-providers/aws" } },
+                  ],
                 },
                 {
                   label: "Google Cloud",
                   collapsed: true,
-                  autogenerate: { directory: "integrations/cloud-providers/gcp" },
+                  items: [
+                    { autogenerate: { directory: "integrations/cloud-providers/gcp" } },
+                  ],
                 },
                 {
                   label: "Azure",
                   collapsed: true,
-                  autogenerate: { directory: "integrations/cloud-providers/azure" },
+                  items: [
+                    { autogenerate: { directory: "integrations/cloud-providers/azure" } },
+                  ],
                 },
                 { label: "Other", link: "/integrations/cloud-providers/other" },
               ],

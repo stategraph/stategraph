@@ -12,7 +12,7 @@ const allPages = await getCollection('docs');
 // Filter for only pages in the current directory and exclude 'index.mdx'
 let searchPages = allPages.filter((p) => {
     // Ensure the page is within the current directory and not an 'index.mdx' file
-    return p.slug.startsWith(currentDirectory) && !p.slug.endsWith('index');
+    return p.id.startsWith(currentDirectory) && !p.id.endsWith('index');
 });
 
 // Sort pages by sidebar order or title
@@ -30,6 +30,6 @@ searchPages = searchPages.sort((a, b) => {
 ---
 <CardGrid>
   { searchPages.map((p) => (
-    <LinkCard href={'/'.concat(p.slug)} title={p.data.title} description={p.data.description}/>
+    <LinkCard href={'/'.concat(p.id)} title={p.data.title} description={p.data.description}/>
   ))}
 </CardGrid>
