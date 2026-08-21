@@ -16,7 +16,7 @@
   {%- endif %}
   {%- if account_status == 'trial_ending' %}
 > [!WARNING]
-> Your Terrateam trial ends in **{{ trial_end_days }} days**.  To avoid an interruption in service, please reach out to support@terrateam.io or contact us on [our Slack](https://terrateam.io/slack).
+> Your Stategraph trial ends in **{{ trial_end_days }} days**.  To avoid an interruption in service, please reach out to support@stategraph.com or contact us on [our Slack](https://stategraph.com/slack).
 
   {%- endif %}
   {%- if runs_limit is defined and runs_used >= runs_limit * 0.8 %}
@@ -26,7 +26,7 @@
   {%- endif %}
   {%- if work_manifest_url is defined %}
 
-Outputs can be viewed in the Terrateam Console [here]({{ work_manifest_url }}).
+Outputs can be viewed in the Stategraph Console [here]({{ work_manifest_url }}).
 
   {%- endif %}
   {%- if compact_view %}
@@ -69,7 +69,7 @@ Not all [dirspaces](https://docs.terrateam.io/getting-started/concepts/#dirspace
 | `{{ g.token }}` | {% if g.dir %}`{{ g.dir }}`{% endif %} | {% if g.workspace %}`{{ g.workspace }}`{% endif %} | {% for p in g.all_of %}`{{ p.q }}` {% endfor %} | {% for p in g.any_of %}`{{ p.q }}` {% endfor %} | {{ g.any_of_count }} |
     {%- endfor %}
 
-These gates are fulfilled by commenting `terrateam gate approve <token1> <token2> ... <tokenN>`.
+These gates are fulfilled by commenting `stategraph gate approve <token1> <token2> ... <tokenN>`.
 {%- endif %}
 {%- if approval_gates %}
 
@@ -93,7 +93,7 @@ To continue, users matching the `Required Approvers` and `Any Approvers` must ap
 To approve a gate with a token, comment the following:
 
 ```
-terrateam gate approve <token1> <token2> ... <tokenN>
+stategraph gate approve <token1> <token2> ... <tokenN>
 ```
 
 Where `<token>` is the token to be approved.
@@ -113,7 +113,7 @@ A gate is satisfied only when all conditions are met. See [documentation](https:
 
   {%- endif %}
 
-## Terrateam Plan Output{% if environment is defined %}: {{ environment }}{% endif %} :thumbsup:
+## Stategraph Plan Output{% if environment is defined %}: {{ environment }}{% endif %} :thumbsup:
 <details>
   <summary>Expand for plan output details</summary>
 
@@ -135,7 +135,7 @@ A gate is satisfied only when all conditions are met. See [documentation](https:
   {%- endif %}
   {%- if work_manifest_url is defined %}
 
-Outputs can be viewed in the Terrateam Console [here]({{ work_manifest_url }}).
+Outputs can be viewed in the Stategraph Console [here]({{ work_manifest_url }}).
 
   {%- endif %}
   {%- if compact_view %}
@@ -143,11 +143,11 @@ The plan output exceeds the size limit for pull request comments. You can view t
 
   {%- endif %}
 
-Running plans **FAILED**.  See **Terrateam Plan Output**.
+Running plans **FAILED**.  See **Stategraph Plan Output**.
 
-After resolving the issue, run `terrateam plan` to execute the plan operation again.
+After resolving the issue, run `stategraph plan` to execute the plan operation again.
 
-## Terrateam Plan Output{% if environment is defined %}: {{ environment }}{% endif %} :heavy_multiplication_x:
+## Stategraph Plan Output{% if environment is defined %}: {{ environment }}{% endif %} :heavy_multiplication_x:
 <details>
   <summary>Expand for plan output details</summary>
 
@@ -298,7 +298,7 @@ No output shown due to comment size.
 To apply all these changes, comment:
 
 ```
-terrateam apply
+stategraph apply
 ```
 
 {%- endif %}
@@ -308,6 +308,6 @@ terrateam apply
 <details>
   <summary><h3>Feedback?</h3></summary>
 
-Questions? Comments? Give feedback by commenting `terrateam feedback <your msg>`.  Your message lands directly in our inbox.
+Questions? Comments? Give feedback by commenting `stategraph feedback <your msg>`.  Your message lands directly in our inbox.
 
 </details>

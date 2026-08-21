@@ -37,7 +37,7 @@ You have {{ c.any_of_count - c.missing_any_of_count }} of {{ c.any_of_count }} r
 **Status Checks**: {% if c.status_checks_check %}:thumbsup: Passed{% else %}:heavy_multiplication_x: Failed{% endif %}
 
       {% if not c.status_checks_check %}
-The following status checks have not passed. They may still be running or have failed. Terrateam will proceed with the apply only after all status checks are successful.  To disable or ignore specific status checks, see the [apply requirements documentation](https://docs.terrateam.io/configuration-reference/apply-requirements/#checks).
+The following status checks have not passed. They may still be running or have failed. Stategraph will proceed with the apply only after all status checks are successful.  To disable or ignore specific status checks, see the [apply requirements documentation](https://docs.terrateam.io/configuration-reference/apply-requirements/#checks).
 
         {% for ch in c.status_checks_failed %}
 - {{ ch.title }}

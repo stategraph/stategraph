@@ -6,15 +6,15 @@ Please ensure that your `.gitlab-ci.yml` contains the following:
 spec:
   inputs:
     TERRATEAM_TRIGGER:
-      description: "Is this being triggered by terrateam?"
+      description: "Is this being triggered by stategraph?"
       type: string
       default: "$TERRATEAM_TRIGGER"
     WORK_TOKEN:
-      description: "The work token from terrateam"
+      description: "The work token from stategraph"
       type: string
       default: "$WORK_TOKEN"
     API_BASE_URL:
-      description: "The base url for the terrateam api"
+      description: "The base url for the stategraph api"
       type: string
       default: "$API_BASE_URL"
     RUNS_ON:
