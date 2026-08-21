@@ -534,6 +534,22 @@ select json_build_object('modules', num_modules.num_modules) from num_modules|};
             (Error (`Invalid_identifier_err "test; drop table test"))
             (Mql_to_pgsql.of_mql ~schema ast);
           ());
+      (* Tenant scoping relies on a query only ever reaching a table through
+         its same-named scoping CTE (see sgs_ep_mql); a schema-qualified name
+         would resolve past the CTE to the real relation. Both layers refuse
+         it: the grammar has no [schema.table] form, and [of_mql] rejects the
+         dotted identifier should one ever be built directly. *)
+      Oth.test ~name:"schema-qualified table name is rejected at both layers" (fun _ ->
+          (match Mql.Ast.of_string "select * from terrateam.test" with
+          | Ok _ -> Oth.Assert.false_ "schema-qualified table reference parsed"
+          | Error _ -> ());
+          let ast = Mql.Build.(select ~from:[ table "terrateam.test" ] ~cols:star ()) in
+          Oth.Assert.eq
+            ~pp:Of_mql_result.pp
+            ~eq:Of_mql_result.equal
+            (Error (`Invalid_identifier_err "terrateam.test"))
+            (Mql_to_pgsql.of_mql ~schema ast);
+          ());
       Oth.test ~name:"sensitive Terraform-state columns are queryable" (fun _ ->
           (* Documents (does not flag) the deliberate exposure: instance
              attributes/sensitive_attributes/private and output values are
