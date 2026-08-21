@@ -11,7 +11,7 @@ DEFAULT_BRANCH=origin/main
 if git log --no-merges "${DEFAULT_BRANCH}"..HEAD --pretty='%s %an' . \
         | grep -v 'dependabot' \
         | grep -v '^OSS import' \
-        | grep -vE '^(([a-zA-Z0-9/.-_]+)?#[0-9]+ )+(ADD|REFACTOR|FIX|UPDATE|REMOVE) .*$' \
+        | grep -vE '^(Revert ")?(([a-zA-Z0-9/.-_]+)?#[0-9]+ )+(ADD|REFACTOR|FIX|UPDATE|REMOVE) .*$' \
         | grep -q .; then
     echo "Not all commit messages match the required structure"
     echo "Commit messages must be of the form:"
@@ -28,6 +28,9 @@ if git log --no-merges "${DEFAULT_BRANCH}"..HEAD --pretty='%s %an' . \
     echo
     echo "For example:"
     echo "#123 FIX Bug in confabulator that prevents users from making progress"
+    echo
+    echo "A revert keeps the message it reverts, inside the prefix GitHub adds:"
+    echo 'Revert "#123 FIX Bug in confabulator that prevents users from making progress"'
     echo
     echo "The confabulator was working on a co-axial retrograde orientation when in reality"
     echo "it necessary for it to be in a tri-axial prograde orientation.  This was preventing"
