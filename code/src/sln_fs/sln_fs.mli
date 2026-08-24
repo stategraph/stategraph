@@ -15,8 +15,8 @@ val normalize_path : string -> string
     becomes visible after [.]/[..] resolution — e.g. [a/../b] is contained (normalizes to [b]) while
     [a/../../b] escapes (normalizes to [../b]).
 
-    Use this to decide whether a path is safe to treat as a location inside some tree (e.g. the
-    reified state root) without the caller needing to know what that tree's root actually is. *)
+    Use this to decide whether a path is safe to treat as a location inside some tree without the
+    caller needing to know what that tree's root actually is. *)
 val has_no_parent_escape : string -> bool
 
 (** [relpath ~from ~to_] computes the relative filesystem walk from directory [from] to [to_]. Both
@@ -54,3 +54,21 @@ val mkdir_p : string -> unit
 (** [write_file ~dir ~filepath content] writes [content] to [dir/filepath], creating any
     intermediate directories via {!mkdir_p}. Truncates an existing file. *)
 val write_file : dir:string -> filepath:string -> string -> unit
+
+(** [mode_of_path ~default path] is [path]'s permission bits, masked to [0o777], or [default] when
+    [path] cannot be stat'd. Total rather than optional because every caller reads the file's
+    contents first: a stat that fails on a path just opened for reading is not a case worth
+    propagating a [None] through the whole pipeline for.
+
+    [default] is the caller's to choose. What an unreadable mode should become is a question about
+    the tree being reproduced, not about the filesystem, so this layer holds no opinion on it. *)
+val mode_of_path : default:int -> string -> int
+
+(** The path whose mode could not be set, and the system's message for why. *)
+type chmod_err = [ `Chmod_err of string * string ] [@@deriving show]
+
+(** [chmod path mode] sets [path]'s permission bits to [mode land 0o777].
+
+    Whether a mode that did not land is worth acting on belongs to the caller, not here, so the
+    failure is returned rather than swallowed. *)
+val chmod : string -> int -> (unit, [> chmod_err ]) result

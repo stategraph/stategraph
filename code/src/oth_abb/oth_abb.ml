@@ -6,8 +6,8 @@ module type ASSERT = sig
   include Oth.ASSERT
 
   module Exit_code : sig
-    val zero : Abb_intf.Process.Exit_code.t -> unit
-    val non_zero : Abb_intf.Process.Exit_code.t -> unit
+    val zero : ?fail_msg:string -> Abb_intf.Process.Exit_code.t -> unit
+    val non_zero : ?fail_msg:string -> Abb_intf.Process.Exit_code.t -> unit
   end
 end
 
@@ -20,21 +20,28 @@ module Assert = struct
   include Oth.Assert
 
   module Exit_code = struct
-    let zero = function
+    (* [fail_msg] is APPENDED to the built-in reason rather than replacing it, unlike the
+       [?fail_msg] on Oth.Assert.ok and friends. The built-in text carries the return code the
+       process actually produced, which the caller cannot supply and always wants to see; the
+       caller's message carries the context that identifies WHICH command it was -- for a test that
+       shells out, typically the command's own stdout/stderr. Losing either one makes the failure
+       materially harder to read, so both are reported. *)
+    let fail ?fail_msg reason =
+      Oth.Assert.false_ (CCOption.map_or ~default:reason (Printf.sprintf "%s: %s" reason) fail_msg)
+
+    let zero ?fail_msg = function
       | Abb_intf.Process.Exit_code.Exited 0 -> ()
       | Abb_intf.Process.Exit_code.Exited rc ->
-          Oth.Assert.false_ (Format.sprintf "Expected a zero return code, but got %d" rc)
-      | Abb_intf.Process.Exit_code.Signaled _ ->
-          Oth.Assert.false_ "Expected 'Exited', got 'Signaled'"
-      | Abb_intf.Process.Exit_code.Stopped _ -> Oth.Assert.false_ "Expected 'Exited', got 'Stopped'"
+          fail ?fail_msg (Format.sprintf "Expected a zero return code, but got %d" rc)
+      | Abb_intf.Process.Exit_code.Signaled _ -> fail ?fail_msg "Expected 'Exited', got 'Signaled'"
+      | Abb_intf.Process.Exit_code.Stopped _ -> fail ?fail_msg "Expected 'Exited', got 'Stopped'"
 
-    let non_zero = function
+    let non_zero ?fail_msg = function
       | Abb_intf.Process.Exit_code.Exited 0 ->
-          Oth.Assert.false_ "Expected a non-zero return code, but got zero"
+          fail ?fail_msg "Expected a non-zero return code, but got zero"
       | Abb_intf.Process.Exit_code.Exited _ -> ()
-      | Abb_intf.Process.Exit_code.Signaled _ ->
-          Oth.Assert.false_ "Expected 'Exited', got 'Signaled'"
-      | Abb_intf.Process.Exit_code.Stopped _ -> Oth.Assert.false_ "Expected 'Exited', got 'Stopped'"
+      | Abb_intf.Process.Exit_code.Signaled _ -> fail ?fail_msg "Expected 'Exited', got 'Signaled'"
+      | Abb_intf.Process.Exit_code.Stopped _ -> fail ?fail_msg "Expected 'Exited', got 'Stopped'"
   end
 end
 

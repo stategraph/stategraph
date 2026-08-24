@@ -1,6 +1,6 @@
 (test
  (name test)
- (libraries containers hcl_ast oth qcheck sln)
+ (libraries containers hcl_ast oth qcheck sln sln_fs)
  (deps
   (source_tree files)
   ../hcl_native_shim/sg_hcl_shim)

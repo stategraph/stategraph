@@ -79,3 +79,17 @@ let write_file ~dir ~filepath content =
   let full = Filename.concat dir filepath in
   mkdir_p (Filename.dirname full);
   CCIO.with_out full (fun oc -> output_string oc content)
+
+(* Permission bits only.  The set-user-ID, set-group-ID and sticky bits are deliberately dropped:
+   they are recorded nowhere that reads this and restaging one would grant a privilege the source
+   tree's owner never asked us to reproduce. *)
+let perm_mask = 0o777
+
+let mode_of_path ~default path =
+  try (Unix.stat path).Unix.st_perm land perm_mask with Unix.Unix_error _ -> default
+
+type chmod_err = [ `Chmod_err of string * string ] [@@deriving show]
+
+let chmod path mode =
+  try Ok (Unix.chmod path (mode land perm_mask))
+  with Unix.Unix_error (err, _, _) -> Error (`Chmod_err (path, Unix.error_message err))

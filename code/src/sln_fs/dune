@@ -1,0 +1,6 @@
+(library
+ (name sln_fs)
+ (wrapped false)
+ (libraries containers unix)
+ (preprocess
+  (pps ppx_deriving.show)))
