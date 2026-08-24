@@ -414,6 +414,15 @@ module Provider :
                (Jsonu.of_yaml_string content)
           >>= fun json -> Abbs_future_combinators.return_ok (Some (fname, json))
 
+    (* Config parity (#1442): [.stategraph/config] wins when both exist;
+       [.terrateam/config] keeps working so existing repos need no rename. *)
+    let fetch_repo_config_file_with_fallback request_id client repo ref_ =
+      let open Abbs_future_combinators.Infix_result_monad in
+      fetch_repo_config_file request_id client repo ref_ ".stategraph/config"
+      >>= function
+      | Some _ as r -> Abb.Future.return (Ok r)
+      | None -> fetch_repo_config_file request_id client repo ref_ ".terrateam/config"
+
     let maybe_fetch_centralized_repo_config_file request_id client centralized_repo basename =
       match centralized_repo with
       | Some (remote_repo, branch) ->
@@ -499,8 +508,8 @@ module Provider :
               client
               centralized_repo
               ("config/" ^ Api.Repo.name repo ^ "/config")
-        <*> fetch_repo_config_file request_id client repo default_branch_ref ".terrateam/config"
-        <*> fetch_repo_config_file request_id client repo ref_ ".terrateam/config")
+        <*> fetch_repo_config_file_with_fallback request_id client repo default_branch_ref
+        <*> fetch_repo_config_file_with_fallback request_id client repo ref_)
       >>= fun ( global_defaults,
                 global_overrides,
                 repo_defaults,

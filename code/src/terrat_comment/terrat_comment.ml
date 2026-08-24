@@ -1,4 +1,4 @@
-let trigger_words = [ "terrateam"; "terraform"; "tofu" ]
+let trigger_words = [ "terrateam"; "stategraph"; "terraform"; "tofu" ]
 
 type t =
   | Apply of { tag_query : Terrat_tag_query.t }

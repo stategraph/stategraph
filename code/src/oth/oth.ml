@@ -103,6 +103,16 @@ module Assert = struct
       if not (CCList.is_empty l) then
         false_
           (Format.asprintf "Expected list to be empty, got list of length %d" (CCList.length l))
+
+    let all_true ~pp p l =
+      match CCList.filter (fun x -> not (p x)) l with
+      | [] -> ()
+      | failed ->
+          false_
+            (Format.asprintf
+               "Expected predicate to hold for every element, failed for: %a"
+               (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ") pp)
+               failed)
   end
 
   module Eq = struct

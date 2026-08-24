@@ -4471,6 +4471,15 @@ module Repo_config = struct
              (Jsonu.of_yaml_string content)
         >>= fun json -> Abbs_future_combinators.return_ok (Some (fname, json))
 
+  (* Config parity (#1442): [.stategraph/config] wins when both exist;
+       [.terrateam/config] keeps working so existing repos need no rename. *)
+  let fetch_repo_config_file_with_fallback request_id client repo ref_ =
+    let open Abbs_future_combinators.Infix_result_monad in
+    fetch_repo_config_file request_id client repo ref_ ".stategraph/config"
+    >>= function
+    | Some _ as r -> Abbs_future_combinators.return_ok r
+    | None -> fetch_repo_config_file request_id client repo ref_ ".terrateam/config"
+
   let repo_config_system_defaults system_defaults =
     (* Access control should be disabled for OSS *)
     let module V1 = Terrat_base_repo_config_v1 in
@@ -4498,8 +4507,8 @@ module Repo_config = struct
     in
     Abbs_future_combinators.Infix_result_app.(
       (fun default_repo_config repo_config -> (default_repo_config, repo_config))
-      <$> fetch_repo_config_file request_id client repo default_branch_ref ".terrateam/config"
-      <*> fetch_repo_config_file request_id client repo ref_ ".terrateam/config")
+      <$> fetch_repo_config_file_with_fallback request_id client repo default_branch_ref
+      <*> fetch_repo_config_file_with_fallback request_id client repo ref_)
     >>= fun (default_repo_config, repo_config) ->
     let wrap_err fname =
       Abbs_future_combinators.Result.map_err ~f:(function

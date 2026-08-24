@@ -103,3 +103,13 @@ module Make (S : S) : sig
     Terrat_base_repo_config_v1.Access_control.Match_list.t ->
     (bool, [> err ]) result Abb.Future.t
 end
+
+module Tests : sig
+  (** The filenames {!is_repo_config_change} matches: both the [.stategraph/config] and
+      [.terrateam/config] spellings, in both extensions the providers probe. *)
+  val repo_config_files : string list
+
+  (** Does the diff touch a repo config file (either the [.stategraph/config] or [.terrateam/config]
+      spelling, [.yml] or [.yaml])? *)
+  val is_repo_config_change : Terrat_change.Diff.t list -> bool
+end

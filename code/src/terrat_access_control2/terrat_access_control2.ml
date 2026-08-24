@@ -1,7 +1,29 @@
 type query_err = [ `Error ] [@@deriving show]
 type err = query_err [@@deriving show]
 
-let terrateam_repo_config = [ ".terrateam/config.yml"; ".terrateam/config.yaml" ]
+(* Both spellings of the repo config file, in both extensions the providers
+   probe. [.stategraph/config] takes precedence over [.terrateam/config] at
+   read time (see [fetch_repo_config_file_with_fallback] in the VCS services),
+   so a change to EITHER must count as a repo-config change for the
+   [access_control.terrateam_config_update] policy. *)
+let repo_config_files =
+  [
+    ".stategraph/config.yml";
+    ".stategraph/config.yaml";
+    ".terrateam/config.yml";
+    ".terrateam/config.yaml";
+  ]
+
+let repo_config_files_mem searched = Sln_list.String.mem searched repo_config_files
+
+let is_repo_config_change =
+  CCList.exists
+    Terrat_change.Diff.(
+      function
+      | Add { filename } | Change { filename } | Remove { filename } ->
+          repo_config_files_mem filename
+      | Move { filename; previous_filename } ->
+          repo_config_files_mem filename || repo_config_files_mem previous_filename)
 
 module Policy = struct
   type t = {
@@ -61,16 +83,6 @@ module Make (S : S) = struct
     let make ~request_id ~client ~config ~repo ~user () = { request_id; client; config; repo; user }
     let set_user user t = { t with user }
   end
-
-  let is_repo_config_change =
-    CCList.exists
-      Terrat_change.Diff.(
-        function
-        | Add { filename } | Change { filename } | Remove { filename } ->
-            CCList.mem ~eq:CCString.equal filename terrateam_repo_config
-        | Move { filename; previous_filename } ->
-            CCList.mem ~eq:CCString.equal filename terrateam_repo_config
-            || CCList.mem ~eq:CCString.equal previous_filename terrateam_repo_config)
 
   let rec test_queries ctx = function
     | [] -> Abbs_future_combinators.return_ok None
@@ -150,4 +162,9 @@ module Make (S : S) = struct
     let open Abbs_future_combinators.Infix_result_monad in
     test_queries ctx match_list
     >>= fun res -> Abbs_future_combinators.return_ok (CCOption.is_some res)
+end
+
+module Tests = struct
+  let repo_config_files = repo_config_files
+  let is_repo_config_change = is_repo_config_change
 end

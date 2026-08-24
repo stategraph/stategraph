@@ -74,6 +74,10 @@ module type ASSERT = sig
 
     (** Asserts that the list is empty, otherwise fails the test. *)
     val empty : 'a list -> unit
+
+    (** Asserts that [p] holds for every element of the list, otherwise fails the test naming the
+        elements (rendered with [pp]) for which it does not. *)
+    val all_true : pp:(Format.formatter -> 'a -> unit) -> ('a -> bool) -> 'a list -> unit
   end
 
   module Eq : sig
