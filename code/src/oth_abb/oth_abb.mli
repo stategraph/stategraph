@@ -10,12 +10,17 @@ module type ASSERT = sig
 
   module Exit_code : sig
     (** Asserts that the process exited with a zero return code, otherwise fails the test. A
-        signaled or stopped process also fails the test. *)
-    val zero : Abb_intf.Process.Exit_code.t -> unit
+        signaled or stopped process also fails the test.
+
+        [fail_msg] is APPENDED to the built-in reason rather than replacing it, unlike the
+        [?fail_msg] on {!Oth.ASSERT.ok} and friends: the built-in text names the return code the
+        process produced, which the caller cannot supply, while [fail_msg] says which command it was
+        — for a test that shells out, usually the command's own output. Both are worth having. *)
+    val zero : ?fail_msg:string -> Abb_intf.Process.Exit_code.t -> unit
 
     (** Asserts that the process exited, with a non-zero exit, otherwise fails the test. A signaled
-        or stopped process also fails the test. *)
-    val non_zero : Abb_intf.Process.Exit_code.t -> unit
+        or stopped process also fails the test. [fail_msg] behaves as in {!zero}. *)
+    val non_zero : ?fail_msg:string -> Abb_intf.Process.Exit_code.t -> unit
   end
 end
 
