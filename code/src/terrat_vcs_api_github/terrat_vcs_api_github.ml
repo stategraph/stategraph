@@ -712,6 +712,17 @@ let react_to_comment ~request_id client pull_request comment_id =
 let create_commit_checks ~request_id client repo ref_ checks =
   let open Abb.Future.Infix_monad in
   Logs.info (fun m -> m "%s : CREATE_COMMIT_CHECKS : num=%d" request_id (CCList.length checks));
+  (* Titles are canonical ("terrateam ...") internally; the brand is applied
+     only here, at the VCS boundary. *)
+  let checks =
+    CCList.map
+      (fun c ->
+        {
+          c with
+          Terrat_commit_check.title = Terrat_check_title.branded c.Terrat_commit_check.title;
+        })
+      checks
+  in
   Terrat_vcs_api_github_commit_check.create
     ~owner:(Repo.owner repo)
     ~repo:(Repo.name repo)
@@ -740,7 +751,16 @@ let fetch_commit_checks ~request_id client repo ref_ =
         ~ref_
         client.Client.client)
   >>= function
-  | Ok _ as res -> Abb.Future.return res
+  | Ok checks ->
+      (* Normalize fetched titles so internal comparisons accept both brands. *)
+      Abbs_future_combinators.return_ok
+        (CCList.map
+           (fun c ->
+             {
+               c with
+               Terrat_commit_check.title = Terrat_check_title.canonical c.Terrat_commit_check.title;
+             })
+           checks)
   | Error `Timeout -> vcs_api_timeout_err ~request_id "FETCH_COMMIT_CHECKS"
   | Error (#Terrat_vcs_api_github_commit_check.list_err as err) ->
       Prmths.Counter.inc_one Metrics.github_errors_total;

@@ -1,6 +1,12 @@
 (library
  (name terrat_vcs_api_gitlab)
- (libraries gitlabc openapic_abb prmths terrat_comment terrat_vcs_api)
+ (libraries
+  gitlabc
+  openapic_abb
+  prmths
+  terrat_check_title
+  terrat_comment
+  terrat_vcs_api)
  (preprocess
   (pps
    ppx_deriving.eq

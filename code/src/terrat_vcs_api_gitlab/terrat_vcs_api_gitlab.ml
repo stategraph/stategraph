@@ -733,7 +733,7 @@ let create_commit_checks ~request_id client repo ref_ checks =
                 (Parameters.make
                    ~id:(CCInt.to_string @@ Repo.id repo)
                    ~sha:ref_
-                   ~name:(Some "terrateam apply")
+                   ~name:(Some (Terrat_check_title.branded "terrateam apply"))
                    ()))
           >>= fun existing_checks ->
           let pipeline_id =
@@ -760,10 +760,11 @@ let create_commit_checks ~request_id client repo ref_ checks =
       ~f:(fun { C.status; title; description; _ } ->
         let body =
           {
-            Body.context = "terrateam external";
+            (* Canonical internally; brand applied at the VCS boundary. *)
+            Body.context = Terrat_check_title.branded "terrateam external";
             coverage = None;
             description = Some description;
-            name = title;
+            name = Terrat_check_title.branded title;
             pipeline_id;
             ref_ = None;
             state =
@@ -830,7 +831,8 @@ let fetch_commit_checks ~request_id client repo ref_ =
            {
              C.details_url = "";
              description = CCOption.get_or ~default:"" description;
-             title = name;
+             (* Normalize so internal comparisons accept both brands. *)
+             title = Terrat_check_title.canonical name;
              status =
                (match status with
                | "pending" -> C.Status.Queued
