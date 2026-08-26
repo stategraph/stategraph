@@ -45,6 +45,10 @@ services:
 
   server:
     image: ghcr.io/terrateamio/terrat-oss:latest
+    # On stop the container drains nginx and lets in-flight runs finish, which
+    # takes up to 55s. Compose's default grace period is 10s, which would
+    # SIGKILL that drain partway through.
+    stop_grace_period: 60s
     environment:
       DB_HOST: "db"
       DB_PORT: "5432"

@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# runit control hook, installed at /etc/service/nginx/control/t.
+#
+# runsv runs this INSTEAD of sending the service a TERM, and waits for it to
+# finish. Exiting 0 tells runsv to refrain from sending the signal at all.
+#
+# nginx treats TERM and INT as a *fast* shutdown: it closes the listen socket
+# AND kills live connections. QUIT is the graceful one -- it closes the listen
+# socket and lets the workers finish what they are serving. nginx has no
+# directive to remap that, so the translation has to happen here.
+kill -QUIT "$(cat "$(dirname "$0")/../supervise/pid")" 2>/dev/null
+exit 0

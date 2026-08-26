@@ -177,7 +177,7 @@ RUN apk add --no-cache \
     sudo \
     yj
 RUN addgroup -S terrat && adduser -S -G terrat terrat
-RUN mkdir -p /usr/local/bin /etc/service/terrat /etc/service/nginx /usr/local/share/terrat/ui/assets
+RUN mkdir -p /usr/local/bin /etc/service/terrat /etc/service/nginx /etc/service/nginx/control /usr/local/share/terrat/ui/assets
 # CA-cert installer: root-owned, runnable (not writable) by terrat via a narrow
 # sudoers rule; reads the CUSTOM_CA_CERT env var at container start.
 COPY docker/terrat/install-ca-cert.py /usr/local/bin/install-ca-cert
@@ -190,11 +190,16 @@ RUN chown -R terrat:terrat /etc/service /usr/local/share/terrat /etc/nginx /var/
 # `nginx` renders nginx.conf.template (fronts on 8080) and serves the iris SPA.
 COPY docker/terrat/service/terrat /etc/service/terrat/run
 COPY docker/terrat/service/nginx /etc/service/nginx/run
+# Shutdown path. runit-init replaces runsvdir as the container's main process so
+# Fly's stop signal drains the services instead of orphaning them; nginx's
+# control/t hook makes `sv down` send nginx a graceful SIGQUIT, not a fast TERM.
+COPY --chmod=755 docker/terrat/runit-init /usr/local/bin/runit-init
+COPY --chmod=755 docker/terrat/service/nginx-control-t /etc/service/nginx/control/t
 COPY docker/terrat/nginx.conf.template /etc/nginx/nginx.conf.template
 COPY --from=terrat-build /tmp/mono/_build/default/code/src/iris/ui-export/ /usr/local/share/terrat/ui/assets/
 USER terrat
 EXPOSE 8080
-CMD ["runsvdir", "/etc/service"]
+CMD ["/usr/local/bin/runit-init"]
 
 # Final terrat-ee image
 FROM terrat-final-base AS terrat-ee
