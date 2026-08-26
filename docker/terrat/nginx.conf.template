@@ -2,6 +2,20 @@ daemon off;
 
 worker_processes 2;
 
+# Bound the graceful shutdown. runit-init sends the master a SIGQUIT, which
+# closes the listen socket and lets the workers finish what they are serving.
+# Unset, that drain is unbounded, and /api sets proxy_read_timeout 120 -- one
+# slow request could hold the container past the platform's stop grace period
+# and get everything force-killed, which is the failure this is meant to remove.
+#
+# The 35s default is sized to a 60s grace period (Fly kill_timeout, Compose
+# stop_grace_period, ECS stopTimeout); runit-init splits that into 40s for nginx,
+# 10s for the backends and 5s for runsvdir. This must stay below runit-init's
+# NGINX_SHUTDOWN_WAIT so nginx ends its own drain rather than being SIGKILLed by
+# sv with connections still up, so the two move together: NGINX_WORKER_SHUTDOWN_
+# TIMEOUT and NGINX_SHUTDOWN_WAIT.
+worker_shutdown_timeout ${NGINX_WORKER_SHUTDOWN_TIMEOUT}s;
+
 error_log /dev/stderr warn;
 
 env TERRATEAM_UI_ANALYTICS;

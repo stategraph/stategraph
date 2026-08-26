@@ -23,6 +23,21 @@ let close_both a b =
   let open Abb.Future.Infix_monad in
   Abb.Socket.close a >>= fun _ -> Abb.Socket.close b >>= fun _ -> Abb.Future.return ()
 
+(* Some tests below need a descriptor that is NOT a socket, and nothing about
+   which file it is matters to them.  The suite makes its own rather than
+   reaching into /etc: this was /etc/hostname, which does not exist on macOS, and
+   the three tests using it failed there for five days before a release run
+   happened to execute them (#2018).  Any system path is the same bet on the next
+   platform.  It carries a few bytes so a poll for readability has something to
+   report -- an empty file need not wake a kqueue reader. *)
+let regular_file =
+  let path = Filename.temp_file "abb_fd_safety" ".tmp" in
+  let oc = open_out_bin path in
+  output_string oc "fd_safety";
+  close_out oc;
+  at_exit (fun () -> try Sys.remove path with Sys_error _ -> ());
+  path
+
 (* [readable]/[writable] return a non-result future, so they cannot report the
    closure to the caller.  They must still not arm a poll on the descriptor. *)
 let readable_on_closed_socket =
@@ -73,7 +88,7 @@ let descriptor_number_recycled =
       let recv = Abb.Socket.Tcp.recv a ~buf ~pos:0 ~len:8 in
       Abb.Socket.close a
       >>= fun _ ->
-      Abb.File.open_file ~flags:Abb_intf.File.Flag.[ Read_only ] "/etc/hostname"
+      Abb.File.open_file ~flags:Abb_intf.File.Flag.[ Read_only ] regular_file
       >>= fun opened ->
       (* Without this the test silently degenerates into a duplicate of
          [op_built_before_close] whenever the kernel hands out a different
@@ -83,7 +98,7 @@ let descriptor_number_recycled =
           Oth.Assert.true_
             "the open must have taken the closed socket's descriptor number"
             (Abb.File.to_native f = Abb.Socket.Tcp.to_native a)
-      | Error _ -> Oth.Assert.false_ "could not open /etc/hostname");
+      | Error _ -> Oth.Assert.false_ "could not open the suite's regular file");
       recv
       >>= fun res ->
       ignore (Oth.Assert.error ~fail_msg:"recv on a recycled number must fail" res);
@@ -134,9 +149,9 @@ let file_ops_after_close =
     ~name:"file ops after close"
     (fun () ->
       let open Abb.Future.Infix_monad in
-      Abb.File.open_file ~flags:Abb_intf.File.Flag.[ Read_only ] "/etc/hostname"
+      Abb.File.open_file ~flags:Abb_intf.File.Flag.[ Read_only ] regular_file
       >>= fun opened ->
-      let f = Oth.Assert.ok ~fail_msg:"could not open /etc/hostname" opened in
+      let f = Oth.Assert.ok ~fail_msg:"could not open the suite's regular file" opened in
       Abb.File.close f
       >>= fun _ ->
       Abb.File.close f
@@ -152,10 +167,17 @@ let file_ops_after_close =
       ignore (Oth.Assert.error ~fail_msg:"pread on a closed file must fail" pres);
       Abb.Future.return ())
 
-(* The production crash: [uv_poll_init] itself failing.  A regular file is a
-   perfectly good descriptor that epoll refuses ([EPERM]), so wrapping one in a
-   LIVE handle reaches the failure without going through the closed-flag check
-   that short-circuits the other tests. *)
+(* The production crash: [uv_poll_init] itself failing.  Wrapping a regular file
+   in a LIVE handle reaches it without going through the closed-flag check that
+   short-circuits the other tests.
+
+   Which path this takes is platform-dependent, and the assertions are written to
+   hold on both.  On Linux a regular file is a perfectly good descriptor that
+   epoll refuses ([EPERM]), so the poll never arms.  On macOS the backend is
+   kqueue, where [EVFILT_READ] on a vnode is valid, so libuv may arm it and
+   report the file readable at once.  Either way the invariant #1984 added is the
+   same and is what this pins: the waiter resolves and the loop survives, rather
+   than the process aborting. *)
 let poll_init_failure_is_reported =
   Oth_abb.test
     ~tags
@@ -163,7 +185,7 @@ let poll_init_failure_is_reported =
     ~name:"poll init failure reported"
     (fun () ->
       let open Abb.Future.Infix_monad in
-      let raw = Unix.openfile "/etc/hostname" [ Unix.O_RDONLY ] 0 in
+      let raw = Unix.openfile regular_file [ Unix.O_RDONLY ] 0 in
       let not_pollable = Abb.Socket.Tcp.of_native raw in
       Abb.Socket.readable not_pollable
       >>= fun () ->

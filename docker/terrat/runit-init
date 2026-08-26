@@ -1,0 +1,81 @@
+#!/bin/sh
+#
+# Container main process, in place of runsvdir.
+#
+# Fly (and docker stop) signal the main child and expect it to terminate. runsvdir
+# cannot turn that into a clean shutdown: it has no control interface, on TERM it
+# calls _exit(0) without touching its children, and on HUP it TERMs them and exits
+# at once without waiting. Either way the services are orphaned, keep serving, and
+# are destroyed when the VM is torn down -- in-flight work included.
+#
+# So runsvdir stays a child and we drive the shutdown through sv, which does wait.
+# This is runit's stage 3, merged into stage 2 so a container can use it.
+#
+# Order matters. Every terrat request arrives through nginx, and terrat does its
+# work inside the request (the webhook handler awaits the evaluator before it
+# answers). So draining nginx drains terrat: once nginx's workers finish, terrat
+# has nothing in flight.
+#
+# nginx's own drain is bounded by worker_shutdown_timeout in nginx.conf.template
+# (NGINX_WORKER_SHUTDOWN_TIMEOUT, default 35s). It sits under NGINX_WAIT so nginx
+# ends the drain itself and the SIGKILL sv sends on expiry stays a backstop
+# rather than the normal path. Lower one and you must lower the other.
+#
+# The defaults are sized to a 60s stop grace period (Fly kill_timeout, Compose
+# stop_grace_period, ECS stopTimeout). Worst case is 40 + 10 + 5 = 55s, leaving
+# 5s for process teardown and sv's 1s polling granularity. The platform
+# force-kills on overrun, which is the backstop, not the plan. We exit as soon as
+# the drain finishes, so the platform proceeds immediately instead of always
+# waiting out the whole grace period. A deployment with a shorter grace period
+# must lower all four through the environment.
+SVDIR_PATH="${SVDIR_PATH:-/etc/service}"
+NGINX_WAIT="${NGINX_SHUTDOWN_WAIT:-40}"
+BACKEND_WAIT="${BACKEND_SHUTDOWN_WAIT:-10}"
+RUNSVDIR_WAIT="${RUNSVDIR_SHUTDOWN_WAIT:-5}"
+
+runsvdir "$SVDIR_PATH" &
+RUNSVDIR=$!
+
+stopping=""
+stop() {
+    [ -n "$stopping" ] && return    # a second signal must not re-enter
+    stopping=1
+    echo "[runit-init] stop requested; draining nginx"
+
+    # force-stop, not down: force-stop sends SIGKILL when the wait expires, so a
+    # wedged service cannot outlive us. nginx/control/t turns the TERM into a
+    # SIGQUIT, which is nginx's graceful shutdown (TERM is a *fast* shutdown and
+    # drops live connections).
+    sv -w "$NGINX_WAIT" force-stop "$SVDIR_PATH/nginx"
+
+    # Nothing is in flight now. Stop the rest in ONE sv call so the wait is
+    # shared across them rather than summed.
+    rest=""
+    for svc in "$SVDIR_PATH"/*; do
+        [ -d "$svc" ] || continue
+        [ "${svc##*/}" = nginx ] && continue
+        rest="$rest $svc"
+    done
+    if [ -n "$rest" ]; then
+        echo "[runit-init] stopping:$rest"
+        # shellcheck disable=SC2086
+        sv -w "$BACKEND_WAIT" force-stop $rest
+    fi
+
+    # Services are down and will not restart. Retire the supervisors.
+    kill -HUP "$RUNSVDIR" 2>/dev/null
+    i=0
+    while [ "$i" -lt "$RUNSVDIR_WAIT" ] && kill -0 "$RUNSVDIR" 2>/dev/null; do
+        sleep 1
+        i=$((i + 1))
+    done
+    kill -KILL "$RUNSVDIR" 2>/dev/null
+    echo "[runit-init] drained; exiting"
+    exit 0
+}
+trap stop INT TERM
+
+wait "$RUNSVDIR"
+rc=$?
+echo "[runit-init] runsvdir exited on its own (rc=$rc)"
+exit "$rc"
