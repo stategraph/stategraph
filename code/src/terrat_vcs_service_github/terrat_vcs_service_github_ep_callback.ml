@@ -144,7 +144,7 @@ let perform_auth request_id config storage code =
                         email
                         is_primary)
                     emails
-                  >>= fun () -> Abbs_future_combinators.return_ok (Terrat_user.make ~id:user_id ()))
+                  >>| fun () -> Terrat_user.make ~id:user_id ())
           | (user_id, _email, _name, _avatar_url) :: _ ->
               Pgsql_io.Prepared_stmt.execute
                 db
@@ -168,7 +168,7 @@ let perform_auth request_id config storage code =
                     email
                     is_primary)
                 emails
-              >>= fun () -> Abbs_future_combinators.return_ok (Terrat_user.make ~id:user_id ())))
+              >>| fun () -> Terrat_user.make ~id:user_id ()))
 
 let get config storage code installation_id_opt =
   let open Abb.Future.Infix_monad in

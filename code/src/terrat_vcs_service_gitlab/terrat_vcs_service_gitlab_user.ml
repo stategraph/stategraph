@@ -156,7 +156,7 @@ module Oauth = struct
           expiration
           oauth.Response.refresh_token
           refresh_expiration
-        >>= fun () -> Abbs_future_combinators.return_ok oauth.Response.access_token
+        >>| fun () -> oauth.Response.access_token
     | (token, _, _) :: _ -> Abbs_future_combinators.return_ok token
 end
 
@@ -200,13 +200,13 @@ let query_user_id' db user =
     (Sql.select_gitlab_user_id ())
     ~f:(fun _ _ _ _ user_id -> user_id)
     (Terrat_user.id user)
-  >>= function
-  | [] -> Abbs_future_combinators.return_ok None
-  | user_id :: _ -> Abbs_future_combinators.return_ok (Some (CCInt64.to_int user_id))
+  >>| function
+  | [] -> None
+  | user_id :: _ -> Some (CCInt64.to_int user_id)
 
 let query_user_id db user =
   let open Abbs_future_combinators.Infix_result_monad in
   query_user_id' db user
-  >>= function
-  | Some user_id -> Abbs_future_combinators.return_ok user_id
-  | None -> Abbs_future_combinators.return_err (`User_not_found_err user)
+  >>? function
+  | Some user_id -> Ok user_id
+  | None -> Error (`User_not_found_err user)

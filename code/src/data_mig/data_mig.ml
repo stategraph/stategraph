@@ -63,9 +63,7 @@ module Make (M : S) = struct
     start_migration mt name
     >>= fun () ->
     run_migration m mt
-    >>= fun r ->
-    add_migration mt name
-    >>= fun () -> complete_migration mt name >>= fun () -> Abbs_future_combinators.return_ok r
+    >>= fun r -> add_migration mt name >>= fun () -> complete_migration mt name >>| fun () -> r
 
   let rec verify_consistency migrations ms =
     match (migrations, ms) with
@@ -92,7 +90,7 @@ module Make (M : S) = struct
                 M.list_migrations tx [ fst migration ]
                 >>= fun () ->
                 let open Abbs_future_combinators.Infix_result_monad in
-                exec tx migration >>= fun r -> Abbs_future_combinators.return_ok (`Cont r)
+                exec tx migration >>| fun r -> `Cont r
             | None -> Abbs_future_combinators.return_err `Consistency_err))
     >>= function
     | `Done -> Abbs_future_combinators.return_ok ()

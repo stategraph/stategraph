@@ -91,7 +91,7 @@ struct
       | (Ok () | Error `Noop) as ret ->
           let open Irm in
           Builder.run_db s ~f:(fun db -> update_job_state_completed s job.Tjc.Job.id db)
-          >>= fun () -> Abb.Future.return ret
+          >>? fun () -> ret
       (* [`Rerun] rides alongside [`Suspend_eval]: neither is a failure, and
          marking the job failed for one would be unrecoverable, because the next
          pass finds the job already in a terminal state and gives up. *)
@@ -216,7 +216,7 @@ struct
         | Some (account, repo, branch) ->
             write_config_history ~account ~repo ~branch ~sha:branch_ref repo_config_json s
         | None -> Abbs_future_combinators.return_ok ())
-      >>= fun () -> Abbs_future_combinators.return_ok repo_config
+      >>| fun () -> repo_config
 
     let derived_repo_config
         ~cache_key
@@ -305,31 +305,26 @@ struct
           >>= function
           | { C.scope = C.Scope.Pull_request _; _ } ->
               fetch Keys.pull_request
-              >>= fun pull_request ->
-              Abbs_future_combinators.return_ok
-                (Terrat_vcs_provider2.Target.Pr (Terrat_pull_request.set_diff () @@ pull_request))
+              >>| fun pull_request ->
+              Terrat_vcs_provider2.Target.Pr (Terrat_pull_request.set_diff () @@ pull_request)
           | { C.scope = C.Scope.Branch (branch, _); _ } ->
               fetch Keys.repo
-              >>= fun repo ->
-              Abbs_future_combinators.return_ok
-                (Terrat_vcs_provider2.Target.Drift { repo; branch = S.Api.Ref.to_string branch }))
+              >>| fun repo ->
+              Terrat_vcs_provider2.Target.Drift { repo; branch = S.Api.Ref.to_string branch })
 
     let initiator =
       run ~name:"initiator" (fun _s { Bs.Fetcher.fetch } ->
           let open Irm in
           fetch Keys.job
-          >>= function
+          >>| function
           | { Tjc.Job.initiator = Some user; _ } ->
-              Abbs_future_combinators.return_ok
-                (Terrat_work_manifest3.Initiator.User (S.Api.User.to_string user))
-          | { Tjc.Job.initiator = None; _ } ->
-              Abbs_future_combinators.return_ok Terrat_work_manifest3.Initiator.System)
+              Terrat_work_manifest3.Initiator.User (S.Api.User.to_string user)
+          | { Tjc.Job.initiator = None; _ } -> Terrat_work_manifest3.Initiator.System)
 
     let user =
       run ~name:"user" (fun _s { Bs.Fetcher.fetch } ->
           let open Irm in
-          fetch Keys.job
-          >>= fun { Tjc.Job.initiator; _ } -> Abbs_future_combinators.return_ok initiator)
+          fetch Keys.job >>| fun { Tjc.Job.initiator; _ } -> initiator)
 
     let client =
       run ~name:"client" (fun s { Bs.Fetcher.fetch } ->
@@ -344,8 +339,7 @@ struct
     let context_id =
       run ~name:"context_id" (fun _s { Bs.Fetcher.fetch } ->
           let open Irm in
-          fetch Keys.job
-          >>= fun job -> Abbs_future_combinators.return_ok job.Tjc.Job.context.Tjc.Context.id)
+          fetch Keys.job >>| fun job -> job.Tjc.Job.context.Tjc.Context.id)
 
     let context =
       run ~name:"context" (fun s { Bs.Fetcher.fetch } ->
@@ -419,11 +413,9 @@ struct
                 time)
             (fun () ->
               S.Api.fetch_branch_sha ~request_id:(Builder.log_id s) client repo default_branch)
-          >>= function
-          | Some branch_sha -> Abbs_future_combinators.return_ok branch_sha
-          | None ->
-              Abbs_future_combinators.return_err
-                (`Branch_not_found_err (S.Api.Ref.to_string default_branch)))
+          >>? function
+          | Some branch_sha -> Ok branch_sha
+          | None -> Error (`Branch_not_found_err (S.Api.Ref.to_string default_branch)))
 
     let matches =
       run ~name:"matches" (fun s { Bs.Fetcher.fetch } ->
@@ -442,7 +434,7 @@ struct
             fetch Keys.synthesized_config
             >>= fun config ->
             fetch Keys.job
-            >>= fun job ->
+            >>| fun job ->
             let out_of_change_dirspace_configs =
               CCList.flat_map
                 CCFun.(Terrat_change_match3.of_dirspace config %> CCOption.to_list)
@@ -598,12 +590,11 @@ struct
                 (CCList.filter (Terrat_change_match3.match_tag_query ~tag_query))
                 all_matches
             in
-            Abbs_future_combinators.return_ok
-              ( working_set_matches,
-                all_matches,
-                all_tag_query_matches,
-                all_unapplied_matches,
-                working_layer )
+            ( working_set_matches,
+              all_matches,
+              all_tag_query_matches,
+              all_unapplied_matches,
+              working_layer )
           in
           let go () =
             let module Tjc = Terrat_job_context in
@@ -685,15 +676,14 @@ struct
                 fetch Keys.missing_autoplan_matches
                 >>= fun missing_autoplan_matches ->
                 missing_autoplan_matches' missing_autoplan_matches working_set_matches
-                >>= fun working_set_matches ->
-                Abbs_future_combinators.return_ok
-                  {
-                    Keys.Matches.working_set_matches;
-                    all_matches;
-                    all_tag_query_matches;
-                    all_unapplied_matches;
-                    working_layer;
-                  }
+                >>| fun working_set_matches ->
+                {
+                  Keys.Matches.working_set_matches;
+                  all_matches;
+                  all_tag_query_matches;
+                  all_unapplied_matches;
+                  working_layer;
+                }
             | T.Autoapply ->
                 let module V1 = Terrat_base_repo_config_v1 in
                 let module Tcm = Terrat_change_match3 in
@@ -733,7 +723,7 @@ struct
           let open Irm in
           let module M = Keys.Matches in
           go ()
-          >>= fun ({
+          >>| fun ({
                      M.working_set_matches;
                      all_matches;
                      all_unapplied_matches;
@@ -763,41 +753,34 @@ struct
               m "%s : MATCHES : working_layer=%d" (Builder.log_id s) (CCList.length working_layer));
           Logs.info (fun m ->
               m "%s : MATCHES : num_layers=%d" (Builder.log_id s) (CCList.length all_matches));
-          Abbs_future_combinators.return_ok matches)
+          matches)
 
     let working_set_matches =
       run ~name:"working_set_matches" (fun _s { Bs.Fetcher.fetch } ->
           let open Irm in
-          fetch Keys.matches
-          >>= fun { Keys.Matches.working_set_matches; _ } ->
-          Abbs_future_combinators.return_ok working_set_matches)
+          fetch Keys.matches >>| fun { Keys.Matches.working_set_matches; _ } -> working_set_matches)
 
     let all_matches =
       run ~name:"all_matches" (fun _s { Bs.Fetcher.fetch } ->
           let open Irm in
-          fetch Keys.matches
-          >>= fun { Keys.Matches.all_matches; _ } -> Abbs_future_combinators.return_ok all_matches)
+          fetch Keys.matches >>| fun { Keys.Matches.all_matches; _ } -> all_matches)
 
     let all_unapplied_matches =
       run ~name:"all_unapplied_matches" (fun _s { Bs.Fetcher.fetch } ->
           let open Irm in
           fetch Keys.matches
-          >>= fun { Keys.Matches.all_unapplied_matches; _ } ->
-          Abbs_future_combinators.return_ok all_unapplied_matches)
+          >>| fun { Keys.Matches.all_unapplied_matches; _ } -> all_unapplied_matches)
 
     let all_tag_query_matches =
       run ~name:"all_tag_query_matches" (fun _s { Bs.Fetcher.fetch } ->
           let open Irm in
           fetch Keys.matches
-          >>= fun { Keys.Matches.all_tag_query_matches; _ } ->
-          Abbs_future_combinators.return_ok all_tag_query_matches)
+          >>| fun { Keys.Matches.all_tag_query_matches; _ } -> all_tag_query_matches)
 
     let working_layer =
       run ~name:"working_layer" (fun _s { Bs.Fetcher.fetch } ->
           let open Irm in
-          fetch Keys.matches
-          >>= fun { Keys.Matches.working_layer; _ } ->
-          Abbs_future_combinators.return_ok working_layer)
+          fetch Keys.matches >>| fun { Keys.Matches.working_layer; _ } -> working_layer)
 
     let repo_tree_branch_wm_completed =
       run ~name:"repo_tree_branch_wm_completed" (fun s ({ Bs.Fetcher.fetch } as fetcher) ->
@@ -845,12 +828,11 @@ struct
                     db
                     account
                     branch_ref))
-          >>= function
-          | Some tree ->
-              Abbs_future_combinators.return_ok (CCList.map (fun { I.path; _ } -> path) tree)
+          >>? function
+          | Some tree -> Ok (CCList.map (fun { I.path; _ } -> path) tree)
           | None ->
               Logs.err (fun m -> m "%s : EXPECTED_BUILT_REPO_TREE" (Builder.log_id s));
-              Abbs_future_combinators.return_err (`Msg_err "EXPECTED_BUILT_REPO_TREE"))
+              Error (`Msg_err "EXPECTED_BUILT_REPO_TREE"))
 
     let built_repo_config_branch_wm_completed =
       run ~name:"built_repo_config_branch_wm_completed" (fun s ({ Bs.Fetcher.fetch } as fetcher) ->
@@ -958,7 +940,7 @@ struct
                   load_data_chunks kv data_cache_key
               | _ -> Abbs_future_combinators.return_ok None)
           | Error (#Terrat_kv_store.err as err) -> Abbs_future_combinators.return_err err)
-      >>= fun files ->
+      >>| fun files ->
       Logs.info (fun m ->
           m
             "%s : %s : LOAD : cache_key = %a : num_files=%d"
@@ -967,7 +949,7 @@ struct
             Cache.Key.pp
             cache_key
             (CCOption.map_or ~default:0 CCList.length files));
-      Abbs_future_combinators.return_ok files
+      files
 
     let repo_tree_branch =
       run ~name:"repo_tree_branch" (fun s { Bs.Fetcher.fetch } ->
@@ -1032,7 +1014,7 @@ struct
                       cache_key
                       s
                       repo_tree)
-                >>= fun () -> Abbs_future_combinators.return_ok repo_tree)
+                >>| fun () -> repo_tree)
 
     let repo_tree_dest_branch_wm_completed =
       run ~name:"repo_tree_dest_branch_wm_completed" (fun s ({ Bs.Fetcher.fetch } as fetcher) ->
@@ -1071,12 +1053,11 @@ struct
                     time)
                 (fun () ->
                   S.Db.query_repo_tree ~request_id:(Builder.log_id s) db account dest_branch_ref))
-          >>= function
-          | Some tree ->
-              Abbs_future_combinators.return_ok (CCList.map (fun { I.path; _ } -> path) tree)
+          >>? function
+          | Some tree -> Ok (CCList.map (fun { I.path; _ } -> path) tree)
           | None ->
               Logs.err (fun m -> m "%s : EXPECTED_BUILT_REPO_TREE_DEST_BRANCH" (Builder.log_id s));
-              Abbs_future_combinators.return_err (`Msg_err "EXPECTED_BUILT_REPO_TREE_DEST_BRANCH"))
+              Error (`Msg_err "EXPECTED_BUILT_REPO_TREE_DEST_BRANCH"))
 
     let built_repo_config_dest_branch_wm_completed =
       run
@@ -1203,7 +1184,7 @@ struct
                       cache_key
                       s
                       repo_tree)
-                >>= fun () -> Abbs_future_combinators.return_ok repo_tree)
+                >>| fun () -> repo_tree)
 
     let built_repo_config_branch =
       run ~name:"built_repo_config_branch" (fun s { Bs.Fetcher.fetch } ->
@@ -1340,7 +1321,7 @@ struct
             ~repo_config_raw
             s
             fetcher
-          >>= fun repo_config -> Abbs_future_combinators.return_ok (provenance, repo_config))
+          >>| fun repo_config -> (provenance, repo_config))
 
     let derived_repo_config =
       run ~name:"derived_repo_config" (fun s ({ Bs.Fetcher.fetch } as fetcher) ->
@@ -1374,14 +1355,13 @@ struct
             ~repo_config_raw
             s
             fetcher
-          >>= fun repo_config -> Abbs_future_combinators.return_ok (provenance, repo_config))
+          >>| fun repo_config -> (provenance, repo_config))
 
     let repo_config_with_provenance =
       run ~name:"repo_config_with_provenance" (fun _s { Bs.Fetcher.fetch } ->
           let open Irm in
           fetch Keys.derived_repo_config
-          >>= fun repo_config ->
-          fetch Keys.synthesized_config >>= fun _ -> Abbs_future_combinators.return_ok repo_config)
+          >>= fun repo_config -> fetch Keys.synthesized_config >>| fun _ -> repo_config)
 
     let synthesized_config_empty_index =
       run ~name:"synthesized_config_empty_index" (fun _s { Bs.Fetcher.fetch } ->
@@ -1389,15 +1369,14 @@ struct
           fetch Keys.repo_tree_branch
           >>= fun _repo_tree ->
           fetch Keys.derived_repo_config_empty_index
-          >>= fun (_provenance, repo_config) ->
+          >>? fun (_provenance, repo_config) ->
           match
             Terrat_change_match3.synthesize_config
               ~index:Terrat_base_repo_config_v1.Index.empty
               repo_config
           with
-          | Ok synthesized_config -> Abbs_future_combinators.return_ok synthesized_config
-          | Error (#Terrat_change_match3.synthesize_config_err as err) ->
-              Abbs_future_combinators.return_err err)
+          | Ok synthesized_config -> Ok synthesized_config
+          | Error (#Terrat_change_match3.synthesize_config_err as err) -> Error err)
 
     let synthesized_config =
       run ~name:"synthesized_config" (fun _s { Bs.Fetcher.fetch } ->
@@ -1407,17 +1386,15 @@ struct
           fetch Keys.repo_index_branch
           >>= fun index ->
           fetch Keys.derived_repo_config
-          >>= fun (_provenance, repo_config) ->
+          >>? fun (_provenance, repo_config) ->
           match Terrat_change_match3.synthesize_config ~index repo_config with
-          | Ok synthesized_config -> Abbs_future_combinators.return_ok synthesized_config
-          | Error (#Terrat_change_match3.synthesize_config_err as err) ->
-              Abbs_future_combinators.return_err err)
+          | Ok synthesized_config -> Ok synthesized_config
+          | Error (#Terrat_change_match3.synthesize_config_err as err) -> Error err)
 
     let repo_config =
       run ~name:"repo_config" (fun _s { Bs.Fetcher.fetch } ->
           let open Irm in
-          fetch Keys.repo_config_with_provenance
-          >>= fun (_, repo_config) -> Abbs_future_combinators.return_ok repo_config)
+          fetch Keys.repo_config_with_provenance >>| fun (_, repo_config) -> repo_config)
 
     (* Repo config dest branch *)
     let repo_config_dest_branch_raw' =
@@ -1506,7 +1483,7 @@ struct
             ~repo_config_raw
             s
             fetcher
-          >>= fun repo_config -> Abbs_future_combinators.return_ok (provenance, repo_config))
+          >>| fun repo_config -> (provenance, repo_config))
 
     let derived_repo_config_dest_branch =
       run ~name:"derived_repo_config_dest_branch" (fun s ({ Bs.Fetcher.fetch } as fetcher) ->
@@ -1540,15 +1517,13 @@ struct
             ~repo_config_raw
             s
             fetcher
-          >>= fun repo_config -> Abbs_future_combinators.return_ok (provenance, repo_config))
+          >>| fun repo_config -> (provenance, repo_config))
 
     let repo_config_dest_branch_with_provenance =
       run ~name:"repo_config_dest_branch_with_provenance" (fun _s { Bs.Fetcher.fetch } ->
           let open Irm in
           fetch Keys.derived_repo_config_dest_branch
-          >>= fun repo_config ->
-          fetch Keys.synthesized_config_dest_branch
-          >>= fun _ -> Abbs_future_combinators.return_ok repo_config)
+          >>= fun repo_config -> fetch Keys.synthesized_config_dest_branch >>| fun _ -> repo_config)
 
     let synthesized_config_dest_branch_empty_index =
       run ~name:"synthesized_config_dest_branch_empty_index" (fun _s { Bs.Fetcher.fetch } ->
@@ -1556,15 +1531,14 @@ struct
           fetch Keys.repo_tree_dest_branch
           >>= fun _repo_tree ->
           fetch Keys.derived_repo_config_dest_branch_empty_index
-          >>= fun (_provenance, repo_config) ->
+          >>? fun (_provenance, repo_config) ->
           match
             Terrat_change_match3.synthesize_config
               ~index:Terrat_base_repo_config_v1.Index.empty
               repo_config
           with
-          | Ok synthesized_config -> Abbs_future_combinators.return_ok synthesized_config
-          | Error (#Terrat_change_match3.synthesize_config_err as err) ->
-              Abbs_future_combinators.return_err err)
+          | Ok synthesized_config -> Ok synthesized_config
+          | Error (#Terrat_change_match3.synthesize_config_err as err) -> Error err)
 
     let synthesized_config_dest_branch =
       run ~name:"synthesized_config_dest_branch" (fun _s { Bs.Fetcher.fetch } ->
@@ -1574,17 +1548,15 @@ struct
           fetch Keys.repo_index_dest_branch
           >>= fun index ->
           fetch Keys.derived_repo_config_dest_branch
-          >>= fun (_provenance, repo_config) ->
+          >>? fun (_provenance, repo_config) ->
           match Terrat_change_match3.synthesize_config ~index repo_config with
-          | Ok synthesized_config -> Abbs_future_combinators.return_ok synthesized_config
-          | Error (#Terrat_change_match3.synthesize_config_err as err) ->
-              Abbs_future_combinators.return_err err)
+          | Ok synthesized_config -> Ok synthesized_config
+          | Error (#Terrat_change_match3.synthesize_config_err as err) -> Error err)
 
     let repo_config_dest_branch =
       run ~name:"repo_config_dest_branch" (fun _s { Bs.Fetcher.fetch } ->
           let open Irm in
-          fetch Keys.repo_config_dest_branch_with_provenance
-          >>= fun (_, repo_config) -> Abbs_future_combinators.return_ok repo_config)
+          fetch Keys.repo_config_dest_branch_with_provenance >>| fun (_, repo_config) -> repo_config)
 
     let repo_index_branch_wm_completed =
       run ~name:"repo_index_branch_wm_completed" (fun s ({ Bs.Fetcher.fetch } as fetcher) ->
@@ -1645,11 +1617,9 @@ struct
                         time)
                     (fun () ->
                       S.Db.query_index ~request_id:(Builder.log_id s) db account working_branch_ref))
-              >>= function
-              | Some { I.index; _ } -> Abbs_future_combinators.return_ok index
-              | None ->
-                  Abbs_future_combinators.return_err
-                    (`Msg_err "MISSING_REPO_CONFIG_INDEX_DESPITE_WM_COMPLETED")))
+              >>? function
+              | Some { I.index; _ } -> Ok index
+              | None -> Error (`Msg_err "MISSING_REPO_CONFIG_INDEX_DESPITE_WM_COMPLETED")))
 
     let repo_index_branch =
       run ~name:"repo_index_branch" (fun _s { Bs.Fetcher.fetch } ->
@@ -1730,11 +1700,11 @@ struct
                         time)
                     (fun () ->
                       S.Db.query_index ~request_id:(Builder.log_id s) db account dest_branch_ref))
-              >>= function
-              | Some { I.index; _ } -> Abbs_future_combinators.return_ok index
+              >>? function
+              | Some { I.index; _ } -> Ok index
               | None ->
                   Logs.err (fun m -> m "%s : EXPECTED_BUILT_INDEX_DEST_BRANCH" (Builder.log_id s));
-                  Abbs_future_combinators.return_err (`Msg_err "EXPECTED_BUILT_INDEX_DEST_BRANCH")))
+                  Error (`Msg_err "EXPECTED_BUILT_INDEX_DEST_BRANCH")))
 
     let repo_index_dest_branch =
       run ~name:"repo_index_dest_branch" (fun _s { Bs.Fetcher.fetch } ->
@@ -1766,7 +1736,7 @@ struct
                        (CCList.map
                           (fun filename -> Terrat_change.Diff.(Change { filename }))
                           repo_tree))))
-          >>= fun matches ->
+          >>| fun matches ->
           let workflows = Terrat_base_repo_config_v1.workflows repo_config in
           let dirspaceflows =
             let module S = Terrat_base_repo_config_v1.Stacks in
@@ -1791,36 +1761,33 @@ struct
                   })
               matches
           in
-          Abbs_future_combinators.return_ok
-            (CCList.map
-               (fun Terrat_change.
-                      {
-                        Dirspaceflow.dirspace = { Dirspace.dir; workspace } as dirspace;
-                        workflow;
-                        variables;
-                        _;
-                      }
-                  ->
-                 let module Tcm = Terrat_change_match3 in
-                 let module Wmd = Terrat_api_components.Work_manifest_dir in
-                 let { Tcm.Dirspace_config.stack_name; _ } =
-                   CCOption.get_exn_or "dirspaces" @@ Tcm.of_dirspace config dirspace
-                 in
-                 {
-                   Wmd.path = dir;
-                   workspace;
-                   workflow =
-                     CCOption.map
-                       (fun Terrat_change.Dirspaceflow.Workflow.{ idx; _ } -> idx)
-                       workflow;
-                   rank = 0;
-                   variables =
-                     CCOption.map
-                       (fun additional -> Wmd.Variables.make ~additional Json_schema.Empty_obj.t)
-                       variables;
-                   stack_name;
-                 })
-               dirspaceflows))
+          CCList.map
+            (fun Terrat_change.
+                   {
+                     Dirspaceflow.dirspace = { Dirspace.dir; workspace } as dirspace;
+                     workflow;
+                     variables;
+                     _;
+                   }
+               ->
+              let module Tcm = Terrat_change_match3 in
+              let module Wmd = Terrat_api_components.Work_manifest_dir in
+              let { Tcm.Dirspace_config.stack_name; _ } =
+                CCOption.get_exn_or "dirspaces" @@ Tcm.of_dirspace config dirspace
+              in
+              {
+                Wmd.path = dir;
+                workspace;
+                workflow =
+                  CCOption.map (fun Terrat_change.Dirspaceflow.Workflow.{ idx; _ } -> idx) workflow;
+                rank = 0;
+                variables =
+                  CCOption.map
+                    (fun additional -> Wmd.Variables.make ~additional Json_schema.Empty_obj.t)
+                    variables;
+                stack_name;
+              })
+            dirspaceflows)
 
     let branch_dirspaces =
       run ~name:"branch_dirspaces" (fun s { Bs.Fetcher.fetch } ->
@@ -1841,7 +1808,7 @@ struct
                        (CCList.map
                           (fun filename -> Terrat_change.Diff.(Change { filename }))
                           repo_tree))))
-          >>= fun matches ->
+          >>| fun matches ->
           let workflows = Terrat_base_repo_config_v1.workflows repo_config in
           let dirspaceflows =
             let module S = Terrat_base_repo_config_v1.Stacks in
@@ -1866,36 +1833,33 @@ struct
                   })
               matches
           in
-          Abbs_future_combinators.return_ok
-            (CCList.map
-               (fun Terrat_change.
-                      {
-                        Dirspaceflow.dirspace = { Dirspace.dir; workspace } as dirspace;
-                        workflow;
-                        variables;
-                        _;
-                      }
-                  ->
-                 let module Tcm = Terrat_change_match3 in
-                 let module Wmd = Terrat_api_components.Work_manifest_dir in
-                 let { Tcm.Dirspace_config.stack_name; _ } =
-                   CCOption.get_exn_or "dirspaces" @@ Tcm.of_dirspace config dirspace
-                 in
-                 {
-                   Wmd.path = dir;
-                   workspace;
-                   workflow =
-                     CCOption.map
-                       (fun Terrat_change.Dirspaceflow.Workflow.{ idx; _ } -> idx)
-                       workflow;
-                   rank = 0;
-                   variables =
-                     CCOption.map
-                       (fun additional -> Wmd.Variables.make ~additional Json_schema.Empty_obj.t)
-                       variables;
-                   stack_name;
-                 })
-               dirspaceflows))
+          CCList.map
+            (fun Terrat_change.
+                   {
+                     Dirspaceflow.dirspace = { Dirspace.dir; workspace } as dirspace;
+                     workflow;
+                     variables;
+                     _;
+                   }
+               ->
+              let module Tcm = Terrat_change_match3 in
+              let module Wmd = Terrat_api_components.Work_manifest_dir in
+              let { Tcm.Dirspace_config.stack_name; _ } =
+                CCOption.get_exn_or "dirspaces" @@ Tcm.of_dirspace config dirspace
+              in
+              {
+                Wmd.path = dir;
+                workspace;
+                workflow =
+                  CCOption.map (fun Terrat_change.Dirspaceflow.Workflow.{ idx; _ } -> idx) workflow;
+                rank = 0;
+                variables =
+                  CCOption.map
+                    (fun additional -> Wmd.Variables.make ~additional Json_schema.Empty_obj.t)
+                    variables;
+                stack_name;
+              })
+            dirspaceflows)
 
     let compute_node =
       run ~name:"compute_node" (fun s { Bs.Fetcher.fetch } ->
@@ -1917,9 +1881,9 @@ struct
                     ~request_id:(Builder.log_id s)
                     ~compute_node_id
                     db))
-          >>= function
-          | Some compute_node -> Abbs_future_combinators.return_ok compute_node
-          | None -> Abbs_future_combinators.return_err (`Missing_dep_err "compute_node"))
+          >>? function
+          | Some compute_node -> Ok compute_node
+          | None -> Error (`Missing_dep_err "compute_node"))
 
     let access_control =
       run ~name:"access_control" (fun s { Bs.Fetcher.fetch } ->
@@ -1942,23 +1906,22 @@ struct
                     (S.Api.Repo.to_string repo)
                     time)
                 (fun () -> S.Api.fetch_remote_repo ~request_id:(Builder.log_id s) client repo)
-              >>= fun remote_repo ->
+              >>| fun remote_repo ->
               let access_control = Terrat_base_repo_config_v1.access_control repo_config in
-              Abbs_future_combinators.return_ok
-                {
-                  Keys.Access_control_engine.config = access_control;
-                  ctx =
-                    Keys.Access_control_engine.Access_control.Ctx.make
-                      ~request_id:(Builder.log_id s)
-                      ~client
-                      ~config:(S.Api.Config.config (Builder.State.config s))
-                      ~repo
-                      ~user:(S.Api.User.to_string user)
-                      ();
-                  request_id = Builder.log_id s;
-                  user = S.Api.User.to_string user;
-                  policy_branch = S.Api.Remote_repo.default_branch remote_repo;
-                }
+              {
+                Keys.Access_control_engine.config = access_control;
+                ctx =
+                  Keys.Access_control_engine.Access_control.Ctx.make
+                    ~request_id:(Builder.log_id s)
+                    ~client
+                    ~config:(S.Api.Config.config (Builder.State.config s))
+                    ~repo
+                    ~user:(S.Api.User.to_string user)
+                    ();
+                request_id = Builder.log_id s;
+                user = S.Api.User.to_string user;
+                policy_branch = S.Api.Remote_repo.default_branch remote_repo;
+              }
           | None -> assert false)
 
     let applied_dirspaces =
@@ -2012,8 +1975,8 @@ struct
               | Some checks ->
                   fetch Keys.publish_comment
                   >>= fun publish_comment ->
-                  publish_comment' publish_comment (Msg.Tier_check checks)
-                  >>= fun () -> Abbs_future_combinators.return_err `Noop)
+                  publish_comment' publish_comment (Msg.Tier_check checks) >>? fun () -> Error `Noop
+              )
           | None -> Abbs_future_combinators.return_ok ())
 
     let check_account_status_expired =
@@ -2036,8 +1999,7 @@ struct
               Logs.info (fun m -> m "%s : ACCOUNT_EXPIRED" (Builder.log_id s));
               fetch Keys.publish_comment
               >>= fun publish_comment ->
-              publish_comment' publish_comment Msg.Account_expired
-              >>= fun () -> Abbs_future_combinators.return_err `Noop)
+              publish_comment' publish_comment Msg.Account_expired >>? fun () -> Error `Noop)
 
     let publish_dest_branch_no_match =
       run ~name:"publish_dest_branch_no_match" (fun _s { Bs.Fetcher.fetch } ->
@@ -2164,8 +2126,7 @@ struct
                         "%s : DEST_BRANCH_NOT_VALID_BRANCH_EXPLICIT : branch=%s"
                         (Builder.log_id s)
                         (S.Api.Ref.to_string base_branch_name));
-                  fetch Keys.publish_dest_branch_no_match
-                  >>= fun () -> Abbs_future_combinators.return_err `Noop
+                  fetch Keys.publish_dest_branch_no_match >>? fun () -> Error `Noop
               | T.Gate_approval _ | T.Help | T.Index | T.Repo_config | T.Unlock _ | T.Push ->
                   assert false)
           | Error `No_matching_source_branch -> (
@@ -2186,8 +2147,7 @@ struct
                         "%s : SOURCE_BRANCH_NOT_VALID_BRANCH_EXPLICIT : branch=%s"
                         (Builder.log_id s)
                         (S.Api.Ref.to_string branch_name));
-                  fetch Keys.publish_dest_branch_no_match
-                  >>= fun () -> Abbs_future_combinators.return_err `Noop
+                  fetch Keys.publish_dest_branch_no_match >>? fun () -> Error `Noop
               | T.Gate_approval _ | T.Help | T.Index | T.Repo_config | T.Unlock _ | T.Push ->
                   assert false))
 
@@ -2389,8 +2349,7 @@ struct
                       ~compute_node_id:compute_node.C.id
                       db
                       C.State.Terminated))
-            >>= fun () ->
-            Abbs_future_combinators.return_ok (Wmc.Work_manifest_done { Wmd.type_ = `Done })
+            >>| fun () -> Wmc.Work_manifest_done { Wmd.type_ = `Done }
         | None -> (
             match work_manifest with
             | { Wm.state = Wm.State.(Completed | Aborted); _ } ->
@@ -2427,12 +2386,9 @@ struct
                               ~request_id:(Builder.log_id s)
                               ~compute_node_id:compute_node.C.id
                               db))
-                    >>= function
-                    | Some { Cw.work = wm_response; _ } ->
-                        Abbs_future_combinators.return_ok wm_response
-                    | None ->
-                        Abbs_future_combinators.return_ok
-                          (Wmc.Work_manifest_done { Wmd.type_ = `Done }))
+                    >>| function
+                    | Some { Cw.work = wm_response; _ } -> wm_response
+                    | None -> Wmc.Work_manifest_done { Wmd.type_ = `Done })
                 | Error (#Builder.err as err) ->
                     (* If anything failed, be sure to return to the querying node to give up. *)
                     Logs.info (fun m -> m "%s : %a" (Builder.log_id s) Builder.pp_err err);
@@ -2535,8 +2491,7 @@ struct
                   context.Tjc.Context.id
                   log_id);
             Fc.to_result @@ Fc.ignore @@ Builder.eval s' Keys.iter_job
-            >>= fun () ->
-            Abbs_future_combinators.return_ok (Wmc.Work_manifest_done { Wmd.type_ = `Done })
+            >>| fun () -> Wmc.Work_manifest_done { Wmd.type_ = `Done }
         | None ->
             Logs.err (fun m -> m "%s : JOB_NOT_FOUND" (Builder.log_id s));
             assert false
@@ -2828,7 +2783,7 @@ struct
               Uuidm.pp
               work_manifest_id
               run_id);
-        fail_running_job s work_manifest_id >>= fun () -> Abbs_future_combinators.return_err `Noop
+        fail_running_job s work_manifest_id >>? fun () -> Error `Noop
       in
       let dispatch_fail_event s work_manifest run_id =
         Logs.info (fun m ->

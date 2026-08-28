@@ -116,7 +116,7 @@ struct
         fetch Keys.create_commit_checks
         >>= fun create_commit_checks ->
         create_commit_checks' create_commit_checks branch_ref [ check ]
-        >>= fun () -> Abbs_future_combinators.return_ok [ work_manifest ]
+        >>| fun () -> [ work_manifest ]
     | Some _ ->
         fetch Keys.commit_checks
         >>= fun commit_checks ->
@@ -137,8 +137,7 @@ struct
         in
         fetch Keys.create_commit_checks
         >>= fun create_commit_checks ->
-        create_commit_checks' create_commit_checks branch_ref unfinished_checks
-        >>= fun () -> Abbs_future_combinators.return_ok []
+        create_commit_checks' create_commit_checks branch_ref unfinished_checks >>| fun () -> []
 
   let initiate ~branch ({ Wm.id; _ } as work_manifest) s { Bs.Fetcher.fetch } =
     let open Irm in
@@ -197,7 +196,7 @@ struct
                index)
           ~file_list:repo_tree
           repo_config_raw)
-    >>= fun repo_config ->
+    >>| fun repo_config ->
     let module B = Terrat_api_components.Work_manifest_build_config in
     let config =
       repo_config
@@ -208,7 +207,7 @@ struct
       Terrat_api_components.Work_manifest.Work_manifest_build_config
         { B.base_ref = S.Api.Ref.to_string dest_branch_name; token; type_ = `Build_config; config }
     in
-    Abbs_future_combinators.return_ok response
+    response
 
   let fail ~branch work_manifest s { Bs.Fetcher.fetch } =
     let open Irm in
@@ -263,11 +262,11 @@ struct
       fetch Keys.publish_comment
       >>= fun publish_comment ->
       publish_comment' publish_comment msg
-      >>= fun () ->
+      >>? fun () ->
       (* No config was built.  Stop here rather than return [Ok], which marks
          the work manifest completed and sends whoever wanted the config
          looking for one that does not exist. *)
-      Abbs_future_combinators.return_err `Silent_failure
+      Error `Silent_failure
     in
     match result with
     | Wmr.Work_manifest_build_config_result { Bc.config } -> (

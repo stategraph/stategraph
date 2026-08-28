@@ -959,7 +959,7 @@ module Db = struct
                           title,
                           user ) ))
                     pr_ids)
-              >>= fun rows -> Abbs_future_combinators.return_ok (index_rows_by_id rows)
+              >>| fun rows -> index_rows_by_id rows
         in
         let fetch_drift_details drift_ids =
           match drift_ids with
@@ -974,7 +974,7 @@ module Db = struct
                     (Sql.select_drift_work_manifests_batch ())
                     ~f:(fun id branch _reconcile -> (id, branch))
                     drift_ids)
-              >>= fun rows -> Abbs_future_combinators.return_ok (index_rows_by_id rows)
+              >>| fun rows -> index_rows_by_id rows
         in
         let resolve_targets pr_tbl drift_tbl wms =
           CCList.filter_map
@@ -1046,7 +1046,7 @@ module Db = struct
           fetch_pull_request_details (CCList.map (fun wm -> wm.Wm.id) pr_wms)
           >>= fun pr_tbl ->
           fetch_drift_details (CCList.map (fun wm -> wm.Wm.id) drift_wms)
-          >>= fun drift_tbl ->
+          >>? fun drift_tbl ->
           let results = resolve_targets pr_tbl drift_tbl wms in
           if CCList.length results <> CCList.length wms then (
             Logs.info (fun m ->
@@ -1055,8 +1055,8 @@ module Db = struct
                   request_id
                   (CCList.length wms)
                   (CCList.length results));
-            Abbs_future_combinators.return_err `Error)
-          else Abbs_future_combinators.return_ok results
+            Error `Error)
+          else Ok results
         in
         let open Abb.Future.Infix_monad in
         run
@@ -1698,12 +1698,12 @@ module Db = struct
                   m "%s : QUERY_WORK_MANIFEST : id=%a : time=%f" request_id Uuidm.pp id time))
             (fun () ->
               query_work_manifest ~request_id db id
-              >>= function
+              >>| function
               | Some wm ->
                   let module Wm = Terrat_work_manifest3 in
                   assert (wm.Wm.state = Wm.State.Queued);
-                  Abbs_future_combinators.return_ok (Some wm)
-              | None -> Abbs_future_combinators.return_ok None)
+                  Some wm
+              | None -> None)
       | _ :: _ -> assert false
     in
     let open Abb.Future.Infix_monad in
@@ -1885,20 +1885,18 @@ module Db = struct
           Abbs_future_combinators.List_result.map
             ~f:(query_work_manifest ~request_id db)
             conflicting
-          >>= fun wms ->
-          Abbs_future_combinators.return_ok
-            (Some
-               (Terrat_vcs_provider2.Conflicting_work_manifests.Conflicting
-                  (CCList.filter_map CCFun.id wms)))
+          >>| fun wms ->
+          Some
+            (Terrat_vcs_provider2.Conflicting_work_manifests.Conflicting
+               (CCList.filter_map CCFun.id wms))
       | _, (_ :: _ as maybe_stale) ->
           Abbs_future_combinators.List_result.map
             ~f:(query_work_manifest ~request_id db)
             maybe_stale
-          >>= fun wms ->
-          Abbs_future_combinators.return_ok
-            (Some
-               (Terrat_vcs_provider2.Conflicting_work_manifests.Maybe_stale
-                  (CCList.filter_map CCFun.id wms)))
+          >>| fun wms ->
+          Some
+            (Terrat_vcs_provider2.Conflicting_work_manifests.Maybe_stale
+               (CCList.filter_map CCFun.id wms))
       | _, _ -> Abbs_future_combinators.return_ok None
     in
     let open Abb.Future.Infix_monad in
@@ -1969,20 +1967,18 @@ module Db = struct
           Abbs_future_combinators.List_result.map
             ~f:(query_work_manifest ~request_id db)
             conflicting
-          >>= fun wms ->
-          Abbs_future_combinators.return_ok
-            (Some
-               (Terrat_vcs_provider2.Conflicting_work_manifests.Conflicting
-                  (CCList.filter_map CCFun.id wms)))
+          >>| fun wms ->
+          Some
+            (Terrat_vcs_provider2.Conflicting_work_manifests.Conflicting
+               (CCList.filter_map CCFun.id wms))
       | _, (_ :: _ as maybe_stale) ->
           Abbs_future_combinators.List_result.map
             ~f:(query_work_manifest ~request_id db)
             maybe_stale
-          >>= fun wms ->
-          Abbs_future_combinators.return_ok
-            (Some
-               (Terrat_vcs_provider2.Conflicting_work_manifests.Maybe_stale
-                  (CCList.filter_map CCFun.id wms)))
+          >>| fun wms ->
+          Some
+            (Terrat_vcs_provider2.Conflicting_work_manifests.Maybe_stale
+               (CCList.filter_map CCFun.id wms))
       | _, _ -> Abbs_future_combinators.return_ok None
     in
     let open Abb.Future.Infix_monad in
@@ -2015,7 +2011,7 @@ module Db = struct
             job_id)
       >>= fun ids ->
       Abbs_future_combinators.List_result.map ~f:(query_work_manifest ~request_id db) ids
-      >>= fun wms -> Abbs_future_combinators.return_ok (CCList.filter_map CCFun.id wms)
+      >>| fun wms -> CCList.filter_map CCFun.id wms
     in
     let open Abb.Future.Infix_monad in
     run
@@ -2199,7 +2195,7 @@ module Db = struct
                 work_manifest_id
                 dirspace.Terrat_dirspace.dir
                 dirspace.Terrat_dirspace.workspace)
-          >>= fun () -> Abbs_future_combinators.return_ok (Some data)
+          >>| fun () -> Some data
     in
     let open Abb.Future.Infix_monad in
     run
@@ -2351,22 +2347,18 @@ module Apply_requirements = struct
             | { Tprr.user = Some user; _ } -> (
                 let user = Api.User.make user in
                 match_query ~request_id client repo user query
-                >>= function
-                | true -> Abbs_future_combinators.return_ok (Some user)
-                | false -> Abbs_future_combinators.return_ok None)
+                >>| function
+                | true -> Some user
+                | false -> None)
             | _ -> Abbs_future_combinators.return_ok None)
           approved_reviews
-        >>= fun matching_reviews ->
+        >>| fun matching_reviews ->
         (* [query] is something like "user:foo" or "team:bar" and
            [approved_reviews] are the list of reviews for this PR.
            [matching_reviews] are the users that match this query. *)
-        Abbs_future_combinators.return_ok
-          (CCList.fold_left
-             (fun acc user -> Match_map.add_to_list query user acc)
-             acc
-             matching_reviews))
+        CCList.fold_left (fun acc user -> Match_map.add_to_list query user acc) acc matching_reviews)
       combined_queries
-    >>= fun matching_reviews ->
+    >>| fun matching_reviews ->
     (* [matching_reviews] is a map from a query to those users that approved and
        match that query. *)
     let all_of_results, all_of_missing =
@@ -2397,11 +2389,10 @@ module Apply_requirements = struct
           (Bool.to_string any_of_passed));
     (* Considered approved if all "all_of" passes and any "any_of" passes OR
          "all of" and "any of" are empty and the approvals is more than count *)
-    Abbs_future_combinators.return_ok
-      ( all_of_passed && any_of_passed && required_reviews_passed,
-        missing_reviews,
-        missing_any_of,
-        any_of_count )
+    ( all_of_passed && any_of_passed && required_reviews_passed,
+      missing_reviews,
+      missing_any_of,
+      any_of_count )
 
   let eval ~request_id _config _user client repo_config pull_request dirspace_configs =
     let max_parallel = 20 in
@@ -2513,7 +2504,7 @@ module Apply_requirements = struct
                   approved
                   approved_reviews
                   requested_reviews
-                >>= fun (approved_result, missing_reviews, missing_any_of_count, any_of_count) ->
+                >>| fun (approved_result, missing_reviews, missing_any_of_count, any_of_count) ->
                 let module Ac = Terrat_base_repo_config_v1.Apply_requirements.Approved in
                 let { Ac.any_of; _ } = approved in
                 let ignore_matching = status_checks.Sc.ignore_matching in
@@ -2611,7 +2602,7 @@ module Apply_requirements = struct
                       (Bool.to_string merged)
                       (Bool.to_string ready_for_review)
                       (Bool.to_string passed));
-                Abbs_future_combinators.return_ok apply_requirements
+                apply_requirements
             | None ->
                 Logs.info (fun m -> m "%s : NO_APPLY_REQUIREMENTS_MATCHED" request_id);
                 Abbs_future_combinators.return_ok
@@ -2691,8 +2682,8 @@ module Tier = struct
       Sql.select_users_this_month
       ~f:(fun user created_at -> (user, created_at))
       (CCInt64.of_int @@ Api.Account.id account)
-    >>= function
-    | [] -> Abbs_future_combinators.return_ok None
+    >>| function
+    | [] -> None
     | users -> (
         let user = Api.User.to_string user in
         let all_users = Sln_set.String.dedup_list (user :: CCList.map fst users) in
@@ -2711,8 +2702,8 @@ module Tier = struct
                 Logs.info (fun m ->
                     m "%s : TIER_CHECK : user=%s : first_run=%s" request_id user first_run))
               users;
-            Abbs_future_combinators.return_ok (Some { Terrat_tier.Check.users = all_users; limit })
-        | _ -> Abbs_future_combinators.return_ok None)
+            Some { Terrat_tier.Check.users = all_users; limit }
+        | _ -> None)
 
   let runs_usage' ~request_id account limit db =
     if limit = CCInt.max_int then Abbs_future_combinators.return_ok None
@@ -2734,10 +2725,10 @@ module Tier = struct
   let check_runs_per_month ~request_id account limit db =
     let open Abbs_future_combinators.Infix_result_monad in
     runs_usage' ~request_id account limit db
-    >>= function
+    >>| function
     | Some { Terrat_tier.Check.used; limit } when used >= limit ->
-        Abbs_future_combinators.return_ok (Some { Terrat_tier.Check.used; limit })
-    | Some _ | None -> Abbs_future_combinators.return_ok None
+        Some { Terrat_tier.Check.used; limit }
+    | Some _ | None -> None
 
   let runs_usage ~request_id account db =
     let run =
@@ -2777,12 +2768,11 @@ module Tier = struct
           check_users_per_month ~request_id user account num_users_per_month db
           >>= fun users_check ->
           check_runs_per_month ~request_id account runs_per_month db
-          >>= fun runs_check ->
+          >>| fun runs_check ->
           match (users_check, runs_check) with
-          | None, None -> Abbs_future_combinators.return_ok None
+          | None, None -> None
           | users_per_month, runs_per_month ->
-              Abbs_future_combinators.return_ok
-                (Some { Terrat_tier.Check.tier_name; users_per_month; runs_per_month }))
+              Some { Terrat_tier.Check.tier_name; users_per_month; runs_per_month })
     in
     let open Abb.Future.Infix_monad in
     run
@@ -4332,7 +4322,7 @@ module Repo_config = struct
         @@ CCResult.map_err
              (fun (`Yaml_decode_err err) -> `Yaml_decode_err (fname, err))
              (Jsonu.of_yaml_string content)
-        >>= fun json -> Abbs_future_combinators.return_ok (Some (fname, json))
+        >>| fun json -> Some (fname, json)
 
   (* Config parity (#1442): [.stategraph/config] wins when both exist;
        [.terrateam/config] keeps working so existing repos need no rename. *)
@@ -4381,8 +4371,7 @@ module Repo_config = struct
     let validate_configs =
       Abbs_future_combinators.List_result.iter ~f:(function
         | Some (fname, json) ->
-            wrap_err fname (Abb.Future.return (V1.of_version_1_json json))
-            >>= fun _ -> Abbs_future_combinators.return_ok ()
+            wrap_err fname (Abb.Future.return (V1.of_version_1_json json)) >>| fun _ -> ()
         | None -> Abbs_future_combinators.return_ok ())
     in
     let get_json = function
@@ -4440,7 +4429,7 @@ module Repo_config = struct
             "default"
             (Abb.Future.return (V1.of_version_1_json (get_json default_repo_config)))
       <*> wrap_err "repo" (Abb.Future.return (V1.of_version_1_json (get_json repo_config))))
-    >>= fun (default_repo_config, repo_config) ->
+    >>? fun (default_repo_config, repo_config) ->
     let final_repo_config =
       Terrat_base_repo_config_v1.merge_with_default_branch_config
         ~default:default_repo_config
@@ -4451,10 +4440,10 @@ module Repo_config = struct
            functionality and is surprised when it doesn't work. *)
     match V1.to_view final_repo_config with
     | { V1.View.access_control = { V1.Access_control.enabled = true; _ }; _ } ->
-        Abbs_future_combinators.return_err (`Premium_feature_err `Access_control)
+        Error (`Premium_feature_err `Access_control)
     | { V1.View.drift = { V1.Drift.enabled = true; schedules }; _ }
       when Sln_map.String.cardinal schedules > 1 ->
-        Abbs_future_combinators.return_err (`Premium_feature_err `Multiple_drift_schedules)
+        Error (`Premium_feature_err `Multiple_drift_schedules)
     | { V1.View.apply_requirements = { V1.Apply_requirements.checks; _ }; _ }
       when CCList.exists
              (fun {
@@ -4463,14 +4452,13 @@ module Repo_config = struct
                     _;
                   }
                 -> require_completed_reviews)
-             checks ->
-        Abbs_future_combinators.return_err (`Premium_feature_err `Require_completed_reviews)
+             checks -> Error (`Premium_feature_err `Require_completed_reviews)
     | {
      V1.View.notifications =
        { V1.Notifications.summary = { V1.Notifications.Summary.enabled = true }; _ };
      _;
-    } -> Abbs_future_combinators.return_err (`Premium_feature_err `Notifications_summary)
-    | _ -> Abbs_future_combinators.return_ok (provenance, final_repo_config)
+    } -> Error (`Premium_feature_err `Notifications_summary)
+    | _ -> Ok (provenance, final_repo_config)
 end
 
 module Access_control = struct
@@ -4662,9 +4650,9 @@ module Work_manifest = struct
       Openapic_abb.call
         (Api.Client.to_native client)
         Pipeline_api.(make ~body (Parameters.make ~id:(CCInt.to_string @@ Api.Repo.id repo)))
-      >>= fun resp ->
+      >>? fun resp ->
       match Openapi.Response.value resp with
-      | `Created _ -> Abbs_future_combinators.return_ok ()
+      | `Created _ -> Ok ()
       | `Bad_request json
         when CCString.find ~sub:"Identity verification is required in order to run CI jobs"
              @@ Yojson.Safe.to_string json
@@ -4672,8 +4660,7 @@ module Work_manifest = struct
           (* The above is cheap trick to determine if our specific error message
              we care about is somewhere in the JSON error rather than decoding
              it. *)
-          Abbs_future_combinators.return_err
-            (`Failed_to_start_with_msg_err "IDENTITY_VERIFICATION_ERR")
+          Error (`Failed_to_start_with_msg_err "IDENTITY_VERIFICATION_ERR")
       | `Bad_request json
         when CCString.find
                ~sub:"Given inputs not defined in the `spec` section"
@@ -4681,10 +4668,8 @@ module Work_manifest = struct
              <> -1 ->
           let err_msg = "Given inputs not defined in the `spec` section" in
           Logs.err (fun m -> m "%s : %s : %s" request_id err_msg (Yojson.Safe.to_string json));
-          Abbs_future_combinators.return_err
-            (`Failed_to_start_with_msg_err "GITLAB_INPUTS_MISSING_DEFAULTS")
-      | (`Bad_request _ | `Unauthorized _ | `Forbidden _ | `Not_found _) as err ->
-          Abbs_future_combinators.return_err err
+          Error (`Failed_to_start_with_msg_err "GITLAB_INPUTS_MISSING_DEFAULTS")
+      | (`Bad_request _ | `Unauthorized _ | `Forbidden _ | `Not_found _) as err -> Error err
     in
     let open Abb.Future.Infix_monad in
     run
@@ -4841,7 +4826,7 @@ module Work_manifest = struct
                 }
           | Terrat_vcs_provider2.Target.Drift { repo = _; branch } ->
               Pgsql_io.Prepared_stmt.execute db (Sql.insert_drift_work_manifest ()) id branch
-              >>= fun () -> Abbs_future_combinators.return_ok work_manifest)
+              >>| fun () -> work_manifest)
     in
     let open Abb.Future.Infix_monad in
     run
@@ -5701,7 +5686,7 @@ module Job_context = struct
         match state with
         | Terrat_job_context.Job.State.(Completed | Failed) ->
             Pgsql_io.Prepared_stmt.fetch db Sql.abort_live_work_manifests_for_job ~f:CCFun.id job_id
-            >>= fun ids ->
+            >>| fun ids ->
             CCList.iter
               (fun id ->
                 Logs.info (fun m ->
@@ -5713,7 +5698,7 @@ module Job_context = struct
                       Uuidm.pp
                       id))
               ids;
-            Abb.Future.return (Ok ())
+            ()
         | Terrat_job_context.Job.State.Running -> Abb.Future.return (Ok ())
       in
       let open Abb.Future.Infix_monad in

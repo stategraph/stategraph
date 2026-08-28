@@ -536,8 +536,7 @@ module Cp = struct
             Abbs_future_combinators.all chunks
             >>= fun results ->
             let open Abbs_future_combinators.Infix_result_monad in
-            Abb.Future.return (CCResult.flatten_l results)
-            >>= fun _ -> Abbs_future_combinators.return_ok ()
+            Abb.Future.return (CCResult.flatten_l results) >>| fun _ -> ()
         | Ok n ->
             let chunk = Base64.encode_string @@ Bytes.sub_string buf 0 n in
             let checksum = "sha256:" ^ Sha256.(to_hex @@ string chunk) in

@@ -308,8 +308,8 @@ let fetch_branch_sha ~request_id client repo ref_ =
       ~repo:repo.Repo.name
       ~branch:ref_
       client.Client.client
-    >>= fun { B.primary = { B.Primary.commit = { C.primary = { C.Primary.sha; _ }; _ }; _ }; _ } ->
-    Abbs_future_combinators.return_ok sha
+    >>| fun { B.primary = { B.Primary.commit = { C.primary = { C.Primary.sha; _ }; _ }; _ }; _ } ->
+    sha
   in
   let open Abb.Future.Infix_monad in
   ret
@@ -391,9 +391,9 @@ let fetch_centralized_repo ~request_id client owner =
 let create_client' config { Account.installation_id } =
   let open Abbs_future_combinators.Infix_result_monad in
   Terrat_github.get_installation_access_token config.Config.github installation_id
-  >>= fun access_token ->
+  >>| fun access_token ->
   let github_client = Terrat_github.create config.Config.github (`Token access_token) in
-  Abbs_future_combinators.return_ok github_client
+  github_client
 
 let create_client ~request_id config account _db =
   let open Abb.Future.Infix_monad in
@@ -521,10 +521,10 @@ let fetch_diff_files ~request_id ~base_ref ~branch_ref repo client =
       ~base_ref:(Ref.to_string base_ref)
       ~branch_ref:(Ref.to_string branch_ref)
       client.Client.client
-    >>= fun github_diff ->
+    >>| fun github_diff ->
     (* TODO: Unique the diff?  Not sure if this is necessary? *)
     let diff = diff_of_github_diff github_diff in
-    Abbs_future_combinators.return_ok diff
+    diff
   in
   let open Abb.Future.Infix_monad in
   run
@@ -540,9 +540,9 @@ let fetch_diff_files ~request_id ~base_ref ~branch_ref repo client =
 let fetch_diff ~client ~owner ~repo pull_number =
   let open Abbs_future_combinators.Infix_result_monad in
   Terrat_github.fetch_pull_request_files ~owner ~repo ~pull_number client.Client.client
-  >>= fun github_diff ->
+  >>| fun github_diff ->
   let diff = diff_of_github_diff github_diff in
-  Abbs_future_combinators.return_ok diff
+  diff
 
 let fetch_pull_request' request_id _account client repo pull_request_id =
   let owner = repo.Repo.owner in
@@ -556,7 +556,7 @@ let fetch_pull_request' request_id _account client repo pull_request_id =
           ~pull_number:pull_request_id
           client.Client.client
     <*> fetch_diff ~client ~owner ~repo:repo_name pull_request_id)
-  >>= fun (pr, diff) ->
+  >>| fun (pr, diff) ->
   let module Ghc_comp = Githubc2_components in
   let module Pr = Ghc_comp.Pull_request in
   let module Head = Pr.Primary.Head in
@@ -601,27 +601,26 @@ let fetch_pull_request' request_id _account client repo pull_request_id =
         mergeable_state
         (CCOption.get_or ~default:"" merge_commit_sha)
         (CCOption.get_or ~default:"" merged_at));
-  Abbs_future_combinators.return_ok
-    (Terrat_pull_request.make
-       ~base_branch_name
-       ~base_ref:base_sha
-       ~branch_name
-       ~branch_ref:head_sha
-       ~id:pull_request_id
-       ~state:
-         (match (merge_commit_sha, state, merged, merged_at) with
-         | _, `Open, _, _ -> Terrat_pull_request.State.Open
-         | Some merge_commit_sha, `Closed, true, Some merged_at ->
-             Terrat_pull_request.State.(Merged Merged.{ merged_hash = merge_commit_sha; merged_at })
-         | _, `Closed, false, _ -> Terrat_pull_request.State.Closed
-         | _, _, _, _ -> assert false)
-       ~title:(Some title)
-       ~user:(Some login)
-       ~repo
-       ~diff
-       ~draft
-       ~provisional_merge_ref:merge_commit_sha
-       ())
+  Terrat_pull_request.make
+    ~base_branch_name
+    ~base_ref:base_sha
+    ~branch_name
+    ~branch_ref:head_sha
+    ~id:pull_request_id
+    ~state:
+      (match (merge_commit_sha, state, merged, merged_at) with
+      | _, `Open, _, _ -> Terrat_pull_request.State.Open
+      | Some merge_commit_sha, `Closed, true, Some merged_at ->
+          Terrat_pull_request.State.(Merged Merged.{ merged_hash = merge_commit_sha; merged_at })
+      | _, `Closed, false, _ -> Terrat_pull_request.State.Closed
+      | _, _, _, _ -> assert false)
+    ~title:(Some title)
+    ~user:(Some login)
+    ~repo
+    ~diff
+    ~draft
+    ~provisional_merge_ref:merge_commit_sha
+    ()
 
 let fetch_pull_request ~request_id account client repo pull_request_id =
   let open Abb.Future.Infix_monad in
@@ -865,20 +864,19 @@ let fetch_pull_request_requested_reviews ~request_id repo pull_number client =
       client.Client.client
       Githubc2_pulls.List_requested_reviewers.(
         make (Parameters.make ~owner:repo.Repo.owner ~repo:repo.Repo.name ~pull_number))
-    >>= fun resp ->
+    >>| fun resp ->
     let module Rr = Githubc2_components.Pull_request_review_request in
     let (`OK { Rr.primary = { Rr.Primary.teams; users }; _ }) = Openapi.Response.value resp in
     let module T = Githubc2_components_team in
     let module U = Githubc2_components_simple_user in
-    Abbs_future_combinators.return_ok
-      (CCList.map
-         (fun { T.primary = { T.Primary.name; _ }; _ } ->
-           Terrat_base_repo_config_v1.Access_control.Match.Team name)
-         teams
-      @ CCList.map
-          (fun { U.primary = { U.Primary.login; _ }; _ } ->
-            Terrat_base_repo_config_v1.Access_control.Match.User login)
-          users)
+    CCList.map
+      (fun { T.primary = { T.Primary.name; _ }; _ } ->
+        Terrat_base_repo_config_v1.Access_control.Match.Team name)
+      teams
+    @ CCList.map
+        (fun { U.primary = { U.Primary.login; _ }; _ } ->
+          Terrat_base_repo_config_v1.Access_control.Match.User login)
+        users
   in
   let open Abb.Future.Infix_monad in
   run
@@ -987,11 +985,11 @@ let merge_pull_request' ?(retain_pr_title = false) request_id client pull_reques
                 ~owner:repo.Repo.owner
                 ~repo:repo.Repo.name
                 ~pull_number:(Terrat_pull_request.id pull_request)))
-      >>= fun resp ->
+      >>? fun resp ->
       match Openapi.Response.value resp with
-      | `OK _ -> Abbs_future_combinators.return_ok ()
+      | `OK _ -> Ok ()
       | (`Method_not_allowed _ | `Conflict _ | `Forbidden _ | `Not_found _ | `Unprocessable_entity _)
-        as err -> Abbs_future_combinators.return_err err)
+        as err -> Error err)
   | (`Conflict _ | `Forbidden _ | `Method_not_allowed _ | `Not_found _ | `Unprocessable_entity _) as
     err -> Abbs_future_combinators.return_err err
 
@@ -1051,9 +1049,9 @@ let delete_branch' request_id client repo branch =
     client.Client.client
     Githubc2_git.Delete_ref.(
       make Parameters.(make ~owner:repo.Repo.owner ~repo:repo.Repo.name ~ref_:("heads/" ^ branch)))
-  >>= fun resp ->
+  >>| fun resp ->
   match Openapi.Response.value resp with
-  | `No_content -> Abbs_future_combinators.return_ok ()
+  | `No_content -> ()
   | `Unprocessable_entity err ->
       Logs.info (fun m ->
           m
@@ -1064,7 +1062,7 @@ let delete_branch' request_id client repo branch =
             branch
             Githubc2_git.Delete_ref.Responses.Unprocessable_entity.pp
             err);
-      Abbs_future_combinators.return_ok ()
+      ()
   | `Conflict err ->
       Logs.info (fun m ->
           m
@@ -1075,7 +1073,7 @@ let delete_branch' request_id client repo branch =
             branch
             Githubc2_components.Basic_error.pp
             err);
-      Abbs_future_combinators.return_ok ()
+      ()
 
 let delete_branch ~request_id client repo branch =
   let open Abb.Future.Infix_monad in

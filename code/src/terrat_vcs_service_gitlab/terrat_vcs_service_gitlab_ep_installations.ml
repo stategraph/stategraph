@@ -157,22 +157,21 @@ module Make (S : S with type Account_id.t = int) = struct
       Openapic_abb.call
         client
         G.(make (Parameters.make ~id:(CCInt.to_string installation_id) ~user_id))
-      >>= fun resp ->
+      >>? fun resp ->
       let module M = Gitlabc_components.API_Entities_Member in
       match Openapi.Response.value resp with
       | `OK { M.access_level; _ } ->
-          if access_level >= 40 then Abbs_future_combinators.return_ok ()
-          else Abbs_future_combinators.return_err (`Access_level_err access_level)
-      | `Not_found -> Abbs_future_combinators.return_err `User_not_found_in_group_err
+          if access_level >= 40 then Ok () else Error (`Access_level_err access_level)
+      | `Not_found -> Error `User_not_found_in_group_err
 
     let fetch_group_name client installation_id =
       let open Abbs_future_combinators.Infix_result_monad in
       let module G = Gitlabc_groups.GetApiV4GroupsId in
       Openapic_abb.call client G.(make (Parameters.make ~id:(CCInt.to_string installation_id) ()))
-      >>= fun resp ->
+      >>| fun resp ->
       let module Group = Gitlabc_components.API_Entities_GroupDetail in
       let (`OK { Group.name; _ }) = Openapi.Response.value resp in
-      Abbs_future_combinators.return_ok name
+      name
 
     let get' config storage user installation_id webhook_url =
       let module Oauth = Terrat_vcs_service_gitlab_user.Oauth in

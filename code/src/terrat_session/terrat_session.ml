@@ -48,9 +48,9 @@ module Cookie = struct
                 ~f:(fun id ->
                   Terrat_user.make ~access_token_id:uuid ~capabilities:default_caps ~id ())
                 uuid
-              >>= function
-              | [] -> Abbs_future_combinators.return_ok None
-              | user :: _ -> Abbs_future_combinators.return_ok (Some user))
+              >>| function
+              | [] -> None
+              | user :: _ -> Some user)
         in
         let open Abb.Future.Infix_monad in
         load
@@ -201,7 +201,7 @@ let rem_session storage ctx =
         let token = CCOption.get_exn_or ("token: " ^ token) (Uuidm.of_string token) in
         Pgsql_pool.with_conn storage ~f:(fun db ->
             Pgsql_io.Prepared_stmt.execute db Cookie.Sql.delete token)
-        >>= fun () -> Abbs_future_combinators.return_ok (Brtl_mw_session.rem_session_value key ctx)
+        >>| fun () -> Brtl_mw_session.rem_session_value key ctx
     | None -> Abbs_future_combinators.return_ok ctx
   in
   let open Abb.Future.Infix_monad in

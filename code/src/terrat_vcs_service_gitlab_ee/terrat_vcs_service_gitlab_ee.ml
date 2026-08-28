@@ -77,7 +77,7 @@ module Provider : module type of Terrat_vcs_service_gitlab_provider = struct
           @@ CCResult.map_err
                (fun (`Yaml_decode_err err) -> `Yaml_decode_err (fname, err))
                (Jsonu.of_yaml_string content)
-          >>= fun json -> Abbs_future_combinators.return_ok (Some (fname, json))
+          >>| fun json -> Some (fname, json)
 
     (* Config parity (#1442): [.stategraph/config] wins when both exist;
        [.terrateam/config] keeps working so existing repos need no rename. *)
@@ -108,9 +108,9 @@ module Provider : module type of Terrat_vcs_service_gitlab_provider = struct
             client
             (Api.Remote_repo.to_repo remote_repo)
             (Api.Remote_repo.default_branch remote_repo)
-          >>= function
-          | Some branch_sha -> Abbs_future_combinators.return_ok (Some (remote_repo, branch_sha))
-          | None -> Abbs_future_combinators.return_ok None)
+          >>| function
+          | Some branch_sha -> Some (remote_repo, branch_sha)
+          | None -> None)
       | None -> Abbs_future_combinators.return_ok None
 
     let fetch_with_provenance ?system_defaults ?built_config request_id client repo ref_ =
@@ -192,7 +192,7 @@ module Provider : module type of Terrat_vcs_service_gitlab_provider = struct
         Abbs_future_combinators.List_result.iter ~f:(function
           | Some (fname, json) ->
               wrap_err fname (Abb.Future.return (Terrat_base_repo_config_v1.of_version_1_json json))
-              >>= fun _ -> Abbs_future_combinators.return_ok ()
+              >>| fun _ -> ()
           | None -> Abbs_future_combinators.return_ok ())
       in
       let get_json = function
@@ -292,12 +292,11 @@ module Provider : module type of Terrat_vcs_service_gitlab_provider = struct
                   "repo"
                   (Abb.Future.return
                      (Terrat_base_repo_config_v1.of_version_1_json (get_json repo_config))))
-          >>= fun (default_repo_config, repo_config) ->
-          Abbs_future_combinators.return_ok
-            ( provenance,
-              Terrat_base_repo_config_v1.merge_with_default_branch_config
-                ~default:default_repo_config
-                repo_config )
+          >>| fun (default_repo_config, repo_config) ->
+          ( provenance,
+            Terrat_base_repo_config_v1.merge_with_default_branch_config
+              ~default:default_repo_config
+              repo_config )
       | _, _, (Some (_, _) as forced_repo_config), _, _ ->
           let provenance =
             collect_provenance
@@ -315,7 +314,7 @@ module Provider : module type of Terrat_vcs_service_gitlab_provider = struct
             "repo"
             (Abb.Future.return
                (Terrat_base_repo_config_v1.of_version_1_json (get_json repo_config)))
-          >>= fun repo_config -> Abbs_future_combinators.return_ok (provenance, repo_config)
+          >>| fun repo_config -> (provenance, repo_config)
   end
 
   module Access_control = struct
@@ -325,7 +324,7 @@ module Provider : module type of Terrat_vcs_service_gitlab_provider = struct
       let run =
         let open Abbs_future_combinators.Infix_result_monad in
         Api.find_workflow_file ~request_id repo client
-        >>= function
+        >>| function
         | Some path ->
             let diff_paths =
               CCList.flat_map
@@ -336,8 +335,8 @@ module Provider : module type of Terrat_vcs_service_gitlab_provider = struct
                       [ filename; previous_filename ])
                 diff
             in
-            Abbs_future_combinators.return_ok (CCList.mem ~eq:CCString.equal path diff_paths)
-        | None -> Abbs_future_combinators.return_ok false
+            CCList.mem ~eq:CCString.equal path diff_paths
+        | None -> false
       in
       let open Abb.Future.Infix_monad in
       run

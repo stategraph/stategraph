@@ -59,15 +59,14 @@ let run storage t f =
           | Ok _ as r ->
               let open Abbs_future_combinators.Infix_result_monad in
               Pgsql_pool.with_conn storage ~f:(fun db -> update_task db t.id "completed")
-              >>= fun () -> Abb.Future.return r
+              >>? fun () -> r
           | Error _ as err ->
               let open Abbs_future_combinators.Infix_result_monad in
               Pgsql_pool.with_conn storage ~f:(fun db -> update_task db t.id "failed")
-              >>= fun () -> Abb.Future.return err)
+              >>? fun () -> err)
       | Error _ as err ->
           let open Abbs_future_combinators.Infix_result_monad in
-          Pgsql_pool.with_conn storage ~f:(fun db -> update_task db t.id "failed")
-          >>= fun () -> Abb.Future.return err)
+          Pgsql_pool.with_conn storage ~f:(fun db -> update_task db t.id "failed") >>? fun () -> err)
     ~failure:(fun () ->
       Abbs_future_combinators.ignore
         (Pgsql_pool.with_conn storage ~f:(fun db -> update_task db t.id "failed")))

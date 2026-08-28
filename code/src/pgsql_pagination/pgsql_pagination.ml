@@ -102,8 +102,7 @@ let next search conn query ~f =
         (Pgsql_io.Row_func.map sql ~f)
         (fun cursor ->
           let open Abbs_future_combinators.Infix_result_monad in
-          Pgsql_io.Cursor.fetch cursor
-          >>= fun results -> Abbs_future_combinators.return_ok (make_result search results))
+          Pgsql_io.Cursor.fetch cursor >>| fun results -> make_result search results)
         (search.Search.limit + 1)
   | `Desc ->
       let sql = prev_query search query in
@@ -113,8 +112,7 @@ let next search conn query ~f =
         (Pgsql_io.Row_func.map sql ~f)
         (fun cursor ->
           let open Abbs_future_combinators.Infix_result_monad in
-          Pgsql_io.Cursor.fetch cursor
-          >>= fun results -> Abbs_future_combinators.return_ok (make_result search results))
+          Pgsql_io.Cursor.fetch cursor >>| fun results -> make_result search results)
         (search.Search.limit + 1)
 
 let prev search conn query ~f =
@@ -129,8 +127,7 @@ let prev search conn query ~f =
         (Pgsql_io.Row_func.map sql ~f)
         (fun cursor ->
           let open Abbs_future_combinators.Infix_result_monad in
-          Pgsql_io.Cursor.fetch cursor
-          >>= fun results -> Abbs_future_combinators.return_ok (make_result_rev search results))
+          Pgsql_io.Cursor.fetch cursor >>| fun results -> make_result_rev search results)
         (search.Search.limit + 1)
   | `Desc ->
       let sql = next_query search query in
@@ -140,8 +137,7 @@ let prev search conn query ~f =
         (Pgsql_io.Row_func.map sql ~f)
         (fun cursor ->
           let open Abbs_future_combinators.Infix_result_monad in
-          Pgsql_io.Cursor.fetch cursor
-          >>= fun results -> Abbs_future_combinators.return_ok (make_result_rev search results))
+          Pgsql_io.Cursor.fetch cursor >>| fun results -> make_result_rev search results)
         (search.Search.limit + 1)
 
 let results t = t.results

@@ -253,7 +253,7 @@ let rec fill_in storage update while_ =
       Pgsql_io.tx db ~f:(fun () ->
           while_ db
           >>= function
-          | `Cont -> update db >>= fun () -> Abbs_future_combinators.return_ok `Cont
+          | `Cont -> update db >>| fun () -> `Cont
           | `Done -> Abbs_future_combinators.return_ok `Done))
   >>= function
   | `Cont -> fill_in storage update while_
@@ -264,9 +264,9 @@ let update' sql db = Pgsql_io.Prepared_stmt.execute db sql
 let while' sql db =
   let open Abbs_future_combinators.Infix_result_monad in
   Pgsql_io.Prepared_stmt.fetch db sql ~f:CCFun.id
-  >>= function
-  | [] -> Abbs_future_combinators.return_ok `Done
-  | _ :: _ -> Abbs_future_combinators.return_ok `Cont
+  >>| function
+  | [] -> `Done
+  | _ :: _ -> `Cont
 
 let fill_in_change_dirspace (_config, storage) =
   fill_in storage (update' Sql.change_dirspaces_update) (while' Sql.change_dirspaces_while_)

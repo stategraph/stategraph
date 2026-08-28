@@ -217,6 +217,14 @@ module Make (Fut : Abb_intf.Future.S) : sig
     val ( >>= ) : ('a, 'c) t -> ('a -> ('b, 'c) t) -> ('b, 'c) t
     val ( >>| ) : ('a, 'c) t -> ('a -> 'b) -> ('b, 'c) t
 
+    (** [t >>? f] runs [f] on the [Ok] value of [t], flattening the [result] it returns into the
+        error channel, so [f] may turn an [Ok] into an [Error] without a further asynchronous step.
+        If [t] determines to [Error], [f] is not called and the error propagates unchanged. Like
+        {!(>>=)}, but the continuation stays in the [result] monad rather than returning a future;
+        the analogue of [Lwt_result.bind_result]. Contrast {!(>>|)}, whose continuation cannot fail.
+    *)
+    val ( >>? ) : ('a, 'c) t -> ('a -> ('b, 'c) result) -> ('b, 'c) t
+
     (** [when_ b f] runs [f ()] if [b] is [true], otherwise returns a future determined to [Ok ()].
         Equivalent to Haskell's
         {{:https://hackage.haskell.org/package/base/docs/Control-Monad.html#v:when}

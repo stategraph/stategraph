@@ -51,5 +51,5 @@ module Make (Abb : Abb_intf.S) = struct
     Abb.Future.return (Abb.Socket.listen tcp ~backlog)
     >>= fun () ->
     let ch = Abb.Chan.create ~capacity:1000 () in
-    Fut_comb.to_result (Abb.Future.fork (tcp_accept_loop tcp ch)) >>= fun _ -> Fut_comb.return_ok ch
+    Fut_comb.to_result (Abb.Future.fork (tcp_accept_loop tcp ch)) >>| fun _ -> ch
 end

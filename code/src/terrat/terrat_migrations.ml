@@ -79,8 +79,8 @@ let run_sql ?(mode = `Tx) sql_contents { Migrate.config = _; storage; tx = db } 
   let conn ~f =
     let open Abbs_future_combinators.Infix_result_monad in
     match mode with
-    | `Tx -> f db >>= fun () -> Abbs_future_combinators.return_ok `Sync
-    | `Notx -> Pgsql_pool.with_conn storage ~f >>= fun () -> Abbs_future_combinators.return_ok `Sync
+    | `Tx -> f db >>| fun () -> `Sync
+    | `Notx -> Pgsql_pool.with_conn storage ~f >>| fun () -> `Sync
     | `Async ->
         Abbs_future_combinators.return_ok (`Async (fun _ -> Pgsql_pool.with_conn storage ~f))
   in
@@ -112,8 +112,7 @@ let add_encryption_key { Migrate.config = _; storage = _; tx = db } =
       /^ "insert into encryption_keys (rank, data) values(0, decode($data, 'base64'))"
       /% Var.(ud (text "data") Base64.encode_exn))
   in
-  Pgsql_io.Prepared_stmt.execute db insert_encryption_key key
-  >>= fun () -> Abbs_future_combinators.return_ok `Sync
+  Pgsql_io.Prepared_stmt.execute db insert_encryption_key key >>| fun () -> `Sync
 
 let add_gitlab_token_from_config { Migrate.config; storage = _; tx = db } =
   let open Abbs_future_combinators.Infix_result_monad in
@@ -128,7 +127,7 @@ let add_gitlab_token_from_config { Migrate.config; storage = _; tx = db } =
   | Some gc ->
       let access_token = Gc.access_token gc in
       Pgsql_io.Prepared_stmt.execute db (add_gitlab_token_from_config ()) access_token
-      >>= fun () -> Abbs_future_combinators.return_ok `Sync
+      >>| fun () -> `Sync
   | None -> Abbs_future_combinators.return_ok `Sync
 
 let migrations =

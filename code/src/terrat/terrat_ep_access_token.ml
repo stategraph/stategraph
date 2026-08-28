@@ -41,14 +41,13 @@ module Refresh = struct
               | capabilities :: _ ->
                   let user = Terrat_user.make ~id:(Terrat_user.id user) ?capabilities () in
                   Terrat_user.Token.to_token ~expiration:(Duration.of_min 1) db user
-                  >>= fun token ->
-                  Abbs_future_combinators.return_ok
-                    (Brtl_ctx.set_response
-                       (Brtl_rspnc.create
-                          ~status:`OK
-                          (Yojson.Safe.to_string
-                          @@ Terrat_api_access_token.Refresh.Responses.OK.(to_yojson { token })))
-                       ctx))
+                  >>| fun token ->
+                  Brtl_ctx.set_response
+                    (Brtl_rspnc.create
+                       ~status:`OK
+                       (Yojson.Safe.to_string
+                       @@ Terrat_api_access_token.Refresh.Responses.OK.(to_yojson { token })))
+                    ctx)
         in
         let open Abb.Future.Infix_monad in
         run

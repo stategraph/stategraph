@@ -156,9 +156,9 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
             let host = CCOption.get_exn_or "get host" (Uri.host uri) in
             let port = CCOption.get_or ~default:80 (Uri.port uri) in
             connect_to_port host port
-            >>= fun sock ->
+            >>| fun sock ->
             let reader, writer = Buffered_of.of_tcp_socket sock in
-            Fut_comb.return_ok (sock, reader, writer)
+            (sock, reader, writer)
         | Some "https" ->
             let host = CCOption.get_exn_or "get host" (Uri.host uri) in
             let port = CCOption.get_or ~default:443 (Uri.port uri) in
@@ -168,7 +168,7 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
                 connect_to_port host port
                 >>= fun sock ->
                 Abb.Future.return (Abb_tls.client_tcp sock tls_config host)
-                >>= fun (reader, writer) -> Fut_comb.return_ok (sock, reader, writer))
+                >>| fun (reader, writer) -> (sock, reader, writer))
               ~finally:(fun tls_config ->
                 Otls.Tls_config.destroy tls_config;
                 Fut_comb.unit)
@@ -178,7 +178,7 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
       let connect tls_config request =
         let open Fut_comb.Infix_result_monad in
         connect_with_sock tls_config (Request.uri request)
-        >>= fun (_, reader, writer) -> Fut_comb.return_ok (Transport.default reader writer)
+        >>| fun (_, reader, writer) -> Transport.default reader writer
 
       let make ?(tls_config = fun _ -> Otls.Tls_config.create ()) ?(connect = connect) () =
         connect tls_config
@@ -215,8 +215,7 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
                   | Some status when Cohttp.Code.is_success status && CCString.equal scheme "https"
                     ->
                       Abb.Future.return (Abb_tls.client_tcp sock (tls_config host) host)
-                      >>= fun (reader, writer) ->
-                      Fut_comb.return_ok (Transport.default reader writer)
+                      >>| fun (reader, writer) -> Transport.default reader writer
                   | Some status when Cohttp.Code.is_success status && CCString.equal scheme "http"
                     -> Fut_comb.return_ok (Transport.default reader writer)
                   | _ -> Fut_comb.return_err (`Unexpected_err ("PROXY:RESPONSE:" ^ status)))
@@ -393,8 +392,7 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
                   (CCOption.map (fun body -> fun writer -> Request_io.write_body writer body) body)
                 transport
                 request
-              >>= fun response ->
-              read_whole_body transport >>= fun body -> Fut_comb.return_ok (response, body)
+              >>= fun response -> read_whole_body transport >>| fun body -> (response, body)
           | Error _ as err -> Abb.Future.return err)
         ~finally:(function
           | Ok transport -> Transport.destroy transport

@@ -97,13 +97,13 @@ let call ?(tries = 3) t req =
     ~f:(fun () ->
       let open Abbs_future_combinators.Infix_result_monad in
       Openapic_abb.call t req
-      >>= fun resp ->
+      >>| fun resp ->
       CCOption.iter (fun remaining ->
           Metrics.Rate_limit_remaining_histograph.observe
             Metrics.rate_limit_remaining_count
             remaining)
       @@ get_rate_limit_remaining resp;
-      Abbs_future_combinators.return_ok resp)
+      resp)
     ~while_:
       (Abbs_future_combinators.finite_tries tries (function
         | Error _ -> true
@@ -255,12 +255,12 @@ let fetch_branch_sha ~request_id client repo ref_ =
     call
       client.Client.client
       Gl.(make (Parameters.make ~id:(CCInt.to_string @@ Repo.id repo) ~branch:ref_))
-    >>= fun resp ->
+    >>| fun resp ->
     let module B = Gitlabc_components.API_Entities_Branch in
     let module C = Gitlabc_components_api_entities_commit in
     match Openapi.Response.value resp with
-    | `OK { B.commit = { C.id; _ }; _ } -> Abbs_future_combinators.return_ok (Some id)
-    | `Not_found -> Abbs_future_combinators.return_ok None
+    | `OK { B.commit = { C.id; _ }; _ } -> Some id
+    | `Not_found -> None
   in
   let open Abb.Future.Infix_monad in
   run
@@ -278,14 +278,13 @@ let fetch_file ~request_id client repo ref_ path =
     call
       client.Client.client
       Gl.(make (Parameters.make ~id:(CCInt.to_string @@ Repo.id repo) ~file_path:path ~ref_))
-    >>= fun resp ->
+    >>| fun resp ->
     let module OK = Gl.Responses.OK in
     match Openapi.Response.value resp with
     | `OK { OK.content; encoding = Some `Base64; _ } ->
-        Abbs_future_combinators.return_ok
-          (Some (Base64.decode_exn (CCString.replace ~sub:"\n" ~by:"" content)))
-    | `OK { OK.content; _ } -> Abbs_future_combinators.return_ok (Some content)
-    | `Not_found -> Abbs_future_combinators.return_ok None
+        Some (Base64.decode_exn (CCString.replace ~sub:"\n" ~by:"" content))
+    | `OK { OK.content; _ } -> Some content
+    | `Not_found -> None
   in
   let open Abb.Future.Infix_monad in
   run
@@ -301,10 +300,10 @@ let fetch_remote_repo' ~request_id:_ client repo =
   let open Abbs_future_combinators.Infix_result_monad in
   let id = CCInt.to_string @@ Repo.id repo in
   call client.Client.client Gl.(make (Parameters.make ~id ()))
-  >>= fun resp ->
+  >>| fun resp ->
   match Openapi.Response.value resp with
-  | `OK p -> Abbs_future_combinators.return_ok (Some p)
-  | `Not_found -> Abbs_future_combinators.return_ok None
+  | `OK p -> Some p
+  | `Not_found -> None
 
 let fetch_remote_repo ~request_id client repo =
   let open Abb.Future.Infix_monad in
@@ -348,22 +347,21 @@ let fetch_diff_files ~request_id ~base_ref ~branch_ref repo client =
     let open Abbs_future_combinators.Infix_result_monad in
     let id = CCInt.to_string @@ Repo.id repo in
     call client.Client.client R.(make (Parameters.make ~from:base_ref ~to_:branch_ref ~id ()))
-    >>= fun resp ->
+    >>| fun resp ->
     let module C = Gitlabc_components.API_Entities_Compare in
     let module Tcd = Terrat_change.Diff in
     let module D = Gitlabc_components_api_entities_diff in
     let (`OK compare) = Openapi.Response.value resp in
     let diff = CCOption.get_or ~default:[] compare.C.diffs in
-    Abbs_future_combinators.return_ok
-      (CCList.map
-         (function
-           | { D.old_path = filename; deleted_file = true; _ } -> Tcd.Remove { filename }
-           | { D.old_path = previous_filename; new_path = filename; _ }
-             when not (CCString.equal previous_filename filename) ->
-               Tcd.Move { previous_filename; filename }
-           | { D.new_path = filename; new_file = true; _ } -> Tcd.Add { filename }
-           | { D.new_path = filename; _ } -> Tcd.Change { filename })
-         diff)
+    CCList.map
+      (function
+        | { D.old_path = filename; deleted_file = true; _ } -> Tcd.Remove { filename }
+        | { D.old_path = previous_filename; new_path = filename; _ }
+          when not (CCString.equal previous_filename filename) ->
+            Tcd.Move { previous_filename; filename }
+        | { D.new_path = filename; new_file = true; _ } -> Tcd.Add { filename }
+        | { D.new_path = filename; _ } -> Tcd.Change { filename })
+      diff
   in
   let open Abb.Future.Infix_monad in
   run
@@ -426,14 +424,13 @@ let fetch_tree ~request_id client repo ref_ =
              ~ref_:(Some ref_)
              ~recursive:true
              ()))
-    >>= fun tree ->
+    >>| fun tree ->
     let module T = Gitlabc_components_api_entities_treeobject in
-    Abbs_future_combinators.return_ok
-      (CCList.filter_map
-         (function
-           | { T.path; type_ = "blob"; _ } -> Some path
-           | _ -> None)
-         tree)
+    CCList.filter_map
+      (function
+        | { T.path; type_ = "blob"; _ } -> Some path
+        | _ -> None)
+      tree
   in
   let open Abb.Future.Infix_monad in
   run
@@ -462,10 +459,10 @@ let comment_on_pull_request ~request_id client pull_request body =
           (Parameters.make
              ~id:(CCInt.to_string @@ Repo.id @@ Terrat_pull_request.repo pull_request)
              ~merge_request_iid:(Terrat_pull_request.id pull_request)))
-    >>= fun resp ->
+    >>? fun resp ->
     match Openapi.Response.value resp with
-    | `Created { Gl.Responses.Created.id } -> Abbs_future_combinators.return_ok id
-    | `Not_found -> Abbs_future_combinators.return_err `Not_found
+    | `Created { Gl.Responses.Created.id } -> Ok id
+    | `Not_found -> Error `Not_found
   in
   let open Abb.Future.Infix_monad in
   run
@@ -496,19 +493,18 @@ let fetch_diff ~request_id ~client ~repo merge_request_iid =
       ~page:Openapic_abb.Page.gitlab
       client.Client.client
       Gl.(make (Parameters.make ~id:(CCInt.to_string @@ Repo.id repo) ~merge_request_iid ()))
-    >>= fun diff ->
+    >>| fun diff ->
     let module Tcd = Terrat_change.Diff in
     let module D = Gitlabc_components_api_entities_diff in
-    Abbs_future_combinators.return_ok
-      (CCList.map
-         (function
-           | { D.old_path = filename; deleted_file = true; _ } -> Tcd.Remove { filename }
-           | { D.old_path = previous_filename; new_path = filename; _ }
-             when not (CCString.equal previous_filename filename) ->
-               Tcd.Move { previous_filename; filename }
-           | { D.new_path = filename; new_file = true; _ } -> Tcd.Add { filename }
-           | { D.new_path = filename; _ } -> Tcd.Change { filename })
-         diff)
+    CCList.map
+      (function
+        | { D.old_path = filename; deleted_file = true; _ } -> Tcd.Remove { filename }
+        | { D.old_path = previous_filename; new_path = filename; _ }
+          when not (CCString.equal previous_filename filename) ->
+            Tcd.Move { previous_filename; filename }
+        | { D.new_path = filename; new_file = true; _ } -> Tcd.Add { filename }
+        | { D.new_path = filename; _ } -> Tcd.Change { filename })
+      diff
   in
   let open Abb.Future.Infix_monad in
   run
@@ -555,7 +551,7 @@ let fetch_pull_request ~request_id _account client repo merge_request_iid =
       (fun mr diff -> (mr, diff))
       <$> fetch_pull_request' ~request_id ~client ~repo merge_request_iid
       <*> fetch_diff ~request_id ~client ~repo merge_request_iid)
-    >>= fun ((diff_refs, mr), diff) ->
+    >>| fun ((diff_refs, mr), diff) ->
     let module Ub = Gitlabc_components_api_entities_userbasic in
     let module Mr = Gitlabc_components_api_entities_mergerequest in
     let module Dr = Gitlabc_components_api_entities_diffrefs in
@@ -590,21 +586,20 @@ let fetch_pull_request ~request_id _account client repo merge_request_iid =
           request_id
           (CCOption.get_or ~default:"" detailed_merge_status)
           (CCOption.get_or ~default:"" merge_commit_sha));
-    Abbs_future_combinators.return_ok
-      (Terrat_pull_request.make
-         ~base_branch_name
-         ~base_ref
-         ~branch_name
-         ~branch_ref
-         ~id:merge_request_iid
-         ~state
-         ~title:(Some title)
-         ~user:(Some username)
-         ~repo
-         ~diff
-         ~draft
-         ~provisional_merge_ref
-         ())
+    Terrat_pull_request.make
+      ~base_branch_name
+      ~base_ref
+      ~branch_name
+      ~branch_ref
+      ~id:merge_request_iid
+      ~state
+      ~title:(Some title)
+      ~user:(Some username)
+      ~repo
+      ~diff
+      ~draft
+      ~provisional_merge_ref
+      ()
   in
   let open Abb.Future.Infix_monad in
   run
@@ -638,10 +633,10 @@ let react_to_comment ~request_id client pull_request comment_id =
              ~merge_request_iid:(Terrat_pull_request.id pull_request)
              ~note_id:comment_id
              ~name:"rocket"))
-    >>= fun resp ->
+    >>? fun resp ->
     match Openapi.Response.value resp with
-    | `Created _ -> Abbs_future_combinators.return_ok ()
-    | (`Bad_request | `Not_found) as err -> Abbs_future_combinators.return_err err
+    | `Created _ -> Ok ()
+    | (`Bad_request | `Not_found) as err -> Error err
   in
   let open Abb.Future.Infix_monad in
   run
@@ -715,7 +710,7 @@ let create_commit_checks ~request_id client repo ref_ checks =
                    ~sha:ref_
                    ~name:(Some (Terrat_check_title.branded "terrateam apply"))
                    ()))
-          >>= fun existing_checks ->
+          >>| fun existing_checks ->
           let pipeline_id =
             match existing_checks with
             | { Glc.pipeline_id; _ } :: _ -> pipeline_id
@@ -726,7 +721,7 @@ let create_commit_checks ~request_id client repo ref_ checks =
             | Some _ -> "existing_status"
             | None -> "none"
           in
-          Abbs_future_combinators.return_ok (pipeline_id, source))
+          (pipeline_id, source))
     >>= fun (pipeline_id, source) ->
     Logs.info (fun m ->
         m
@@ -762,7 +757,7 @@ let create_commit_checks ~request_id client repo ref_ checks =
         call
           client.Client.client
           Gl.(make ~body (Parameters.make ~id:(CCInt.to_string @@ Repo.id repo) ~sha:ref_))
-        >>= fun resp ->
+        >>? fun resp ->
         let module Cs = Gitlabc_components_api_entities_commitstatus in
         match Openapi.Response.value resp with
         | `Created { Cs.pipeline_id; _ } ->
@@ -771,12 +766,10 @@ let create_commit_checks ~request_id client repo ref_ checks =
                   "%s : CREATE_COMMIT_CHECKS : pipeline_id=%s"
                   request_id
                   (CCOption.map_or ~default:"" CCInt.to_string pipeline_id));
-            Abbs_future_combinators.return_ok ()
+            Ok ()
         | `Bad_request { Gl.Responses.Bad_request.message = Some message }
-          when CCString.mem ~sub:"Cannot transition status via" message ->
-            Abbs_future_combinators.return_ok ()
-        | (`Bad_request _ | `Unauthorized _ | `Forbidden _ | `Not_found _) as err ->
-            Abbs_future_combinators.return_err err)
+          when CCString.mem ~sub:"Cannot transition status via" message -> Ok ()
+        | (`Bad_request _ | `Unauthorized _ | `Forbidden _ | `Not_found _) as err -> Error err)
       checks
   in
   let open Abb.Future.Infix_monad in
@@ -804,26 +797,25 @@ let fetch_commit_checks ~request_id client repo ref_ =
       ~page:Openapic_abb.Page.gitlab
       client.Client.client
       Gl.(make (Parameters.make ~id:(CCInt.to_string @@ Repo.id repo) ~sha:ref_ ()))
-    >>= fun checks ->
-    Abbs_future_combinators.return_ok
-      (CCList.map
-         (fun { Glc.description; name; status; _ } ->
-           {
-             C.details_url = "";
-             description = CCOption.get_or ~default:"" description;
-             (* Normalize so internal comparisons accept both brands. *)
-             title = Terrat_check_title.canonical name;
-             status =
-               (match status with
-               | "pending" -> C.Status.Queued
-               | "running" -> C.Status.Running
-               | "success" -> C.Status.Completed
-               | "failed" -> C.Status.Failed
-               | "canceled" -> C.Status.Failed
-               | "skipped" -> C.Status.Completed
-               | _ -> C.Status.Queued);
-           })
-         checks)
+    >>| fun checks ->
+    CCList.map
+      (fun { Glc.description; name; status; _ } ->
+        {
+          C.details_url = "";
+          description = CCOption.get_or ~default:"" description;
+          (* Normalize so internal comparisons accept both brands. *)
+          title = Terrat_check_title.canonical name;
+          status =
+            (match status with
+            | "pending" -> C.Status.Queued
+            | "running" -> C.Status.Running
+            | "success" -> C.Status.Completed
+            | "failed" -> C.Status.Failed
+            | "canceled" -> C.Status.Failed
+            | "skipped" -> C.Status.Completed
+            | _ -> C.Status.Queued);
+        })
+      checks
   in
   let open Abb.Future.Infix_monad in
   run
@@ -900,18 +892,18 @@ let fetch_pull_request_approvals' ~request_id repo pull_number client =
     call
       client.Client.client
       Gl.(make (Parameters.make ~id:(Repo.id repo) ~merge_request_iid:pull_number))
-    >>= fun resp ->
+    >>? fun resp ->
     let module Resp = Gitlabc_components.API_Entities_MergeRequestApprovals in
     match Openapi.Response.value resp with
     | `OK { Resp.approved_by } ->
         let module A = Gitlabc_components.API_Entities_Approvals in
         let module Ub = Gitlabc_components.API_Entities_UserBasic in
         let module Prr = Terrat_pull_request_review in
-        Abbs_future_combinators.return_ok
+        Ok
           (CCList.map (fun { A.user = { Ub.username; _ } } ->
                { Prr.id = username; status = Prr.Status.Approved; user = Some username })
           @@ CCOption.get_or ~default:[] approved_by)
-    | `Not_found -> Abbs_future_combinators.return_err `Not_found
+    | `Not_found -> Error `Not_found
   in
   let open Abb.Future.Infix_monad in
   run
@@ -936,13 +928,13 @@ let fetch_pull_request_reviews' ~request_id repo pull_number client =
       client.Client.client
       Gl.(
         make (Parameters.make ~id:(CCInt.to_string @@ Repo.id repo) ~merge_request_iid:pull_number))
-    >>= fun resp ->
+    >>? fun resp ->
     match Openapi.Response.value resp with
     | `OK reviews ->
         let module R = Gitlabc_components.API_Entities_MergeRequestReviewer in
         let module Ub = Gitlabc_components.API_Entities_UserBasic in
         let module Prr = Terrat_pull_request_review in
-        Abbs_future_combinators.return_ok
+        Ok
           (CCList.map
              (function
                | { R.state = "reviewed"; user = { Ub.username; _ }; _ } ->
@@ -950,7 +942,7 @@ let fetch_pull_request_reviews' ~request_id repo pull_number client =
                | { R.user = { Ub.username; _ }; _ } ->
                    { Prr.id = username; status = Prr.Status.Unknown; user = Some username })
              reviews)
-    | `Not_found -> Abbs_future_combinators.return_err `Not_found
+    | `Not_found -> Error `Not_found
   in
   let open Abb.Future.Infix_monad in
   run
@@ -989,17 +981,17 @@ let fetch_pull_request_requested_reviews ~request_id repo pull_number client =
       client.Client.client
       Gl.(
         make (Parameters.make ~id:(CCInt.to_string @@ Repo.id repo) ~merge_request_iid:pull_number))
-    >>= fun resp ->
+    >>? fun resp ->
     match Openapi.Response.value resp with
     | `OK reviews ->
         let module R = Gitlabc_components.API_Entities_MergeRequestReviewer in
         let module Ub = Gitlabc_components.API_Entities_UserBasic in
-        Abbs_future_combinators.return_ok
+        Ok
           (CCList.map
              (fun { R.user = { Ub.username; _ }; _ } ->
                Terrat_base_repo_config_v1.Access_control.Match.User username)
              reviews)
-    | `Not_found -> Abbs_future_combinators.return_err `Not_found
+    | `Not_found -> Error `Not_found
   in
   let open Abb.Future.Infix_monad in
   run
@@ -1058,10 +1050,10 @@ let merge_pull_request ~request_id ?(retain_pr_title = false) client pull_reques
           (Parameters.make
              ~id:(CCInt.to_string @@ Repo.id @@ Terrat_pull_request.repo pull_request)
              ~merge_request_iid:(Terrat_pull_request.id pull_request)))
-    >>= fun resp ->
+    >>? fun resp ->
     match Openapi.Response.value resp with
-    | `OK _ -> Abbs_future_combinators.return_ok ()
-    | #Gl.Responses.t as err -> Abbs_future_combinators.return_err err
+    | `OK _ -> Ok ()
+    | #Gl.Responses.t as err -> Error err
   in
   let open Abb.Future.Infix_monad in
   run
@@ -1091,10 +1083,10 @@ let delete_branch ~request_id client repo branch =
     call
       client.Client.client
       Gl.(make (Parameters.make ~id:(CCInt.to_string @@ Repo.id repo) ~branch))
-    >>= fun resp ->
+    >>? fun resp ->
     match Openapi.Response.value resp with
-    | `No_content -> Abbs_future_combinators.return_ok ()
-    | `Not_found -> Abbs_future_combinators.return_err `Not_found
+    | `No_content -> Ok ()
+    | `Not_found -> Error `Not_found
   in
   let open Abb.Future.Infix_monad in
   run
@@ -1120,10 +1112,10 @@ let fetch_member_of_team ~request_id:_ ~team ~user client =
     | `OK ({ U.id = user_id; _ } :: _) -> (
         let group_id = Uri.pct_encode team in
         call client.Client.client Glg.(make (Parameters.make ~id:group_id ~user_id))
-        >>= fun resp ->
+        >>| fun resp ->
         match Openapi.Response.value resp with
-        | `OK m -> Abbs_future_combinators.return_ok (Some m)
-        | `Not_found -> Abbs_future_combinators.return_ok None)
+        | `OK m -> Some m
+        | `Not_found -> None)
     | `OK [] -> Abbs_future_combinators.return_ok None
   in
   let open Abb.Future.Infix_monad in
@@ -1135,8 +1127,7 @@ let fetch_member_of_team ~request_id:_ ~team ~user client =
 let is_member_of_team ~request_id ~team ~user _repo client =
   let run =
     let open Abbs_future_combinators.Infix_result_monad in
-    fetch_member_of_team ~request_id ~team ~user client
-    >>= fun res -> Abbs_future_combinators.return_ok (CCOption.is_some res)
+    fetch_member_of_team ~request_id ~team ~user client >>| fun res -> CCOption.is_some res
   in
   let open Abb.Future.Infix_monad in
   run
@@ -1160,7 +1151,7 @@ let get_repo_role ~request_id repo user client =
         call
           client.Client.client
           Glp.(make (Parameters.make ~id:(CCInt.to_string @@ Repo.id repo) ~user_id))
-        >>= fun resp ->
+        >>| fun resp ->
         let module M = Gitlabc_components_api_entities_member in
         match Openapi.Response.value resp with
         | `OK { M.access_level; _ } ->
@@ -1177,8 +1168,8 @@ let get_repo_role ~request_id repo user client =
               | 60 -> Some "admin"
               | _ -> None
             in
-            Abbs_future_combinators.return_ok al
-        | `Not_found -> Abbs_future_combinators.return_ok None)
+            al
+        | `Not_found -> None)
     | `OK [] -> Abbs_future_combinators.return_err `Not_found
   in
   let open Abb.Future.Infix_monad in
@@ -1205,7 +1196,7 @@ let get_org_role ~request_id ~org user client =
     | `OK ({ U.id = user_id; _ } :: _) -> (
         let group_id = Uri.pct_encode org in
         call client.Client.client Glg.(make (Parameters.make ~id:group_id ~user_id))
-        >>= fun resp ->
+        >>| fun resp ->
         let module M = Gitlabc_components_api_entities_member in
         match Openapi.Response.value resp with
         | `OK { M.access_level; _ } ->
@@ -1215,8 +1206,8 @@ let get_org_role ~request_id ~org user client =
               | n when n > 0 -> Some `User
               | _ -> None
             in
-            Abbs_future_combinators.return_ok role
-        | `Not_found -> Abbs_future_combinators.return_ok None)
+            role
+        | `Not_found -> None)
     | `OK [] -> Abbs_future_combinators.return_ok None
   in
   let open Abb.Future.Infix_monad in

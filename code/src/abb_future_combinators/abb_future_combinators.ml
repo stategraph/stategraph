@@ -313,6 +313,7 @@ module Make (Fut : Abb_intf.Future.S) = struct
       | Ok v -> Ok (f v)
       | Error _ as err -> err
 
+    let ( >>? ) t f = t >>= fun v -> Fut.return (f v)
     let when_ b f = if b then f () else Fut.return (Ok ())
     let when_m mb f = mb >>= fun b -> when_ b f
   end
@@ -343,8 +344,7 @@ module Make (Fut : Abb_intf.Future.S) = struct
       | l :: ls -> f init l >>= fun acc -> fold_left ~f ~init:acc ls
 
     let map ~f l =
-      fold_left ~f:(fun acc l -> f l >>= fun v -> Fut.return (Ok (v :: acc))) ~init:[] l
-      >>| fun l -> Std_list.rev l
+      fold_left ~f:(fun acc l -> f l >>| fun v -> v :: acc) ~init:[] l >>| fun l -> Std_list.rev l
 
     let iter ~f l = fold_left ~f:(fun () l -> f l) ~init:() l
 
@@ -363,9 +363,9 @@ module Make (Fut : Abb_intf.Future.S) = struct
       fold_left
         ~f:(fun acc v ->
           f v
-          >>= function
-          | Some r -> Fut.return (Ok (r :: acc))
-          | None -> Fut.return (Ok acc))
+          >>| function
+          | Some r -> r :: acc
+          | None -> acc)
         ~init:[]
         l
       >>| fun l -> Std_list.rev l

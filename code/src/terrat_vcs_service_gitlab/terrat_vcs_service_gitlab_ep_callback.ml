@@ -106,7 +106,7 @@ let perform_auth config storage code =
                     user_id
                     username
                     (CCInt64.of_int gitlab_user_id)
-                  >>= fun () -> Abbs_future_combinators.return_ok (Terrat_user.make ~id:user_id ()))
+                  >>| fun () -> Terrat_user.make ~id:user_id ())
           | (user_id, _email, _name, _avatar_url) :: _ ->
               Pgsql_io.Prepared_stmt.execute
                 db
@@ -121,7 +121,7 @@ let perform_auth config storage code =
                 user_id
                 username
                 (CCInt64.of_int gitlab_user_id)
-              >>= fun () -> Abbs_future_combinators.return_ok (Terrat_user.make ~id:user_id ())))
+              >>| fun () -> Terrat_user.make ~id:user_id ()))
 
 let get config storage code _state =
   let open Abb.Future.Infix_monad in

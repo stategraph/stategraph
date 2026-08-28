@@ -40,11 +40,11 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
           match Otls.Tls.write tls ~pos ~len buf with
           | Ok n when n = len ->
               let open Fut_comb.Infix_result_monad in
-              write ~bufs:bs >>= fun n' -> Fut_comb.return_ok (n + n')
+              write ~bufs:bs >>| fun n' -> n + n'
           | Ok n ->
               let open Fut_comb.Infix_result_monad in
               write ~bufs:Abb_intf.Write_buf.({ buf; pos = pos + n; len = len - n } :: bs)
-              >>= fun n' -> Fut_comb.return_ok (n + n')
+              >>| fun n' -> n + n'
           | Error (`Want_pollin | `Want_pollout) when Abb.Socket.is_closed sock -> closed ()
           | Error `Want_pollin ->
               let open Abb.Future.Infix_monad in

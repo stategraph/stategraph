@@ -122,7 +122,7 @@ struct
         fetch Keys.create_commit_checks
         >>= fun create_commit_checks ->
         create_commit_checks' create_commit_checks branch_ref [ check ]
-        >>= fun () -> Abbs_future_combinators.return_ok [ work_manifest ]
+        >>| fun () -> [ work_manifest ]
     | Some _ ->
         fetch Keys.commit_checks
         >>= fun commit_checks ->
@@ -143,8 +143,7 @@ struct
         in
         fetch Keys.create_commit_checks
         >>= fun create_commit_checks ->
-        create_commit_checks' create_commit_checks branch_ref unfinished_checks
-        >>= fun () -> Abbs_future_combinators.return_ok []
+        create_commit_checks' create_commit_checks branch_ref unfinished_checks >>| fun () -> []
 
   let initiate ~branch ({ Wm.id; _ } as work_manifest) s { Bs.Fetcher.fetch } =
     let open Irm in
@@ -196,7 +195,7 @@ struct
         }
     in
     Builder.run_db s ~f:(fun db -> create_token s db account id)
-    >>= fun token ->
+    >>| fun token ->
     let module B = Terrat_api_components.Work_manifest_build_tree in
     let config =
       repo_config_raw
@@ -207,7 +206,7 @@ struct
       Terrat_api_components.Work_manifest.Work_manifest_build_tree
         { B.base_ref = S.Api.Ref.to_string dest_branch_name; token; type_ = `Build_tree; config }
     in
-    Abbs_future_combinators.return_ok response
+    response
 
   let fail ~branch work_manifest s { Bs.Fetcher.fetch } =
     let open Irm in
@@ -267,7 +266,7 @@ struct
                  (Builder.log_id s)
                  (S.Api.Ref.to_string branch_ref));
            Builder.run_db s ~f:(fun db -> store_repo_tree s db account branch_ref files)
-           >>= fun () -> Abbs_future_combinators.return_err (`Rerun [ rerun_id ])))
+           >>? fun () -> Error (`Rerun [ rerun_id ])))
         >>= fun () ->
         fetch Keys.repo
         >>= fun repo ->
@@ -316,11 +315,11 @@ struct
         fetch Keys.publish_comment
         >>= fun publish_comment ->
         publish_comment' publish_comment (Msg.Build_tree_failure msg)
-        >>= fun () ->
+        >>? fun () ->
         (* The tree was not built.  Stop here rather than return [Ok], which
            marks the work manifest completed and sends whoever wanted the tree
            looking for one that does not exist. *)
-        Abbs_future_combinators.return_err `Silent_failure
+        Error `Silent_failure
     | Wmr.Work_manifest_build_config_result _ -> assert false
     | Terrat_api_components_work_manifest_result.Work_manifest_tf_operation_result _ -> assert false
     | Terrat_api_components_work_manifest_result.Work_manifest_tf_operation_result2 _ ->

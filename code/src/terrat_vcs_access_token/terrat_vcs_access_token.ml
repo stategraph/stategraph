@@ -131,14 +131,13 @@ module Make (_ : Terrat_vcs_provider2.S) (S : S) = struct
                                ())
                         in
                         Terrat_user.Token.to_token db user
-                        >>= fun refresh_token ->
+                        >>| fun refresh_token ->
                         let module At = Terrat_api_components.Access_token in
-                        Abbs_future_combinators.return_ok
-                          (Brtl_ctx.set_response
-                             (Brtl_rspnc.create
-                                ~status:`OK
-                                (Yojson.Safe.to_string @@ At.to_yojson { At.refresh_token }))
-                             ctx))
+                        Brtl_ctx.set_response
+                          (Brtl_rspnc.create
+                             ~status:`OK
+                             (Yojson.Safe.to_string @@ At.to_yojson { At.refresh_token }))
+                          ctx)
             | Error err ->
                 Logs.info (fun m -> m "%s : CREATE : %s" (Brtl_ctx.token ctx) err);
                 Abbs_future_combinators.return_ok

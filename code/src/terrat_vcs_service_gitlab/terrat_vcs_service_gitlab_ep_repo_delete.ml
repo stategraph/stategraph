@@ -32,24 +32,23 @@ module Make (P : Terrat_vcs_provider2_gitlab.S) (S : S) = struct
   let lookup_username db user =
     let open Abbs_future_combinators.Infix_result_monad in
     Pgsql_io.Prepared_stmt.fetch db (Sql.select_username ()) ~f:CCFun.id (Terrat_user.id user)
-    >>= function
-    | username :: _ -> Abbs_future_combinators.return_ok username
-    | [] -> Abbs_future_combinators.return_err `Forbidden
+    >>? function
+    | username :: _ -> Ok username
+    | [] -> Error `Forbidden
 
   let enforce_org_admin ~request_id ~org username client =
     let open Abbs_future_combinators.Infix_result_monad in
     let vcs_user = P.Api.User.make username in
     P.Api.get_org_role ~request_id ~org vcs_user client
-    >>= function
-    | Some `Admin -> Abbs_future_combinators.return_ok ()
-    | Some `User | None -> Abbs_future_combinators.return_err `Forbidden
+    >>? function
+    | Some `Admin -> Ok ()
+    | Some `User | None -> Error `Forbidden
 
   let ensure_archived ~request_id client repo =
     let open Abbs_future_combinators.Infix_result_monad in
     P.Api.fetch_remote_repo ~request_id client repo
-    >>= fun remote_repo ->
-    if P.Api.Remote_repo.is_archived remote_repo then Abbs_future_combinators.return_ok ()
-    else Abbs_future_combinators.return_err `Not_archived
+    >>? fun remote_repo ->
+    if P.Api.Remote_repo.is_archived remote_repo then Ok () else Error `Not_archived
 
   let perform_delete ~request_id config _storage installation_id repo_id user db =
     let open Abbs_future_combinators.Infix_result_monad in

@@ -1058,11 +1058,10 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
           Abb.Future.return ()
         in
         Connector.request connector options headers body meth_ uri
-        >>= fun (id, p) -> Fc.return_ok (connector, id, buf, p))
+        >>| fun (id, p) -> (connector, id, buf, p))
       (fun res ->
         let open Fc.Infix_result_monad in
-        Abb.Future.return res
-        >>= fun (_, _, buf, p) -> p >>= fun resp -> Fc.return_ok (resp, Buffer.contents buf))
+        Abb.Future.return res >>= fun (_, _, buf, p) -> p >>| fun resp -> (resp, Buffer.contents buf))
       ~finally:(fun res ->
         Fc.ignore
           (let open Fc.Infix_result_monad in

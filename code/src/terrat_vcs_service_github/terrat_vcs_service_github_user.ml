@@ -81,7 +81,7 @@ let get_token config storage user =
             expiration
             oauth.Oauth.refresh_token
             refresh_expiration
-          >>= fun () -> Abbs_future_combinators.return_ok oauth.Oauth.access_token)
+          >>| fun () -> oauth.Oauth.access_token)
   | (token, false, _) :: _ -> Abbs_future_combinators.return_ok token
 
 let enforce_installation_access storage user installation_id ctx =

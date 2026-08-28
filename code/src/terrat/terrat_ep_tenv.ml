@@ -108,8 +108,7 @@ let get _config storage _origin work_manifest_id path ctx =
             Abb_io_file.write_file ~fname:(body_path ^ ".tmp") body
             >>= fun () ->
             Abb.File.rename ~src:(body_path ^ ".tmp") ~dst:body_path
-            >>= fun () ->
-            Abbs_future_combinators.return_ok { V.body_path; headers = headers_of_interest }
+            >>| fun () -> { V.body_path; headers = headers_of_interest }
         | resp, _ ->
             Abbs_future_combinators.return_err
               (`Curl_err

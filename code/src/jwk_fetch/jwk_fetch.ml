@@ -21,12 +21,12 @@ let get_max_age cache_control =
 let fetch uri =
   let open Abbs_future_combinators.Infix_result_monad in
   Http.Client.get uri
-  >>= function
+  >>? function
   | resp, body when resp.Http.Response.status = `OK -> (
       let headers = Http.Response.headers resp in
       let cache_control = CCOption.get_or ~default:"" (Cohttp.Header.get headers "cache-control") in
       let max_age = get_max_age cache_control in
       match Jwk.of_string body with
-      | Some jwk -> Abbs_future_combinators.return_ok (jwk, max_age)
-      | None -> Abbs_future_combinators.return_err `Bad_response)
-  | _ -> Abbs_future_combinators.return_err `Bad_response
+      | Some jwk -> Ok (jwk, max_age)
+      | None -> Error `Bad_response)
+  | _ -> Error `Bad_response

@@ -4,10 +4,10 @@ let run () =
   Githubc2_abb.collect_all
     client
     Githubc2_activity.List_repos_starred_by_authenticated_user.(make (Parameters.make ()))
-  >>= fun repos ->
+  >>| fun repos ->
   print_endline (Githubc2_activity.List_repos_starred_by_authenticated_user.Responses.OK.show repos);
   Printf.printf "Num = %d\n" (CCList.length repos);
-  Abbs_future_combinators.return_ok ()
+  ()
 (* let open Abbs_future_combinators.Infix_result_monad in
  * Ghc.Schema.create ()
  * >>= fun schema ->

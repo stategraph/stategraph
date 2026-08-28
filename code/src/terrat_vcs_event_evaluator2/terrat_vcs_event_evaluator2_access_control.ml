@@ -106,7 +106,7 @@ struct
             let ctx = Ace.Access_control.Ctx.set_user user access_control.Ace.ctx in
             let t' = { access_control with Ace.ctx } in
             eval' t' changes (fun { P.superapproval; _ } -> superapproval)
-            >>= fun { Terrat_access_control2.R.pass; _ } ->
+            >>| fun { Terrat_access_control2.R.pass; _ } ->
             let acc =
               CCListLabels.fold_left
                 ~f:(fun acc { Terrat_change_match3.Dirspace_config.dirspace; _ } ->
@@ -114,15 +114,14 @@ struct
                 ~init:acc
                 pass
             in
-            Abbs_future_combinators.return_ok acc)
+            acc)
           ~init:pass_with_superapproval
           reviewers
-        >>= fun unapproved ->
-        Abbs_future_combinators.return_ok
-          (Terrat_data.Dirspace_map.fold
-             (fun k _ acc -> Terrat_data.Dirspace_map.remove k acc)
-             unapproved
-             pass_with_superapproval)
+        >>| fun unapproved ->
+        Terrat_data.Dirspace_map.fold
+          (fun k _ acc -> Terrat_data.Dirspace_map.remove k acc)
+          unapproved
+          pass_with_superapproval
     | _ ->
         Logs.debug (fun m ->
             m
@@ -148,7 +147,7 @@ struct
                 deny
             in
             eval_superapproved access_control reviewers denied_change_matches
-            >>= fun superapproved ->
+            >>| fun superapproved ->
             let pass =
               pass @ (superapproved |> Terrat_data.Dirspace_map.to_list |> CCList.map snd)
             in
@@ -162,7 +161,7 @@ struct
                    -> not (Terrat_data.Dirspace_map.mem dirspace superapproved))
                 deny
             in
-            Abbs_future_combinators.return_ok { Terrat_access_control2.R.pass; deny }
+            { Terrat_access_control2.R.pass; deny }
         | r -> Abbs_future_combinators.return_ok r)
     | `Apply_force -> eval' access_control matches (fun { P.apply_force; _ } -> apply_force)
 

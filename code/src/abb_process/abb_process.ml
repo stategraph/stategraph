@@ -25,7 +25,7 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
       let open Fut_comb.Infix_result_monad in
       Abb.File.read file ~buf:bytes ~pos:0 ~len
       >>= function
-      | 0 -> Abb.File.close file >>= fun _ -> Fut_comb.return_ok (Buffer.contents buffer)
+      | 0 -> Abb.File.close file >>| fun _ -> Buffer.contents buffer
       | n ->
           Buffer.add_subbytes buffer bytes 0 n;
           read_data buffer file bytes
@@ -56,9 +56,9 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
                 stdin_w
                 Abb_intf.Write_buf.
                   [ { buf = Bytes.of_string input; pos = 0; len = String.length input } ]
-              >>= fun n ->
+              >>| fun n ->
               assert (n = String.length input);
-              Fut_comb.return_ok ()
+              ()
           | None -> Fut_comb.return_ok ())
         >>= fun () ->
         Abb.File.close stdin_w

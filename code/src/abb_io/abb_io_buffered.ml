@@ -159,9 +159,9 @@ module Make (Fut : Abb_intf.Future.S) = struct
     let open Fut_comb.Infix_result_monad in
     let b = Buffer.create (Bytes.length t.buf) in
     read_line_buffer t b
-    >>= function
-    | `Ok -> Fut.return (Ok (Some (Buffer.to_bytes b)))
-    | `Eof -> Fut.return (Ok None)
+    >>| function
+    | `Ok -> Some (Buffer.to_bytes b)
+    | `Eof -> None
 
   let read_line t =
     let open Fut_comb.Infix_result_monad in

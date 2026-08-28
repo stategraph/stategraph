@@ -156,4 +156,4 @@ let collect_all t req =
       | _ -> Abbs_future_combinators.return_err `Error)
     t
     req
-  >>= fun res -> Abbs_future_combinators.return_ok (CCList.rev res)
+  >>| fun res -> CCList.rev res

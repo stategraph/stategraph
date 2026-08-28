@@ -229,13 +229,13 @@ let call ?(tries = 3) t req =
     ~f:(fun () ->
       let open Abbs_future_combinators.Infix_result_monad in
       Githubc2_abb.call t req
-      >>= fun resp ->
+      >>| fun resp ->
       CCOption.iter (fun remaining ->
           Metrics.Rate_limit_remaining_histograph.observe
             Metrics.rate_limit_remaining_count
             remaining)
       @@ get_rate_limit_remaining resp;
-      Abbs_future_combinators.return_ok resp)
+      resp)
     ~while_:
       (Abbs_future_combinators.finite_tries tries (function
         | Error _ -> true
@@ -259,11 +259,10 @@ let user ~config ~access_token () =
   Prmths.Counter.inc_one (Metrics.fn_call_total "user");
   let client = create config (`Token access_token) in
   call client (Githubc2_users.Get_authenticated.make ())
-  >>= fun resp ->
+  >>? fun resp ->
   match Openapi.Response.value resp with
-  | `OK user -> Abbs_future_combinators.return_ok user
-  | (`Forbidden _ | `Not_modified | `Unauthorized _) as err ->
-      Abbs_future_combinators.return_err err
+  | `OK user -> Ok user
+  | (`Forbidden _ | `Not_modified | `Unauthorized _) as err -> Error err
 
 let get_installation_access_token
     ?(expiration_sec = installation_expiration_sec)
@@ -294,33 +293,30 @@ let get_installation_access_token
       make
         ~body:Request_body.(make Primary.(make ~permissions ()))
         (Parameters.make ~installation_id))
-  >>= fun resp ->
+  >>? fun resp ->
   match Openapi.Response.value resp with
   | `Created token ->
       let installation_token = Githubc2_components.Installation_token.value token in
-      Abbs_future_combinators.return_ok
-        installation_token.Githubc2_components.Installation_token.Primary.token
-  | (`Unauthorized _ | `Forbidden _ | `Not_found _ | `Unprocessable_entity _) as err ->
-      Abbs_future_combinators.return_err err
+      Ok installation_token.Githubc2_components.Installation_token.Primary.token
+  | (`Unauthorized _ | `Forbidden _ | `Not_found _ | `Unprocessable_entity _) as err -> Error err
 
 let fetch_repo ~owner ~repo client =
   Prmths.Counter.inc_one (Metrics.fn_call_total "fetch_repo");
   let open Abbs_future_combinators.Infix_result_monad in
   call client Githubc2_repos.Get.(make (Parameters.make ~owner ~repo))
-  >>= fun resp ->
+  >>? fun resp ->
   match Openapi.Response.value resp with
-  | `OK repo -> Abbs_future_combinators.return_ok repo
-  | (`Forbidden _ | `Moved_permanently _ | `Not_found _) as err ->
-      Abbs_future_combinators.return_err err
+  | `OK repo -> Ok repo
+  | (`Forbidden _ | `Moved_permanently _ | `Not_found _) as err -> Error err
 
 let fetch_branch ~owner ~repo ~branch client =
   Prmths.Counter.inc_one (Metrics.fn_call_total "fetch_branch");
   let open Abbs_future_combinators.Infix_result_monad in
   call client Githubc2_repos.Get_branch.(make (Parameters.make ~branch ~owner ~repo))
-  >>= fun resp ->
+  >>? fun resp ->
   match Openapi.Response.value resp with
-  | `OK branch -> Abbs_future_combinators.return_ok branch
-  | (`Moved_permanently _ | `Not_found _) as err -> Abbs_future_combinators.return_err err
+  | `OK branch -> Ok branch
+  | (`Moved_permanently _ | `Not_found _) as err -> Error err
 
 let fetch_file ~owner ~repo ~ref_ ~path client =
   Prmths.Counter.inc_one (Metrics.fn_call_total "fetch_file");
@@ -328,13 +324,13 @@ let fetch_file ~owner ~repo ~ref_ ~path client =
   call
     client
     Githubc2_repos.Get_content.(make (Parameters.make ~owner ~repo ~ref_:(Some ref_) ~path ()))
-  >>= fun resp ->
+  >>? fun resp ->
   let module C = Githubc2_repos.Get_content.Responses.OK in
   match Openapi.Response.value resp with
-  | `OK (C.Content_file file) -> Abbs_future_combinators.return_ok (Some file)
-  | `OK _ -> Abbs_future_combinators.return_err `Not_file
-  | `Not_found _ -> Abbs_future_combinators.return_ok None
-  | (`Forbidden _ | `Found | `Not_modified) as err -> Abbs_future_combinators.return_err err
+  | `OK (C.Content_file file) -> Ok (Some file)
+  | `OK _ -> Error `Not_file
+  | `Not_found _ -> Ok None
+  | (`Forbidden _ | `Found | `Not_modified) as err -> Error err
 
 let fetch_pull_request_files ~owner ~repo ~pull_number client =
   Prmths.Counter.inc_one (Metrics.fn_call_total "fetch_pull_request_files");
@@ -360,14 +356,14 @@ let fetch_pull_request ~owner ~repo ~pull_number client =
   Prmths.Counter.inc_one (Metrics.fn_call_total "fetch_pull_request");
   let open Abbs_future_combinators.Infix_result_monad in
   call client Githubc2_pulls.Get.(make Parameters.(make ~owner ~repo ~pull_number))
-  >>= fun resp ->
+  >>? fun resp ->
   match Openapi.Response.value resp with
-  | `OK v -> Abbs_future_combinators.return_ok v
+  | `OK v -> Ok v
   | ( `Not_modified
     | `Not_found _
     | `Not_acceptable _
     | `Internal_server_error _
-    | `Service_unavailable _ ) as err -> Abbs_future_combinators.return_err err
+    | `Service_unavailable _ ) as err -> Error err
 
 let get_user_installations client =
   let open Abbs_future_combinators.Infix_result_monad in
@@ -377,12 +373,10 @@ let get_user_installations client =
     client
     Githubc2_apps.List_installations_for_authenticated_user.(
       make Parameters.(make ~per_page:100 ()))
-  >>= fun resp ->
+  >>? fun resp ->
   match Openapi.Response.value resp with
-  | `OK R.OK.{ primary = Primary.{ installations; _ }; _ } ->
-      Abbs_future_combinators.return_ok installations
-  | (`Forbidden _ | `Not_modified | `Unauthorized _) as err ->
-      Abbs_future_combinators.return_err err
+  | `OK R.OK.{ primary = Primary.{ installations; _ }; _ } -> Ok installations
+  | (`Forbidden _ | `Not_modified | `Unauthorized _) as err -> Error err
 
 let get_installation_repos client =
   let module R = Githubc2_apps.List_repos_accessible_to_installation.Responses in
@@ -425,7 +419,7 @@ let find_workflow_file ~owner ~repo client =
     ~f:(fun () ->
       let open Abbs_future_combinators.Infix_result_monad in
       list_workflows ~owner ~repo client
-      >>= fun workflows ->
+      >>| fun workflows ->
       match
         CCList.filter
           (fun (_, name, path) ->
@@ -433,8 +427,8 @@ let find_workflow_file ~owner ~repo client =
             || CCString.equal path terrateam_workflow_path)
           workflows
       with
-      | (_, _, path) :: _ -> Abbs_future_combinators.return_ok (Some path)
-      | [] -> Abbs_future_combinators.return_ok None)
+      | (_, _, path) :: _ -> Some path
+      | [] -> None)
     ~while_:
       (Abbs_future_combinators.finite_tries 3 (function
         | Ok (Some _) -> false
@@ -449,7 +443,7 @@ let load_workflow ?override_path ~owner ~repo client =
     ~f:(fun () ->
       let open Abbs_future_combinators.Infix_result_monad in
       list_workflows ~owner ~repo client
-      >>= fun workflows ->
+      >>| fun workflows ->
       match
         CCList.filter
           (fun (_, name, path) ->
@@ -461,8 +455,8 @@ let load_workflow ?override_path ~owner ~repo client =
                   || CCString.equal path terrateam_workflow_path))
           workflows
       with
-      | (id, _, _) :: _ -> Abbs_future_combinators.return_ok (Some id)
-      | [] -> Abbs_future_combinators.return_ok None)
+      | (id, _, _) :: _ -> Some id
+      | [] -> None)
     ~while_:
       (Abbs_future_combinators.finite_tries 3 (function
         | Ok (Some _) -> false
@@ -481,15 +475,14 @@ let publish_comment ~owner ~repo ~pull_number ~body client =
       make
         ~body:Request_body.(make Primary.{ body })
         Parameters.(make ~issue_number:pull_number ~owner ~repo))
-  >>= fun resp ->
+  >>? fun resp ->
   match Openapi.Response.value resp with
   | `Created c ->
       let module P = Githubc2_components.Issue_comment.Primary in
       let cm = Githubc2_components.Issue_comment.value c in
       let id = CCInt64.to_int cm.P.id in
-      Abbs_future_combinators.return_ok id
-  | (`Forbidden _ | `Not_found _ | `Gone _ | `Unprocessable_entity _) as err ->
-      Abbs_future_combinators.return_err err
+      Ok id
+  | (`Forbidden _ | `Not_found _ | `Gone _ | `Unprocessable_entity _) as err -> Error err
 
 let delete_comment ~owner ~repo ~comment_id client =
   Prmths.Counter.inc_one (Metrics.fn_call_total "delete_comment");
@@ -554,10 +547,10 @@ let minimize_comment ~owner ~repo ~comment_id client =
           let url = "/api/graphql" in
           let request = create_minimize_request url node_id in
           call client request
-          >>= fun resp ->
+          >>? fun resp ->
           match Openapi.Response.value resp with
-          | `OK -> Abbs_future_combinators.return_ok ()
-          | `Not_found -> Abbs_future_combinators.return_err `Not_found))
+          | `OK -> Ok ()
+          | `Not_found -> Error `Not_found))
   | `Not_found _ -> Abbs_future_combinators.return_err `Not_found
 
 (* [reviewDecision] is GitHub's own verdict on whether the pull request
@@ -677,10 +670,10 @@ let react_to_comment ?(content = `Rocket) ~owner ~repo ~comment_id client =
       make
         ~body:Request_body.(make Primary.(make ~content))
         Parameters.(make ~comment_id:(CCInt64.of_int comment_id) ~owner ~repo))
-  >>= fun resp ->
+  >>? fun resp ->
   match Openapi.Response.value resp with
-  | `OK _ | `Created _ -> Abbs_future_combinators.return_ok ()
-  | `Unprocessable_entity _ as err -> Abbs_future_combinators.return_err err
+  | `OK _ | `Created _ -> Ok ()
+  | `Unprocessable_entity _ as err -> Error err
 
 let rec get_tree ~owner ~repo ~sha client =
   Prmths.Counter.inc_one (Metrics.fn_call_total "get_tree");
@@ -720,10 +713,10 @@ let rec get_tree ~owner ~repo ~sha client =
                   match item.Items.primary.Items.Primary.type_ with
                   | "tree" ->
                       get_tree ~owner ~repo ~sha:item.Items.primary.Items.Primary.sha client
-                      >>= fun fs ->
+                      >>| fun fs ->
                       let path = item.Items.primary.Items.Primary.path in
                       let fs = CCList.map (Filename.concat path) fs in
-                      Abbs_future_combinators.return_ok (files @ fs)
+                      files @ fs
                   | "blob" ->
                       Abbs_future_combinators.return_ok
                         (item.Items.primary.Items.Primary.path :: files)
@@ -760,11 +753,10 @@ let get_team_membership_in_org ~org ~team ~user client =
     client
     Githubc2_teams.Get_membership_for_user_in_org.(
       make Parameters.(make ~org ~team_slug:team ~username:user))
-  >>= fun resp ->
+  >>| fun resp ->
   match Openapi.Response.value resp with
-  | `Not_found -> Abbs_future_combinators.return_ok false
-  | `OK Team.{ primary = Primary.{ state; _ }; _ } ->
-      Abbs_future_combinators.return_ok (state = `Active)
+  | `Not_found -> false
+  | `OK Team.{ primary = Primary.{ state; _ }; _ } -> state = `Active
 
 let get_repo_collaborator_permission ~org ~repo ~user client =
   Prmths.Counter.inc_one (Metrics.fn_call_total "get_repo_collaborator_permission");
@@ -774,25 +766,22 @@ let get_repo_collaborator_permission ~org ~repo ~user client =
     client
     Githubc2_repos.Get_collaborator_permission_level.(
       make Parameters.(make ~owner:org ~repo ~username:user))
-  >>= fun resp ->
+  >>| fun resp ->
   match Openapi.Response.value resp with
-  | `Not_found _ -> Abbs_future_combinators.return_ok None
-  | `OK Permission.{ primary = Primary.{ role_name; _ }; _ } ->
-      Abbs_future_combinators.return_ok (Some role_name)
+  | `Not_found _ -> None
+  | `OK Permission.{ primary = Primary.{ role_name; _ }; _ } -> Some role_name
 
 let get_org_membership ~org ~user client =
   Prmths.Counter.inc_one (Metrics.fn_call_total "get_org_membership");
   let open Abbs_future_combinators.Infix_result_monad in
   let module Membership = Githubc2_components.Org_membership in
   call client Githubc2_orgs.Get_membership_for_user.(make Parameters.(make ~org ~username:user))
-  >>= fun resp ->
+  >>| fun resp ->
   match Openapi.Response.value resp with
-  | `Not_found _ -> Abbs_future_combinators.return_ok None
-  | `Forbidden _ -> Abbs_future_combinators.return_ok None
+  | `Not_found _ -> None
+  | `Forbidden _ -> None
   | `OK Membership.{ primary = Primary.{ role; state; _ }; _ } ->
-      if state = `Active then
-        Abbs_future_combinators.return_ok (Some (if role = `Admin then `Admin else `User))
-      else Abbs_future_combinators.return_ok None
+      if state = `Active then Some (if role = `Admin then `Admin else `User) else None
 
 module Commit_status = struct
   type create_err = Githubc2_abb.call_err [@@deriving show]
@@ -837,7 +826,7 @@ module Commit_status = struct
                   ~body:
                     Request_body.(make Primary.(make ?context ~description ~state ~target_url ()))
                   Parameters.(make ~owner ~repo ~sha))
-            >>= fun _ -> Abbs_future_combinators.return_ok ())
+            >>| fun _ -> ())
           creates)
       (CCList.chunks (CCInt.max 1 (CCList.length creates / max_parallel)) creates)
     >>= fun res ->

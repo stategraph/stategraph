@@ -21,10 +21,10 @@ let create' ?call_timeout ~api_key ~base_url () =
       Openapic_abb.create ~user_agent:"Ttm Client" ?call_timeout ~base_url (`Bearer api_key)
     in
     Openapic_abb.call client Terrat_api_access_token.Refresh.(make ())
-    >>= fun resp ->
+    >>? fun resp ->
     match Openapi.Response.value resp with
     | `OK { Terrat_api_access_token.Refresh.Responses.OK.token } ->
-        Abbs_future_combinators.return_ok
+        Ok
           {
             base_url;
             api_key;
@@ -32,7 +32,7 @@ let create' ?call_timeout ~api_key ~base_url () =
             client =
               Openapic_abb.create ~user_agent:"Ttm Client" ?call_timeout ~base_url (`Bearer token);
           }
-    | `Forbidden -> Abbs_future_combinators.return_err `Refresh_token_err
+    | `Forbidden -> Error `Refresh_token_err
   with Create_err_exn err ->
     Abbs_future_combinators.return_err (err : create_err :> [> create_err ])
 
@@ -62,9 +62,9 @@ let call ?(tries = 3) t req =
       | resp when Openapi.Response.status resp = 403 ->
           (* It's a Forbidden response, so assume the token needs to be re-upped *)
           create' ?call_timeout:t.call_timeout ~api_key:t.api_key ~base_url:t.base_url ()
-          >>= fun c ->
+          >>| fun c ->
           t.client <- c.client;
-          Abbs_future_combinators.return_ok resp
+          resp
       | resp -> Abbs_future_combinators.return_ok resp)
     ~while_:
       (Abbs_future_combinators.finite_tries tries (function

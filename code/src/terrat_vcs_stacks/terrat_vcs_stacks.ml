@@ -225,7 +225,7 @@ module Make (M : M with type db = Pgsql_io.t) = struct
     >>= function
     | Some stacks ->
         M.query_dirspace_states ~request_id ~installation_id ~repo_id ~pull_request_id db
-        >>= fun dirspace_states ->
+        >>| fun dirspace_states ->
         let dirspace_states =
           Terrat_data.Dirspace_map.of_list
           @@ CCList.map
@@ -242,7 +242,7 @@ module Make (M : M with type db = Pgsql_io.t) = struct
                 stacks.Tac.Stacks.stacks;
           }
         in
-        Abbs_future_combinators.return_ok (Some stacks)
+        Some stacks
     | None -> Abbs_future_combinators.return_ok None
 
   let enforce_installation_access user installation_id db ctx =

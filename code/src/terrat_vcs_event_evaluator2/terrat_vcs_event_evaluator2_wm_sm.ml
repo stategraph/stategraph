@@ -271,7 +271,7 @@ struct
         fetch Keys.compute_node_id
         >>= fun compute_node_id ->
         Builder.run_db s ~f:(fun db -> set_work s compute_node_id id response db)
-        >>= fun () -> Abbs_future_combinators.return_err (`Suspend_eval name)
+        >>? fun () -> Error (`Suspend_eval name)
     | Some (E.Fail { work_manifest; error }) when eq work_manifest -> (
         Logs.info (fun m -> m "%s : WM : FAIL : name=%s" (Builder.log_id s) name);
         fail work_manifest s fetcher
@@ -279,10 +279,9 @@ struct
         publish_fail s fetcher error
         >>= fun () ->
         fetch Keys.work_manifests_for_job
-        >>= function
-        | wms when all_wms_completed @@ CCList.filter eq wms ->
-            Abbs_future_combinators.return_ok (CCList.filter eq wms)
-        | _ -> Abbs_future_combinators.return_err (`Suspend_eval name))
+        >>? function
+        | wms when all_wms_completed @@ CCList.filter eq wms -> Ok (CCList.filter eq wms)
+        | _ -> Error (`Suspend_eval name))
     | Some (E.Result { work_manifest; result = wm_result }) when eq work_manifest -> (
         Logs.info (fun m -> m "%s : WM : RESULT : name=%s" (Builder.log_id s) name);
         result work_manifest wm_result s fetcher
@@ -295,15 +294,15 @@ struct
            have already created work manifests in parallel operations so we
            don't need to do it again. *)
         Builder.run_db s ~f:(fun db -> query_work_manifests s job.Tjc.Job.id db)
-        >>= function
+        >>? function
         | wms when all_wms_completed @@ CCList.filter eq wms ->
             Logs.info (fun m ->
                 m "%s : WM : RESULT : name=%s : all_wms_completed" (Builder.log_id s) name);
-            Abbs_future_combinators.return_ok (CCList.filter eq wms)
+            Ok (CCList.filter eq wms)
         | _ ->
             Logs.info (fun m ->
                 m "%s : WM : RESULT : name=%s : not_all_wms_completed" (Builder.log_id s) name);
-            Abbs_future_combinators.return_err (`Suspend_eval name))
+            Error (`Suspend_eval name))
     | Some _ | None -> (
         fetch Keys.job
         >>= fun job ->
@@ -354,7 +353,7 @@ struct
                     fetch Keys.job
                     >>= fun job ->
                     Builder.run_db s ~f:(fun db -> add_work_manifests s job.Tjc.Job.id wms db)
-                    >>= fun () -> Abbs_future_combinators.return_err (`Suspend_eval name))
+                    >>? fun () -> Error (`Suspend_eval name))
             | wms when all_wms_completed wms ->
                 Logs.info (fun m ->
                     m "%s : WM : CREATE : name=%s : all_wms_completed" (Builder.log_id s) name);

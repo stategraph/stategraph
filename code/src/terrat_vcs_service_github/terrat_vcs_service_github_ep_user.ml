@@ -37,7 +37,7 @@ module Whoami = struct
                 (Sql.select_github_user ())
                 ~f:(fun username _ _ avatar_url -> (username, avatar_url))
                 (Terrat_user.id user))
-          >>= fun res -> Abbs_future_combinators.return_ok (CCOption.of_list res)
+          >>| fun res -> CCOption.of_list res
         in
         let open Abb.Future.Infix_monad in
         run

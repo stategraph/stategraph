@@ -404,9 +404,9 @@ struct
         let open Abbs_future_combinators.Infix_result_monad in
         Pgsql_pool.with_conn t.storage ~f:(fun db ->
             Pgsql_io.Prepared_stmt.fetch db Sql.select_github_user2_exists ~f:CCFun.id user_id
-            >>= function
-            | [] -> Abbs_future_combinators.return_ok None
-            | _ :: _ -> Abbs_future_combinators.return_ok (Some (Terrat_user.make ~id:user_id ())))
+            >>| function
+            | [] -> None
+            | _ :: _ -> Some (Terrat_user.make ~id:user_id ()))
       in
       let open Abb.Future.Infix_monad in
       run

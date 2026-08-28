@@ -248,10 +248,10 @@ module Io = struct
           ~f:(fun () ->
             let open Abbs_future_combinators.Infix_result_monad in
             Abbs_io_buffered.read conn.r ~buf ~pos:0 ~len:(Bytes.length buf)
-            >>= fun n ->
+            >>| fun n ->
             Buffer.add_subbytes b buf 0 n;
             needed_bytes := !needed_bytes - n;
-            Abbs_future_combinators.return_ok n)
+            n)
           ~while_:(function
             | Ok 0 | Error _ -> false
             | Ok _ -> !needed_bytes > 0)
@@ -1085,8 +1085,7 @@ module Cursor = struct
           | ReadyForQuery _ -> true
           | _ -> false);
         ];
-    Io.consume_matching t.conn (consume_expected_frames t.conn)
-    >>= fun _ -> Abbs_future_combinators.return_ok ()
+    Io.consume_matching t.conn (consume_expected_frames t.conn) >>| fun _ -> ()
 
   let with_cursor t ~f =
     Abbs_future_combinators.with_finally
@@ -1114,9 +1113,9 @@ module Prepared_stmt = struct
         Parse { stmt; query; data_types = Typed_sql.to_data_type_list sql })
     in
     Io.send_frame conn frame
-    >>= fun () ->
+    >>| fun () ->
     add_expected_frame conn Pgsql_codec.Frame.Backend.(equal ParseComplete);
-    Abbs_future_combinators.return_ok { conn; sql; id = stmt }
+    { conn; sql; id = stmt }
 
   let bind t rf =
     Typed_sql.kbind
@@ -1135,9 +1134,9 @@ module Prepared_stmt = struct
               })
         in
         Io.send_frame t.conn bind_frame
-        >>= fun () ->
+        >>| fun () ->
         add_expected_frame t.conn Pgsql_codec.Frame.Backend.(equal BindComplete);
-        Abbs_future_combinators.return_ok (Cursor.make t.conn rf portal))
+        Cursor.make t.conn rf portal)
       t.sql
 
   let destroy t =
@@ -1153,8 +1152,7 @@ module Prepared_stmt = struct
           | ReadyForQuery _ -> true
           | _ -> false);
         ];
-    Io.consume_matching t.conn (consume_expected_frames t.conn)
-    >>= fun _ -> Abbs_future_combinators.return_ok ()
+    Io.consume_matching t.conn (consume_expected_frames t.conn) >>| fun _ -> ()
 
   (* A server-side prepared statement that no longer exists (26000, e.g. dropped
      by a rolled-back transaction) or whose cached plan is stale after DDL
@@ -1822,7 +1820,7 @@ let tx t ~f =
           >>= function
           | Ok _ as r ->
               let open Abbs_future_combinators.Infix_result_monad in
-              tx_commit t >>= fun _ -> Abb.Future.return r
+              tx_commit t >>? fun _ -> r
           | Error _ as r -> tx_rollback t >>= fun _ -> Abb.Future.return r)
       | Ok fs ->
           Logs.debug (fun m -> m "%s Tx received unexpected frames, failing" (Uuidm.to_string t.id));
@@ -1863,8 +1861,7 @@ let listen conn ~channel =
         conn
         Pgsql_codec.Frame.Backend.
           [ equal (CommandComplete { tag = "LISTEN" }); equal (ReadyForQuery { status = 'I' }) ];
-      Io.consume_matching conn (consume_expected_frames conn)
-      >>= fun _ -> Abbs_future_combinators.return_ok ())
+      Io.consume_matching conn (consume_expected_frames conn) >>| fun _ -> ())
 
 let unlisten conn ~channel =
   with_busy conn ~what:"unlisten" (fun () ->
@@ -1877,8 +1874,7 @@ let unlisten conn ~channel =
         conn
         Pgsql_codec.Frame.Backend.
           [ equal (CommandComplete { tag = "UNLISTEN" }); equal (ReadyForQuery { status = 'I' }) ];
-      Io.consume_matching conn (consume_expected_frames conn)
-      >>= fun _ -> Abbs_future_combinators.return_ok ())
+      Io.consume_matching conn (consume_expected_frames conn) >>| fun _ -> ())
 
 let unlisten_all conn =
   with_busy conn ~what:"unlisten_all" (fun () ->
@@ -1890,9 +1886,9 @@ let unlisten_all conn =
         Pgsql_codec.Frame.Backend.
           [ equal (CommandComplete { tag = "UNLISTEN" }); equal (ReadyForQuery { status = 'I' }) ];
       Io.consume_matching conn (consume_expected_frames conn)
-      >>= fun _ ->
+      >>| fun _ ->
       conn.listening <- false;
-      Abbs_future_combinators.return_ok ())
+      ())
 
 let notify conn ~channel ?(payload = "") () =
   let open Abbs_future_combinators.Infix_result_monad in
@@ -1909,7 +1905,7 @@ let notify conn ~channel ?(payload = "") () =
       /% Var.text "payload")
   in
   Prepared_stmt.fetch conn sql ~f:(fun (_ : string) -> ()) channel payload
-  >>= fun (_ : unit list) -> Abbs_future_combinators.return_ok ()
+  >>| fun (_ : unit list) -> ()
 
 let wait_for_notification conn =
   with_busy conn ~what:"wait_for_notification" (fun () -> Io.wait_for_notification conn)

@@ -8,11 +8,11 @@ let get _config _storage services =
           ~f:(function
             | Terrat_vcs_service.Service ((module M), service) -> (
                 M.Service.get_user service (Terrat_user.id user)
-                >>= function
-                | Some _ -> Abbs_future_combinators.return_ok (Some (M.Service.name service))
-                | None -> Abbs_future_combinators.return_ok None))
+                >>| function
+                | Some _ -> Some (M.Service.name service)
+                | None -> None))
           services
-        >>= fun vcs -> Abbs_future_combinators.return_ok (CCList.filter_map CCFun.id vcs)
+        >>| fun vcs -> CCList.filter_map CCFun.id vcs
       in
       let open Abb.Future.Infix_monad in
       run

@@ -118,7 +118,7 @@ struct
         fetch Keys.create_commit_checks
         >>= fun create_commit_checks ->
         create_commit_checks' create_commit_checks branch_ref [ check ]
-        >>= fun () -> Abbs_future_combinators.return_ok [ work_manifest ]
+        >>| fun () -> [ work_manifest ]
     | Some _ ->
         fetch Keys.commit_checks
         >>= fun commit_checks ->
@@ -139,8 +139,7 @@ struct
         in
         fetch Keys.create_commit_checks
         >>= fun create_commit_checks ->
-        create_commit_checks' create_commit_checks branch_ref unfinished_checks
-        >>= fun () -> Abbs_future_combinators.return_ok []
+        create_commit_checks' create_commit_checks branch_ref unfinished_checks >>| fun () -> []
 
   let initiate ~branch ({ Wm.id; _ } as work_manifest) s { Bs.Fetcher.fetch } =
     let open Irm in
@@ -201,7 +200,7 @@ struct
     Abb.Future.return (Wm_sm.dirspaceflows_of_changes repo_config_raw matches)
     >>= fun dirspaceflows ->
     Builder.run_db s ~f:(fun db -> create_token s db account id)
-    >>= fun token ->
+    >>| fun token ->
     let module Dsf = Terrat_change.Dirspaceflow in
     let dirs =
       CCList.map (fun Terrat_change.Dirspace.{ dir; _ } -> dir)
@@ -221,7 +220,7 @@ struct
       Terrat_api_components.Work_manifest.Work_manifest_index
         { I.dirs; base_ref = S.Api.Ref.to_string dest_branch_name; token; type_ = `Index; config }
     in
-    Abbs_future_combinators.return_ok response
+    response
 
   let fail ~branch work_manifest s { Bs.Fetcher.fetch } =
     let open Irm in
@@ -326,10 +325,10 @@ struct
         fetch Keys.publish_comment
         >>= fun publish_comment ->
         publish_comment' publish_comment (Msg.Index_complete (false, []))
-        >>= fun () ->
+        >>? fun () ->
         (* No index was built, so stop rather than mark the work manifest
            completed. *)
-        Abbs_future_combinators.return_err `Silent_failure
+        Error `Silent_failure
     | Wmr.Work_manifest_tf_operation_result _ -> assert false
     | Wmr.Work_manifest_tf_operation_result2 _ -> assert false
     | Wmr.Work_manifest_build_config_result _ -> assert false

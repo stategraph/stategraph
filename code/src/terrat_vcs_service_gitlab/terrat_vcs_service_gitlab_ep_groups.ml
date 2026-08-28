@@ -21,11 +21,10 @@ module List = struct
       ~page:Openapic_abb.Page.gitlab
       client
       Groups.(make (Parameters.make ~order_by:`Name ()))
-    >>= fun groups ->
+    >>| fun groups ->
     let module G = Gitlabc_components_api_entities_group in
     let module R = Terrat_api_components_gitlab_group in
-    Abbs_future_combinators.return_ok
-      (CCList.map (fun { G.id; full_name = name; _ } -> { R.id; name }) groups)
+    CCList.map (fun { G.id; full_name = name; _ } -> { R.id; name }) groups
 
   let get config storage =
     Brtl_ep.run_result_json ~f:(fun ctx ->

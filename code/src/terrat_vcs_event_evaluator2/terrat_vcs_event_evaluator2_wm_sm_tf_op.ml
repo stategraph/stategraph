@@ -442,16 +442,15 @@ struct
               s
               (fun m log_id time -> m "%s : WORK_MANIFEST : CREATE : time=%f" log_id time)
               (fun () -> S.Work_manifest.create ~request_id:(Builder.log_id s) db work_manifest))
-        >>= fun work_manifest ->
-        Abbs_future_combinators.return_ok
-          ( work_manifest,
-            op_commit_checks
-              (Builder.State.config s)
-              account
-              repo
-              work_manifest
-              "Queued"
-              Terrat_commit_check.Status.Queued ))
+        >>| fun work_manifest ->
+        ( work_manifest,
+          op_commit_checks
+            (Builder.State.config s)
+            account
+            repo
+            work_manifest
+            "Queued"
+            Terrat_commit_check.Status.Queued ))
       dirspaceflows_by_run_params
     >>= fun work_manifests_and_checks ->
     let work_manifests = CCList.map fst work_manifests_and_checks in
@@ -480,7 +479,7 @@ struct
       (CCList.flatten matches.Keys.Matches.all_matches)
       (Terrat_base_repo_config_v1.apply_requirements repo_config)
       commit_checks
-    >>= fun () -> Abbs_future_combinators.return_ok work_manifests
+    >>| fun () -> work_manifests
 
   module Plan = struct
     let eq base_ref' branch_ref' { Wm.base_ref; branch_ref; steps; _ } =
@@ -556,7 +555,7 @@ struct
             (fun m log_id time -> m "%s : CREATE_TOKEN : wm=%a : time=%f" log_id Uuidm.pp id time)
             (fun () ->
               Wm_sm.create_token' ~log_id:(Builder.log_id s) (S.Api.Account.id account) id db))
-      >>= fun token ->
+      >>| fun token ->
       let response =
         Terrat_api_components.(
           Work_manifest.Work_manifest_plan
@@ -580,7 +579,7 @@ struct
               capabilities = [ "tenv" ];
             })
       in
-      Abbs_future_combinators.return_ok response
+      response
 
     let fail work_manifest s { Bs.Fetcher.fetch } =
       let open Irm in
@@ -677,8 +676,7 @@ struct
                     repo_config)
               >>= fun repo_config ->
               Abb.Future.return (Terrat_change_match3.synthesize_config ~index repo_config)
-              >>= fun synthesized_config ->
-              Abbs_future_combinators.return_ok (repo_config, synthesized_config)
+              >>| fun synthesized_config -> (repo_config, synthesized_config)
             in
             run
             >>= fun (repo_config, synthesized_config) ->
@@ -710,7 +708,7 @@ struct
                            synthesized_config;
                            work_manifest;
                          })))
-            >>= fun () -> Abbs_future_combinators.return_ok ()
+            >>| fun () -> ()
           else Abbs_future_combinators.return_ok ()
       | Wmr.Work_manifest_tf_operation_result result ->
           let open Irm in
@@ -747,7 +745,7 @@ struct
               branch_ref
               work_manifest
               work_manifest_result
-            >>= fun () -> Abbs_future_combinators.return_ok ()
+            >>| fun () -> ()
           else Abbs_future_combinators.return_ok ()
       | Wmr.Work_manifest_index_result _ -> assert false
       | Wmr.Work_manifest_build_config_result _ -> assert false
@@ -849,8 +847,7 @@ struct
       maybe_comment_autoapply_running s fetcher
       >>= fun () ->
       create ~dest_branch_ref ~branch_ref ~branch `Apply s fetcher
-      >>= fun wms ->
-      maybe_comment_queued_behind wms s fetcher >>= fun () -> Abbs_future_combinators.return_ok wms
+      >>= fun wms -> maybe_comment_queued_behind wms s fetcher >>| fun () -> wms
 
     let initiate ({ Wm.id; _ } as work_manifest) s { Bs.Fetcher.fetch } =
       let open Irm in
@@ -908,7 +905,7 @@ struct
             (fun m log_id time -> m "%s : CREATE_TOKEN : wm=%a : time=%f" log_id Uuidm.pp id time)
             (fun () ->
               Wm_sm.create_token' ~log_id:(Builder.log_id s) (S.Api.Account.id account) id db))
-      >>= fun token ->
+      >>| fun token ->
       let response =
         Terrat_api_components.(
           Work_manifest.Work_manifest_apply
@@ -930,7 +927,7 @@ struct
               capabilities = [ "tenv" ];
             })
       in
-      Abbs_future_combinators.return_ok response
+      response
 
     let fail work_manifest s { Bs.Fetcher.fetch } =
       let open Irm in
