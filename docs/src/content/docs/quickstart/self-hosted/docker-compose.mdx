@@ -7,7 +7,15 @@ Docker Compose provides the quickest way to get Terrateam Self-Hosted up and run
 
 ## What the Setup Wizard Does
 
-The Terrateam setup wizard is a containerized application that handles all the complex configuration automatically for your chosen version control system:
+The Terrateam setup wizard is a containerized application that handles all the complex configuration automatically for your chosen version control system. It is published as the `ghcr.io/stategraph/orchestration-setup` container image. The `setup` service in `docker/terrat/docker-compose.yml` pulls that image, and you can also run it on its own:
+
+```sh
+docker run --rm -p 3000:3000 ghcr.io/stategraph/orchestration-setup:latest
+```
+
+The previous image, `ghcr.io/terrateamio/terrateam-setup`, is no longer updated.
+
+The wizard handles:
 
 ### For GitHub
 - **Automated GitHub App Creation**: Creates a GitHub App with all required permissions

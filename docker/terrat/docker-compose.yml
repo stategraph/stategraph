@@ -2,7 +2,7 @@ version: "3.4"
 
 services:
   setup:
-    image: ghcr.io/terrateamio/terrateam-setup:latest
+    image: ghcr.io/stategraph/orchestration-setup:latest
     environment:
       GH_ORG: "${GH_ORG}"
       GHE_HOST: "${GHE_HOST}"
