@@ -43,6 +43,7 @@ module Route = struct
 
     let string = ud CCOption.return
     let int = ud (CCFun.compose int_of_string CCOption.return)
+    let uuid = ud Uuidm.of_string
 
     let any idx s =
       if s.[idx] = '/' then
@@ -83,6 +84,7 @@ module Route = struct
 
     let string n = ud n CCOption.return
     let int n = ud n CCFun.(int_of_string %> CCOption.return)
+    let uuid n = ud n Uuidm.of_string
 
     let bool n =
       ud n (function
