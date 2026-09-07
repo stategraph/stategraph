@@ -7,9 +7,11 @@ let marked_comment_is_from_self =
 let plain_comment_is_not_from_self =
   Oth.test ~name:"plain comment is not from self" (fun _ ->
       Oth.Assert.not_true
-        "a command is not from self"
+        ~fail_msg:"a command is not from self"
         (Terrat_comment.is_from_self "terrateam plan");
-      Oth.Assert.not_true "an empty body is not from self" (Terrat_comment.is_from_self "");
+      Oth.Assert.not_true
+        ~fail_msg:"an empty body is not from self"
+        (Terrat_comment.is_from_self "");
       ())
 
 (* The marker closes the body, so the command parser still reads the first word
@@ -35,7 +37,9 @@ let quoted_marked_comment_is_not_from_self =
         |> CCString.concat "\n"
       in
       let body = quoted ^ "\n\nterrateam apply" in
-      Oth.Assert.not_true "a quote-reply is not from self" (Terrat_comment.is_from_self body);
+      Oth.Assert.not_true
+        ~fail_msg:"a quote-reply is not from self"
+        (Terrat_comment.is_from_self body);
       ())
 
 (* Trailing white space around the marker must not hide it. *)

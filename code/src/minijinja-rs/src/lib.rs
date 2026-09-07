@@ -76,7 +76,14 @@ pub extern "C" fn minijinja_render_template(
     match env.get_template("template") {
         Ok(tmpl) => match tmpl.render(&context) {
             Ok(result) => {
-                let data = CString::new(result.replace('\0', "\0")).unwrap();
+                // Strip interior NUL bytes before building the C string. A rendered
+                // template can legitimately contain a NUL (e.g. an OpenTofu plan diff
+                // that surfaces a base64gzip'd EC2 user_data blob — gzip magic + NULs),
+                // and CString::new rejects any interior NUL. The previous
+                // `.replace('\0', "\0")` was a no-op (NUL -> NUL), so `.unwrap()`
+                // still panicked with NulError and took the whole process down. NUL
+                // bytes cannot be represented in a C string regardless, so drop them.
+                let data = CString::new(result.replace('\0', "")).unwrap();
                 return RenderResult {
                     success: true,
                     data: data.into_raw(),
@@ -104,5 +111,43 @@ pub extern "C" fn minijinja_render_template(
 pub unsafe extern "C" fn minijinja_free_string(ptr: *mut c_char) {
     if !ptr.is_null() {
         let _ = CString::from_raw(ptr);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Drive the FFI entry point exactly as the OCaml caller does, returning
+    /// (success, rendered_output).
+    fn render(template: &str, json: &str) -> (bool, String) {
+        let t = CString::new(template).unwrap();
+        let j = CString::new(json).unwrap();
+        let res = minijinja_render_template(t.as_ptr(), j.as_ptr());
+        let out = unsafe { CStr::from_ptr(res.data) }
+            .to_str()
+            .expect("output is valid UTF-8")
+            .to_owned();
+        unsafe { minijinja_free_string(res.data) };
+        (res.success, out)
+    }
+
+    #[test]
+    fn renders_a_normal_template() {
+        let (ok, out) = render("Hello {{ name }}", r#"{"name": "world"}"#);
+        assert!(ok);
+        assert_eq!(out, "Hello world");
+    }
+
+    /// Regression for the CString NulError panic: a rendered value containing an
+    /// interior NUL byte — as an OpenTofu plan diff does when it surfaces a
+    /// base64gzip'd EC2 user_data blob (gzip magic + NULs) — must not crash the
+    /// FFI. Before the fix, `CString::new(result.replace('\0', "\0"))` (a
+    /// NUL->NUL no-op) hit NulError and `.unwrap()` aborted the whole process.
+    #[test]
+    fn interior_nul_byte_is_stripped_not_panicked() {
+        let (ok, out) = render("{{ x }}", r#"{"x": "a\u0000b"}"#);
+        assert!(ok, "render must succeed instead of panicking on the NUL byte");
+        assert_eq!(out, "ab", "the interior NUL must be dropped from the output");
     }
 }

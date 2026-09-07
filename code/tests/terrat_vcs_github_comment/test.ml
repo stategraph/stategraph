@@ -91,7 +91,7 @@ let test =
          step's default. *)
       Oth.test ~name:"a plan step obeys visible_on from the payload" (fun _ ->
           let s = step ~name:"tf/plan" ~success:true (plan_payload ~visible_on:"failure" ()) in
-          Oth.Assert.not_true "hidden on a successful run" (shown ~overall_success:true s);
+          Oth.Assert.not_true ~fail_msg:"hidden on a successful run" (shown ~overall_success:true s);
           Oth.Assert.true_ "shown on a failed run" (shown ~overall_success:false s);
           ());
       Oth.test ~name:"a plan step with no visible_on is always shown" (fun _ ->
@@ -102,11 +102,11 @@ let test =
       Oth.test ~name:"an apply step obeys visible_on from the payload" (fun _ ->
           let s = step ~name:"tf/apply" ~success:true (run_payload ~visible_on:"success" ()) in
           Oth.Assert.true_ "shown on a successful run" (shown ~overall_success:true s);
-          Oth.Assert.not_true "hidden on a failed run" (shown ~overall_success:false s);
+          Oth.Assert.not_true ~fail_msg:"hidden on a failed run" (shown ~overall_success:false s);
           ());
       Oth.test ~name:"an init step with no visible_on is shown only on failure" (fun _ ->
           let s = step ~name:"tf/init" ~success:true (run_payload ()) in
-          Oth.Assert.not_true "hidden on a successful run" (shown ~overall_success:true s);
+          Oth.Assert.not_true ~fail_msg:"hidden on a successful run" (shown ~overall_success:true s);
           Oth.Assert.true_ "shown on a failed run" (shown ~overall_success:false s);
           ());
       (* The stategraph engine names its steps stategraph/<action>, which the step dispatch used to
@@ -126,7 +126,7 @@ let test =
           let s =
             step ~name:"stategraph/plan" ~success:true (plan_payload ~visible_on:"failure" ())
           in
-          Oth.Assert.not_true "hidden on a successful run" (shown ~overall_success:true s);
+          Oth.Assert.not_true ~fail_msg:"hidden on a successful run" (shown ~overall_success:true s);
           ());
       (* A payload that says nothing about visibility is still a payload the comment can read. The
          env step sends no visible_on at all, and used to come out as a JSON dump of its own

@@ -61,7 +61,11 @@ module Assert = struct
            (Format.asprintf "Expected:@.@[%a@]@.Got:@.@[%a@]" pp expected pp actual))
 
   let true_ msg v = if not v then raise (Assert_failure_msg msg)
-  let not_true msg v = if v then raise (Assert_failure_msg msg)
+
+  let not_true ?fail_msg v =
+    let msg = CCOption.get_or ~default:"Expected false, got true" fail_msg in
+    if v then raise (Assert_failure_msg msg)
+
   let false_ msg = raise (Assert_failure_msg msg)
 
   let str_contains ~haystack ~needle =

@@ -140,8 +140,8 @@ When using Docker Compose, load the certificate from a file on the host:
 
 ```yaml
 services:
-  terrat:
-    image: ghcr.io/terrateamio/terrat:latest
+  server:
+    image: ghcr.io/terrateamio/terrat-oss:latest
     environment:
       CUSTOM_CA_CERT: ${CUSTOM_CA_CERT}
 ```

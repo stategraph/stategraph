@@ -522,7 +522,7 @@ let assert_bad_glob ~expected_glob ~expected_pattern = function
       Oth.Assert.eq ~eq:CCString.equal ~pp:CCString.pp expected_glob glob;
       Oth.Assert.eq ~eq:CCString.equal ~pp:CCString.pp expected_pattern pattern;
       Oth.Assert.str_contains ~haystack:location ~needle:expected_glob;
-      Oth.Assert.not_true "the parser message is empty" (CCString.is_empty err)
+      Oth.Assert.not_true ~fail_msg:"the parser message is empty" (CCString.is_empty err)
   | err ->
       Oth.Assert.false_
         (Printf.sprintf "Expected Bad_glob_err, got %s" (V1.show_of_version_1_json_err err))

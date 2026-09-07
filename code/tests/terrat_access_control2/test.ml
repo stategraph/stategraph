@@ -47,7 +47,7 @@ let test_list_covers_both_spellings_and_extensions =
 let test_unrelated_changes_do_not_count =
   Oth.test ~name:"unrelated files (and near-misses) are not repo config changes" (fun _ ->
       Oth.Assert.not_true
-        "near-misses misdetected as a repo config change"
+        ~fail_msg:"near-misses misdetected as a repo config change"
         (Terrat_access_control2.Tests.is_repo_config_change
            Terrat_change.Diff.
              [
@@ -64,7 +64,7 @@ let unrelated_diff n =
 let test_short_diff_is_trusted =
   Oth.test ~name:"a diff the VCS reported in full is trusted" (fun _ ->
       Oth.Assert.not_true
-        "a short diff of unrelated files asked for the config policy"
+        ~fail_msg:"a short diff of unrelated files asked for the config policy"
         (Terrat_access_control2.Tests.may_be_repo_config_change
            (unrelated_diff (Terrat_access_control2.Tests.max_reported_diff_files - 1))))
 
