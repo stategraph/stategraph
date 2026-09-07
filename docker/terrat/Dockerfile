@@ -27,7 +27,7 @@
 ARG BASE_IMAGE
 
 # Optional base setup stage if BASE_IMAGE is not provided
-FROM alpine:3.23@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659 AS build-base
+FROM alpine:3.23@sha256:fd791d74b68913cbb027c6546007b3f0d3bc45125f797758156952bc2d6daf40 AS build-base
 
 # [[[cog emit("apk-base") ]]]
 RUN apk add --no-cache \
@@ -145,7 +145,9 @@ RUN if [ -n "$GIT_SHA" ]; then \
 
 # [[[cog emit("terrat-images") ]]]
 # Final code-indexer image
-FROM alpine:3.23@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659 AS code-indexer
+FROM alpine:3.23@sha256:fd791d74b68913cbb027c6546007b3f0d3bc45125f797758156952bc2d6daf40 AS code-indexer
+# The minirootfs lags its own package branch, so upgrade what it pre-installed.
+RUN apk upgrade --no-cache
 RUN addgroup -S terrat && adduser -S -G terrat terrat
 COPY --from=terrat-build /tmp/mono/_build/default/code/src/terrat_code_indexer/terrat_code_indexer.exe /usr/local/bin/terrat_code_indexer
 USER terrat
@@ -153,13 +155,17 @@ WORKDIR /mnt
 ENTRYPOINT ["/usr/local/bin/terrat_code_indexer"]
 
 # Final ttm image
-FROM alpine:3.23@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659 AS ttm
+FROM alpine:3.23@sha256:fd791d74b68913cbb027c6546007b3f0d3bc45125f797758156952bc2d6daf40 AS ttm
+# The minirootfs lags its own package branch, so upgrade what it pre-installed.
+RUN apk upgrade --no-cache
 COPY --from=terrat-build /tmp/mono/_build/default/code/src/ttm/ttm.exe /usr/local/bin/ttm
 WORKDIR /mnt
 ENTRYPOINT ["/usr/local/bin/ttm"]
 
 # Shared runtime base for the terrat-ee / terrat-oss server images
-FROM alpine:3.23@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659 AS terrat-final-base
+FROM alpine:3.23@sha256:fd791d74b68913cbb027c6546007b3f0d3bc45125f797758156952bc2d6daf40 AS terrat-final-base
+# The minirootfs lags its own package branch, so upgrade what it pre-installed.
+RUN apk upgrade --no-cache
 # These are the Terrateam-branded images, so comment templates render with the
 # Terrateam brand. The unified stategraph image leaves this unset and gets the
 # stategraph default.

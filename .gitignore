@@ -35,6 +35,7 @@ pnpm-debug.log*
 
 # Rust build artifacts (cargo runs from each *-rs/ dir via dune rules)
 code/src/json_of_yaml-rs/target/
+code/src/minijinja-rs/target/
 code/src/jsonschema-rs/target/
 code/src/yaml_of_json-rs/target/
 
