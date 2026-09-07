@@ -658,6 +658,13 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
             Curl.set_customrequest handle "DELETE";
             maybe_set_body_writer handle body
         | `PATCH body ->
+            (* CUSTOMREQUEST on its own only rewrites the method token: the
+               request stays in GET send-mode, postfieldsize is ignored and the
+               body never leaves.  POST send-mode makes curl read the callback,
+               and CUSTOMREQUEST still names the verb. *)
+            (match body with
+            | Some _ -> Curl.set_post handle true
+            | None -> ());
             Curl.set_customrequest handle "PATCH";
             maybe_set_body_writer handle body
         | `Custom (meth_, body) ->

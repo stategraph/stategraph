@@ -53,6 +53,16 @@ http {
 
     client_body_buffer_size 64k;
 
+    # The SPA document is the shell of a signed-in app and must not be stored;
+    # the assets it pulls must. `location /` serves both from one root, and only
+    # the JS and CSS under /assets carry a content hash -- the images beside them
+    # do not -- so the split is made on content type rather than on path. nginx
+    # skips an add_header whose value is empty, so everything else is untouched.
+    map $sent_http_content_type $terrat_document_cache_control {
+        default    "";
+        ~*^text/html "no-store";
+    }
+
     # Public facing portion of the app
     server {
         listen       8080;
@@ -69,6 +79,7 @@ http {
         add_header X-Frame-Options "DENY" always;
         add_header X-Content-Type-Options "nosniff" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
 
         location / {
 
@@ -94,6 +105,8 @@ http {
             add_header X-Frame-Options "DENY" always;
             add_header X-Content-Type-Options "nosniff" always;
             add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+            add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+            add_header Cache-Control $terrat_document_cache_control always;
         }
 
         location /api {
@@ -124,6 +137,7 @@ http {
             add_header X-Frame-Options "DENY" always;
             add_header X-Content-Type-Options "nosniff" always;
             add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+            add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
         }
 
         # Turn off rate limit for health checks
