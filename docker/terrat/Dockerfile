@@ -91,14 +91,14 @@ WORKDIR /tmp
 # When this layer is reused cached, new packages may seem missing.
 # When you hit that (package published on more recent opam snapshot), bump the date here to re-run this layer.
 # Note that the date has no impact on `opam`. It's just a mean to trigger rebuilding of this layer.
-ARG OPAM_INDEX_DATE=2026-08-26
+ARG OPAM_INDEX_DATE=2026-09-08
 RUN echo "opam-repository index refreshed ${OPAM_INDEX_DATE}" && \
     opam init -ay --disable-sandboxing --bare
 # [[[end]]]
 COPY ./ /tmp/mono
 # [[[cog emit("opam-switch") ]]]
 RUN eval $(opam env) && \
-    opam switch create -y 5.5.0 && \
+    opam switch create -y 5.5.1 && \
     eval $(opam env) && \
     opam repository add opam-acsl mono/opam && \
     opam pin add -n ISO8601 mono/vendor/ISO8601 --no-depexts && \

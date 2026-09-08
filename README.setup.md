@@ -7,7 +7,7 @@ reference — its `build-base` stage runs the same setup and is exercised by CI 
 Create a local opam switch from the repository's root:
 
 ```shell
-opam switch create -y 5.5.0 --no-depexts
+opam switch create -y 5.5.1 --no-depexts
 eval $(opam env)
 ```
 
