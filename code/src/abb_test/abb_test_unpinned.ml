@@ -58,14 +58,14 @@ module Make (Abb : Abb_intf.S) = struct
                Abb.Sys.sleep 0.01 >>= fun () -> raise (Failure "boom"))
           >>= fun fut -> fut)
         >>= fun outer ->
-        Abb.Sys.sleep 0.05
-        >>= fun () ->
-        match Abb.Future.state outer with
-        | `Exn (Failure msg, _) when String.equal msg "boom" -> Abb.Future.return ()
+        Abb.Future.await outer
+        >>| function
+        | `Exn (Failure msg, _) when String.equal msg "boom" -> ()
         | `Exn (exn, _) ->
             Oth.Assert.false_
               (Printf.sprintf "expected Failure \"boom\", got %s" (Printexc.to_string exn))
-        | _ -> Oth.Assert.false_ "expected the forked task to be in `Exn state")
+        | `Det _ -> Oth.Assert.false_ "expected the body's exception, got a determined value"
+        | `Aborted -> Oth.Assert.false_ "expected the body's exception, got an abort")
 
   (* Pinned task awaits an unpinned task's future and sees the right
      value.  Both directions of cross-pin Future-bind. *)

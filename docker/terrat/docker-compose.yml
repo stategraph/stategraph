@@ -28,21 +28,6 @@ services:
     networks:
       - terrateam
 
-  # Uncomment to enable self-hosted cloud pricing API (large container)
-  # cloud-pricing-api:
-  #   image: ghcr.io/terrateamio/cloud-pricing-api:latest
-  #   environment:
-  #     SELF_HOSTED_INFRACOST_API_KEY: "REPLACE_WITH_32_CHARACTER_STRING"  # Any 32 character string
-  #   ports:
-  #     - "4000:4000"
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
-  #     interval: 3s
-  #     timeout: 3s
-  #     retries: 10
-  #   networks:
-  #     - terrateam
-
   server:
     image: ghcr.io/terrateamio/terrat-oss:latest
     # On stop the container drains nginx and lets in-flight runs finish, which
@@ -65,9 +50,6 @@ services:
       GITLAB_APP_SECRET: "${GITLAB_APP_SECRET}"
       GITLAB_ACCESS_TOKEN: "${GITLAB_ACCESS_TOKEN}"
       TERRATUNNEL_API_ENDPOINT: "http://terratunnel:8081"
-      # Uncomment to use self-hosted cloud pricing API
-      # INFRACOST_PRICING_API_ENDPOINT: "http://cloud-pricing-api:4000"
-      # SELF_HOSTED_INFRACOST_API_KEY: "REPLACE_WITH_32_CHARACTER_STRING"  # Must match cloud-pricing-api key
       TERRAT_UI_BASE: "${TERRAT_UI_BASE}"
       TERRAT_WEB_BASE_URL: "${TERRAT_WEB_BASE_URL}"
       TERRAT_API_BASE: "${TERRAT_API_BASE}"
@@ -81,9 +63,6 @@ services:
         condition: service_healthy
       terratunnel:
         condition: service_healthy
-      # Uncomment when using cloud-pricing-api
-      # cloud-pricing-api:
-      #   condition: service_healthy
     networks:
       - terrateam
 

@@ -467,6 +467,16 @@ let is_some_tenants_admin caps =
       (not (Sg_caps_match.grants_all tenants)) && not (Tenant_scope.grants_nothing (Some tenants))
   | Some None | None -> false
 
+type instance_admin =
+  [ `Instance_admin
+  | `No_admin
+  ]
+
+let set_instance_admin admin caps =
+  match admin with
+  | `Instance_admin -> set_tenant_scope caps `Admin None
+  | `No_admin -> clear_tenant_grant caps `Admin
+
 let tenant_coverage caps g tenant =
   match tenant_scope caps g with
   | None -> Tenant_scope.Not_covered (* the capability itself is absent *)
