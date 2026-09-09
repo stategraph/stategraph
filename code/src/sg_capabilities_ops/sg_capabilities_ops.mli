@@ -124,6 +124,30 @@ val is_instance_admin : Sgs_session_caps_capabilities.t -> bool
     Mutually exclusive with {!is_instance_admin} by construction. *)
 val is_some_tenants_admin : Sgs_session_caps_capabilities.t -> bool
 
+(** The [admin] grant a write leaves a user holding. There is no tenant-scoped case: naming
+    individual tenants is {!grant_tenant}'s and {!revoke_tenant}'s business, while this is the
+    installation-wide authority, which either covers every tenant or is not there at all.
+
+    - [`Instance_admin]: an unrestricted [admin], covering every tenant there is and every tenant
+      there will be.
+    - [`No_admin]: no [admin] key whatsoever. Deliberately not spelled "no instance admin": a
+      tenant-scoped grant left behind would satisfy that name, and is removed too. *)
+type instance_admin =
+  [ `Instance_admin
+  | `No_admin
+  ]
+
+(** [set_instance_admin admin caps] leaves [caps] holding exactly [admin]: [`Instance_admin] writes
+    an unrestricted grant -- no [tenants] allow-list, so {!is_instance_admin} holds of the result --
+    replacing whatever scope was there, and [`No_admin] removes the key entirely. Nothing else in
+    [caps] is touched.
+
+    It replaces rather than merges, unlike {!grant_tenant} and {!revoke_tenant}: those edit one
+    entry of an allow-list because a tenant-scoped caller may only touch its own tenant, whereas
+    this grant answers for every tenant at once and has no entry to edit. *)
+val set_instance_admin :
+  instance_admin -> Sgs_session_caps_capabilities.t -> Sgs_session_caps_capabilities.t
+
 (** [tenant_coverage caps g tenant] is [Tenant_scope.Not_covered] when [caps] has no [g] grant at
     all, otherwise the coverage of that grant's [tenants] list. *)
 val tenant_coverage :
