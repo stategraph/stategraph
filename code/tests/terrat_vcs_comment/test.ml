@@ -674,11 +674,415 @@ let test_minimize_strategy =
       multiple_mixed;
     ]
 
+(* Scripted-queue harness for Terrat_vcs_comment_unified, analogous to
+   [Eh]/[H] above but with the unified comment command set. *)
+module Ehu = struct
+  type el = {
+    dirspace : Terrat_dirspace.t;
+    status : Terrat_vcs_comment_unified.Status.t;
+    has_changes : bool;
+    size : int;
+  }
+  [@@deriving ord, show]
+
+  type comment_id = int [@@deriving ord, show]
+
+  type t =
+    | Query_els of (el list, [ `Error ]) result
+    | Query_comment_id of (comment_id option, [ `Error ]) result
+    | Update_comment of comment_id * string * (unit, [ `Not_found | `Error ]) result
+    | Post_comment of string * (comment_id, [ `Error ]) result
+    | Upsert_comment_id of comment_id * (unit, [ `Error ]) result
+  [@@deriving show]
+
+  type commands = t list [@@deriving show]
+end
+
+module Hu = struct
+  module U = Terrat_vcs_comment_unified
+
+  type t = Ehu.commands ref
+  type el = Ehu.el [@@deriving ord, show]
+  type comment_id = Ehu.comment_id [@@deriving ord, show]
+
+  let table_row_cost = 2
+
+  let query_els t =
+    match !t with
+    | Ehu.Query_els cmd_result :: rest ->
+        t := rest;
+        let abb_result = Abb.Future.return cmd_result in
+        (abb_result : ('a, [ `Error ]) result Abb.Future.t :> ('a, [> `Error ]) result Abb.Future.t)
+    | es ->
+        Printf.printf "\n\tQUERY ELS LOG: %s%!\n" (Ehu.show_commands es);
+        Oth.Assert.false_ "test: unexpected value"
+
+  let query_comment_id t =
+    match !t with
+    | Ehu.Query_comment_id cmd_result :: rest ->
+        t := rest;
+        let abb_result = Abb.Future.return cmd_result in
+        (abb_result : ('a, [ `Error ]) result Abb.Future.t :> ('a, [> `Error ]) result Abb.Future.t)
+    | es ->
+        Printf.printf "\n\tQUERY COMMENT_ID LOG: %s%!\n" (Ehu.show_commands es);
+        Oth.Assert.false_ "test: unexpected value"
+
+  let tier_label = function
+    | U.Tier.Details n -> Printf.sprintf "details(%d)" n
+    | U.Tier.Table -> "table"
+    | U.Tier.Truncated n -> Printf.sprintf "truncated(%d)" n
+
+  (* Pure renderer.  The body records the tier and the element order so tests
+     can assert on both, and its length is a deterministic function of the
+     tier and the element sizes so tests can force tier selection via [size]
+     and [max_comment_length]. *)
+  let render _ tier els =
+    let shown =
+      match tier with
+      | U.Tier.Details _ | U.Tier.Table -> els
+      | U.Tier.Truncated n -> CCList.take n els
+    in
+    let order =
+      CCString.concat "," (CCList.map (fun el -> el.Ehu.dirspace.Terrat_dirspace.dir) shown)
+    in
+    let content_length =
+      match tier with
+      | U.Tier.Details n ->
+          CCList.fold_left (fun acc el -> acc + el.Ehu.size) 0 (CCList.take n els)
+          + (CCList.length els * table_row_cost)
+      | U.Tier.Table -> CCList.length els * table_row_cost
+      | U.Tier.Truncated _ -> CCList.length shown * table_row_cost
+    in
+    Printf.sprintf "%s|%s|%s" (tier_label tier) order (CCString.make content_length 'x')
+
+  let update_comment t cid body =
+    match !t with
+    | Ehu.Update_comment (cid2, body2, cmd_result) :: rest when cid = cid2 && body = body2 ->
+        t := rest;
+        let abb_result = Abb.Future.return cmd_result in
+        (abb_result
+          : ('a, [ `Not_found | `Error ]) result Abb.Future.t
+          :> ('a, [> `Not_found | `Error ]) result Abb.Future.t)
+    | es ->
+        Printf.printf "\n\tUPDATE COMMENT INPUT: %d %s%!\n" cid body;
+        Printf.printf "\n\tUPDATE COMMENT LOG: %s%!\n" (Ehu.show_commands es);
+        Oth.Assert.false_ "test: unexpected value"
+
+  let post_comment t body =
+    match !t with
+    | Ehu.Post_comment (body2, cmd_result) :: rest when body = body2 ->
+        t := rest;
+        let abb_result = Abb.Future.return cmd_result in
+        (abb_result : ('a, [ `Error ]) result Abb.Future.t :> ('a, [> `Error ]) result Abb.Future.t)
+    | es ->
+        Printf.printf "\n\tPOST COMMENT INPUT: %s%!\n" body;
+        Printf.printf "\n\tPOST COMMENT LOG: %s%!\n" (Ehu.show_commands es);
+        Oth.Assert.false_ "test: unexpected value"
+
+  let upsert_comment_id t cid =
+    match !t with
+    | Ehu.Upsert_comment_id (cid2, cmd_result) :: rest when cid = cid2 ->
+        t := rest;
+        let abb_result = Abb.Future.return cmd_result in
+        (abb_result : ('a, [ `Error ]) result Abb.Future.t :> ('a, [> `Error ]) result Abb.Future.t)
+    | es ->
+        Printf.printf "\n\tUPSERT INPUT: %d%!\n" cid;
+        Printf.printf "\n\tUPSERT LOG: %s%!\n" (Ehu.show_commands es);
+        Oth.Assert.false_ "test: unexpected value"
+
+  let dirspace el = el.Ehu.dirspace
+  let status el = el.Ehu.status
+  let has_changes el = el.Ehu.has_changes
+  let max_comment_length = 100
+end
+
+module Shared_unified = struct
+  let create_el dir status has_changes size =
+    let module D = Terrat_dirspace in
+    { Ehu.dirspace = D.{ dir; workspace = "default" }; status; has_changes; size }
+
+  (* [render] is pure so the expected body is just the renderer applied to the
+     expected tier and the expected sorted order. *)
+  let expected_body tier els = Hu.render (ref []) tier els
+end
+
+module Make_unified_wrapper = struct
+  let run t =
+    let open Abb.Future.Infix_monad in
+    let module Cm = Terrat_vcs_comment_unified.Make (Hu) in
+    Cm.run t
+    >>= function
+    | Ok () -> (
+        match !t with
+        | [] -> Abbs_future_combinators.return_ok ()
+        | es ->
+            Printf.printf "\n\tT: %s%!\n" (Ehu.show_commands es);
+            Oth.Assert.false_ "test: unexpected value")
+    | Error e -> Abbs_future_combinators.return_err e
+end
+
+let test_unified_basic =
+  let empty_els =
+    Oth_abb.test
+      ~desc:"No elements means the comment is left untouched and nothing else is called"
+      ~name:"[Unified] Empty elements"
+      (fun () ->
+        let open Abb.Future.Infix_monad in
+        let t = ref [ Ehu.Query_els (Ok []) ] in
+        Make_unified_wrapper.run t
+        >>= function
+        | Ok () -> Abb.Future.return ()
+        | Error _ -> Oth.Assert.false_ "[Unified] Empty elements: unexpected value")
+  in
+  let first_post =
+    Oth_abb.test
+      ~desc:"No tracked comment yet: post a fresh comment and record its id"
+      ~name:"[Unified] First publish posts and upserts"
+      (fun () ->
+        let open Abb.Future.Infix_monad in
+        let module U = Terrat_vcs_comment_unified in
+        let el1 = Shared_unified.create_el "A" U.Status.Planned true 10 in
+        let els = [ el1 ] in
+        let body = Shared_unified.expected_body (U.Tier.Details 1) els in
+        let t =
+          ref
+            [
+              Ehu.Query_els (Ok els);
+              Ehu.Query_comment_id (Ok None);
+              Ehu.Post_comment (body, Ok 1);
+              Ehu.Upsert_comment_id (1, Ok ());
+            ]
+        in
+        Make_unified_wrapper.run t
+        >>= function
+        | Ok () -> Abb.Future.return ()
+        | Error _ -> Oth.Assert.false_ "[Unified] First publish posts and upserts: unexpected value")
+  in
+  let existing_update =
+    Oth_abb.test
+      ~desc:"A tracked comment is updated in place with no post or upsert"
+      ~name:"[Unified] Existing comment is updated"
+      (fun () ->
+        let open Abb.Future.Infix_monad in
+        let module U = Terrat_vcs_comment_unified in
+        let el1 = Shared_unified.create_el "A" U.Status.Planned true 10 in
+        let els = [ el1 ] in
+        let body = Shared_unified.expected_body (U.Tier.Details 1) els in
+        let t =
+          ref
+            [
+              Ehu.Query_els (Ok els);
+              Ehu.Query_comment_id (Ok (Some 42));
+              Ehu.Update_comment (42, body, Ok ());
+            ]
+        in
+        Make_unified_wrapper.run t
+        >>= function
+        | Ok () -> Abb.Future.return ()
+        | Error _ -> Oth.Assert.false_ "[Unified] Existing comment is updated: unexpected value")
+  in
+  Oth_abb.parallel [ empty_els; first_post; existing_update ]
+
+let test_unified_errors =
+  let update_not_found =
+    Oth_abb.test
+      ~desc:"A tracked comment that was deleted falls back to posting a fresh comment"
+      ~name:"[Unified] Update not found falls back to post"
+      (fun () ->
+        let open Abb.Future.Infix_monad in
+        let module U = Terrat_vcs_comment_unified in
+        let el1 = Shared_unified.create_el "A" U.Status.Planned true 10 in
+        let els = [ el1 ] in
+        let body = Shared_unified.expected_body (U.Tier.Details 1) els in
+        let t =
+          ref
+            [
+              Ehu.Query_els (Ok els);
+              Ehu.Query_comment_id (Ok (Some 42));
+              Ehu.Update_comment (42, body, Error `Not_found);
+              Ehu.Post_comment (body, Ok 43);
+              Ehu.Upsert_comment_id (43, Ok ());
+            ]
+        in
+        Make_unified_wrapper.run t
+        >>= function
+        | Ok () -> Abb.Future.return ()
+        | Error _ ->
+            Oth.Assert.false_ "[Unified] Update not found falls back to post: unexpected value")
+  in
+  let update_error =
+    Oth_abb.test
+      ~desc:"An error during update_comment is propagated"
+      ~name:"[Unified] Update error is propagated"
+      (fun () ->
+        let open Abb.Future.Infix_monad in
+        let module U = Terrat_vcs_comment_unified in
+        let el1 = Shared_unified.create_el "A" U.Status.Planned true 10 in
+        let els = [ el1 ] in
+        let body = Shared_unified.expected_body (U.Tier.Details 1) els in
+        let t =
+          ref
+            [
+              Ehu.Query_els (Ok els);
+              Ehu.Query_comment_id (Ok (Some 42));
+              Ehu.Update_comment (42, body, Error `Error);
+            ]
+        in
+        Make_unified_wrapper.run t
+        >>= function
+        | Ok _ -> Oth.Assert.false_ "[Unified] Update error is propagated: unexpected value"
+        | Error `Error ->
+            Oth.Assert.List.empty !t;
+            Abb.Future.return ()
+        | Error _ -> Oth.Assert.false_ "[Unified] Update error is propagated: unexpected value")
+  in
+  Oth_abb.parallel [ update_not_found; update_error ]
+
+let test_unified_sorting =
+  let mixed_order =
+    Oth_abb.test
+      ~desc:
+        "Elements arrive at render sorted by status rank, then has_changes (changes first), then \
+         dirspace, regardless of input order"
+      ~name:"[Unified] Sorting"
+      (fun () ->
+        let open Abb.Future.Infix_monad in
+        let module U = Terrat_vcs_comment_unified in
+        let el_applied = Shared_unified.create_el "a" U.Status.Applied false 5 in
+        let el_failed = Shared_unified.create_el "z" U.Status.Failed true 5 in
+        let el_planned_changes = Shared_unified.create_el "m" U.Status.Planned true 5 in
+        let el_planned_no_changes = Shared_unified.create_el "b" U.Status.Planned false 5 in
+        let el_pending = Shared_unified.create_el "q" U.Status.Pending false 5 in
+        let els =
+          [ el_applied; el_planned_no_changes; el_pending; el_failed; el_planned_changes ]
+        in
+        (* Failed first, then planned with changes before planned without
+           (despite "b" < "m"), then pending, then applied. *)
+        let sorted =
+          [ el_failed; el_planned_changes; el_planned_no_changes; el_pending; el_applied ]
+        in
+        let body = Shared_unified.expected_body (U.Tier.Details 5) sorted in
+        let t =
+          ref
+            [
+              Ehu.Query_els (Ok els);
+              Ehu.Query_comment_id (Ok None);
+              Ehu.Post_comment (body, Ok 1);
+              Ehu.Upsert_comment_id (1, Ok ());
+            ]
+        in
+        Make_unified_wrapper.run t
+        >>= function
+        | Ok () -> Abb.Future.return ()
+        | Error _ -> Oth.Assert.false_ "[Unified] Sorting: unexpected value")
+  in
+  Oth_abb.parallel [ mixed_order ]
+
+let test_unified_tiers =
+  let table_tier =
+    Oth_abb.test
+      ~desc:"Oversized details force degradation to the table tier"
+      ~name:"[Unified] Tier degradation to table"
+      (fun () ->
+        let open Abb.Future.Infix_monad in
+        let module U = Terrat_vcs_comment_unified in
+        let el1 = Shared_unified.create_el "a" U.Status.Planned true 40 in
+        let el2 = Shared_unified.create_el "b" U.Status.Planned true 40 in
+        let el3 = Shared_unified.create_el "c" U.Status.Planned true 40 in
+        let els = [ el1; el2; el3 ] in
+        (* Details 3 renders 3 * 40 + 3 * table_row_cost > max_comment_length,
+           so the table tier is chosen. *)
+        let body = Shared_unified.expected_body U.Tier.Table els in
+        let t =
+          ref
+            [
+              Ehu.Query_els (Ok els);
+              Ehu.Query_comment_id (Ok None);
+              Ehu.Post_comment (body, Ok 1);
+              Ehu.Upsert_comment_id (1, Ok ());
+            ]
+        in
+        Make_unified_wrapper.run t
+        >>= function
+        | Ok () -> Abb.Future.return ()
+        | Error _ -> Oth.Assert.false_ "[Unified] Tier degradation to table: unexpected value")
+  in
+  let details_five_tier =
+    Oth_abb.test
+      ~desc:"More than 5 elements that do not all fit degrade to details for the first 5"
+      ~name:"[Unified] Tier degradation to details 5"
+      (fun () ->
+        let open Abb.Future.Infix_monad in
+        let module U = Terrat_vcs_comment_unified in
+        let el1 = Shared_unified.create_el "a" U.Status.Planned true 10 in
+        let el2 = Shared_unified.create_el "b" U.Status.Planned true 10 in
+        let el3 = Shared_unified.create_el "c" U.Status.Planned true 10 in
+        let el4 = Shared_unified.create_el "d" U.Status.Planned true 10 in
+        let el5 = Shared_unified.create_el "e" U.Status.Planned true 10 in
+        let el6 = Shared_unified.create_el "f" U.Status.Planned true 60 in
+        let els = [ el1; el2; el3; el4; el5; el6 ] in
+        (* Details 6 includes the oversized 6th element and does not fit;
+           Details 5 drops its details and does. *)
+        let body = Shared_unified.expected_body (U.Tier.Details 5) els in
+        let t =
+          ref
+            [
+              Ehu.Query_els (Ok els);
+              Ehu.Query_comment_id (Ok None);
+              Ehu.Post_comment (body, Ok 1);
+              Ehu.Upsert_comment_id (1, Ok ());
+            ]
+        in
+        Make_unified_wrapper.run t
+        >>= function
+        | Ok () -> Abb.Future.return ()
+        | Error _ -> Oth.Assert.false_ "[Unified] Tier degradation to details 5: unexpected value")
+  in
+  let truncated_tier =
+    Oth_abb.test
+      ~desc:
+        "When even the full table does not fit, degradation ends at the unconditional truncated \
+         tier"
+      ~name:"[Unified] Tier degradation to truncated"
+      (fun () ->
+        let open Abb.Future.Infix_monad in
+        let module U = Terrat_vcs_comment_unified in
+        let els =
+          CCList.init 60 (fun i ->
+              Shared_unified.create_el (Printf.sprintf "d%02d" i) U.Status.Planned true 0)
+        in
+        (* 60 table rows exceed max_comment_length, as do the first 50, so the
+           final Truncated 10 tier is used. *)
+        let body = Shared_unified.expected_body (U.Tier.Truncated 10) els in
+        let t =
+          ref
+            [
+              Ehu.Query_els (Ok els);
+              Ehu.Query_comment_id (Ok None);
+              Ehu.Post_comment (body, Ok 1);
+              Ehu.Upsert_comment_id (1, Ok ());
+            ]
+        in
+        Make_unified_wrapper.run t
+        >>= function
+        | Ok () -> Abb.Future.return ()
+        | Error _ -> Oth.Assert.false_ "[Unified] Tier degradation to truncated: unexpected value")
+  in
+  Oth_abb.parallel [ table_tier; details_five_tier; truncated_tier ]
+
 let test =
   Oth_abb.(
     parallel
       [
-        test_basic; test_errors; test_append_strategy; test_delete_strategy; test_minimize_strategy;
+        test_basic;
+        test_errors;
+        test_append_strategy;
+        test_delete_strategy;
+        test_minimize_strategy;
+        test_unified_basic;
+        test_unified_errors;
+        test_unified_sorting;
+        test_unified_tiers;
       ])
 
 let () =

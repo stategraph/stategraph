@@ -245,10 +245,7 @@ module S = struct
 
   let summary_enabled t =
     let module N = Terrat_base_repo_config_v1.Notifications in
-    let { N.summary = { N.Summary.enabled; _ }; _ } =
-      Terrat_base_repo_config_v1.notifications t.repo_config
-    in
-    enabled
+    N.Summary.enabled (Terrat_base_repo_config_v1.notifications t.repo_config).N.summary
 
   (* Link to the PR-level runs page so the comment (which aggregates every work
      manifest for the pull request) points at all of them, not just the last one

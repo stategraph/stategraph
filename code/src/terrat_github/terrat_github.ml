@@ -142,6 +142,13 @@ type minimize_comment_err =
   ]
 [@@deriving show]
 
+type update_comment_err =
+  [ Githubc2_abb.call_err
+  | `Not_found
+  | `Unprocessable_entity of Githubc2_components.Validation_error.t
+  ]
+[@@deriving show]
+
 type fetch_pull_request_review_decision_err =
   [ Githubc2_abb.call_err
   | `Graphql_err of string list
@@ -578,6 +585,27 @@ let minimize_comment ~owner ~repo ~comment_id client =
           | `OK -> Ok ()
           | `Not_found -> Error `Not_found))
   | `Not_found _ -> Abbs_future_combinators.return_err `Not_found
+
+let update_comment ~owner ~repo ~comment_id ~body client =
+  Prmths.Counter.inc_one (Metrics.fn_call_total "update_comment");
+  let open Abb.Future.Infix_monad in
+  call
+    client
+    Githubc2_issues.Update_comment.(
+      make
+        ~body:Request_body.(make Primary.{ body })
+        Parameters.(make ~comment_id:(CCInt64.of_int comment_id) ~owner ~repo))
+  >>= function
+  | Ok resp -> (
+      match Openapi.Response.value resp with
+      | `OK _ -> Abbs_future_combinators.return_ok ()
+      | `Unprocessable_entity _ as err -> Abbs_future_combinators.return_err err)
+  | Error (`Missing_response resp) when Openapi.Response.status resp = 404 ->
+      (* A comment that has been deleted by the user comes back as a 404, which
+         the generated client does not have a response for, so detect that case
+         here. *)
+      Abbs_future_combinators.return_err `Not_found
+  | Error (#Githubc2_abb.call_err as err) -> Abbs_future_combinators.return_err err
 
 (* [reviewDecision] is GitHub's own verdict on whether the pull request
    satisfies the target branch's required-review rule, including CODEOWNERS

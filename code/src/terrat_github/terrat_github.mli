@@ -101,6 +101,13 @@ type minimize_comment_err =
   ]
 [@@deriving show]
 
+type update_comment_err =
+  [ Githubc2_abb.call_err
+  | `Not_found
+  | `Unprocessable_entity of Githubc2_components.Validation_error.t
+  ]
+[@@deriving show]
+
 type fetch_pull_request_review_decision_err =
   [ Githubc2_abb.call_err
   | `Graphql_err of string list
@@ -321,6 +328,14 @@ val minimize_comment :
   comment_id:int ->
   Githubc2_abb.t ->
   (unit, [> minimize_comment_err ]) result Abb.Future.t
+
+val update_comment :
+  owner:string ->
+  repo:string ->
+  comment_id:int ->
+  body:string ->
+  Githubc2_abb.t ->
+  (unit, [> update_comment_err ]) result Abb.Future.t
 
 (** GitHub's [PullRequest.reviewDecision], which is its own verdict on the target branch's
     required-review rule, CODEOWNERS included. [None] means GitHub returned [null], which happens

@@ -1233,8 +1233,17 @@
       "additionalProperties": false,
       "properties": {
         "enabled": {
-          "default": false,
+          "description": "Enable the summary comment.  This property has no default: a repository that does not set it is not the same as a repository that sets it.  The Enterprise Edition treats an unset property as enabled.  The Open Source Edition disables the summary in its system defaults, and refuses a repository that sets this property to true, because the summary is an Enterprise feature.",
           "type": "boolean"
+        },
+        "mode": {
+          "default": "pull_request",
+          "description": "Define where the summary goes: 'pull_request' posts one summary comment for the pull request, 'header' puts the summary in the header of each plan or apply comment.",
+          "enum": [
+            "header",
+            "pull_request"
+          ],
+          "type": "string"
         }
       },
       "type": "object"

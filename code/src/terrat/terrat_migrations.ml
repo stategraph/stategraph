@@ -286,6 +286,12 @@ let migrations =
       run_sql ~mode:`Async [%blob "migrations/2026-08-21-add-pull-request-sha-indices.sql"] );
     ( "add-work-manifests-pending-index",
       run_sql ~mode:`Async [%blob "migrations/2026-09-03-add-work-manifests-pending-index.sql"] );
+    ( "add-unified-comment-tracking",
+      run_sql [%blob "migrations/2026-07-21-add-unified-comment-tracking.sql"] );
+    ( "add-unified-comment-workflow-step-output-index",
+      run_sql
+        ~mode:`Async
+        [%blob "migrations/2026-07-22-add-unified-comment-workflow-step-output-index.sql"] );
   ]
 
 let run config storage = Mig.run { Migrate.config; storage; tx = () } migrations

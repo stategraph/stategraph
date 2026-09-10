@@ -60,10 +60,7 @@ module S = struct
 
   let summary_enabled t =
     let module N = Terrat_base_repo_config_v1.Notifications in
-    let { N.summary = { N.Summary.enabled; _ }; _ } =
-      Terrat_base_repo_config_v1.notifications t.repo_config
-    in
-    enabled
+    N.Summary.enabled (Terrat_base_repo_config_v1.notifications t.repo_config).N.summary
 
   let post_comment t els =
     let open Abb.Future.Infix_monad in
