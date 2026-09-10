@@ -1109,10 +1109,35 @@ module Notifications = struct
   end
 
   module Summary = struct
-    (* Enterprise feature: the comment summary header only renders in the
-       Enterprise Edition.  Defaults to disabled so Open Source users are not
-       blocked by the premium-feature gate on the default configuration. *)
-    type t = { enabled : bool [@default false] } [@@deriving make, show, yojson, eq]
+    module Mode = struct
+      type t =
+        | Header
+        | Pull_request
+      [@@deriving show, yojson, eq]
+    end
+
+    (* Enterprise feature: the comment summary only renders in the Enterprise
+       Edition.  [enabled] has no default in the schema, so [None] says the
+       repository never named the summary and [Some _] says it made a choice.
+       [None] reads as enabled, which is the default of the Enterprise Edition:
+       a repository gets the unified summary comment unless it opts out or into
+       the header.  The Open Source Edition forces [Some false] into the
+       configuration it hands back, so the summary is off there, and its
+       premium-feature gate rejects the [Some true] that only a repository can
+       write.
+
+       [Header] renders the summary as a header inside each plan/apply comment,
+       so a comment the [visible_on] setting hides takes the header with it.
+       [Pull_request] maintains a single unified summary comment for the whole
+       pull request and suppresses the per-work-manifest result comments.
+       [Pull_request] is the default mode. *)
+    type t = {
+      enabled : bool option; [@default None]
+      mode : Mode.t; [@default Mode.Pull_request]
+    }
+    [@@deriving make, show, yojson, eq]
+
+    let enabled t = CCOption.get_or ~default:true t.enabled
   end
 
   type t = {
@@ -2572,7 +2597,13 @@ let of_version_1_notifications notifications =
   let policies = CCOption.get_or ~default:[] policies in
   let summary =
     match summary with
-    | Some { Sn.enabled } -> { Notifications.Summary.enabled }
+    | Some { Sn.enabled; mode } ->
+        let mode =
+          match mode with
+          | `Header -> Notifications.Summary.Mode.Header
+          | `Pull_request -> Notifications.Summary.Mode.Pull_request
+        in
+        { Notifications.Summary.enabled; mode }
     | None -> Notifications.Summary.make ()
   in
   CCResult.map_l of_version_1_notification_policy policies
@@ -3445,10 +3476,17 @@ let to_version_1_notification_policy policy =
 let to_version_1_notifications notifications =
   let module N = Terrat_repo_config.Notifications in
   let module Sn = Terrat_repo_config.Notifications_summary in
-  let { Notifications.policies; summary = { Notifications.Summary.enabled } } = notifications in
+  let { Notifications.policies; summary = { Notifications.Summary.enabled; mode } } =
+    notifications
+  in
+  let mode =
+    match mode with
+    | Notifications.Summary.Mode.Header -> `Header
+    | Notifications.Summary.Mode.Pull_request -> `Pull_request
+  in
   {
     N.policies = Some (CCList.map to_version_1_notification_policy policies);
-    summary = Some { Sn.enabled };
+    summary = Some { Sn.enabled; mode };
   }
 
 let to_version_1_storage_plans plans =

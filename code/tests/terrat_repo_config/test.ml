@@ -153,6 +153,77 @@ let test_workflow_entry_storage_plan_none =
       | Ok _ -> failwith "Expected workflow storage plans method none"
       | Error msg -> failwith msg)
 
+module Ns = Terrat_repo_config.Notifications_summary
+
+let eq_mode expected actual =
+  Oth.Assert.eq ~eq:( = ) ~pp:(fun f v -> Format.pp_print_string f (Ns.Mode.show v)) expected actual
+
+(* [enabled] has no default in the schema, so an omitted property stays [None].  That is how the
+   Open Source Edition tells a repository that asked for the summary from one that said nothing. *)
+let assert_enabled expected actual =
+  Oth.Assert.eq
+    ~eq:(CCOption.equal CCBool.equal)
+    ~pp:(fun f v ->
+      Format.pp_print_string
+        f
+        (match v with
+        | Some b -> CCBool.to_string b
+        | None -> "unset"))
+    expected
+    actual
+
+let test_notifications_summary_pull_request_round_trip =
+  Oth.test ~name:"Notifications_summary: mode pull_request round-trip" (fun _ ->
+      let json = `Assoc [ ("enabled", `Bool true); ("mode", `String "pull_request") ] in
+      let t = Oth.Assert.ok (Ns.of_yojson json) in
+      assert_enabled (Some true) t.Ns.enabled;
+      eq_mode `Pull_request t.Ns.mode;
+      let round_tripped = Ns.to_yojson t in
+      let t' = Oth.Assert.ok (Ns.of_yojson round_tripped) in
+      eq_mode `Pull_request t'.Ns.mode)
+
+let test_notifications_summary_header_round_trip =
+  Oth.test ~name:"Notifications_summary: mode header round-trip" (fun _ ->
+      let json = `Assoc [ ("enabled", `Bool true); ("mode", `String "header") ] in
+      let t = Oth.Assert.ok (Ns.of_yojson json) in
+      eq_mode `Header t.Ns.mode;
+      let round_tripped = Ns.to_yojson t in
+      let t' = Oth.Assert.ok (Ns.of_yojson round_tripped) in
+      eq_mode `Header t'.Ns.mode)
+
+let test_notifications_summary_mode_default =
+  Oth.test ~name:"Notifications_summary: mode omitted defaults to pull_request" (fun _ ->
+      let json = `Assoc [ ("enabled", `Bool true) ] in
+      let t = Oth.Assert.ok (Ns.of_yojson json) in
+      assert_enabled (Some true) t.Ns.enabled;
+      eq_mode `Pull_request t.Ns.mode)
+
+let test_notifications_summary_enabled_unset =
+  Oth.test ~name:"Notifications_summary: enabled omitted stays unset" (fun _ ->
+      let json = `Assoc [] in
+      let t = Oth.Assert.ok (Ns.of_yojson json) in
+      assert_enabled None t.Ns.enabled;
+      eq_mode `Pull_request t.Ns.mode)
+
+(* An unset [enabled] is written back as no property at all, so a layer of a configuration merge
+   does not say something about the summary that its author never wrote. *)
+let test_notifications_summary_enabled_unset_round_trip =
+  Oth.test ~name:"Notifications_summary: unset enabled emits no property" (fun _ ->
+      let t = Oth.Assert.ok (Ns.of_yojson (`Assoc [])) in
+      match Ns.to_yojson t with
+      | `Assoc kvs ->
+          Oth.Assert.not_true
+            ~fail_msg:"enabled property is present"
+            (CCList.exists (fun (k, _) -> CCString.equal k "enabled") kvs)
+      | _ -> Oth.Assert.false_ "Expected an object")
+
+let test_notifications_summary_rejects_unknown_mode =
+  Oth.test ~name:"Notifications_summary: unknown mode rejected" (fun _ ->
+      let json = `Assoc [ ("enabled", `Bool true); ("mode", `String "sidebar") ] in
+      match Ns.of_yojson json with
+      | Ok _ -> failwith "Expected unknown mode to be rejected, but it was accepted"
+      | Error _ -> ())
+
 let test =
   Oth.parallel
     [
@@ -167,6 +238,12 @@ let test =
       test_storage_plan_none_round_trip;
       test_storage_plan_none_unsafe_round_trip;
       test_workflow_entry_storage_plan_none;
+      test_notifications_summary_pull_request_round_trip;
+      test_notifications_summary_header_round_trip;
+      test_notifications_summary_mode_default;
+      test_notifications_summary_enabled_unset;
+      test_notifications_summary_enabled_unset_round_trip;
+      test_notifications_summary_rejects_unknown_mode;
     ]
 
 let () =

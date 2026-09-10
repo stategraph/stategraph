@@ -492,6 +492,116 @@ let test_workflow_missing_step_reports_index =
                "Expected Workflows_missing_plan_step_err (1, \"dir:bar\"), got %s"
                (V1.show_of_version_1_json_err err)))
 
+let test_notifications_summary_mode_pull_request =
+  Oth.test ~name:"of_version_1_json: notifications summary mode pull_request" (fun _ ->
+      let module Sum = V1.Notifications.Summary in
+      let json =
+        `Assoc
+          [
+            ( "notifications",
+              `Assoc
+                [
+                  ("summary", `Assoc [ ("enabled", `Bool true); ("mode", `String "pull_request") ]);
+                ] );
+          ]
+      in
+      let cfg =
+        Oth.Assert.ok_show ~show:V1.show_of_version_1_json_err (V1.of_version_1_json json)
+      in
+      let { V1.Notifications.summary; policies = _ } = V1.notifications cfg in
+      match summary with
+      | { Sum.enabled = Some true; mode = Sum.Mode.Pull_request; _ } -> ()
+      | _ -> failwith "Expected summary enabled=true with mode=Pull_request")
+
+let test_notifications_summary_mode_default =
+  Oth.test ~name:"of_version_1_json: notifications summary mode defaults to pull_request" (fun _ ->
+      let module Sum = V1.Notifications.Summary in
+      let json =
+        `Assoc [ ("notifications", `Assoc [ ("summary", `Assoc [ ("enabled", `Bool true) ]) ]) ]
+      in
+      let cfg =
+        Oth.Assert.ok_show ~show:V1.show_of_version_1_json_err (V1.of_version_1_json json)
+      in
+      let { V1.Notifications.summary; policies = _ } = V1.notifications cfg in
+      match summary with
+      | { Sum.enabled = Some true; mode = Sum.Mode.Pull_request; _ } -> ()
+      | _ -> failwith "Expected summary enabled=true with default mode=Pull_request")
+
+(* [enabled] has no default in the schema, so a configuration that never names the summary keeps
+   [None].  [Summary.enabled] reads [None] as on, which is the default of the Enterprise Edition.
+   The Open Source Edition forces [Some false] into the configuration it hands back, after its
+   premium-feature gate has seen the [Some true] that only a repository can write. *)
+let test_notifications_summary_enabled_unset =
+  Oth.test ~name:"of_version_1_json: notifications summary enabled unset" (fun _ ->
+      let module Sum = V1.Notifications.Summary in
+      let cfg =
+        Oth.Assert.ok_show ~show:V1.show_of_version_1_json_err (V1.of_version_1_json (`Assoc []))
+      in
+      let summary = (V1.notifications cfg).V1.Notifications.summary in
+      (match summary.Sum.enabled with
+      | None -> ()
+      | Some _ -> failwith "Expected an unset summary enabled");
+      Oth.Assert.true_ "An unset enabled reads as on" (Sum.enabled summary))
+
+(* Every configuration layer of a merge passes through [to_version_1].  A repository that sets the
+   mode and not [enabled] must come back with [enabled] still unset, or a layer would say something
+   about the summary that its author never wrote. *)
+let test_notifications_summary_enabled_unset_round_trip =
+  Oth.test ~name:"to_version_1: an unset summary enabled stays unset" (fun _ ->
+      let module Nn = Repo.Notifications in
+      let module Sn = Repo.Notifications_summary in
+      let round_trip summary expected =
+        let json = `Assoc [ ("notifications", `Assoc [ ("summary", summary) ]) ] in
+        let cfg =
+          Oth.Assert.ok_show ~show:V1.show_of_version_1_json_err (V1.of_version_1_json json)
+        in
+        let v1 = V1.to_version_1 cfg in
+        match
+          CCOption.flat_map
+            (fun notifications -> notifications.Nn.summary)
+            v1.Repo.Version_1.notifications
+        with
+        | Some summary ->
+            Oth.Assert.eq
+              ~eq:(CCOption.equal CCBool.equal)
+              ~pp:(fun f v ->
+                Format.pp_print_string
+                  f
+                  (match v with
+                  | Some b -> CCBool.to_string b
+                  | None -> "unset"))
+              expected
+              summary.Sn.enabled
+        | None -> failwith "Round-trip to Version_1 did not produce a summary"
+      in
+      round_trip (`Assoc [ ("mode", `String "header") ]) None;
+      round_trip (`Assoc [ ("enabled", `Bool false) ]) (Some false))
+
+let test_notifications_summary_mode_round_trip =
+  Oth.test ~name:"to_version_1: notifications summary mode round-trips" (fun _ ->
+      let module Sn = Repo.Notifications_summary in
+      let round_trip mode_str expected =
+        let json =
+          `Assoc
+            [
+              ( "notifications",
+                `Assoc
+                  [ ("summary", `Assoc [ ("enabled", `Bool true); ("mode", `String mode_str) ]) ] );
+            ]
+        in
+        let cfg =
+          Oth.Assert.ok_show ~show:V1.show_of_version_1_json_err (V1.of_version_1_json json)
+        in
+        let v1 = V1.to_version_1 cfg in
+        match v1.Repo.Version_1.notifications with
+        | Some { Repo.Notifications.summary = Some { Sn.enabled = Some true; mode; _ }; _ } ->
+            if mode <> expected then
+              failwith (Printf.sprintf "Round-trip of mode %s produced a different mode" mode_str)
+        | _ -> failwith "Round-trip to Version_1 did not produce a notifications summary"
+      in
+      round_trip "pull_request" `Pull_request;
+      round_trip "header" `Header)
+
 (* A glob in the repository configuration that the glob parser rejects.
 
    The [dirs] section is keyed by directory, and a key containing a '*' is a
@@ -640,6 +750,11 @@ let test =
       test_derive_reports_ambiguous_star_star;
       test_bad_glob_shows_everything_needed_to_diagnose;
       test_derive_glob_dir_valid;
+      test_notifications_summary_mode_pull_request;
+      test_notifications_summary_mode_default;
+      test_notifications_summary_enabled_unset;
+      test_notifications_summary_enabled_unset_round_trip;
+      test_notifications_summary_mode_round_trip;
     ]
 
 let () =

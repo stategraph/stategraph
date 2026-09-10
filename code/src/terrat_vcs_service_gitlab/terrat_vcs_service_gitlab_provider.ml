@@ -4347,6 +4347,27 @@ module Repo_config = struct
         V1.View.access_control = V1.Access_control.make ~enabled:false ();
       }
 
+  (* The summary comment is an Enterprise feature, so the Open Source Edition turns it off in the
+     configuration it hands back.  [enabled] has no default of its own, so this is the only place
+     that decides the answer for this edition, and it runs after the premium-feature gate below:
+     the gate still sees the [Some true] that only a repository can write, and stays quiet for a
+     repository that never named the summary.  The system defaults are not the place for this,
+     because a whole notifications section there would join the policy list of every repository. *)
+  let disable_summary repo_config =
+    let module V1 = Terrat_base_repo_config_v1 in
+    let module N = V1.Notifications in
+    let view = V1.to_view repo_config in
+    let notifications = view.V1.View.notifications in
+    V1.of_view
+      {
+        view with
+        V1.View.notifications =
+          {
+            notifications with
+            N.summary = { notifications.N.summary with N.Summary.enabled = Some false };
+          };
+      }
+
   let fetch_with_provenance ?system_defaults ?built_config request_id client repo ref_ =
     let module V1 = Terrat_base_repo_config_v1 in
     let open Abbs_future_combinators.Infix_result_monad in
@@ -4459,10 +4480,10 @@ module Repo_config = struct
              checks -> Error (`Premium_feature_err `Require_completed_reviews)
     | {
      V1.View.notifications =
-       { V1.Notifications.summary = { V1.Notifications.Summary.enabled = true }; _ };
+       { V1.Notifications.summary = { V1.Notifications.Summary.enabled = Some true; mode = _ }; _ };
      _;
     } -> Error (`Premium_feature_err `Notifications_summary)
-    | _ -> Ok (provenance, final_repo_config)
+    | _ -> Ok (provenance, disable_summary final_repo_config)
 end
 
 module Access_control = struct

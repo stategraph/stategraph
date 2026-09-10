@@ -698,13 +698,31 @@ module Notifications : sig
 
     type t = {
       tag_query : Tag_query.t;
-      comment_strategy : Strategy.t; [@default Strategy.Append]
+      comment_strategy : Strategy.t; [@default Strategy.Minimize]
     }
     [@@deriving make, show, yojson, eq]
   end
 
   module Summary : sig
-    type t = { enabled : bool [@default false] } [@@deriving make, show, yojson, eq]
+    module Mode : sig
+      type t =
+        | Header
+        | Pull_request
+      [@@deriving show, yojson, eq]
+    end
+
+    type t = {
+      enabled : bool option; [@default None]
+      mode : Mode.t; [@default Mode.Pull_request]
+    }
+    [@@deriving make, show, yojson, eq]
+
+    (** Whether the summary comment is on. The [enabled] field has no default in the schema, so a
+        repository that never names the summary reads as [None], and [None] is on. That is the
+        default of the Enterprise Edition. The Open Source Edition forces [Some false] into the
+        configuration it hands back, after its premium-feature gate has seen the [Some true] that
+        only a repository can write, so [None] does not reach this function in that edition. *)
+    val enabled : t -> bool
   end
 
   type t = {
