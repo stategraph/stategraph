@@ -349,9 +349,9 @@ module Ast = struct
     and mk_joins = function
       | [] -> assert false
       | x :: xs ->
-          CCListLabels.fold_right
+          CCListLabels.fold_left
             ~init:(D.join @@ mk_join x)
-            ~f:(fun x acc -> D.joins acc @@ mk_join x)
+            ~f:(fun acc x -> D.joins acc @@ mk_join x)
             xs
 
     and mk_order_by_expr = function

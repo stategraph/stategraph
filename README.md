@@ -15,12 +15,6 @@
   and changes that touch different resources run at the same time.
 </p>
 
-> [!NOTE]
-> Terrateam and Stategraph have merged into one platform. We're transitioning gradually; existing Terrateam setups keep working unchanged. During the transition:
->
-> Stategraph Orchestration (formerly Terrateam) → [app.terrateam.io](https://app.terrateam.io) · [docs.terrateam.io](https://docs.terrateam.io)  
-> Stategraph Infrastructure as a Database → [app.stategraph.cloud](https://app.stategraph.cloud)
-
 <p align="center">
   <a href="https://stategraph.com">Website</a> ·
   <a href="https://stategraph.com/docs">Docs</a> ·
@@ -44,7 +38,7 @@ Every Terraform team hits the same wall. Any operation that can write state lock
 
 Stategraph is one platform that meets you on both sides of that wall:
 
-* **Stategraph Orchestration**: GitOps for Terraform and OpenTofu on GitHub and GitLab. Plan and apply from pull requests, policy and cost checks built in. Adopted in an afternoon, free for small teams.
+* **Stategraph Orchestration** (formerly Terrateam): GitOps for Terraform and OpenTofu on GitHub and GitLab. Plan and apply from pull requests, policy and cost checks built in. Adopted in an afternoon; open source and self-hostable.
 * **Stategraph Infrastructure as a Database**: the state engine that removes the global lock. Your state becomes a dependency graph in PostgreSQL. Plans are scoped to the subgraph your change touches, conflicts are detected per resource at commit, and SQL runs across every state you have. Works standalone with any workflow, no VCS provider required.
 
 Neither requires the other. Orchestration works without the database, and the database works without Orchestration. Start with pull-request automation, and when one lock per state file starts deciding who ships today, graduate to the engine that removes it. Same platform, same PRs; you turn more of it on.
@@ -73,7 +67,7 @@ Open a pull request and the plan shows up as a comment. Apply from the PR when y
 * **Built for scale** with tag-based configuration for 10 or 10,000 workspaces, monorepo or many repos
 * **Works with** Terraform, OpenTofu, Terragrunt, CDKTF, and Pulumi
 
-Runs on GitHub and GitLab. Configure workflows via `.terrateam/config.yml`. See the [Terrateam docs](https://docs.terrateam.io).
+Runs on GitHub and GitLab. Configure workflows via `.stategraph/config.yml`; an existing `.terrateam/config.yml` keeps working, and `.stategraph/config.yml` wins if both exist. See the [Orchestration docs](https://docs.terrateam.io).
 
 ## Drop the global lock
 
@@ -113,7 +107,7 @@ Ship from the CLI too. With remote execution, `stategraph plan` and `stategraph 
 
 ### Stategraph Orchestration
 
-**Hosted:** [Start free](https://terrateam.io). Connects to GitHub or GitLab, free for small teams.
+**Hosted:** [Start free](https://app.terrateam.io). Connects to GitHub or GitLab; plan limits are on the [pricing](https://terrateam.io/pricing) page.
 
 **Self-hosted:**
 
@@ -167,20 +161,10 @@ The full walkthrough, including exploring what you imported, is in the [quicksta
 
 * [Quickstart](https://stategraph.com/docs/getting-started/quickstart): zero to querying your infrastructure in about ten minutes
 * [Core concepts](https://stategraph.com/docs/getting-started/concepts): states, transactions, and the graph
-* [Terrateam docs](https://docs.terrateam.io): PR workflows, policy, cost, drift for Orchestration
+* [Orchestration docs](https://docs.terrateam.io): PR workflows, policy, cost, drift
 * [CLI reference](https://stategraph.com/docs/cli): every command
-* [Orchestration pricing](https://terrateam.io/pricing): free for small teams, flat price as you grow
-* [Infrastructure as a Database pricing](https://stategraph.com/pricing): annual contract, available standalone
-
-## Coming from Terrateam?
-
-You're in the right place, and nothing changes for you today. Terrateam is becoming Stategraph Orchestration: same engine, same team, one platform. We're doing the move gradually rather than flipping a switch, so for now:
-
-* Hosted Terrateam keeps running at [terrateam.io](https://terrateam.io), and that's still where you sign up for Orchestration
-* The [Terrateam docs](https://docs.terrateam.io) remain the reference for PR automation
-* Your existing setup and `.terrateam/config.yml` keep working unchanged
-
-As pieces move over to Stategraph, we'll say so here and in the docs.
+* [Orchestration pricing](https://terrateam.io/pricing): hosted plans and the self-hosted Enterprise Edition
+* [Infrastructure as a Database pricing](https://stategraph.com/pricing): hosted tiers, with self-hosted and BYOC on Enterprise
 
 ## Community
 
@@ -196,4 +180,4 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 The code in this repository is [MPL-2.0](LICENSE) licensed.
 
-Stategraph Infrastructure as a Database is commercial software, available in the hosted service or self-hosted with a license key. Stategraph Orchestration is open source, with enterprise features (RBAC, centralized configuration, advanced approval workflows) available in the hosted service and the self-hosted Enterprise Edition.
+Stategraph Infrastructure as a Database is commercial software, available in the hosted service or self-hosted with a license key. Stategraph Orchestration is open source, with enterprise features (RBAC, centralized configuration, advanced approval workflows) available in the hosted service and the self-hosted Enterprise Edition. The open-source build, which the self-hosted setup above runs, allows up to 3 active users per month per GitHub or GitLab installation (an active user is anyone who triggers a plan or apply that month); runs are unlimited. The self-hosted Enterprise Edition has no user limit, and hosted plan limits are on the [pricing](https://terrateam.io/pricing) page.

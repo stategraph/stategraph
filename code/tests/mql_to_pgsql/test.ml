@@ -975,10 +975,10 @@ inner join graph_roots on true|};
                  coalesce(top_rt.type, $texts[2]), coalesce(top_rt.c, $bigints[4]), \
                  coalesce(largest_mod.module, $texts[3]), coalesce(largest_mod.c, $bigints[5]), \
                  coalesce(most_deployed_mod.module, $texts[4]), coalesce(most_deployed_mod.c, \
-                 $bigints[6]), graph_roots.c from cnt_s inner join cnt_r on true inner join \
-                 graph_roots on true left join most_deployed_mod on true left join largest_mod on \
-                 true left join top_rt on true inner join cnt_m on true inner join cnt_p on true \
-                 inner join edges on true inner join cnt_i on true limit 20";
+                 $bigints[6]), graph_roots.c from cnt_s inner join cnt_r on true inner join cnt_i \
+                 on true inner join edges on true inner join cnt_p on true inner join cnt_m on \
+                 true left join top_rt on true left join largest_mod on true left join \
+                 most_deployed_mod on true inner join graph_roots on true limit 20";
               ]
           in
           assert_eq sql query;
@@ -1004,12 +1004,12 @@ order by instances desc|};
             build_str
               [
                 "select providers.name as provider, count(*) as instances from providers inner \
-                 join states on providers.state_id = states.id inner join instances on \
-                 instances.state_id = resources.state_id and instances.resource_address = \
-                 resources.address inner join resources on resources.state_id = providers.state_id \
-                 and resources.provider = providers.name where states.tenant_id = $texts[1]::uuid \
-                 and states.deleted_at is null group by providers.name order by instances desc \
-                 limit 20";
+                 join states on providers.state_id = states.id inner join resources on \
+                 resources.state_id = providers.state_id and resources.provider = providers.name \
+                 inner join instances on instances.state_id = resources.state_id and \
+                 instances.resource_address = resources.address where states.tenant_id = \
+                 $texts[1]::uuid and states.deleted_at is null group by providers.name order by \
+                 instances desc limit 20";
               ]
           in
           assert_eq sql query;
@@ -1156,10 +1156,10 @@ select orphaned.c from orphaned|};
                 "all_deps as (select dep as address from instances, unnest(dependencies) as dep \
                  inner join ts on instances.state_id = ts.id group by dep),";
                 "orphaned as (select count(*) as c from instances inner join ts on \
-                 instances.state_id = ts.id left join all_deps on all_deps.address = \
-                 instances.address left join resources on resources.state_id = instances.state_id \
-                 and resources.address = instances.resource_address where resources.address is \
-                 null and all_deps.address is null)";
+                 instances.state_id = ts.id left join resources on resources.state_id = \
+                 instances.state_id and resources.address = instances.resource_address left join \
+                 all_deps on all_deps.address = instances.address where resources.address is null \
+                 and all_deps.address is null)";
                 "select orphaned.c from orphaned limit 20";
               ]
           in

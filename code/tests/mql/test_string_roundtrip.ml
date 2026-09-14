@@ -286,6 +286,19 @@ let test =
           in
           assert_roundtrip sql;
           ());
+      Oth.test ~name:"Roundtrip three joins keep source order" (fun _ ->
+          (* Each join's ON references the alias of the join before it. *)
+          let sql =
+            build_str
+              [
+                "select a.id from t1 as a";
+                "inner join t2 as b on b.a_id = a.id";
+                "left join t3 as c on c.b_id = b.id";
+                "left join t4 as d on d.c_id = c.id";
+              ]
+          in
+          assert_roundtrip sql;
+          ());
       Oth.test ~name:"Roundtrip LIKE" (fun _ ->
           assert_roundtrip @@ build_str [ "select * from foo where bar like 'baz%'" ];
           ());
