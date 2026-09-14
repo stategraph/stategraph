@@ -2632,7 +2632,13 @@ module Apply_requirements = struct
     | Error (`Error as ret) -> Abbs_future_combinators.return_err ret
 end
 
-module Tier = struct
+(* Functor over optional feature caps: [Tier] (no caps) keeps today's behavior
+   for the ee binaries; [Tier_capped] clamps whatever tier the installation row
+   carries down to the OSS limits and is what the oss binaries link. *)
+module Tier_impl (Caps : sig
+  val caps : Terrat_tier.t option
+end) =
+struct
   module Sql = struct
     let read s =
       s
@@ -2745,6 +2751,11 @@ module Tier = struct
       >>= function
       | [] -> assert false
       | (_, _, tier) :: _ ->
+          let tier =
+            match Caps.caps with
+            | Some caps -> Terrat_tier.clamp ~caps tier
+            | None -> tier
+          in
           let { Terrat_tier.runs_per_month; _ } = tier in
           runs_usage' ~request_id account runs_per_month db
     in
@@ -2767,6 +2778,11 @@ module Tier = struct
       >>= function
       | [] -> assert false
       | (tier_id, tier_name, tier) :: _ -> (
+          let tier, tier_name =
+            match Caps.caps with
+            | Some caps -> (Terrat_tier.clamp ~caps tier, "Open Source")
+            | None -> (tier, tier_name)
+          in
           let { Terrat_tier.num_users_per_month; runs_per_month; _ } = tier in
           Logs.info (fun m -> m "%s : TIER : id=%s : name=%s" request_id tier_id tier_name);
           check_users_per_month ~request_id user account num_users_per_month db
@@ -2786,6 +2802,14 @@ module Tier = struct
         Logs.err (fun m -> m "%s : %a" request_id Pgsql_io.pp_err err);
         Abbs_future_combinators.return_err `Error
 end
+
+module Tier = Tier_impl (struct
+  let caps = None
+end)
+
+module Tier_capped = Tier_impl (struct
+  let caps = Some Terrat_tier.oss
+end)
 
 module Gate = struct
   let add_approval ~request_id:_ ~token:_ ~approver:_ _pull_request _db =

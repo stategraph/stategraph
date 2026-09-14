@@ -32,12 +32,13 @@ Terrateam ships in two editions: the **Open Source Edition** (MPL-2.0, free) and
 | [Centralized Configuration](/governance/centralized-config) (defaults/overrides across repos) | ❌ | ✅ |
 | [API Access Tokens](/reference/api/access-tokens) (`/api/v1/{vcs}/access-token`) | ❌ | ✅ |
 | [Comment summary header and unified PR summary comment](/reference/configuration/notifications) (`notifications.summary`) | ❌ | ✅ |
+| Monthly active users per installation | Up to 3 | No limit on self-hosted Enterprise; hosted limits per [pricing](https://terrateam.io/pricing) |
 | Self-hostable | ✅ | ✅ (Enterprise license) |
 | License | MPL-2.0 | Commercial |
 
 ## Open Source Edition
 
-The Open Source Edition includes the full core Terrateam workflow engine — the same engine that the Enterprise Edition (and Hosted SaaS) is built on, minus the Enterprise-only governance features listed below. It is licensed under MPL-2.0, the source is on [GitHub](https://github.com/stategraph/stategraph), and you can self-host it on Docker, Kubernetes, or AWS ECS.
+The Open Source Edition includes the full core Terrateam workflow engine — the same engine that the Enterprise Edition (and Hosted SaaS) is built on, minus the Enterprise-only governance features listed below. It is licensed under MPL-2.0, the source is on [GitHub](https://github.com/stategraph/stategraph), and you can self-host it on Docker, Kubernetes, or AWS ECS. It allows up to 3 active users per month per GitHub or GitLab installation (anyone who triggers a plan or apply that month counts); runs are unlimited.
 
 **Included:**
 - The complete pull-request automation engine: triggers, dirspaces, plan and apply, pre- and post-merge runs, automerge, rollbacks
@@ -92,6 +93,10 @@ The configurations that are rejected on Open Source are:
 
 Centralized Configuration and the API access-token endpoints are simply not present on Open Source — the Open Source server only reads each repo's local `.terrateam/config.yml`, and the access-token routes are not registered.
 
+## What happens when an Open Source installation passes 3 active users?
+
+The first 3 users to run a plan or apply in a calendar month keep working all month. Anyone else's plan or apply does not run, and Terrateam posts an **Open Source Tier Limit Reached** comment on the pull request listing this month's active users. Drift detection is not affected. The count resets at the start of each calendar month.
+
 ## How to Get Each Edition
 
 ### Open Source Edition
@@ -107,6 +112,7 @@ Centralized Configuration and the API access-token endpoints are simply not pres
 
 **Open Source is the right fit when:**
 - You have a single team or a small number of repos and don't need org-wide governance
+- No more than 3 people run plans or applies per installation in a month
 - A single drift schedule per repo is sufficient
 - Your existing GitHub branch protection rules are enough; you don't need Terrateam to enforce CODEOWNERS or fine-grained RBAC inside the apply flow
 - You're comfortable self-hosting and running upgrades

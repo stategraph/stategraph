@@ -196,4 +196,4 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 The code in this repository is [MPL-2.0](LICENSE) licensed.
 
-Stategraph Infrastructure as a Database is commercial software, available in the hosted service or self-hosted with a license key. Stategraph Orchestration is open source, with enterprise features (RBAC, centralized configuration, advanced approval workflows) available in the hosted service and the self-hosted Enterprise Edition.
+Stategraph Infrastructure as a Database is commercial software, available in the hosted service or self-hosted with a license key. Stategraph Orchestration is open source, with enterprise features (RBAC, centralized configuration, advanced approval workflows) available in the hosted service and the self-hosted Enterprise Edition. The open-source build, which the self-hosted setup above runs, allows up to 3 active users per month per GitHub or GitLab installation (an active user is anyone who triggers a plan or apply that month); runs are unlimited. The self-hosted Enterprise Edition has no user limit, and hosted plan limits are on the [pricing](https://terrateam.io/pricing) page.
