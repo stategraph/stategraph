@@ -28,3 +28,22 @@ let is_valid s =
     let stop = len - pad in
     let rec loop i = i >= stop || (is_alphabet (CCString.get s i) && loop (i + 1)) in
     loop 0
+
+(* [Base64_rfc2045] gives [`Malformed "\n"] for the bare LF that PostgreSQL writes, and the decoder
+   continues after a [`Malformed]. Thus the loop ignores that one value and continues. Each other
+   malformation is an error. *)
+let decode_rfc2045 s =
+  let decoder = Base64_rfc2045.decoder (`String s) in
+  let buf = Buffer.create (CCString.length s) in
+  let rec loop () =
+    match Base64_rfc2045.decode decoder with
+    | `End -> Ok (Buffer.contents buf)
+    | `Flush data ->
+        Buffer.add_string buf data;
+        loop ()
+    | `Malformed "\n" -> loop ()
+    | `Malformed err -> Error (`Msg (Printf.sprintf "malformed base64: %s" err))
+    | `Wrong_padding -> Error (`Msg "wrong base64 padding")
+    | `Await -> Error (`Msg "unexpected await from string source")
+  in
+  loop ()

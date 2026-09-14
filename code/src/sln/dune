@@ -1,6 +1,6 @@
 (library
  (name sln)
  (wrapped false)
- (libraries base64 containers iter uuidm uutf yojson)
+ (libraries base64 base64.rfc2045 containers iter uuidm uutf yojson)
  (preprocess
   (pps ppx_deriving_yojson ppx_deriving.show)))

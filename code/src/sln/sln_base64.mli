@@ -18,6 +18,15 @@ val encode : string -> string
     is exactly the ambiguity encoding it was meant to remove. *)
 val decode : string -> (string, [> `Msg of string ]) result
 
+(** [decode_rfc2045 s] is the bytes that [s] encodes. It permits the line breaks that RFC 2045
+    permits. Each other malformation is an error.
+
+    PostgreSQL [encode(..., 'base64')] breaks its output after each 76 characters, and it uses a
+    bare LF where the RFC specifies CRLF. {!decode} refuses a line break of either form. A value
+    that is short enough has no line break, thus {!decode} is sufficient for a small value. It fails
+    on the first value that is long enough to wrap. *)
+val decode_rfc2045 : string -> (string, [> `Msg of string ]) result
+
 (** [is_valid s] is whether [s] is well-formed RFC 4648 base64 {b with} padding: a length that is a
     multiple of four, every character drawn from [A-Za-z0-9+/], and zero, one or two [=] occurring
     only as the final characters.
