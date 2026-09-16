@@ -148,7 +148,7 @@ module Commit_check = struct
 end
 
 module Work_manifest = struct
-  let run ~request_id config client = raise (Failure "nyi")
+  let run ~request_id ~compute_node_id config client work_manifest = raise (Failure "nyi")
   let create ~request_id db work_manifest = raise (Failure "nyi")
   let query' ~request_id db ids = raise (Failure "nyi")
   let query ~request_id db work_manifest_id = raise (Failure "nyi")
@@ -210,7 +210,7 @@ module Job_context = struct
   end
 
   module Compute_node = struct
-    let create ~request_id ~id ~capabilities db = raise (Failure "nyi")
+    let create ~request_id ~capabilities db = raise (Failure "nyi")
     let query ~request_id ~compute_node_id db = raise (Failure "nyi")
     let query_by_work_manifest ~request_id ~work_manifest_id db = raise (Failure "nyi")
     let query_work ~request_id ~compute_node_id db = raise (Failure "nyi")

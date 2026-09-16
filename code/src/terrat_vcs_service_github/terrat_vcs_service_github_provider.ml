@@ -4944,7 +4944,7 @@ module Work_manifest = struct
         repo = Api.Repo.name repo;
       }
 
-  let run ~request_id config client work_manifest =
+  let run ~request_id ~compute_node_id config client work_manifest =
     let module Wm = Terrat_work_manifest3 in
     let get_repo = function
       | { Wm.target = Terrat_vcs_provider2.Target.Pr pr; _ } -> Api.Pull_request.repo pr
@@ -5030,8 +5030,12 @@ module Work_manifest = struct
                                      additional =
                                        Sln_map.String.of_list
                                          ([
-                                            ( "work-token",
-                                              `String (Ouuid.to_string work_manifest.Wm.id) );
+                                            (* The action asks its compute node
+                                               for work, and a node can perform
+                                               more than one work manifest.  The
+                                               response of each poll names the
+                                               work manifest of that step. *)
+                                            ("work-token", `String (Ouuid.to_string compute_node_id));
                                             ( "api-base-url",
                                               `String
                                                 (Terrat_config.api_base (Api.Config.config config)
@@ -5917,6 +5921,8 @@ module Job_context = struct
     let insert_compute_node () =
       Pgsql_io.Typed_sql.(
         sql
+        (* id *)
+        // Ret.uuid
         (* state *)
         // Ret.u Ret.text to_compute_node_state
         (* created_at *)
@@ -5924,7 +5930,6 @@ module Job_context = struct
         (* updated_at *)
         // Ret.text
         /^ read [%blob "sql/insert_compute_node.sql"]
-        /% Var.uuid "id"
         /% Var.(ud (json "capabilities") Tjc.Compute_node.Capabilities.to_yojson))
 
     let select_compute_node () =
@@ -6277,17 +6282,16 @@ module Job_context = struct
   end
 
   module Compute_node = struct
-    let create ~request_id ~id ~capabilities db =
+    let create ~request_id ~capabilities db =
       let open Abb.Future.Infix_monad in
       Pgsql_io.Prepared_stmt.fetch
         db
         (Sql.insert_compute_node ())
-        ~f:(fun state created_at updated_at -> (state, created_at, updated_at))
-        id
+        ~f:(fun id state created_at updated_at -> (id, state, created_at, updated_at))
         capabilities
       >>= function
       | Ok [] -> assert false
-      | Ok ((state, created_at, updated_at) :: _) ->
+      | Ok ((id, state, created_at, updated_at) :: _) ->
           Abbs_future_combinators.return_ok
             { Tjc.Compute_node.id; state; capabilities; created_at; updated_at }
       | Error (#Pgsql_io.err as err) ->

@@ -35,26 +35,30 @@ module Make (P : Terrat_vcs_provider2_gitlab.S) = struct
     | Some _ | None -> Abbs_future_combinators.return_err (Brtl_ctx.set_response `Forbidden ctx)
 
   module Initiate = struct
-    let post' config storage exec work_manifest_id initiate ctx =
+    (* [work_token] is the value the run was given to ask for work with.  Two
+       routes reach here.  On compute-node/<uuid>/initiate it is a compute node
+       id, which is what a run of this server gets.  On
+       work-manifests/<uuid>/initiate it is a work manifest id, which is what a
+       released action and a legacy run still send.  [compute_node_poll] tells
+       the two apart. *)
+    let post' config storage exec work_token initiate ctx =
       let request_id = Brtl_ctx.token ctx in
       Evaluator2.compute_node_poll
         ~request_id
         ~config
         ~storage
         ~exec
-        ~compute_node_id:work_manifest_id
+        ~compute_node_id:work_token
         initiate
 
-    let post config storage exec work_manifest_id initiate =
+    let post config storage exec work_token initiate =
       Brtl_ep.run_result_json ~f:(fun ctx ->
-          (* Initiate isn't called with any auth other than knowing what work
-             manifest it's calling more, so enforce that they have access to the
-             work manifest, pretending we got a token with the work manifest as
-             the access token. *)
-          (* enforce_work_manifest_access (Some work_manifest_id) work_manifest_id storage ctx *)
-          (* >>= fun () -> *)
+          (* Initiate has no auth beyond knowing the work token.  The guard that
+             used to be sketched here cannot come back in that shape: the token
+             is a compute node id now, and [enforce_work_manifest_access] reads
+             the work manifests table, so it would refuse every poll. *)
           let open Abb.Future.Infix_monad in
-          post' config storage exec work_manifest_id initiate ctx
+          post' config storage exec work_token initiate ctx
           >>= function
           | Ok response ->
               let body =

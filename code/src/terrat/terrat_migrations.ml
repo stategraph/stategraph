@@ -299,6 +299,8 @@ let migrations =
     );
     ( "add-compute-node-queued-state",
       run_sql [%blob "migrations/2026-09-01-add-compute-node-queued-state.sql"] );
+    ( "add-compute-node-id-default",
+      run_sql [%blob "migrations/2026-09-02-add-compute-node-id-default.sql"] );
   ]
 
 let run config storage = Mig.run { Migrate.config; storage; tx = () } migrations

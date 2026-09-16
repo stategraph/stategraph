@@ -296,7 +296,16 @@ module Make (S : Terrat_vcs_provider2.S) = struct
               Uuidm.pp
               work_manifest.Wm.id
               time))
-      (fun () -> S.Work_manifest.run ~request_id config client work_manifest)
+      (* The legacy evaluator has no compute nodes.  Its runs ask
+         work-manifests/<id>/initiate, so the work token stays the id of the work
+         manifest. *)
+      (fun () ->
+        S.Work_manifest.run
+          ~request_id
+          ~compute_node_id:work_manifest.Wm.id
+          config
+          client
+          work_manifest)
 
   let store_flow_state request_id db work_manifest_id state =
     Abbs_time_it.run

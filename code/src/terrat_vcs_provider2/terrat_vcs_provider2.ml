@@ -818,8 +818,12 @@ module type S = sig
   end
 
   module Work_manifest : sig
+    (* Start the action run of a compute node.  The node is what the run asks for
+       work, so [compute_node_id] is the work token the run is given, and not the
+       id of the work manifest: a node can perform more than one. *)
     val run :
       request_id:string ->
+      compute_node_id:Uuidm.t ->
       Api.Config.t ->
       Api.Client.t ->
       ( Api.Account.t,
@@ -1027,9 +1031,10 @@ module type S = sig
     end
 
     module Compute_node : sig
+      (* The database chooses the id, so the caller reads it back off the node
+         and then writes the row in compute_node_work with it. *)
       val create :
         request_id:string ->
-        id:Uuidm.t ->
         capabilities:Terrat_job_context.Compute_node.Capabilities.t ->
         Db.t ->
         (Terrat_job_context.Compute_node.t, [> `Error ]) result Abb.Future.t
@@ -1040,8 +1045,9 @@ module type S = sig
         Db.t ->
         (Terrat_job_context.Compute_node.t option, [> `Error ]) result Abb.Future.t
 
-      (* The compute node that owns a work manifest.  The id of a node is the id
-         of its first work manifest only, so a later one cannot be found by id. *)
+      (* The compute node that owns a work manifest.  The database chooses the id
+         of a node, so that id says nothing about the work manifests of the node
+         and this read must go through [compute_node_work]. *)
       val query_by_work_manifest :
         request_id:string ->
         work_manifest_id:Uuidm.t ->

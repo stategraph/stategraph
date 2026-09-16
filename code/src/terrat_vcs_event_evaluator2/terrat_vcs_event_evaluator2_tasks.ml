@@ -2443,89 +2443,87 @@ struct
                         ~request_id:(Builder.log_id s)
                         ~compute_node_id:compute_node.C.id
                         db))
-              >>= fun compute_node_work ->
-              (* The row of the node names the work manifest of this poll.  The
-                 row is in the state [created] only, so it is always work the
+              (* The row of the node names the work manifest of this poll, and
+                 the row is in the state [created] only, so it is always work the
                  node still owes.
 
-                 No row means one of two things.  Either the work of this node is
-                 over, or its work manifest was made before the server wrote a
-                 row with each work manifest.  In the second case the id of the
-                 node is the id of the work manifest, so use it, and let the arms
-                 below tell the two apart by the state of that work manifest. *)
-              let work_manifest_id, work =
-                match compute_node_work with
-                | Some { Cw.work_manifest; work; _ } -> (work_manifest, work)
-                | None -> (compute_node.C.id, None)
-              in
-              Builder.run_db s ~f:(fun db ->
-                  time_it
-                    s
-                    (fun m log_id time ->
-                      m
-                        "%s : WORK_MANIFEST : QUERY : id = %a : time=%f"
-                        log_id
-                        Uuidm.pp
-                        work_manifest_id
-                        time)
-                    (fun () ->
-                      S.Work_manifest.query ~request_id:(Builder.log_id s) db work_manifest_id))
+                 No row means the node owes nothing.  Its id names no work
+                 manifest, because the database chooses it, so there is nothing
+                 else to look for: tell the action to stop and end the node. *)
               >>= function
-              | Some work_manifest ->
-                  fetch Keys.compute_node_offering
-                  >>= fun offering ->
-                  (* Compare the sha that the runner is offering vs the sha that
-                     the compute node is capable of operating against.
-
-                     These should match, however it is possible they don't because:
-
-                     1. There has been an update to this branch between evaluating
-                        the job and running it.
-
-                     2. This is a pull request and the destination branch has
-                        been updated and this PR has not been rebased yet.  The
-                        GitHub API always describes pull requests in terms of
-                        the original commit they were created against and not
-                        the latest commit of the base.  In this case, we will
-                        ALWAYS make work manifests that reference the pull
-                        requests base and not the actual base so we can't just
-                        retry.
-
-                     In case (1), we just want to fail this work manifest and
-                     run another one, that will pick up the new references and
-                     move on.
-
-                     In case (2), however, we have to use this same work manifest.
-
-                     We have two options of what we could do:
-
-                     1. We could tell the runner to switch to the commit we
-                        actually want to run against.
-
-                     2. Determine if this is an operation against the
-                        destination branch and validate it against the actual
-                        destination branch ref and use it.
-
-                     Despite (1) being the more correct answer, we cannot do it
-                     it right now because it would require modifying the
-                     protocol between the server and the runner and we aren't in
-                     a position to change that right now, so we will do (2).
-
-                     How do we determine if we can even apply situation (2)?
-                     Again, to minimize changes to the code, and database right
-                     now, we are going to use a heuristic.  In the work
-                     manifest, if the base_ref and branch_ref are the same, we
-                     will assume we are in (2) and run.
-                   *)
-                  if
-                    compute_node.C.capabilities.C.Capabilities.sha = offering.Offering.sha
-                    || CCString.equal work_manifest.Wm.base_ref work_manifest.Wm.branch_ref
-                  then handle_sha_match s compute_node work_manifest work offering
-                  else handle_sha_mismatch s compute_node work_manifest_id offering
               | None ->
-                  (* If anything failed, be sure to return to the querying node to give up. *)
-                  Logs.info (fun m -> m "%s : UNKNOWN_WORK_MANIFEST" (Builder.log_id s));
-                  Abbs_future_combinators.return_ok (Wmc.Work_manifest_done { Wmd.type_ = `Done })))
+                  terminate_compute_node s compute_node
+                  >>| fun () -> Wmc.Work_manifest_done { Wmd.type_ = `Done }
+              | Some { Cw.work_manifest = work_manifest_id; work; _ } -> (
+                  Builder.run_db s ~f:(fun db ->
+                      time_it
+                        s
+                        (fun m log_id time ->
+                          m
+                            "%s : WORK_MANIFEST : QUERY : id = %a : time=%f"
+                            log_id
+                            Uuidm.pp
+                            work_manifest_id
+                            time)
+                        (fun () ->
+                          S.Work_manifest.query ~request_id:(Builder.log_id s) db work_manifest_id))
+                  >>= function
+                  | Some work_manifest ->
+                      fetch Keys.compute_node_offering
+                      >>= fun offering ->
+                      (* Compare the sha that the runner is offering vs the sha that
+                         the compute node is capable of operating against.
+
+                         These should match, however it is possible they don't because:
+
+                         1. There has been an update to this branch between evaluating
+                            the job and running it.
+
+                         2. This is a pull request and the destination branch has
+                            been updated and this PR has not been rebased yet.  The
+                            GitHub API always describes pull requests in terms of
+                            the original commit they were created against and not
+                            the latest commit of the base.  In this case, we will
+                            ALWAYS make work manifests that reference the pull
+                            requests base and not the actual base so we can't just
+                            retry.
+
+                         In case (1), we just want to fail this work manifest and
+                         run another one, that will pick up the new references and
+                         move on.
+
+                         In case (2), however, we have to use this same work manifest.
+
+                         We have two options of what we could do:
+
+                         1. We could tell the runner to switch to the commit we
+                            actually want to run against.
+
+                         2. Determine if this is an operation against the
+                            destination branch and validate it against the actual
+                            destination branch ref and use it.
+
+                         Despite (1) being the more correct answer, we cannot do it
+                         it right now because it would require modifying the
+                         protocol between the server and the runner and we aren't in
+                         a position to change that right now, so we will do (2).
+
+                         How do we determine if we can even apply situation (2)?
+                         Again, to minimize changes to the code, and database right
+                         now, we are going to use a heuristic.  In the work
+                         manifest, if the base_ref and branch_ref are the same, we
+                         will assume we are in (2) and run.
+                       *)
+                      if
+                        compute_node.C.capabilities.C.Capabilities.sha = offering.Offering.sha
+                        || CCString.equal work_manifest.Wm.base_ref work_manifest.Wm.branch_ref
+                      then handle_sha_match s compute_node work_manifest work offering
+                      else handle_sha_mismatch s compute_node work_manifest_id offering
+                  | None ->
+                      (* If anything failed, be sure to return to the querying node to give up. *)
+                      Logs.info (fun m -> m "%s : UNKNOWN_WORK_MANIFEST" (Builder.log_id s));
+                      Abbs_future_combinators.return_ok
+                        (Wmc.Work_manifest_done { Wmd.type_ = `Done }))))
 
     let work_manifest_event_job =
       run ~name:"work_manifest_event_job" (fun s { Bs.Fetcher.fetch } ->

@@ -199,18 +199,25 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                     Logs.info (fun m ->
                         m "%s : RUN_WORK_MANIFEST : id=%a" request_id Uuidm.pp wm.Wm.id);
                     (* A work manifest made before the server made a node with
-                       each one has no node, so make it here.  Every other one
-                       arrives with its node already. *)
+                       each one has no node, so make it here, with its row.  The
+                       row matters: the database chooses the id of a node now, so
+                       a node without a row names no work manifest and the poll
+                       would have nothing to give the action. *)
                     (match compute_node_id with
                       | Some compute_node_id -> Abbs_future_combinators.return_ok compute_node_id
                       | None ->
                           S.Job_context.Compute_node.create
                             ~request_id
-                            ~id:wm.Wm.id
                             ~capabilities:
                               { Tjc.Compute_node.Capabilities.flags = []; sha = wm.Wm.branch_ref }
                             db
-                          >>| fun { Tjc.Compute_node.id; _ } -> id)
+                          >>= fun { Tjc.Compute_node.id = compute_node_id; _ } ->
+                          S.Job_context.Compute_node.add_work
+                            ~request_id
+                            ~compute_node_id
+                            ~work_manifest:wm.Wm.id
+                            db
+                          >>| fun () -> compute_node_id)
                     >>= fun compute_node_id ->
                     S.Api.create_client ~request_id config wm.Wm.account db
                     >>= fun client ->
@@ -224,16 +231,16 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                               Uuidm.pp
                               wm.Wm.id
                               time))
-                      (fun () -> S.Work_manifest.run ~request_id config client wm)
+                      (fun () -> S.Work_manifest.run ~request_id ~compute_node_id config client wm)
                     >>= function
                     | Ok () ->
                         let open Fc.Infix_result_monad in
                         S.Work_manifest.update_state ~request_id db wm.Wm.id Wm.State.Running
                         >>= fun () ->
-                        (* [insert_compute_node.sql] does not change the state on
-                           a conflict, so a node that was made with the work
-                           manifest is still [queued] here.  Without this write
-                           it stays [queued] for all of its life. *)
+                        (* A node is written [queued], whether it was made with
+                           its work manifest or by the fallback above, and only
+                           the dispatcher moves it on.  Without this write it
+                           stays [queued] for all of its life. *)
                         S.Job_context.Compute_node.update_state
                           ~request_id
                           ~compute_node_id
@@ -679,9 +686,9 @@ module Make (S : Terrat_vcs_provider2.S) = struct
           | Some work_manifest -> Ok work_manifest
           | None -> Error `Error)
     in
-    (* Read the node through [compute_node_work].  The id of a node is the id of
-       its first work manifest only, so a later work manifest of the same node
-       finds no node by id, and its results would fail. *)
+    (* Read the node through [compute_node_work].  The id of a node names no work
+       manifest at all now, because the database chooses it, so this table is the
+       only way from a work manifest to the node that performed it. *)
     let query_compute_node db =
       Abbs_time_it.run
         (fun time ->
@@ -698,9 +705,10 @@ module Make (S : Terrat_vcs_provider2.S) = struct
           >>= function
           | Some compute_node -> Abbs_future_combinators.return_ok compute_node
           | None -> (
-              (* A work manifest made before the server wrote a row with each
-                 work manifest has no row, and the id of its node is its own
-                 id. *)
+              (* A run that started before this phase can still have a node with
+                 no row, and the id of such a node is the id of its work
+                 manifest.  A node made by this phase always has a row, so this
+                 read is for a run that crossed the release only. *)
               S.Job_context.Compute_node.query ~request_id ~compute_node_id:work_manifest_id db
               >>? function
               | Some compute_node -> Ok compute_node
