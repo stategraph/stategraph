@@ -158,6 +158,30 @@ struct
           db
           response)
 
+  (* Every new work manifest gets a compute node in the state [queued], and a
+     row in [compute_node_work] with no work.  The dispatcher starts a node that
+     is [queued], and the first poll of the run fills the row.  The id of the
+     node is the id of the work manifest, which the phase that gives a node its
+     own id removes. *)
+  let create_compute_node s { Wm.id; branch_ref; _ } db =
+    time_it
+      s
+      (fun m log_id time ->
+        m "%s : WM : CREATE_COMPUTE_NODE : compute_node_id=%a : time=%f" log_id Uuidm.pp id time)
+      (fun () ->
+        let open Irm in
+        S.Job_context.Compute_node.create
+          ~request_id:(Builder.log_id s)
+          ~id
+          ~capabilities:{ Tjc.Compute_node.Capabilities.flags = []; sha = branch_ref }
+          db
+        >>= fun _ ->
+        S.Job_context.Compute_node.add_work
+          ~request_id:(Builder.log_id s)
+          ~compute_node_id:id
+          ~work_manifest:id
+          db)
+
   let update_state_completed s name work_manifest_id db =
     time_it
       s
@@ -270,7 +294,12 @@ struct
         >>= fun response ->
         fetch Keys.compute_node_id
         >>= fun compute_node_id ->
-        Builder.run_db s ~f:(fun db -> set_work s compute_node_id id response db)
+        (* An initiate event comes from a poll only, and a poll always knows its
+           compute node.  Fail loudly if that stops being true. *)
+        (match compute_node_id with
+          | None -> Abbs_future_combinators.return_err (`Missing_dep_err "compute_node_id")
+          | Some compute_node_id ->
+              Builder.run_db s ~f:(fun db -> set_work s compute_node_id id response db))
         >>? fun () -> Error (`Suspend_eval name)
     | Some (E.Fail { work_manifest; error }) when eq work_manifest -> (
         Logs.info (fun m -> m "%s : WM : FAIL : name=%s" (Builder.log_id s) name);
@@ -353,6 +382,11 @@ struct
                     fetch Keys.job
                     >>= fun job ->
                     Builder.run_db s ~f:(fun db -> add_work_manifests s job.Tjc.Job.id wms db)
+                    >>= fun () ->
+                    Builder.run_db s ~f:(fun db ->
+                        Abbs_future_combinators.List_result.iter
+                          ~f:(fun wm -> create_compute_node s wm db)
+                          wms)
                     >>? fun () -> Error (`Suspend_eval name))
             | wms when all_wms_completed wms ->
                 Logs.info (fun m ->

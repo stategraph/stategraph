@@ -4,4 +4,4 @@ select
   work,
   work_manifest
 from compute_node_work
-where compute_node = $compute_node_id
+where compute_node = $compute_node_id and state = 'created'

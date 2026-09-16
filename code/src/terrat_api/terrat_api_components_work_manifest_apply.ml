@@ -47,6 +47,7 @@ type t = {
   capabilities : Capabilities.t;
   changed_dirspaces : Changed_dirspaces.t;
   config : Config.t;
+  id : string option; [@default None]
   installation_id : string;
   protocol_version : int option; [@default None]
   result_version : int;

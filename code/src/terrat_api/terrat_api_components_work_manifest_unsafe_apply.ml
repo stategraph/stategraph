@@ -23,6 +23,7 @@ type t = {
   base_ref : string;
   changed_dirspaces : Changed_dirspaces.t;
   config : Config.t;
+  id : string option; [@default None]
   run_kind : string;
   token : string;
   type_ : Type.t; [@key "type"]

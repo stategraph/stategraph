@@ -66,6 +66,7 @@ end
 module Compute_node = struct
   module State = struct
     type t =
+      | Queued
       | Starting
       | Running
       | Terminated
@@ -104,7 +105,9 @@ module Compute_node_work = struct
     compute_node_id : Uuidm.t;
     created_at : string;
     state : State.t;
-    work : Terrat_api_components.Work_manifest.t;
+    (* An empty [work] shows that the node has the work manifest, but that the
+       server has not made the response for the action yet. *)
+    work : Terrat_api_components.Work_manifest.t option;
     work_manifest : Uuidm.t;
   }
 end

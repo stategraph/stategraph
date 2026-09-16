@@ -17,6 +17,7 @@ end
 type t = {
   base_ref : string;
   config : Config.t;
+  id : string option; [@default None]
   token : string;
   type_ : Type.t; [@key "type"]
 }

@@ -3247,7 +3247,14 @@ module Make (S : Terrat_vcs_provider2.S) = struct
           in
           let response =
             Terrat_api_components.Work_manifest.Work_manifest_index
-              { I.dirs; base_ref = S.Api.Ref.to_string base_ref'; token; type_ = `Index; config }
+              {
+                I.dirs;
+                base_ref = S.Api.Ref.to_string base_ref';
+                id = Some (Uuidm.to_string id);
+                token;
+                type_ = `Index;
+                config;
+              }
           in
           Some response
       | Some _ | None -> Abbs_future_combinators.return_ok None
@@ -4258,7 +4265,7 @@ module Make (S : Terrat_vcs_provider2.S) = struct
       let open Abbs_future_combinators.Infix_result_monad in
       initiate_work_manifest state state.State.request_id (Ctx.storage ctx) run_id sha work_manifest
       >>= function
-      | Some { Wm.account; steps; base_ref = _; branch_ref = _; changes; target; _ } -> (
+      | Some { Wm.account; id; steps; base_ref = _; branch_ref = _; changes; target; _ } -> (
           Dv.base_branch_name ctx state
           >>= fun _base_branch_name ->
           let step =
@@ -4347,6 +4354,7 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                   Work_manifest.Work_manifest_plan
                     {
                       Work_manifest_plan.token;
+                      id = Some (Uuidm.to_string id);
                       api_base_url = Terrat_config.api_base @@ S.Api.Config.config @@ Ctx.config ctx;
                       installation_id = S.Api.Account.Id.to_string @@ S.Api.Account.id account;
                       base_dirspaces;
@@ -4424,6 +4432,7 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                   Work_manifest.Work_manifest_apply
                     {
                       Work_manifest_apply.token;
+                      id = Some (Uuidm.to_string id);
                       api_base_url = Terrat_config.api_base @@ S.Api.Config.config @@ Ctx.config ctx;
                       installation_id = S.Api.Account.Id.to_string @@ S.Api.Account.id account;
                       base_ref = S.Api.Ref.to_string base_branch_name;
@@ -6472,6 +6481,7 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                 Terrat_api_components.Work_manifest.Work_manifest_build_tree
                   {
                     B.base_ref = S.Api.Ref.to_string base_branch_name';
+                    id = Some (Uuidm.to_string id);
                     token;
                     type_ = `Build_tree;
                     config;
@@ -6801,6 +6811,7 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                 Terrat_api_components.Work_manifest.Work_manifest_build_config
                   {
                     B.base_ref = S.Api.Ref.to_string base_branch_name;
+                    id = Some (Uuidm.to_string id);
                     token;
                     type_ = `Build_config;
                     config;

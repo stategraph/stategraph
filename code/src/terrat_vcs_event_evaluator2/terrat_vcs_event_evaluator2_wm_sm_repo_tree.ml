@@ -204,7 +204,13 @@ struct
     in
     let response =
       Terrat_api_components.Work_manifest.Work_manifest_build_tree
-        { B.base_ref = S.Api.Ref.to_string dest_branch_name; token; type_ = `Build_tree; config }
+        {
+          B.base_ref = S.Api.Ref.to_string dest_branch_name;
+          id = Some (Uuidm.to_string id);
+          token;
+          type_ = `Build_tree;
+          config;
+        }
     in
     response
 

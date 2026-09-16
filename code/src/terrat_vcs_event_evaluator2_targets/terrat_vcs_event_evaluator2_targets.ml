@@ -225,8 +225,14 @@ module Make (S : Terrat_vcs_provider2.S) = struct
   let compute_node_offering : Terrat_api_components.Work_manifest_initiate.t Key.t =
     Hmap.Key.create "compute_node_offering"
 
-  let compute_node_id : Uuidm.t Key.t = Hmap.Key.create "compute_node_id"
-  let compute_node : Terrat_job_context.Compute_node.t Key.t = Hmap.Key.create "compute_node"
+  (* Only the poll entry point knows a compute node id, and only the results entry
+     point knows a compute node.  Both keys are therefore an option with a task
+     that answers [None], for the same reason that [reruns] has one: a key with
+     neither a store value nor a task raises [Failure "Missing_dep_err ..."] out
+     of [Builder.State.get_k], which reaches the user as an opaque internal
+     error. *)
+  let compute_node_id : Uuidm.t option Key.t = Hmap.Key.create "compute_node_id"
+  let compute_node : Terrat_job_context.Compute_node.t option Key.t = Hmap.Key.create "compute_node"
 
   (* Pull request *)
 

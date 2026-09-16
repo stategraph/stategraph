@@ -575,6 +575,7 @@ struct
           Work_manifest.Work_manifest_plan
             {
               Work_manifest_plan.token;
+              id = Some (Uuidm.to_string id);
               api_base_url = Terrat_config.api_base @@ S.Api.Config.config @@ Builder.State.config s;
               installation_id = S.Api.Account.Id.to_string @@ S.Api.Account.id account;
               base_dirspaces;
@@ -948,6 +949,7 @@ struct
           Work_manifest.Work_manifest_apply
             {
               Work_manifest_apply.token;
+              id = Some (Uuidm.to_string id);
               api_base_url = Terrat_config.api_base @@ S.Api.Config.config @@ Builder.State.config s;
               installation_id = S.Api.Account.Id.to_string @@ S.Api.Account.id account;
               base_ref = S.Api.Ref.to_string dest_branch_name;

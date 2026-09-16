@@ -221,6 +221,16 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                     | Ok () ->
                         let open Fc.Infix_result_monad in
                         S.Work_manifest.update_state ~request_id db wm.Wm.id Wm.State.Running
+                        >>= fun () ->
+                        (* [insert_compute_node.sql] does not change the state on
+                           a conflict, so a node that was made with the work
+                           manifest is still [queued] here.  Without this write
+                           it stays [queued] for all of its life. *)
+                        S.Job_context.Compute_node.update_state
+                          ~request_id
+                          ~compute_node_id:compute_node.Tjc.Compute_node.id
+                          db
+                          Tjc.Compute_node.State.Starting
                         >>| fun () -> `Cont
                     | Error err ->
                         let open Fc.Infix_result_monad in
@@ -550,7 +560,7 @@ module Make (S : Terrat_vcs_provider2.S) = struct
           let target = Keys.eval_compute_node_poll in
           let store =
             Hmap.empty
-            |> Keys.Key.add Keys.compute_node_id compute_node_id
+            |> Keys.Key.add Keys.compute_node_id (Some compute_node_id)
             |> Keys.Key.add Keys.compute_node_offering offering
           in
           with_conn storage ~f:(fun db ->
@@ -741,7 +751,7 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                         in
                         let store =
                           Hmap.empty
-                          |> Keys.Key.add Keys.compute_node compute_node
+                          |> Keys.Key.add Keys.compute_node (Some compute_node)
                           |> Keys.Key.add Keys.work_manifest_event (Some work_manifest_event)
                           |> Keys.Key.add Keys.reruns reruns
                         in

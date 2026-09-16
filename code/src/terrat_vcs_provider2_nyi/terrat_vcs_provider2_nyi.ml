@@ -214,6 +214,7 @@ module Job_context = struct
     let query ~request_id ~compute_node_id db = raise (Failure "nyi")
     let query_work ~request_id ~compute_node_id db = raise (Failure "nyi")
     let update_state ~request_id ~compute_node_id db state = raise (Failure "nyi")
+    let add_work ~request_id ~compute_node_id ~work_manifest db = raise (Failure "nyi")
     let set_work ~request_id ~compute_node_id ~work_manifest db work = raise (Failure "nyi")
   end
 end

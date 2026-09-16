@@ -71,6 +71,20 @@ struct
           / "initiate"
           /* Body.decode ~json:Terrat_api_work_manifest.Initiate.Request_body.of_yojson ())
 
+      (* The action asks its compute node for work.  The compute node id and the
+         work manifest id are the same value until the phase that gives a node
+         its own id, so this route and [work_manifest_initiate] behave the same
+         way.  [work_manifest_initiate] stays for released actions and for
+         legacy runs. *)
+      let compute_node_root base = Brtl_rtng.Route.(base () / "compute-node")
+      let compute_node base = Brtl_rtng.Route.(compute_node_root base /% Path.ud Uuidm.of_string)
+
+      let compute_node_initiate base =
+        Brtl_rtng.Route.(
+          compute_node base
+          / "initiate"
+          /* Body.decode ~json:Terrat_api_compute_node.Initiate.Request_body.of_yojson ())
+
       let work_manifest_plan base =
         Brtl_rtng.Route.(
           work_manifest base
@@ -93,6 +107,7 @@ struct
       let github_work_manifest_plan () = work_manifest_plan github_v1
       let github_work_manifest_workspaces () = work_manifest_workspaces github_v1
       let github_work_manifest_initiate () = work_manifest_initiate github_v1
+      let github_compute_node_initiate () = compute_node_initiate github_v1
       let github_work_manifest_results () = work_manifest_results github_v1
       let github_work_manifest_access_token () = work_manifest_access_token github_v1
 
@@ -267,6 +282,9 @@ struct
             ( `POST,
               Rt.github_work_manifest_initiate ()
               --> Work_manifest.Initiate.post config storage exec );
+            ( `POST,
+              Rt.github_compute_node_initiate () --> Work_manifest.Initiate.post config storage exec
+            );
             ( `POST,
               Rt.github_work_manifest_access_token ()
               --> Work_manifest.Access_token.post config storage );

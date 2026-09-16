@@ -1,6 +1,7 @@
-insert into compute_nodes (capabilities, id) values (
+insert into compute_nodes (capabilities, id, state) values (
     $capabilities,
-    $id)
+    $id,
+    'queued')
 on conflict (id) do update
 set updated_at = now()
 returning state, created_at, updated_at

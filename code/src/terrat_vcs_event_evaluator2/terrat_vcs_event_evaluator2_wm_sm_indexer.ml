@@ -219,7 +219,14 @@ struct
     in
     let response =
       Terrat_api_components.Work_manifest.Work_manifest_index
-        { I.dirs; base_ref = S.Api.Ref.to_string dest_branch_name; token; type_ = `Index; config }
+        {
+          I.dirs;
+          base_ref = S.Api.Ref.to_string dest_branch_name;
+          id = Some (Uuidm.to_string id);
+          token;
+          type_ = `Index;
+          config;
+        }
     in
     response
 

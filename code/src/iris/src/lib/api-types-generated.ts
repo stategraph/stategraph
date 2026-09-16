@@ -4,6 +4,22 @@
  */
 
 export interface paths {
+    "/api/github/v1/compute-node/{compute_node_id}/initiate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["compute-node/initiate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/github/v1/work-manifests/{work_manifest_id}": {
         parameters: {
             query?: never;
@@ -1009,6 +1025,7 @@ export interface components {
             capabilities: string[];
             changed_dirspaces: components["schemas"]["work-manifest-dir"][];
             config: Record<string, never>;
+            id?: string;
             installation_id: string;
             protocol_version?: number;
             result_version: number;
@@ -1021,6 +1038,7 @@ export interface components {
         "work-manifest-build-config": {
             base_ref: string;
             config: Record<string, never>;
+            id?: string;
             token: string;
             /** @constant */
             type: "build-config";
@@ -1034,6 +1052,7 @@ export interface components {
         "work-manifest-build-tree": {
             base_ref: string;
             config: Record<string, never>;
+            id?: string;
             token: string;
             /** @constant */
             type: "build-tree";
@@ -1076,6 +1095,7 @@ export interface components {
             base_ref: string;
             config: Record<string, never>;
             dirs: string[];
+            id?: string;
             token: string;
             /** @constant */
             type: "index";
@@ -1113,6 +1133,7 @@ export interface components {
             changed_dirspaces: components["schemas"]["work-manifest-dir"][];
             config: Record<string, never>;
             dirspaces: components["schemas"]["work-manifest-dir"][];
+            id?: string;
             installation_id: string;
             protocol_version?: number;
             result_version: number;
@@ -1140,6 +1161,7 @@ export interface components {
             base_ref: string;
             changed_dirspaces: components["schemas"]["work-manifest-dir"][];
             config: Record<string, never>;
+            id?: string;
             run_kind: string;
             token: string;
             /** @constant */
@@ -1258,6 +1280,37 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    "compute-node/initiate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                compute_node_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["work-manifest-initiate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["work-manifest"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     "work-manifest/results": {
         parameters: {
             query?: never;

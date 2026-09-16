@@ -1045,6 +1045,16 @@ module type S = sig
         Terrat_job_context.Compute_node.State.t ->
         (unit, [> `Error ]) result Abb.Future.t
 
+      (* Link a work manifest to a compute node before the response for the
+         action exists.  The row is written with no work.  [set_work] fills it
+         on the first poll. *)
+      val add_work :
+        request_id:string ->
+        compute_node_id:Uuidm.t ->
+        work_manifest:Uuidm.t ->
+        Db.t ->
+        (unit, [> `Error ]) result Abb.Future.t
+
       val set_work :
         request_id:string ->
         compute_node_id:Uuidm.t ->

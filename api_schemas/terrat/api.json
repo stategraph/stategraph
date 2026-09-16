@@ -1308,6 +1308,9 @@
           "config": {
             "type": null
           },
+          "id": {
+            "type": "string"
+          },
           "installation_id": {
             "type": "string"
           },
@@ -1358,6 +1361,9 @@
           "config": {
             "type": null
           },
+          "id": {
+            "type": "string"
+          },
           "token": {
             "type": "string"
           },
@@ -1406,6 +1412,9 @@
           },
           "config": {
             "type": null
+          },
+          "id": {
+            "type": "string"
           },
           "token": {
             "type": "string"
@@ -1564,6 +1573,9 @@
             },
             "type": "array"
           },
+          "id": {
+            "type": "string"
+          },
           "token": {
             "type": "string"
           },
@@ -1699,6 +1711,9 @@
               "$ref": "#/components/schemas/work-manifest-dir"
             },
             "type": "array"
+          },
+          "id": {
+            "type": "string"
           },
           "installation_id": {
             "type": "string"
@@ -1838,6 +1853,9 @@
           },
           "config": {
             "type": null
+          },
+          "id": {
+            "type": "string"
           },
           "run_kind": {
             "type": "string"
@@ -2291,6 +2309,43 @@
   },
   "openapi": "3.0.3",
   "paths": {
+    "/api/github/v1/compute-node/{compute_node_id}/initiate": {
+      "post": {
+        "operationId": "compute-node/initiate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "compute_node_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/work-manifest-initiate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/work-manifest"
+                }
+              }
+            }
+          },
+          "403": {}
+        }
+      }
+    },
     "/api/github/v1/work-manifests/{work_manifest_id}": {
       "put": {
         "operationId": "work-manifest/results",

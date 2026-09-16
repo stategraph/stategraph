@@ -297,6 +297,8 @@ let migrations =
     ( "pin-gitlab-installations-map-trigger-search-path",
       run_sql [%blob "migrations/2026-09-09-pin-gitlab-installations-map-trigger-search-path.sql"]
     );
+    ( "add-compute-node-queued-state",
+      run_sql [%blob "migrations/2026-09-01-add-compute-node-queued-state.sql"] );
   ]
 
 let run config storage = Mig.run { Migrate.config; storage; tx = () } migrations

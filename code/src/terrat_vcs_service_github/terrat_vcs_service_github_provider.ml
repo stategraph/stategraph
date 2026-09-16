@@ -5862,6 +5862,7 @@ module Job_context = struct
     let to_compute_node_state =
       Tjc.Compute_node.State.(
         function
+        | "queued" -> Some Queued
         | "starting" -> Some Starting
         | "running" -> Some Running
         | "terminated" -> Some Terminated
@@ -5924,7 +5925,7 @@ module Job_context = struct
         Ret.(u text state_of_string)
         //
         (* work *)
-        Ret.(u json work_of_json)
+        Ret.(option (u json work_of_json))
         //
         (* work_manifest *)
         Ret.uuid
@@ -5934,6 +5935,7 @@ module Job_context = struct
     let string_of_state =
       let module S = Tjc.Compute_node.State in
       function
+      | S.Queued -> "queued"
       | S.Starting -> "starting"
       | S.Running -> "running"
       | S.Terminated -> "terminated"
@@ -5951,7 +5953,7 @@ module Job_context = struct
         /^ read [%blob "sql/upsert_compute_node_work.sql"]
         /% Var.uuid "compute_node_id"
         /% Var.uuid "work_manifest"
-        /% Var.ud (Var.json "work") Terrat_api_components.Work_manifest.to_yojson)
+        /% Var.(option (ud (json "work") Terrat_api_components.Work_manifest.to_yojson)))
   end
 
   let create_or_get_for_pull_request ~request_id db _account repo pull_request_id =
@@ -6266,7 +6268,7 @@ module Job_context = struct
               m "%s : COMPUTE_NODE : UPDATE_STATE : %a" request_id Pgsql_io.pp_err err);
           Abbs_future_combinators.return_err `Error
 
-    let set_work ~request_id ~compute_node_id ~work_manifest db work =
+    let write_work ~request_id ~compute_node_id ~work_manifest db work =
       let open Abb.Future.Infix_monad in
       Pgsql_io.Prepared_stmt.execute
         db
@@ -6277,8 +6279,13 @@ module Job_context = struct
       >>= function
       | Ok () -> Abbs_future_combinators.return_ok ()
       | Error (#Pgsql_io.err as err) ->
-          Logs.err (fun m ->
-              m "%s : COMPUTE_NODE : UPDATE_STATE : %a" request_id Pgsql_io.pp_err err);
+          Logs.err (fun m -> m "%s : COMPUTE_NODE : WRITE_WORK : %a" request_id Pgsql_io.pp_err err);
           Abbs_future_combinators.return_err `Error
+
+    let add_work ~request_id ~compute_node_id ~work_manifest db =
+      write_work ~request_id ~compute_node_id ~work_manifest db None
+
+    let set_work ~request_id ~compute_node_id ~work_manifest db work =
+      write_work ~request_id ~compute_node_id ~work_manifest db (Some work)
   end
 end

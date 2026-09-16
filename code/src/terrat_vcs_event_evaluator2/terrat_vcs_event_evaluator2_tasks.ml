@@ -1861,29 +1861,35 @@ struct
               })
             dirspaceflows)
 
+    (* Only the poll entry point seeds this.  Everywhere else the answer is "this
+       evaluation does not run on a compute node".  See the comment on the key. *)
+    let compute_node_id = run ~name:"compute_node_id" (fun _ _ -> Fc.return_ok None)
+
     let compute_node =
       run ~name:"compute_node" (fun s { Bs.Fetcher.fetch } ->
           let open Irm in
           fetch Keys.compute_node_id
-          >>= fun compute_node_id ->
-          Builder.run_db s ~f:(fun db ->
-              time_it
-                s
-                (fun m log_id time ->
-                  m
-                    "%s : COMPUTE_NODE : QUERY : id = %a : time=%f"
-                    log_id
-                    Uuidm.pp
-                    compute_node_id
-                    time)
-                (fun () ->
-                  S.Job_context.Compute_node.query
-                    ~request_id:(Builder.log_id s)
-                    ~compute_node_id
-                    db))
-          >>? function
-          | Some compute_node -> Ok compute_node
-          | None -> Error (`Missing_dep_err "compute_node"))
+          >>= function
+          | None -> Fc.return_ok None
+          | Some compute_node_id -> (
+              Builder.run_db s ~f:(fun db ->
+                  time_it
+                    s
+                    (fun m log_id time ->
+                      m
+                        "%s : COMPUTE_NODE : QUERY : id = %a : time=%f"
+                        log_id
+                        Uuidm.pp
+                        compute_node_id
+                        time)
+                    (fun () ->
+                      S.Job_context.Compute_node.query
+                        ~request_id:(Builder.log_id s)
+                        ~compute_node_id
+                        db))
+              >>? function
+              | Some _ as compute_node -> Ok compute_node
+              | None -> Error (`Missing_dep_err "compute_node")))
 
     let access_control =
       run ~name:"access_control" (fun s { Bs.Fetcher.fetch } ->
@@ -2303,10 +2309,80 @@ struct
           | None -> assert false)
 
     let eval_compute_node_poll =
-      let handle_sha_match s compute_node work_manifest offering =
+      (* Run the state machine of the work manifest to make the response for the
+         action, then read back the row that the state machine parked. *)
+      let make_work_manifest_response s compute_node work_manifest offering =
         let module C = Tjc.Compute_node in
         let module Cw = Tjc.Compute_node_work in
         let module Offering = Terrat_api_components.Work_manifest_initiate in
+        let module Wm = Terrat_work_manifest3 in
+        let module Wmc = Terrat_api_components.Work_manifest in
+        let module Wmd = Terrat_api_components.Work_manifest_done in
+        match work_manifest with
+        | { Wm.state = Wm.State.(Completed | Aborted); _ } ->
+            Abbs_future_combinators.return_ok (Wmc.Work_manifest_done { Wmd.type_ = `Done })
+        | work_manifest -> (
+            let open Abb.Future.Infix_monad in
+            let work_manifest_event =
+              Keys.Work_manifest_event.Initiate { work_manifest; run_id = offering.Offering.run_id }
+            in
+            let s' =
+              s
+              |> Builder.State.orig_store
+              |> Keys.Key.add Keys.work_manifest_event (Some work_manifest_event)
+              |> Tasks_base.forward_std_keys s
+              |> CCFun.flip Builder.State.set_orig_store s
+            in
+            Builder.eval s' Keys.eval_work_manifest_event
+            >>= function
+            | Ok () | Error (`Suspend_eval _) -> (
+                let open Irm in
+                Builder.run_db s ~f:(fun db ->
+                    time_it
+                      s
+                      (fun m log_id time ->
+                        m
+                          "%s : COMPUTE_NODE : QUERY_WORK : compute_node_id = %a : time=%f"
+                          log_id
+                          Uuidm.pp
+                          compute_node.C.id
+                          time)
+                      (fun () ->
+                        S.Job_context.Compute_node.query_work
+                          ~request_id:(Builder.log_id s)
+                          ~compute_node_id:compute_node.C.id
+                          db))
+                >>| function
+                | Some { Cw.work = Some wm_response; _ } -> wm_response
+                | Some { Cw.work = None; _ } | None -> Wmc.Work_manifest_done { Wmd.type_ = `Done })
+            | Error (#Builder.err as err) ->
+                (* If anything failed, be sure to return to the querying node to give up. *)
+                Logs.info (fun m -> m "%s : %a" (Builder.log_id s) Builder.pp_err err);
+                Abbs_future_combinators.return_ok (Wmc.Work_manifest_done { Wmd.type_ = `Done }))
+      in
+      let terminate_compute_node s compute_node =
+        let module C = Tjc.Compute_node in
+        Builder.run_db s ~f:(fun db ->
+            time_it
+              s
+              (fun m log_id time ->
+                m
+                  "%s : COMPUTE_NODE : UPDATE_STATE : compute_node_id = %a : state = terminated : \
+                   time=%f"
+                  log_id
+                  Uuidm.pp
+                  compute_node.C.id
+                  time)
+              (fun () ->
+                S.Job_context.Compute_node.update_state
+                  ~request_id:(Builder.log_id s)
+                  ~compute_node_id:compute_node.C.id
+                  db
+                  C.State.Terminated))
+      in
+      let handle_sha_match s compute_node work_manifest offering =
+        let module C = Tjc.Compute_node in
+        let module Cw = Tjc.Compute_node_work in
         let module Wm = Terrat_work_manifest3 in
         let module Wmc = Terrat_api_components.Work_manifest in
         let module Wmd = Terrat_api_components.Work_manifest_done in
@@ -2328,72 +2404,30 @@ struct
                   ~request_id:(Builder.log_id s)
                   ~compute_node_id:compute_node.C.id
                   db))
+        (* [select_compute_node_work.sql] reads the row in the state [created]
+           only, so a row that comes back is always work this node still owes.
+
+           The state of a row leaves [created] in one place only: the trigger
+           [work_manifest_compute_node_work_state_trigger], which copies
+           [completed] and [aborted] from the work manifest.  Thus "no row" is
+           the same statement as "the work manifest is over", which is what the
+           [None] arm tests below. *)
         >>= function
-        | Some { Cw.work = wm_response; state = Cw.State.Created; _ } ->
-            Abbs_future_combinators.return_ok wm_response
-        | Some _ ->
-            Builder.run_db s ~f:(fun db ->
-                time_it
-                  s
-                  (fun m log_id time ->
-                    m
-                      "%s : COMPUTE_NODE : UPDATE_STATE : compute_node_id = %a : state = \
-                       terminated : time=%f"
-                      log_id
-                      Uuidm.pp
-                      compute_node.C.id
-                      time)
-                  (fun () ->
-                    S.Job_context.Compute_node.update_state
-                      ~request_id:(Builder.log_id s)
-                      ~compute_node_id:compute_node.C.id
-                      db
-                      C.State.Terminated))
-            >>| fun () -> Wmc.Work_manifest_done { Wmd.type_ = `Done }
+        | Some { Cw.work = Some wm_response; _ } -> Abbs_future_combinators.return_ok wm_response
+        | Some { Cw.work = None; _ } ->
+            (* The node has the work manifest, but the server has not made the
+               response yet.  Take the path that makes it. *)
+            make_work_manifest_response s compute_node work_manifest offering
         | None -> (
             match work_manifest with
             | { Wm.state = Wm.State.(Completed | Aborted); _ } ->
-                Abbs_future_combinators.return_ok (Wmc.Work_manifest_done { Wmd.type_ = `Done })
-            | work_manifest -> (
-                let open Abb.Future.Infix_monad in
-                let work_manifest_event =
-                  Keys.Work_manifest_event.Initiate
-                    { work_manifest; run_id = offering.Offering.run_id }
-                in
-                let s' =
-                  s
-                  |> Builder.State.orig_store
-                  |> Keys.Key.add Keys.work_manifest_event (Some work_manifest_event)
-                  |> Tasks_base.forward_std_keys s
-                  |> CCFun.flip Builder.State.set_orig_store s
-                in
-                Builder.eval s' Keys.eval_work_manifest_event
-                >>= function
-                | Ok () | Error (`Suspend_eval _) -> (
-                    let open Irm in
-                    Builder.run_db s ~f:(fun db ->
-                        time_it
-                          s
-                          (fun m log_id time ->
-                            m
-                              "%s : COMPUTE_NODE : QUERY_WORK : compute_node_id = %a : time=%f"
-                              log_id
-                              Uuidm.pp
-                              compute_node.C.id
-                              time)
-                          (fun () ->
-                            S.Job_context.Compute_node.query_work
-                              ~request_id:(Builder.log_id s)
-                              ~compute_node_id:compute_node.C.id
-                              db))
-                    >>| function
-                    | Some { Cw.work = wm_response; _ } -> wm_response
-                    | None -> Wmc.Work_manifest_done { Wmd.type_ = `Done })
-                | Error (#Builder.err as err) ->
-                    (* If anything failed, be sure to return to the querying node to give up. *)
-                    Logs.info (fun m -> m "%s : %a" (Builder.log_id s) Builder.pp_err err);
-                    Abbs_future_combinators.return_ok (Wmc.Work_manifest_done { Wmd.type_ = `Done })
-                ))
+                (* The node owes nothing and its work manifest is over. *)
+                terminate_compute_node s compute_node
+                >>| fun () -> Wmc.Work_manifest_done { Wmd.type_ = `Done }
+            | work_manifest ->
+                (* A work manifest from before the phase that writes the row has
+                   no row at all.  Make its response the old way. *)
+                make_work_manifest_response s compute_node work_manifest offering)
       in
       let abort_work_manifest s db work_manifest_id run_id =
         let open Irm in
@@ -2505,9 +2539,10 @@ struct
           let open Irm in
           fetch Keys.compute_node
           >>= function
-          | { C.state = C.State.Terminated; _ } ->
+          | None -> Abbs_future_combinators.return_err (`Missing_dep_err "compute_node")
+          | Some { C.state = C.State.Terminated; _ } ->
               Abbs_future_combinators.return_ok (Wmc.Work_manifest_done { Wmd.type_ = `Done })
-          | compute_node -> (
+          | Some compute_node -> (
               (* TODO: Decouple compute node id and work manifest id *)
               let work_manifest_id = compute_node.C.id in
               Builder.run_db s ~f:(fun db ->
@@ -3454,6 +3489,7 @@ struct
     |> Hmap.add (coerce Keys.commit_checks) Tasks.commit_checks
     |> Hmap.add (coerce Keys.complete_no_change_dirspaces) Tasks.complete_no_change_dirspaces
     |> Hmap.add (coerce Keys.compute_node) Tasks.compute_node
+    |> Hmap.add (coerce Keys.compute_node_id) Tasks.compute_node_id
     |> Hmap.add (coerce Keys.context) Tasks.context
     |> Hmap.add (coerce Keys.context_id) Tasks.context_id
     |> Hmap.add (coerce Keys.default_branch_sha) Tasks.default_branch_sha
