@@ -9,8 +9,6 @@
 # docker/terrat/Dockerfile remains the non-FIPS build. This file shares no cog
 # regions with it and docker/terrat/render.sh does not generate it.
 
-ARG WOLFI_BASE=cgr.dev/chainguard/wolfi-base:latest
-
 # ---------------------------------------------------------------------------
 # OpenSSL with the FIPS provider, and libtls built against it.
 #
@@ -22,7 +20,7 @@ ARG WOLFI_BASE=cgr.dev/chainguard/wolfi-base:latest
 # code/src/otls (pkg-config libtls) has nothing to build against unless libtls
 # is built here.
 # ---------------------------------------------------------------------------
-FROM ${WOLFI_BASE} AS openssl-fips
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:3754b6da0e1ccdab0fe46abfdd7bbbba994b593c28149f6659fa6597f2261aeb AS openssl-fips
 
 ARG OPENSSL_FIPS_PROVIDER_VERSION=3.1.2
 ARG OPENSSL_VERSION=3.6.4
@@ -171,7 +169,7 @@ RUN set -eux; \
 # ---------------------------------------------------------------------------
 # opam switch and the OCaml, Rust and Node dependencies of the terrat build.
 # ---------------------------------------------------------------------------
-FROM ${WOLFI_BASE} AS build-base
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:3754b6da0e1ccdab0fe46abfdd7bbbba994b593c28149f6659fa6597f2261aeb AS build-base
 
 ENV SSL_PREFIX=/usr/local/ssl
 
@@ -256,7 +254,7 @@ RUN eval $(opam env) && cd mono/code && \
 # stage keeps the distro OpenSSL. Its output is static files and carries no
 # cryptography into the image.
 # ---------------------------------------------------------------------------
-FROM ${WOLFI_BASE} AS iris-build
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:3754b6da0e1ccdab0fe46abfdd7bbbba994b593c28149f6659fa6597f2261aeb AS iris-build
 
 RUN apk add --no-cache \
     bash \
@@ -295,7 +293,7 @@ RUN if [ -n "$GIT_SHA" ]; then \
 # ---------------------------------------------------------------------------
 # Runtime.
 # ---------------------------------------------------------------------------
-FROM ${WOLFI_BASE} AS terrat-fips-base
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:3754b6da0e1ccdab0fe46abfdd7bbbba994b593c28149f6659fa6597f2261aeb AS terrat-fips-base
 
 ENV SSL_PREFIX=/usr/local/ssl
 ENV TERRAT_BRAND=terrateam
