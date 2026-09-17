@@ -1,7 +1,22 @@
 module Error : sig
+  (** Where the migrations recorded in the database stop matching the migration list they are
+      checked against. *)
+  module Consistency : sig
+    type t = {
+      idx : int;  (** How many migrations the database and the migration list agree on. *)
+      last_common : string option;  (** Last migration both sides agree on, if any. *)
+      applied : string option;  (** What the database has at [idx]. *)
+      expected : string option;  (** What the migration list has at [idx]. *)
+    }
+    [@@deriving show]
+
+    (** Render the divergence as a human-readable message. *)
+    val to_string : t -> string
+  end
+
   type 'a t =
     [ `Migration_err of 'a
-    | `Consistency_err
+    | `Consistency_err of Consistency.t
     ]
 end
 

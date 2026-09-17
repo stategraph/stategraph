@@ -19,6 +19,10 @@ end
 
 let req_start_time = Hmap.Key.create ()
 
+(* [Abb.Sys.sleep 0.0] yields to the loop, putting the continuation on a later
+   iteration where the clock has been refreshed.  This guarantees that even if
+   we only do computational work in the handler, the scheduler loop will be
+   executing, updating the clock. *)
 let pre_handler config ctx =
   let open Abb.Future.Infix_monad in
   let request = Brtl_ctx.request ctx in
@@ -32,6 +36,8 @@ let pre_handler config ctx =
       (CCOption.flat_map (Cohttp.Header.get headers) config.Config.remote_ip_header)
   in
   Logs_pre.info (fun m -> m "%s : %s : %s : %s" remote_addr token meth (Uri.to_string uri));
+  Abb.Sys.sleep 0.0
+  >>= fun () ->
   Abb.Sys.monotonic ()
   >>= fun start_time ->
   let ctx = Brtl_ctx.md_add req_start_time start_time ctx in
@@ -52,6 +58,8 @@ let post_handler config ctx =
       ~default:(Brtl_ctx.remote_addr ctx)
       (CCOption.flat_map (Cohttp.Header.get headers) config.Config.remote_ip_header)
   in
+  Abb.Sys.sleep 0.0
+  >>= fun () ->
   Abb.Sys.monotonic ()
   >>= fun end_time ->
   let duration =

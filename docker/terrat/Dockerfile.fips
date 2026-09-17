@@ -129,16 +129,21 @@ RUN set -eux; \
     ldconfig; \
     openssl version -d | grep -q '"/usr/local/ssl"'
 
-# fips is the only provider the default properties allow, and base carries the
-# encoders and decoders, which the FIPS module does not contain.
+# default_properties = fips=yes, so every implicit fetch resolves in the FIPS
+# module and base carries the encoders and decoders, which that module does not
+# contain. default answers only a fetch that asks for an implementation outside
+# FIPS. Python's hashlib makes an MD5 constructor through such a fetch when it
+# is imported, and Wolfi's python has no built-in _md5 behind it.
 RUN set -eux; \
     cnf="${SSL_PREFIX}/openssl.cnf"; \
     sed -i 's|# .include fipsmodule.cnf|.include '"${SSL_PREFIX}"'/fipsmodule.cnf|' "${cnf}"; \
-    sed -i 's|^default = default_sect|fips = fips_sect\nbase = base_sect\n\n[base_sect]\nactivate = 1|' "${cnf}"; \
+    sed -i 's|^default = default_sect|fips = fips_sect\nbase = base_sect\ndefault = default_sect\n\n[base_sect]\nactivate = 1|' "${cnf}"; \
+    sed -i 's|^\[default_sect\]|[default_sect]\nactivate = 1|' "${cnf}"; \
     sed -i 's|^\[openssl_init\]|[openssl_init]\nalg_section = evp_properties|' "${cnf}"; \
     printf '\n[evp_properties]\ndefault_properties = fips=yes\n' >> "${cnf}"; \
     grep -q '^\.include '"${SSL_PREFIX}"'/fipsmodule.cnf' "${cnf}"; \
-    grep -q '^fips = fips_sect' "${cnf}"
+    grep -q '^fips = fips_sect' "${cnf}"; \
+    grep -q '^default = default_sect' "${cnf}"
 
 # libtls links the FIPS OpenSSL, not the distro one.
 RUN set -eux; \
@@ -157,9 +162,9 @@ RUN set -eux; \
     openssl version -a; \
     openssl fipsinstall -verify -module "${SSL_PREFIX}/lib/ossl-modules/fips.so" -in "${SSL_PREFIX}/fipsmodule.cnf"; \
     openssl list -providers | tee /tmp/providers.txt; \
-    grep -q 'OpenSSL FIPS Provider' /tmp/providers.txt; \
-    grep -q 'status: active' /tmp/providers.txt; \
-    ! grep -q 'OpenSSL Default Provider' /tmp/providers.txt; \
+    grep -A3 -E '^ *base$' /tmp/providers.txt | grep -q 'status: active'; \
+    grep -A3 -E '^ *default$' /tmp/providers.txt | grep -q 'status: active'; \
+    grep -A3 -E '^ *fips$' /tmp/providers.txt | grep -q 'status: active'; \
     echo fips-selftest | openssl dgst -sha256 > /dev/null; \
     if echo fips-selftest | openssl dgst -md5 > /dev/null 2>&1; then \
         echo "MD5 is reachable: the FIPS properties are not in force" >&2; exit 1; \
@@ -347,11 +352,26 @@ COPY --from=iris-build /tmp/mono/code/src/iris/dist/ /usr/local/share/terrat/ui/
 
 # The assembled runtime, not just the builder, has to select the FIPS provider.
 RUN set -eux; \
-    openssl list -providers | grep -q 'OpenSSL FIPS Provider'; \
-    openssl list -providers | grep -q 'status: active'; \
+    openssl list -providers | tee /tmp/providers.txt; \
+    grep -A3 -E '^ *default$' /tmp/providers.txt | grep -q 'status: active'; \
+    grep -A3 -E '^ *fips$' /tmp/providers.txt | grep -q 'status: active'; \
+    rm -f /tmp/providers.txt; \
     if echo fips-selftest | openssl dgst -md5 > /dev/null 2>&1; then \
         echo "MD5 is reachable: the FIPS properties are not in force" >&2; exit 1; \
     fi
+
+# /etc/service/terrat/run is Python, so the image ships an interpreter whose
+# hashlib import must stay silent and whose digests must come out of the FIPS
+# module.
+RUN set -eux; \
+    python3 -c 'import hashlib' 2>&1 | tee /tmp/hashlib.txt; \
+    test ! -s /tmp/hashlib.txt; \
+    rm -f /tmp/hashlib.txt; \
+    python3 -c 'import hashlib; assert hashlib.sha256(b"abc").hexdigest() == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"'; \
+    if python3 -c 'import hashlib; hashlib.md5(b"abc")' > /dev/null 2>&1; then \
+        echo "MD5 answers a plain hashlib call: the FIPS properties are not in force" >&2; exit 1; \
+    fi; \
+    python3 -c 'import hashlib; assert hashlib.md5(b"abc", usedforsecurity=False).hexdigest() == "900150983cd24fb0d6963f7d28e17f72"'
 
 USER terrat
 EXPOSE 8080
