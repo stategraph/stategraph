@@ -183,8 +183,8 @@ let mask ~mask input =
    [union] is commutative and idempotent, and [make ()] is its identity, but it is NOT associative:
    because the irreducible over-grant above is order-dependent, [(a ∪ b) ∪ c] can differ from
    [a ∪ (b ∪ c)] once a negation meets a positive that partially refills its cone (see the
-   [union_not_associative_negations] test).  It IS associative over negation-free operands, where it
-   degenerates to exact set-union (see [prop_union_associative_positive]).  Callers that fold [union]
+   [union_associative_negations] known-gap test). It is associative over negation-free operands, where it
+   degenerates to exact set-union (see [prop_union_associative_positive]). Callers that fold [union]
    (e.g. [Sgs_caps_rules.eval]) therefore get an order-dependent -- but always sound -- result. *)
 let union a b =
   let open Sgs_session_caps_capabilities in
@@ -202,7 +202,7 @@ let union a b =
      parent ([[]] empty positives) is the join identity, so the other side passes through verbatim; a
      ["*"] side contributes the universe.  Sound (never grants less than either parent), and exact
      except in the irreducible cone-minus-subcone-plus-point case (see [union]'s doc and the
-     union_irreducible_over_grant test). *)
+     union_exact_regrant known-gap test). *)
   let denies_all l = CCList.equal CCString.equal (Sg_caps_match.canonicalize_list l) [ "!*" ] in
   let combine a b =
     (* Deny-all ([[]] / ["!*"] / positives fully cancelled) is the join identity: [bottom ∪ x = x].

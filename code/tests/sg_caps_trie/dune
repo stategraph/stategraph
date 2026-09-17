@@ -1,0 +1,15 @@
+(library
+ (name sg_caps_trie_rule_text)
+ (modules sg_caps_trie_rule_text)
+ (libraries containers oth sg_caps_trie))
+
+(test
+ (name test)
+ (modules test)
+ (libraries
+  containers
+  oth
+  qcheck-core
+  sg_caps_trie
+  sg_caps_trie_rule_text
+  sln))
