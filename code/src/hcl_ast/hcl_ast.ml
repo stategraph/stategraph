@@ -163,6 +163,28 @@ module Menhir : PARSER = struct
         | Error err ->
             Error (`Error (Some (to_pos ()), s, Hcl_ast_template.string_of_template_error err)))
     | Error (pos, err) -> Error (`Error (pos, s, CCString.trim err))
+    (* [of_string] catches these same three exceptions, and this function catches them for the same
+       reason: its type says it answers with a result, and every caller reads it that way.  An
+       unterminated quote reaches the lexer as an unclosed multi-line string, thus a malformed
+       expression -- a client-supplied canon, an address that is not a traversal -- raises through
+       an interface that looks total.
+
+       [Failure] is one of the three because the GRAMMAR's actions raise it, and not only the
+       standard library: measured through this function, [(1(2))] answers [Error "Function call
+       requires identifier"] from [expr_to_fun_call], and [1e99999999999999999999] answers [Error
+       "int_of_string"] from the exponent of a number literal.  Both are malformed input that
+       [expr_only] reaches, thus narrowing these arms to the lexer's two exceptions would let them
+       escape.  The cost of the broad arm is that a genuine bug inside [loop] also answers [Error]
+       with a plausible message; closing that means giving the grammar an exception of its own in
+       [hcl_parser.mly] first. *)
+    | exception Hcl_lexer.Error { msg; lexeme } ->
+        let full_msg =
+          if CCString.is_empty lexeme then msg else Printf.sprintf "%s: %S" msg lexeme
+        in
+        Error (`Error (Some (to_pos ()), s, full_msg))
+    | exception Failure msg -> Error (`Error (Some (to_pos ()), s, msg))
+    | exception Sedlexing.MalFormed ->
+        Error (`Error (Some (to_pos ()), s, "Invalid UTF-8 encoding"))
 
   let parse_template_string s =
     match T.parse_template_string s with

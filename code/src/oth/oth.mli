@@ -232,6 +232,25 @@ module type S = sig
       'g t
   end
 
+  (** A group is a phase that runs concurrently with the other groups of a run, rather than after
+      them: every group's setup, tests and teardown overlap. Use it when the groups' lifecycles are
+      independent -- each boots its own server on its own port, say -- so that one group's tests can
+      fill the slots another group's tail leaves idle.
+
+      Same lifecycle as {!Phase}; only {!run_groups} treats it differently. Groups share the one
+      bounded executor, so this changes which tests are eligible to run at a given moment, not how
+      many run at once. *)
+  module Group : sig
+    type 'g t
+
+    val make :
+      name:string ->
+      setup:('g -> ('a, string) result m) ->
+      teardown:('a -> unit m) ->
+      ('a -> Test.t) ->
+      'g t
+  end
+
   val parallel : Test.t list -> Test.t
   val serial : Test.t list -> Test.t
   val loop : int -> Test.t -> Test.t
@@ -287,6 +306,27 @@ module type S = sig
     setup:(unit -> ('g, string) result m) ->
     teardown:('g -> unit m) ->
     'g Phase.t list ->
+    unit
+
+  (** Run a suite whose groups run concurrently. The run-level [setup]/[teardown] bracket the whole
+      run as in {!run_phases}, and each group's own [setup]/[teardown] bracket its tests -- but the
+      groups all start together and the run-level [teardown] waits for the last of them. Results
+      from every group aggregate into the single TAP/summary output.
+
+      A group whose setup fails cannot stop its siblings, which are already running, so every group
+      finishes and the failures are reported together; the run then exits 1.
+
+      [after] is a serial tail: those groups run one at a time, in list order, once every group has
+      finished, and the run-level [teardown] waits for them too. It is how a group whose tests touch
+      something the groups share -- a database row every server reads, say -- still gets the "runs
+      after the bulk, with nothing else running" guarantee that {!run_phases} gives and group
+      concurrency takes away. A failing tail group stops the remaining ones, as in {!run_phases}. *)
+  val run_groups :
+    file:string ->
+    setup:(unit -> ('g, string) result m) ->
+    teardown:('g -> unit m) ->
+    ?after:'g Group.t list ->
+    'g Group.t list ->
     unit
 
   (** Evaluate [Test.t] without running any test body, returning each leaf test's full tag list --

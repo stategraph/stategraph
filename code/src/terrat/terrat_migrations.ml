@@ -43,12 +43,12 @@ module Migrate = struct
             f { config; storage; tx = db }
             >>= function
             | Ok _ as r -> Abb.Future.return r
-            | Error ((`Migration_err #err | `Consistency_err) as err) ->
+            | Error ((`Migration_err #err | `Consistency_err _) as err) ->
                 Abbs_future_combinators.return_err err))
     >>= function
     | Ok _ as r -> Abb.Future.return r
     | Error (#err as err) -> Abbs_future_combinators.return_err (`Migration_err err)
-    | Error ((`Migration_err #err | `Consistency_err) as err) ->
+    | Error ((`Migration_err #err | `Consistency_err _) as err) ->
         Abbs_future_combinators.return_err err
 
   let get_migrations { config = _; storage = _; tx = db } =

@@ -1,3 +1,5 @@
 (library
  (name data_mig)
- (libraries abbs containers))
+ (libraries abbs containers ppx_deriving)
+ (preprocess
+  (pps ppx_deriving.show)))
