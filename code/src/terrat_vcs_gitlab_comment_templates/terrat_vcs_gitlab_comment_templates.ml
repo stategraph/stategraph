@@ -35,17 +35,19 @@ module Tmpl = struct
           | any -> any) )
   end
 
-  let read s =
-    s
-    |> Terrat_brand.rewrite_template
-    |> Snabela.Template.of_utf8_string
-    |> (function
-    | Ok tmpl -> tmpl
-    | Error (#Snabela.Template.err as err) -> failwith (Snabela.Template.show_err err))
-    |> fun tmpl ->
-    Snabela.of_template tmpl Transformers.[ money; compact_plan; plan_diff; minus_one ]
+  (* Each template is prepared for both brands when the module loads, so a
+     template that does not parse fails at startup. *)
+  let read =
+    Terrat_brand.branded (fun s ->
+        s
+        |> Snabela.Template.of_utf8_string
+        |> (function
+        | Ok tmpl -> tmpl
+        | Error (#Snabela.Template.err as err) -> failwith (Snabela.Template.show_err err))
+        |> fun tmpl ->
+        Snabela.of_template tmpl Transformers.[ money; compact_plan; plan_diff; minus_one ])
 
-  let jinja s = Terrat_brand.rewrite_template s
+  let jinja = Terrat_brand.branded CCFun.id
   let terrateam_comment_help = read [%blob "tmpl/terrateam_comment_help.tmpl"]
 
   let apply_requirements_config_err_tag_query =

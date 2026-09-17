@@ -8,6 +8,7 @@
   pgsql_io
   pgsql_pagination
   pgsql_pool
+  terrat_brand
   terrat_comment
   terrat_plan_diff
   terrat_scope

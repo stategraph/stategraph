@@ -297,12 +297,9 @@ let create () =
   env_str "TERRAT_UI_BASE"
   >>= fun _ ->
   (* Validated here so a typo fails boot; the value itself is read by
-     Terrat_check_title at the VCS boundary. Consumers accept both brands
-     regardless, so this only decides what new commit checks are named. *)
-  (match Sys.getenv_opt "TERRAT_CHECK_TITLE_BRAND" with
-    | None | Some "terrateam" | Some "stategraph" -> Ok ()
-    | Some _ -> Error (`Key_error "TERRAT_CHECK_TITLE_BRAND: must be terrateam or stategraph"))
-  >>= fun () ->
+     [Terrat_brand.fallback] for a repository that has no brand of its own. *)
+  CCResult.map_err (fun msg -> `Key_error msg) (Terrat_brand.of_env ())
+  >>= fun _ ->
   of_opt
     (`Key_error "TERRAT_PORT")
     (CCInt.of_string (CCOption.get_or ~default:"8080" (Sys.getenv_opt "TERRAT_PORT")))

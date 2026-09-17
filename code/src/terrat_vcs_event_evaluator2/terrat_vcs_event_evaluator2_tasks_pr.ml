@@ -96,8 +96,16 @@ struct
       s
       (fun m log_id time -> m "%s : PUBLISH_COMMENT : time=%f" log_id time)
       (fun () ->
+        let open Abbs_future_combinators.Infix_result_monad in
+        Terrat_vcs_api.collapse_call_err (fun () ->
+            S.Repo_config.fetch_brand
+              ~request_id:(Builder.log_id s)
+              client
+              (S.Api.Pull_request.repo pull_request))
+        >>= fun brand ->
         S.Comment.publish_comment
           ~request_id:(Builder.log_id s)
+          ~brand
           client
           (CCOption.map_or ~default:"" S.Api.User.to_string user)
           pull_request
@@ -327,7 +335,16 @@ struct
           fun branch_ref checks ->
            (* When updating commit checks, mark the existing key as dirty. *)
            Builder.State.mark_dirty s Keys.commit_checks;
-           S.Api.create_commit_checks ~request_id:(Builder.log_id s) client repo branch_ref checks)
+           let open Abbs_future_combinators.Infix_result_monad in
+           S.Repo_config.fetch_brand ~request_id:(Builder.log_id s) client repo
+           >>= fun brand ->
+           S.Api.create_commit_checks
+             ~request_id:(Builder.log_id s)
+             ~brand
+             client
+             repo
+             branch_ref
+             checks)
 
     let commit_checks =
       run ~name:"commit_checks" (fun s { Bs.Fetcher.fetch } ->

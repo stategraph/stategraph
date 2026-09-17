@@ -567,7 +567,12 @@ module Make (S : Terrat_vcs_provider2.S) = struct
           (fun work_manifest_id ->
             Fc.ignore
               (Abb.Future.fork
-                 (S.Comment.drain_unified_comment ~request_id config storage work_manifest_id)))
+                 (S.Comment.drain_unified_comment
+                    ~request_id
+                    ~fetch_brand:(S.Repo_config.fetch_brand ~request_id)
+                    config
+                    storage
+                    work_manifest_id)))
           work_manifest_id
         >>| fun () -> Ok ()
     | Error _ -> Abbs_future_combinators.return_err `Error
@@ -1037,7 +1042,12 @@ module Make (S : Terrat_vcs_provider2.S) = struct
       ~finally:(fun () ->
         Fc.ignore
           (Abb.Future.fork
-             (S.Comment.drain_unified_comment ~request_id config storage work_manifest_id))
+             (S.Comment.drain_unified_comment
+                ~request_id
+                ~fetch_brand:(S.Repo_config.fetch_brand ~request_id)
+                config
+                storage
+                work_manifest_id))
         >>= fun () ->
         (* The legacy evaluator resolves its result future while its
            transaction is still open, so the dirty mark may not be visible to
@@ -1046,7 +1056,12 @@ module Make (S : Terrat_vcs_provider2.S) = struct
           (Abb.Future.fork
              (Abb.Sys.sleep 10.0
              >>= fun () ->
-             S.Comment.drain_unified_comment ~request_id config storage work_manifest_id))
+             S.Comment.drain_unified_comment
+               ~request_id
+               ~fetch_brand:(S.Repo_config.fetch_brand ~request_id)
+               config
+               storage
+               work_manifest_id))
         >>= fun () ->
         Fc.ignore
         @@ Abb.Future.fork

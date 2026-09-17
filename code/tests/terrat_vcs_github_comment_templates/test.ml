@@ -1,9 +1,13 @@
 module Tmpl = Terrat_vcs_github_comment_templates.Tmpl
 
-let render tmpl kv =
-  match Minijinja.render_template tmpl kv with
+(* Every template is a function of the brand.  These helpers render the
+   Stategraph text; the brand tests render a brand of their own. *)
+let render_brand brand tmpl kv =
+  match Minijinja.render_template (tmpl brand) kv with
   | Ok body -> body
   | Error err -> failwith err
+
+let render tmpl kv = render_brand Terrat_brand.Stategraph tmpl kv
 
 (* The same payload shape the provider builds for the [no matching dirspaces]
    messages, see [Terrat_vcs_provider2.Msg.no_matching_dirspaces_kv]. *)
@@ -94,8 +98,9 @@ let test_plan_warning_with_suggestion =
 
 let test_tag_query_dropped_dirspaces =
   Oth.test ~name:"Tag query dropped dirspaces" (fun _ ->
-      let body =
-        render
+      let render brand =
+        render_brand
+          brand
           Tmpl.tag_query_dropped_dirspaces
           (`Assoc
              [
@@ -109,6 +114,7 @@ let test_tag_query_dropped_dirspaces =
                    ] );
              ])
       in
+      let body = render Terrat_brand.Stategraph in
       Oth.Assert.str_contains_all
         ~haystack:body
         ~needles:
@@ -121,7 +127,7 @@ let test_tag_query_dropped_dirspaces =
       (* The trigger word comes from the template, so it follows the brand; the
          command itself is a rendered value and stays as it was handed over. *)
       Oth.Assert.str_contains
-        ~haystack:(Terrat_brand.to_terrateam body)
+        ~haystack:(render Terrat_brand.Terrateam)
         ~needle:"terrateam apply dir:a or dir:b or dir:c")
 
 let test_matches_in_later_layer =
@@ -298,7 +304,7 @@ let missing_plans_kv rows =
       ])
 
 let render_missing_plans rows =
-  match Snabela.apply Tmpl.missing_plans (missing_plans_kv rows) with
+  match Snabela.apply (Tmpl.missing_plans Terrat_brand.Stategraph) (missing_plans_kv rows) with
   | Ok body -> body
   | Error (#Snabela.err as err) -> failwith (Snabela.show_err err)
 
@@ -359,15 +365,16 @@ let test_published_bodies_carry_the_self_marker =
         | Error (`Tag_query_error _) -> true
         | Error `Not_terrateam -> false
       in
-      Oth.Assert.true_ (CCList.exists (fun (_, tmpl) -> parses_as_a_command tmpl) templates);
-      Oth.Assert.true_
-        (CCList.exists
-           (fun (_, tmpl) -> parses_as_a_command (Terrat_brand.to_terrateam tmpl))
-           templates);
       CCList.iter
-        (fun (_, tmpl) ->
-          Oth.Assert.true_ (Terrat_comment.is_from_self (Terrat_comment.add_self_marker tmpl)))
-        templates;
+        (fun brand ->
+          Oth.Assert.true_
+            (CCList.exists (fun (_, tmpl) -> parses_as_a_command (tmpl brand)) templates);
+          CCList.iter
+            (fun (_, tmpl) ->
+              Oth.Assert.true_
+                (Terrat_comment.is_from_self (Terrat_comment.add_self_marker (tmpl brand))))
+            templates)
+        [ Terrat_brand.Stategraph; Terrat_brand.Terrateam ];
       ())
 
 (* The [work_manifests] payload both providers build for every message that lists work manifests,
@@ -392,7 +399,7 @@ let work_manifests_kv rows =
       ])
 
 let render_snabela template kv =
-  match Snabela.apply template kv with
+  match Snabela.apply (template Terrat_brand.Stategraph) kv with
   | Ok body -> body
   | Error (#Snabela.err as err) -> failwith (Snabela.show_err err)
 
@@ -549,36 +556,36 @@ let test_apply_complete2_details_many_dirspaces_applied =
     ~applied:true
     ~num_dirspaces:10
 
-(* TERRAT_BRAND=terrateam turns the shipped Stategraph text back into the
-   Terrateam text the terrat-ee / terrat-oss images publish. *)
+(* The Terrateam brand of a template holds the Terrateam text of the shipped
+   Stategraph text. *)
 let test_terrateam_brand_rewrite =
   Oth.test ~tags:[ "brand" ] ~name:"Terrateam brand rewrite" (fun _ ->
       let body =
-        render
+        render_brand
+          Terrat_brand.Terrateam
           Tmpl.apply_no_matching_dirspaces
           (kv
              ~tag_query:"dir:foo dir:bar"
              ~implicit_and:true
              ~suggestion:(Some "dir:foo or dir:bar"))
       in
-      let body = Terrat_brand.to_terrateam body in
       Oth.Assert.str_contains ~haystack:body ~needle:"terrateam apply dir:foo or dir:bar";
       Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"stategraph";
       Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"Stategraph")
 
 (* #1651: the unknown-command reply is the one place a reader learns the trigger
    word, so it is stored in the shipped Stategraph wording and reaches the
-   Terrateam images through the same rewrite as every other template.  The
+   Terrateam brand through the same rewrite as every other template.  The
    negative needles carry a trailing space: the bare brand name still appears in
    the docs links, which stay on terrateam.io under both brands. *)
 let test_unknown_action_brand =
   Oth.test ~tags:[ "brand" ] ~name:"Unknown action lists Stategraph commands" (fun _ ->
-      let body = Tmpl.terrateam_comment_unknown_action in
+      let body = Tmpl.terrateam_comment_unknown_action Terrat_brand.Stategraph in
       Oth.Assert.str_contains_all
         ~haystack:body
         ~needles:[ "List of Stategraph commands:"; "`stategraph plan`"; "`stategraph apply`" ];
       Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"terrateam ";
-      let body = Terrat_brand.to_terrateam body in
+      let body = Tmpl.terrateam_comment_unknown_action Terrat_brand.Terrateam in
       Oth.Assert.str_contains_all
         ~haystack:body
         ~needles:[ "List of Terrateam commands:"; "`terrateam plan`"; "`terrateam apply`" ];

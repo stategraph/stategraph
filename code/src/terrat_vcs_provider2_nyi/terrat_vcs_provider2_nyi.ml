@@ -108,15 +108,26 @@ module Gate = struct
 end
 
 module Comment = struct
-  let publish_comment ~request_id client user pull_request msg = raise (Failure "nyi")
-  let drain_unified_comment ~request_id config storage work_manifest_id = raise (Failure "nyi")
+  let publish_comment ~request_id ~brand client user pull_request msg = raise (Failure "nyi")
+
+  let drain_unified_comment ~request_id ~fetch_brand config storage work_manifest_id =
+    raise (Failure "nyi")
+
   let mark_unified_comment_dirty ~request_id db work_manifest_id = raise (Failure "nyi")
 
-  let publish_unified_comment_at_start ~request_id ~repo_config config db work_manifest_id =
+  let publish_unified_comment_at_start
+      ~request_id
+      ~fetch_brand
+      ~repo_config
+      config
+      db
+      work_manifest_id =
     raise (Failure "nyi")
 end
 
 module Repo_config = struct
+  let fetch_brand ~request_id client repo = raise (Failure "nyi")
+
   let fetch_with_provenance ?system_defaults ?built_config request_id client repo ref_ =
     raise (Failure "nyi")
 end

@@ -15,19 +15,27 @@ All configuration files in the central repository have the same structure as the
 ###### 2. Overrides
 ###### 3. Full Configuration
 
-The configuration files for a centralized configuration are located in the `terrateam` repository.
+The configuration files for a centralized configuration are located in a repository named `stategraph` or `terrateam` in the same organization. Terrateam examines `stategraph` first, then `terrateam`, and selects the first repository whose default branch contains one or more of the files below. Every repository in the organization uses the selected repository. The other repository is not read, and the two are never merged. An empty file counts.
 
 The following files are used to construct the repository configuration. File paths are given with the `.yml` extension. The `.yaml` extension is supported as well. If both are present, the `.yml` suffix takes precedence.
 
 | Name | Repository | Branch | Path |
 |--- |--- |--- |--- |
-| `global_defaults`| `terrateam` | `default branch` | `config/defaults.yml` |
-| `global_overrides` | `terrateam` | `default branch` | `config/overrides.yml` |
-| `repo_defaults` | `terrateam` | `default branch` | `config/$repository_name/defaults.yml` |
-| `repo_overrides` | `terrateam` | `default branch` | `config/$repository_name/overrides.yml` |
-| `repo_forced_config` | `terrateam` | `default branch` | `config/$repository_name/config.yml` |
+| `global_defaults`| `stategraph` or `terrateam` | `default branch` | `config/defaults.yml` |
+| `global_overrides` | `stategraph` or `terrateam` | `default branch` | `config/overrides.yml` |
+| `repo_defaults` | `stategraph` or `terrateam` | `default branch` | `config/$repository_name/defaults.yml` |
+| `repo_overrides` | `stategraph` or `terrateam` | `default branch` | `config/$repository_name/overrides.yml` |
+| `repo_forced_config` | `stategraph` or `terrateam` | `default branch` | `config/$repository_name/config.yml` |
 | `repo_default_config` | `$repository` | `default branch` | `.terrateam/config.yml` |
 | `repo_config` | `$repository` | `feature branch` | `.terrateam/config.yml` |
+
+### Brand and commit check names
+A repository without its own `.stategraph/config.yml` or `.terrateam/config.yml`, and a repository with a `repo_forced_config`, take the name of the selected repository as its brand. The brand sets the text of comments and the prefix of commit check names, for example `stategraph plan` or `terrateam plan`. Branch protection rules that require a check by name must use the new name after the brand changes.
+
+### Move from `terrateam` to `stategraph`
+The `stategraph` repository is selected at the first commit that adds one of the files above to its default branch. From that commit on, files that exist only in the `terrateam` repository have no effect. To move without a gap, do one of the following:
+- Copy all files to a branch of the `stategraph` repository, then merge them in one pull request.
+- Rename the `terrateam` repository to `stategraph`.
 
 ## How It Works
 The configuration files are fetched and merged in a specific order to construct the final configuration for each repository. The process is as follows:

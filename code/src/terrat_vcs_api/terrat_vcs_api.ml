@@ -19,6 +19,41 @@ let collapse_call_err f =
   | Ok _ as r -> Abb.Future.return r
   | Error (`Error | `Vcs_api_timeout_err _) -> Abb.Future.return (Error `Error)
 
+(* The centralized configuration repository of an owner.  The first repository
+   in [names] that holds a configuration file on its default branch is selected
+   for every repository of the owner.  A path counts whether or not the file is
+   empty. *)
+module Centralized_repo = struct
+  let names = CCList.map Terrat_brand.to_string Terrat_brand.all
+  let directory = "config"
+
+  let is_config_file ~basenames name =
+    CCList.exists
+      (fun basename ->
+        CCString.equal name (basename ^ ".yml") || CCString.equal name (basename ^ ".yaml"))
+      basenames
+
+  let is_config_path path =
+    match CCString.split_on_char '/' path with
+    | [ dir; name ] when CCString.equal dir directory ->
+        is_config_file ~basenames:[ "defaults"; "overrides" ] name
+    | [ dir; repo; name ] when CCString.equal dir directory && not (CCString.is_empty repo) ->
+        is_config_file ~basenames:[ "defaults"; "overrides"; "config" ] name
+    | _ -> false
+
+  let select lookup =
+    let open Abb.Future.Infix_monad in
+    let rec select' = function
+      | [] -> Abb.Future.return (Ok None)
+      | name :: names -> (
+          lookup name
+          >>= function
+          | Ok None -> select' names
+          | (Ok (Some _) | Error _) as r -> Abb.Future.return r)
+    in
+    select' names
+end
+
 module type ID = sig
   type t [@@deriving yojson, eq, show]
 
@@ -239,6 +274,7 @@ module type S = sig
 
   val create_commit_checks :
     request_id:string ->
+    brand:Terrat_brand.t ->
     Client.t ->
     Repo.t ->
     Ref.t ->

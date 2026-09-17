@@ -48,6 +48,17 @@ val fetch_config :
   result
   Abb.Future.t
 
+(** The path of the file that {!fetch_config} reads, without reading its YAML. *)
+val fetch_config_path :
+  request_id:string ->
+  Terrat_vcs_api_github.Client.t ->
+  Terrat_vcs_api_github.Repo.t ->
+  Terrat_vcs_api_github.Ref.t ->
+  listings ->
+  directory:string ->
+  basename:string ->
+  (string option, [> Terrat_vcs_api.call_err ]) result Abb.Future.t
+
 (** Read the configuration of a repository. Config parity (#1442): [.stategraph/config] wins when
     both exist; [.terrateam/config] keeps working so existing repos need no rename. *)
 val fetch :
@@ -59,6 +70,15 @@ val fetch :
     [> Terrat_vcs_api.call_err | `Yaml_decode_err of string * string ] )
   result
   Abb.Future.t
+
+(** The brand of the directory that holds the configuration file {!fetch} reads, without reading its
+    YAML. *)
+val fetch_config_brand :
+  request_id:string ->
+  Terrat_vcs_api_github.Client.t ->
+  Terrat_vcs_api_github.Repo.t ->
+  Terrat_vcs_api_github.Ref.t ->
+  (Terrat_brand.t option, [> Terrat_vcs_api.call_err ]) result Abb.Future.t
 
 module Tests : sig
   (** Choose [<basename>.yml] before [<basename>.yaml] among the entries of one listed directory.

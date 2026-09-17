@@ -53,51 +53,12 @@ module Provider : module type of Terrat_vcs_service_gitlab_provider = struct
   module Work_manifest = Terrat_vcs_service_gitlab_provider.Work_manifest
 
   module Repo_config = struct
-    let fetch_repo_config_file request_id client repo ref_ basename =
-      let open Abbs_future_combinators.Infix_result_monad in
-      Abbs_future_combinators.Infix_result_app.(
-        (fun yml yaml ->
-          match (yml, yaml) with
-          | Some yml, _ ->
-              Some
-                ( Api.Repo.to_string repo ^ ":" ^ Api.Ref.to_string ref_ ^ ":" ^ basename ^ ".yml",
-                  yml )
-          | _, Some yaml ->
-              Some
-                ( Api.Repo.to_string repo ^ ":" ^ Api.Ref.to_string ref_ ^ ":" ^ basename ^ ".yaml",
-                  yaml )
-          | _, _ -> None)
-        <$> Api.fetch_file ~request_id client repo ref_ (basename ^ ".yml")
-        <*> Api.fetch_file ~request_id client repo ref_ (basename ^ ".yaml"))
-      >>= function
-      | None -> Abbs_future_combinators.return_ok None
-      | Some (_, content) when CCString.is_empty (CCString.trim content) ->
-          Abbs_future_combinators.return_ok None
-      | Some (fname, content) ->
-          Abb.Future.return
-          @@ CCResult.map_err
-               (fun (`Yaml_decode_err err) -> `Yaml_decode_err (fname, err))
-               (Jsonu.of_yaml_string content)
-          >>| fun json -> Some (fname, json)
-
-    (* Config parity (#1442): [.stategraph/config] wins when both exist;
-       [.terrateam/config] keeps working so existing repos need no rename. *)
-    let fetch_repo_config_file_with_fallback request_id client repo ref_ =
-      let open Abbs_future_combinators.Infix_result_monad in
-      fetch_repo_config_file request_id client repo ref_ ".stategraph/config"
-      >>= function
-      | Some _ as r -> Abb.Future.return (Ok r)
-      | None -> fetch_repo_config_file request_id client repo ref_ ".terrateam/config"
+    module Rc = Terrat_vcs_service_gitlab_repo_config
 
     let maybe_fetch_centralized_repo_config_file request_id client centralized_repo basename =
       match centralized_repo with
       | Some (remote_repo, branch) ->
-          fetch_repo_config_file
-            request_id
-            client
-            (Api.Remote_repo.to_repo remote_repo)
-            branch
-            basename
+          Rc.fetch_config ~request_id client (Api.Remote_repo.to_repo remote_repo) branch basename
       | None -> Abbs_future_combinators.return_ok None
 
     let maybe_fetch_centralized_repo_default_branch_sha request_id client centralized_repo =
@@ -113,6 +74,41 @@ module Provider : module type of Terrat_vcs_service_gitlab_provider = struct
           | Some branch_sha -> Some (remote_repo, branch_sha)
           | None -> None)
       | None -> Abbs_future_combinators.return_ok None
+
+    module Brand =
+      Terrat_vcs_provider2.Brand.Make
+        (Api)
+        (struct
+          let provider = "gitlab_ee"
+        end)
+
+    let centralized ~request_id client repo =
+      let open Abbs_future_combinators.Infix_result_monad in
+      Api.fetch_centralized_repo ~request_id client (Api.Repo.owner repo)
+      >>= fun centralized_repo ->
+      maybe_fetch_centralized_repo_default_branch_sha request_id client centralized_repo
+      >>= function
+      | None -> Abbs_future_combinators.return_ok (None, None)
+      | Some (remote_repo, branch) ->
+          let centralized_repo = Api.Remote_repo.to_repo remote_repo in
+          Rc.fetch_config_path
+            ~request_id
+            client
+            centralized_repo
+            branch
+            ("config/" ^ Api.Repo.name repo ^ "/config")
+          >>| fun forced_config ->
+          let brand = Terrat_brand.of_repo_name (Api.Repo.name centralized_repo) in
+          ((if CCOption.is_some forced_config then brand else None), brand)
+
+    let fetch_brand ~request_id client repo =
+      Brand.fetch
+        ~request_id
+        ~fetch_branch_sha:(Api.fetch_branch_sha ~request_id)
+        ~config_brand:(Rc.fetch_config_brand ~request_id)
+        ~centralized:(centralized ~request_id)
+        client
+        repo
 
     let fetch_with_provenance ?system_defaults ?built_config request_id client repo ref_ =
       let open Abbs_future_combinators.Infix_result_monad in
@@ -174,8 +170,8 @@ module Provider : module type of Terrat_vcs_service_gitlab_provider = struct
               client
               centralized_repo
               ("config/" ^ Api.Repo.name repo ^ "/config")
-        <*> fetch_repo_config_file_with_fallback request_id client repo default_branch_ref
-        <*> fetch_repo_config_file_with_fallback request_id client repo ref_)
+        <*> Rc.fetch ~request_id client repo default_branch_ref
+        <*> Rc.fetch ~request_id client repo ref_)
       >>= fun ( global_defaults,
                 global_overrides,
                 repo_defaults,

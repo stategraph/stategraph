@@ -51,27 +51,27 @@ let list_directories ~request_id client repo ref_ directories =
     directories
   >>| CCResult.flatten_l
 
-let decode repo ref_ path content =
-  let open Abbs_future_combinators.Infix_result_monad in
-  if CCString.is_empty (CCString.trim content) then Abbs_future_combinators.return_ok None
-  else
-    let fname = Api.Repo.to_string repo ^ ":" ^ Api.Ref.to_string ref_ ^ ":" ^ path in
-    Abb.Future.return
-      (CCResult.map_err
-         (fun (`Yaml_decode_err err) -> `Yaml_decode_err (fname, err))
-         (Jsonu.of_yaml_string content))
-    >>| fun json -> Some (fname, json)
+(* A file that holds nothing but whitespace reads as no configuration. *)
+let non_blank path content =
+  if CCString.is_empty (CCString.trim content) then None else Some (path, content)
+
+let decode repo ref_ = function
+  | None -> Abbs_future_combinators.return_ok None
+  | Some (path, content) ->
+      let open Abbs_future_combinators.Infix_result_monad in
+      let fname = Api.Repo.to_string repo ^ ":" ^ Api.Ref.to_string ref_ ^ ":" ^ path in
+      Abb.Future.return
+        (CCResult.map_err
+           (fun (`Yaml_decode_err err) -> `Yaml_decode_err (fname, err))
+           (Jsonu.of_yaml_string content))
+      >>| fun json -> Some (fname, json)
 
 (* The listing already gave the size, thus an empty file needs no read. *)
 let fetch_candidate ~request_id client repo ref_ { Candidate.path; size } =
   let open Abbs_future_combinators.Infix_result_monad in
   match size with
   | 0 -> Abbs_future_combinators.return_ok None
-  | _ -> (
-      Api.fetch_file ~request_id client repo ref_ path
-      >>= function
-      | None -> Abbs_future_combinators.return_ok None
-      | Some content -> decode repo ref_ path content)
+  | _ -> Api.fetch_file ~request_id client repo ref_ path >>| CCOption.flat_map (non_blank path)
 
 (* Read both names when the directory could not be listed.  The [.yml] name
    wins when it exists, even when it holds nothing, which is what the listing
@@ -83,12 +83,12 @@ let probe ~request_id client repo ref_ ~directory ~basename =
   Abbs_future_combinators.Result.all2
     (Api.fetch_file ~request_id client repo ref_ yml)
     (Api.fetch_file ~request_id client repo ref_ yaml)
-  >>= function
-  | Some content, _ -> decode repo ref_ yml content
-  | None, Some content -> decode repo ref_ yaml content
-  | None, None -> Abbs_future_combinators.return_ok None
+  >>| function
+  | Some content, _ -> non_blank yml content
+  | None, Some content -> non_blank yaml content
+  | None, None -> None
 
-let fetch_config ~request_id client repo ref_ listings ~directory ~basename =
+let fetch_content ~request_id client repo ref_ listings ~directory ~basename =
   (* A directory that [list_directories] did not read is unknown here, thus
      read its names directly.  That answer is the same, it only costs a
      request. *)
@@ -100,17 +100,44 @@ let fetch_config ~request_id client repo ref_ listings ~directory ~basename =
            (fetch_candidate ~request_id client repo ref_)
   | Some Unlistable | None -> probe ~request_id client repo ref_ ~directory ~basename
 
-(* Config parity (#1442): [.stategraph/config] wins when both exist;
-   [.terrateam/config] keeps working so existing repos need no rename. *)
+let fetch_config ~request_id client repo ref_ listings ~directory ~basename =
+  let open Abbs_future_combinators.Infix_result_monad in
+  fetch_content ~request_id client repo ref_ listings ~directory ~basename >>= decode repo ref_
+
+let fetch_config_path ~request_id client repo ref_ listings ~directory ~basename =
+  let open Abbs_future_combinators.Infix_result_monad in
+  fetch_content ~request_id client repo ref_ listings ~directory ~basename >>| CCOption.map fst
+
+(* Config parity (#1442): the configuration of the brand that comes first wins;
+   the other one keeps working so existing repos need no rename. *)
+let find ~request_id client repo ref_ =
+  let open Abbs_future_combinators.Infix_result_monad in
+  list_directories ~request_id client repo ref_ (CCList.map Terrat_brand.directory Terrat_brand.all)
+  >>= fun listings ->
+  let rec first = function
+    | [] -> Abbs_future_combinators.return_ok None
+    | brand :: brands -> (
+        fetch_content
+          ~request_id
+          client
+          repo
+          ref_
+          listings
+          ~directory:(Terrat_brand.directory brand)
+          ~basename:"config"
+        >>= function
+        | Some content -> Abbs_future_combinators.return_ok (Some (brand, content))
+        | None -> first brands)
+  in
+  first Terrat_brand.all
+
 let fetch ~request_id client repo ref_ =
   let open Abbs_future_combinators.Infix_result_monad in
-  list_directories ~request_id client repo ref_ [ ".stategraph"; ".terrateam" ]
-  >>= fun listings ->
-  fetch_config ~request_id client repo ref_ listings ~directory:".stategraph" ~basename:"config"
-  >>= function
-  | Some _ as config -> Abbs_future_combinators.return_ok config
-  | None ->
-      fetch_config ~request_id client repo ref_ listings ~directory:".terrateam" ~basename:"config"
+  find ~request_id client repo ref_ >>= fun found -> decode repo ref_ (CCOption.map snd found)
+
+let fetch_config_brand ~request_id client repo ref_ =
+  let open Abbs_future_combinators.Infix_result_monad in
+  find ~request_id client repo ref_ >>| CCOption.map fst
 
 module Tests = struct
   let find_candidate = find_candidate

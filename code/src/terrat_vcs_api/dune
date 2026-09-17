@@ -2,7 +2,9 @@
  (name terrat_vcs_api)
  (libraries
   abb
+  containers
   pgsql_io
+  terrat_brand
   terrat_change
   terrat_commit_check
   terrat_config

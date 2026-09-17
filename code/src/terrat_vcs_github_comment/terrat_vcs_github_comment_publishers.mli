@@ -53,6 +53,7 @@ end
 
 module Publisher_tools : sig
   val create_run_output :
+    brand:Terrat_brand.t ->
     view:[> `Compact ] ->
     compacted_dirspaces:Terrat_dirspace.t list ->
     summary:bool ->

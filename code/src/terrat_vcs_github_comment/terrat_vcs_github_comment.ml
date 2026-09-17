@@ -87,6 +87,7 @@ module S = struct
     hooks : (Scope.t * Terrat_api_components_workflow_step_output.t list) list;
     pull_request : unit Api.Pull_request.t;
     request_id : string;
+    brand : Terrat_brand.t;
     num_remaining_layers : int;
     result : Terrat_api_components_work_manifest_tf_operation_result2.t;
     repo_config : Terrat_base_repo_config_v1.derived Terrat_base_repo_config_v1.t;
@@ -308,6 +309,7 @@ module S = struct
     in
     let body =
       Publisher_tools.create_run_output
+        ~brand:t.brand
         ~view:(if compact then `Compact else `Full)
         ~compacted_dirspaces
         ~summary
@@ -338,6 +340,7 @@ module S = struct
     | Error `Error -> (
         let body =
           Publisher_tools.create_run_output
+            ~brand:t.brand
             ~view:`Compact
             ~compacted_dirspaces:(CCList.map (fun { dirspace; _ } -> dirspace) els)
             ~summary
@@ -366,6 +369,7 @@ module S = struct
             let by_scope = [] in
             let body =
               Publisher_tools.create_run_output
+                ~brand:t.brand
                 ~view:`Compact
                 ~compacted_dirspaces:(CCList.map (fun { dirspace; _ } -> dirspace) els)
                 ~summary
@@ -410,6 +414,7 @@ module S = struct
     in
     let body =
       Publisher_tools.create_run_output
+        ~brand:t.brand
         ~view:(if compact then `Compact else `Full)
         ~compacted_dirspaces
         ~summary

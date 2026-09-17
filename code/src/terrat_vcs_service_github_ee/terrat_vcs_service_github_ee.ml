@@ -426,6 +426,46 @@ module Provider :
           | None -> None)
       | None -> Abbs_future_combinators.return_ok None
 
+    module Brand =
+      Terrat_vcs_provider2.Brand.Make
+        (Api)
+        (struct
+          let provider = "github_ee"
+        end)
+
+    let centralized ~request_id client repo =
+      let open Abbs_future_combinators.Infix_result_monad in
+      Api.fetch_centralized_repo ~request_id client (Api.Repo.owner repo)
+      >>= fun centralized_repo ->
+      maybe_fetch_centralized_repo_default_branch_sha request_id client centralized_repo
+      >>= function
+      | None -> Abbs_future_combinators.return_ok (None, None)
+      | Some (remote_repo, branch) ->
+          let centralized_repo = Api.Remote_repo.to_repo remote_repo in
+          let repo_directory = "config/" ^ Api.Repo.name repo in
+          Rc.list_directories ~request_id client centralized_repo branch [ repo_directory ]
+          >>= fun listings ->
+          Rc.fetch_config_path
+            ~request_id
+            client
+            centralized_repo
+            branch
+            listings
+            ~directory:repo_directory
+            ~basename:"config"
+          >>| fun forced_config ->
+          let brand = Terrat_brand.of_repo_name (Api.Repo.name centralized_repo) in
+          ((if CCOption.is_some forced_config then brand else None), brand)
+
+    let fetch_brand ~request_id client repo =
+      Brand.fetch
+        ~request_id
+        ~fetch_branch_sha:(Api.fetch_branch_sha_cached ~request_id)
+        ~config_brand:(Rc.fetch_config_brand ~request_id)
+        ~centralized:(centralized ~request_id)
+        client
+        repo
+
     let fetch_with_provenance ?system_defaults ?built_config request_id client repo ref_ =
       let open Abbs_future_combinators.Infix_result_monad in
       Abbs_future_combinators.Result.all2

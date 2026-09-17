@@ -1,0 +1,10 @@
+(test
+ (name test)
+ (libraries
+  abb
+  abbs
+  abb_future_combinators
+  containers
+  oth
+  oth_abb
+  terrat_vcs_api))

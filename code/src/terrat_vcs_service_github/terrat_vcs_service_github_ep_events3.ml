@@ -104,12 +104,12 @@ module Make (P : Terrat_vcs_provider2_github.S) = struct
   end
 
   module Tmpl = struct
-    let read s =
-      s
-      |> Terrat_brand.rewrite_template
-      |> Snabela.Template.of_utf8_string
-      |> CCResult.get_exn
-      |> fun tmpl -> Snabela.of_template tmpl []
+    let read =
+      Terrat_brand.branded (fun s ->
+          s
+          |> Snabela.Template.of_utf8_string
+          |> CCResult.get_exn
+          |> fun tmpl -> Snabela.of_template tmpl [])
 
     let terrateam_comment_tag_query_error =
       read [%blob "tmpl/terrateam_comment_tag_query_error.tmpl"]
@@ -617,6 +617,32 @@ module Make (P : Terrat_vcs_provider2_github.S) = struct
         Logs.debug (fun m -> m "%s : NOOP : PULL_REQUEST_REVIEW_SUBMITTED" request_id);
         Abbs_future_combinators.return_ok ()
 
+  (* A reply that cannot learn the brand of its repository is not published.  The
+     provider keeps the answer of a repository for a minute, so a burst of
+     replies costs one lookup. *)
+  let fetch_brand ~request_id config db ~installation_id repository =
+    let open Abb.Future.Infix_monad in
+    let account = P.Api.Account.make installation_id in
+    let repo =
+      P.Api.Repo.make
+        ~id:repository.Gw.Repository.id
+        ~name:repository.Gw.Repository.name
+        ~owner:repository.Gw.Repository.owner.Gw.User.login
+        ()
+    in
+    P.Api.create_client ~request_id config account db
+    >>= function
+    | Ok client -> (
+        P.Repo_config.fetch_brand ~request_id client repo
+        >>= function
+        | Ok _ as r -> Abb.Future.return r
+        | Error _ ->
+            Logs.err (fun m -> m "%s : FETCH_BRAND : ERROR" request_id);
+            Abbs_future_combinators.return_err `Error)
+    | Error _ ->
+        Logs.err (fun m -> m "%s : FETCH_BRAND : CREATE_CLIENT : ERROR" request_id);
+        Abbs_future_combinators.return_err `Error
+
   let process_issue_comment request_id config storage exec = function
     | Gw.Issue_comment_event.Issue_comment_created
         { Gw.Issue_comment_created.comment = { Gw.Issue_comment.body = comment_body; _ }; _ }
@@ -680,15 +706,18 @@ module Make (P : Terrat_vcs_provider2_github.S) = struct
             Abbs_future_combinators.return_ok ()
         | Error (`Tag_query_error (_, err)) -> (
             Prmths.Counter.inc_one (Metrics.comment_events_total "tag_query");
+            let open Abbs_future_combinators.Infix_result_monad in
+            Abbs_future_combinators.Result.all2
+              (Pgsql_pool.with_conn storage ~f:(fun db ->
+                   fetch_brand ~request_id config db ~installation_id repository))
+              (Terrat_github.get_installation_access_token
+                 (P.Api.Config.vcs_config config)
+                 installation_id)
+            >>= fun (brand, access_token) ->
             let kv = Snabela.Kv.(Map.of_list [ ("err", string err) ]) in
-            match Snabela.apply Tmpl.terrateam_comment_tag_query_error kv with
+            match Snabela.apply (Tmpl.terrateam_comment_tag_query_error brand) kv with
             | Ok body ->
-                let open Abbs_future_combinators.Infix_result_monad in
                 Logs.info (fun m -> m "%s : COMMENT_ERROR : TAG_QUERY_ERROR : %s" request_id err);
-                Terrat_github.get_installation_access_token
-                  (P.Api.Config.vcs_config config)
-                  installation_id
-                >>= fun access_token ->
                 Abbs_future_combinators.Result.ignore
                 @@ Terrat_github.with_client
                      (P.Api.Config.vcs_config config)
@@ -706,10 +735,13 @@ module Make (P : Terrat_vcs_provider2_github.S) = struct
             Prmths.Counter.inc_one (Metrics.comment_events_total "unknown_action");
             let open Abbs_future_combinators.Infix_result_monad in
             Logs.info (fun m -> m "%s : COMMENT_ERROR : UNKNOWN_ACTION : %s" request_id action);
-            Terrat_github.get_installation_access_token
-              (P.Api.Config.vcs_config config)
-              installation_id
-            >>= fun access_token ->
+            Abbs_future_combinators.Result.all2
+              (Pgsql_pool.with_conn storage ~f:(fun db ->
+                   fetch_brand ~request_id config db ~installation_id repository))
+              (Terrat_github.get_installation_access_token
+                 (P.Api.Config.vcs_config config)
+                 installation_id)
+            >>= fun (brand, access_token) ->
             Abbs_future_combinators.Result.ignore
             @@ Terrat_github.with_client
                  (P.Api.Config.vcs_config config)
@@ -720,8 +752,8 @@ module Make (P : Terrat_vcs_provider2_github.S) = struct
                     ~pull_number:pull_request_id
                     ~body:
                       (Terrat_comment.add_self_marker
-                         Terrat_vcs_github_comment_templates.Tmpl.terrateam_comment_unknown_action))
-        )
+                         (Terrat_vcs_github_comment_templates.Tmpl.terrateam_comment_unknown_action
+                            brand))))
     | Gw.Issue_comment_event.Issue_comment_created _ ->
         Logs.debug (fun m -> m "%s : NOOP : ISSUE_COMMENT_CREATED" request_id);
         Prmths.Counter.inc_one (Metrics.comment_events_total "noop");

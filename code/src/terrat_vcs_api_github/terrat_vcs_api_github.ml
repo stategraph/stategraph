@@ -258,22 +258,22 @@ module Client = struct
   end)
 
   (* Layered on top of [Fetch_repo_cache] on purpose.  [Abbs_cache.Expiring]
-     deletes [Error] entries, so the 404 for an account with no centralized
-     repository is never kept there and the request goes out on every
-     repository config load.  This cache makes the absence an [Ok None], which
-     is keepable.
+     deletes [Error] entries, so the 404 for a repository that does not exist
+     is never kept there and the request goes out on every repository config
+     load.  This cache keeps the selected centralized repository of an owner,
+     and [Ok None] when no repository is selected.
 
      It is a second cache, and not a longer-lived value in the first one,
      because the two answers want different lifetimes.  A repository that
      exists stays in [Fetch_repo_cache] as long as any other repository
-     metadata.  "There is no centralized repository" must expire quickly, so
-     that a repository somebody creates becomes visible soon.  When an entry
-     here expires and the repository does exist, the inner cache answers
-     without a request. *)
+     metadata.  The selection must expire quickly, so that a repository somebody
+     creates, or a configuration file somebody adds, becomes visible soon.  When
+     an entry here expires and the repositories do exist, the inner cache
+     answers without a request. *)
   module Fetch_centralized_repo_cache = Abbs_cache.Expiring.Make (struct
     type k = Account.t * string [@@deriving eq]
     type v = Remote_repo.t option
-    type err = Terrat_github.fetch_repo_err
+    type err = Terrat_vcs_api.call_err
     type args = unit -> (v, err) result Abb.Future.t
 
     let fetch f = f ()
@@ -560,34 +560,6 @@ let fetch_remote_repo ~request_id client repo =
           m "%s : FETCH_REMOTE_REPO : %a" request_id Terrat_github.pp_fetch_repo_err err);
       Abbs_future_combinators.return_err `Error
 
-let fetch_centralized_repo ~request_id client owner =
-  let centralized_repo_name = "terrateam" in
-  let open Abb.Future.Infix_monad in
-  (* Read through [Fetch_repo_cache] so that a repository that exists keeps the
-     lifetime of any other repository metadata.  Only the 404, which that cache
-     discards, is turned into [Ok None] and kept here. *)
-  let fetch () =
-    Client.Fetch_repo_cache.fetch
-      client.Client.fetch_repo_cache
-      (client.Client.account, (owner, centralized_repo_name))
-      (fun () -> Terrat_github.fetch_repo ~owner ~repo:centralized_repo_name client.Client.client)
-    >>| function
-    | Ok remote_repo -> Ok (Some remote_repo)
-    | Error (`Not_found _) -> Ok None
-    | Error (#Terrat_github.fetch_repo_err as err) -> Error err
-  in
-  Client.Fetch_centralized_repo_cache.fetch
-    client.Client.fetch_centralized_repo_cache
-    (client.Client.account, owner)
-    fetch
-  >>= function
-  | Ok _ as r -> Abb.Future.return r
-  | Error `Timeout -> vcs_api_timeout_err ~request_id "FETCH_CENTRALIZED_REPO"
-  | Error (#Terrat_github.fetch_repo_err as err) ->
-      Logs.info (fun m ->
-          m "%s : FETCH_CENTRALIZED_REPO : %a" request_id Terrat_github.pp_fetch_repo_err err);
-      Abbs_future_combinators.return_err `Error
-
 let create_client' config { Account.installation_id } =
   let open Abbs_future_combinators.Infix_result_monad in
   Terrat_github.get_installation_access_token config.Config.github installation_id
@@ -635,6 +607,53 @@ let fetch_tree ~request_id client repo ref_ =
   | Error (#Terrat_github.get_tree_err as err) ->
       Logs.info (fun m -> m "%s : FETCH_TREE : %a" request_id Terrat_github.pp_get_tree_err err);
       Abbs_future_combinators.return_err `Error
+
+(* Read through [Fetch_repo_cache] so that a repository that exists keeps the
+   lifetime of any other repository metadata. *)
+let fetch_centralized_repo ~request_id client owner =
+  let open Abbs_future_combinators.Infix_result_monad in
+  let module Cr = Terrat_vcs_api.Centralized_repo in
+  let fetch_remote_repo name =
+    let open Abb.Future.Infix_monad in
+    Client.Fetch_repo_cache.fetch
+      client.Client.fetch_repo_cache
+      (client.Client.account, (owner, name))
+      (fun () -> Terrat_github.fetch_repo ~owner ~repo:name client.Client.client)
+    >>= function
+    | Ok remote_repo -> Abbs_future_combinators.return_ok (Some remote_repo)
+    | Error (`Not_found _) -> Abbs_future_combinators.return_ok None
+    | Error `Timeout -> vcs_api_timeout_err ~request_id "FETCH_CENTRALIZED_REPO"
+    | Error (#Terrat_github.fetch_repo_err as err) ->
+        Logs.info (fun m ->
+            m "%s : FETCH_CENTRALIZED_REPO : %a" request_id Terrat_github.pp_fetch_repo_err err);
+        Abbs_future_combinators.return_err `Error
+  in
+  (* One recursive read of the tree answers this for a repository of any shape,
+     and it is kept by revision in [Fetch_tree_cache]. *)
+  let holds_config repo ref_ =
+    let open Abbs_future_combinators.Infix_result_monad in
+    fetch_tree ~request_id client repo ref_ >>| CCList.exists Cr.is_config_path
+  in
+  let lookup name =
+    fetch_remote_repo name
+    >>= function
+    | None -> Abbs_future_combinators.return_ok None
+    | Some remote_repo -> (
+        let repo = Remote_repo.to_repo remote_repo in
+        fetch_branch_sha_cached ~request_id client repo (Remote_repo.default_branch remote_repo)
+        >>= function
+        | None -> Abbs_future_combinators.return_ok None
+        | Some ref_ ->
+            holds_config repo ref_ >>| fun holds -> if holds then Some remote_repo else None)
+  in
+  let open Abb.Future.Infix_monad in
+  Client.Fetch_centralized_repo_cache.fetch
+    client.Client.fetch_centralized_repo_cache
+    (client.Client.account, owner)
+    (fun () -> Cr.select lookup)
+  >>= function
+  | Ok _ as r -> Abb.Future.return r
+  | Error (#Terrat_vcs_api.call_err as err) -> Abbs_future_combinators.return_err err
 
 let comment_on_pull_request ~request_id client pull_request body =
   let open Abb.Future.Infix_monad in
@@ -960,7 +979,7 @@ let react_to_comment ~request_id client pull_request comment_id =
           m "%s : REACT_TO_COMMENT : %a" request_id Terrat_github.pp_publish_reaction_err err);
       Abbs_future_combinators.return_err `Error
 
-let create_commit_checks ~request_id client repo ref_ checks =
+let create_commit_checks ~request_id ~brand client repo ref_ checks =
   let open Abb.Future.Infix_monad in
   Logs.info (fun m -> m "%s : CREATE_COMMIT_CHECKS : num=%d" request_id (CCList.length checks));
   (* Titles are canonical ("terrateam ...") internally; the brand is applied
@@ -970,7 +989,8 @@ let create_commit_checks ~request_id client repo ref_ checks =
       (fun c ->
         {
           c with
-          Terrat_commit_check.title = Terrat_check_title.branded c.Terrat_commit_check.title;
+          Terrat_commit_check.title =
+            Terrat_check_title.branded_with ~brand c.Terrat_commit_check.title;
         })
       checks
   in

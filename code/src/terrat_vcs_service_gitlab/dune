@@ -9,6 +9,7 @@
   minijinja
   pgsql_pagination
   sln
+  terrat_brand
   terrat_code_idx
   terrat_comment
   terrat_metrics

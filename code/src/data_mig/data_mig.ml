@@ -1,7 +1,26 @@
 module Error = struct
+  module Consistency = struct
+    type t = {
+      idx : int;
+      last_common : string option;
+      applied : string option;
+      expected : string option;
+    }
+    [@@deriving show]
+
+    let to_string { idx; last_common; applied; expected } =
+      let name = CCOption.get_or ~default:"<none>" in
+      Printf.sprintf
+        "diverged after %d migration(s) (last in common: %s): database has %s, expected %s"
+        idx
+        (name last_common)
+        (name applied)
+        (name expected)
+  end
+
   type 'a t =
     [ `Migration_err of 'a
-    | `Consistency_err
+    | `Consistency_err of Consistency.t
     ]
 end
 
@@ -65,11 +84,22 @@ module Make (M : S) = struct
     run_migration m mt
     >>= fun r -> add_migration mt name >>= fun () -> complete_migration mt name >>| fun () -> r
 
-  let rec verify_consistency migrations ms =
+  (* The migrations recorded in the database must be a prefix of the migration
+     list.  On a mismatch, report where the two diverge so the operator can see
+     which migration the database stopped agreeing at. *)
+  let rec verify_consistency ~idx ~last_common migrations ms =
     match (migrations, ms) with
-    | [], ms -> Some ms
-    | mig :: migs, (m, _) :: ms when m = mig -> verify_consistency migs ms
-    | _ :: _, _ :: _ | _, [] -> None
+    | [], ms -> Ok ms
+    | mig :: migs, (m, _) :: ms when m = mig ->
+        verify_consistency ~idx:(idx + 1) ~last_common:(Some mig) migs ms
+    | mig :: _, ms ->
+        Error
+          {
+            Error.Consistency.idx;
+            last_common;
+            applied = Some mig;
+            expected = CCOption.map fst (CCList.head_opt ms);
+          }
 
   (* Do each migration one at a time inside a transaction, committing the
      transaction between steps.  This is so that, in the case of a database, we
@@ -83,15 +113,16 @@ module Make (M : S) = struct
         get_migrations tx
         >>= function
         | migrations -> (
-            match verify_consistency migrations ms with
-            | Some [] -> Abbs_future_combinators.return_ok `Done
-            | Some (migration :: _) ->
+            match verify_consistency ~idx:0 ~last_common:None migrations ms with
+            | Ok [] -> Abbs_future_combinators.return_ok `Done
+            | Ok (migration :: _) ->
                 let open Abb.Future.Infix_monad in
                 M.list_migrations tx [ fst migration ]
                 >>= fun () ->
                 let open Abbs_future_combinators.Infix_result_monad in
                 exec tx migration >>| fun r -> `Cont r
-            | None -> Abbs_future_combinators.return_err `Consistency_err))
+            | Error consistency -> Abbs_future_combinators.return_err (`Consistency_err consistency)
+            ))
     >>= function
     | `Done -> Abbs_future_combinators.return_ok ()
     | `Cont `Sync -> run' mt ms

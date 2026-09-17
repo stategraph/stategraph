@@ -244,7 +244,11 @@ module Make (S : Terrat_vcs_provider2.S) = struct
   let publish_msg request_id client user pull_request msg =
     Abbs_time_it.run
       (fun time -> Logs.info (fun m -> m "%s : PUBLISH_MSG : time=%f" request_id time))
-      (fun () -> S.Comment.publish_comment ~request_id client user pull_request msg)
+      (fun () ->
+        let open Abbs_future_combinators.Infix_result_monad in
+        Terrat_vcs_api.collapse_call_err (fun () ->
+            S.Repo_config.fetch_brand ~request_id client (S.Api.Pull_request.repo pull_request))
+        >>= fun brand -> S.Comment.publish_comment ~request_id ~brand client user pull_request msg)
 
   let fetch_pull_request request_id account client repo pull_request_id =
     Abbs_time_it.run
@@ -421,7 +425,9 @@ module Make (S : Terrat_vcs_provider2.S) = struct
               time))
       (fun () ->
         Terrat_vcs_api.collapse_call_err (fun () ->
-            S.Api.create_commit_checks ~request_id client repo ref_ checks))
+            let open Abbs_future_combinators.Infix_result_monad in
+            S.Repo_config.fetch_brand ~request_id client repo
+            >>= fun brand -> S.Api.create_commit_checks ~request_id ~brand client repo ref_ checks))
 
   let fetch_commit_checks request_id client repo ref_ =
     Abbs_time_it.run

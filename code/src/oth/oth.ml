@@ -488,6 +488,17 @@ module type S = sig
       'g t
   end
 
+  module Group : sig
+    type 'g t
+
+    val make :
+      name:string ->
+      setup:('g -> ('a, string) result m) ->
+      teardown:('a -> unit m) ->
+      ('a -> Test.t) ->
+      'g t
+  end
+
   val parallel : Test.t list -> Test.t
   val serial : Test.t list -> Test.t
   val loop : int -> Test.t -> Test.t
@@ -512,6 +523,14 @@ module type S = sig
     'g Phase.t list ->
     unit
 
+  val run_groups :
+    file:string ->
+    setup:(unit -> ('g, string) result m) ->
+    teardown:('g -> unit m) ->
+    ?after:'g Group.t list ->
+    'g Group.t list ->
+    unit
+
   val collect_tags : file:string -> Test.t -> string list list m
 end
 
@@ -525,6 +544,9 @@ module Make (T : T) : S with type 'a m = 'a T.t = struct
     type t = {
       oth : State.t;
       backend : T.state;
+      (* Set while a {!serial} chain holds an executor slot on behalf of the tests inside it, so a
+         leaf test does not take a second one.  See {!serial}. *)
+      in_serial : bool;
     }
   end
 
@@ -559,7 +581,10 @@ module Make (T : T) : S with type 'a m = 'a T.t = struct
         return Test_result.[ { name; desc; tags; duration = Duration.of_f 0.0; res = `Skipped } ]
     | State.Run ->
         Logs.debug (fun m -> m "test : start : %s" name);
-        T.run_test rs.Run_state.backend ~name (fun () -> time_test f)
+        (* Inside a chain the slot is already held, for the chain and not for this test.  See
+           {!serial}. *)
+        (if rs.Run_state.in_serial then time_test f
+         else T.run_test rs.Run_state.backend ~name (fun () -> time_test f))
         >>= fun (duration, res) ->
         let outcome =
           match res with
@@ -575,13 +600,34 @@ module Make (T : T) : S with type 'a m = 'a T.t = struct
         in
         return Test_result.[ { name; desc; tags; duration; res } ]
 
+  (* The chain takes one executor slot and holds it for all of its tests.
+
+     The alternative -- every test in the chain taking a slot of its own -- spreads the chain over
+     the whole run: the queue is FIFO and hundreds of tests deep, so the chain's second test enters
+     it behind all of them, its third behind those, and a five-case chain that started in the first
+     second is still running at the end.  Measured on the e2e suite at 48 slots: a chain whose
+     cases sum to 525s spanned 18 of the run's 22 minutes, and the three such chains were the only
+     tests left running while the box fell from 95% busy to 9%.
+
+     Holding one slot also keeps the meaning [serial] is asked for -- these cases must not run
+     beside each other -- while bounding what the chain costs the rest of the run to one slot.
+
+     A [parallel] nested inside a chain would break that meaning: the flag suppresses [T.run_test]
+     for every test below it, thus the branches would run beside each other inside the chain's one
+     slot.  Nothing nests them today.  Clearing the flag in [parallel] is not the repair, because
+     the chain still holds its slot and each branch would queue behind it -- a one-slot run
+     deadlocks. *)
   let serial tests rs =
     Logs.debug (fun m -> m "serial : begin : n=%d" (CCList.length tests));
+    let held = rs.Run_state.in_serial in
+    let chain_rs = { rs with Run_state.in_serial = true } in
     let rec loop acc = function
       | [] -> return (CCList.rev acc |> CCList.flatten)
-      | t :: ts -> t rs >>= fun r -> loop (r :: acc) ts
+      | t :: ts -> t chain_rs >>= fun r -> loop (r :: acc) ts
     in
-    loop [] tests
+    (* A chain nested in a chain is already inside its parent's slot. *)
+    (if held then loop [] tests
+     else T.run_test rs.Run_state.backend ~name:"serial" (fun () -> loop [] tests))
     >>= fun r ->
     Logs.debug (fun m -> m "serial : end");
     return r
@@ -654,18 +700,29 @@ module Make (T : T) : S with type 'a m = 'a T.t = struct
       | Error msg -> return (Error (Printf.sprintf "Phase %s setup failed:\n%s" name msg))
   end
 
+  module Group = struct
+    type 'g t = 'g Phase.t
+
+    let make = Phase.make
+  end
+
+  (* Build the run state and the run-level setup value both [eval_phases] and [eval_groups] need,
+     then hand them to [f]. *)
+  let with_run_state ~mode ~file ~setup f =
+    T.create_state ()
+    >>= fun backend ->
+    let oth = State.create ~mode ~file () in
+    let rs = { Run_state.oth; backend; in_serial = false } in
+    setup ()
+    >>= function
+    | Error msg -> return (Error msg)
+    | Ok setup_value -> f rs setup_value
+
   (* Returns [Error msg] when the run-level [setup] or a phase setup failed; test evaluation
      stops at the failed phase. The run-level [teardown] runs unless the run-level [setup]
      itself failed. Each phase's teardown completes before the next phase's setup starts. *)
   let eval_phases ~mode ~file ~setup ~teardown phases =
-    T.create_state ()
-    >>= fun backend ->
-    let oth = State.create ~mode ~file () in
-    let rs = { Run_state.oth; backend } in
-    setup ()
-    >>= function
-    | Error msg -> return (Error msg)
-    | Ok setup_value ->
+    with_run_state ~mode ~file ~setup (fun rs setup_value ->
         let rec go acc = function
           | [] -> teardown setup_value >>= fun () -> return (Ok (CCList.flatten (CCList.rev acc)))
           | phase :: phases -> (
@@ -674,9 +731,56 @@ module Make (T : T) : S with type 'a m = 'a T.t = struct
               | Ok rr -> go (rr :: acc) phases
               | Error msg -> teardown setup_value >>= fun () -> return (Error msg))
         in
-        go [] phases
+        go [] phases)
 
-  let run_phases ~file ~setup ~teardown phases =
+  (* The concurrent counterpart of [eval_phases].  [T.parallel] starts every group, the [after]
+     phases then run one at a time, and the two sets of results are merged before the run-level
+     [teardown].  A group's setup failure cannot stop its siblings, thus the run collects the
+     failures of the whole set into one message rather than stopping at the first. *)
+  let eval_groups ~mode ~file ~setup ~teardown ~after groups =
+    with_run_state ~mode ~file ~setup (fun rs setup_value ->
+        T.parallel (CCList.map (fun group () -> group rs setup_value) groups)
+        >>= fun group_results ->
+        let rec go acc = function
+          | [] -> return (Ok (CCList.rev acc))
+          | phase :: phases -> (
+              phase rs setup_value
+              >>= function
+              | Ok rr -> go (rr :: acc) phases
+              | Error msg -> return (Error msg))
+        in
+        go [] after
+        >>= fun after_results ->
+        let results =
+          group_results
+          @
+          match after_results with
+          | Ok rrs -> CCList.map (fun rr -> Ok rr) rrs
+          | Error msg -> [ Error msg ]
+        in
+        teardown setup_value
+        >>= fun () ->
+        let errs =
+          CCList.filter_map
+            (function
+              | Ok _ -> None
+              | Error msg -> Some msg)
+            results
+        in
+        match errs with
+        | [] ->
+            return
+              (Ok
+                 (CCList.flatten
+                    (CCList.filter_map
+                       (function
+                         | Ok rr -> Some rr
+                         | Error _ -> None)
+                       results)))
+        | _ :: _ -> return (Error (CCString.concat "\n" errs)))
+
+  (* Drive [eval] -- the sequential or the concurrent evaluator -- and report what it produced. *)
+  let run_evaluated eval =
     let tap_output_base_name =
       let exec_name = Filename.basename Sys.executable_name in
       match Sys.getenv_opt "OTH_TAP_DIR" with
@@ -699,7 +803,7 @@ module Make (T : T) : S with type 'a m = 'a T.t = struct
         let mode =
           if CCOption.is_some (Sys.getenv_opt "OTH_PRINT_TAGS") then State.Print_tags else State.Run
         in
-        eval_phases ~mode ~file ~setup ~teardown phases
+        eval ~mode
         >>= function
         | Error msg ->
             (* setup failed: no tests ran. Surface the message and exit 1
@@ -751,6 +855,12 @@ module Make (T : T) : S with type 'a m = 'a T.t = struct
             in
             if has_failure then return (exit 1) else return (exit 0))
 
+  let run_phases ~file ~setup ~teardown phases =
+    run_evaluated (fun ~mode -> eval_phases ~mode ~file ~setup ~teardown phases)
+
+  let run_groups ~file ~setup ~teardown ?(after = []) groups =
+    run_evaluated (fun ~mode -> eval_groups ~mode ~file ~setup ~teardown ~after groups)
+
   let run ~file ~setup ~teardown test_fn =
     run_phases
       ~file
@@ -768,7 +878,7 @@ module Make (T : T) : S with type 'a m = 'a T.t = struct
     T.create_state ()
     >>= fun backend ->
     let oth = State.create ~mode:State.Collect ~file () in
-    test { Run_state.oth; backend }
+    test { Run_state.oth; backend; in_serial = false }
     >>= fun trs -> return (CCList.map (fun tr -> tr.Test_result.tags) trs)
 end
 

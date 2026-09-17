@@ -2871,6 +2871,7 @@ module Comment = struct
 
       let post_comment
           request_id
+          brand
           account_status
           config
           client
@@ -2903,6 +2904,7 @@ module Comment = struct
         let t =
           {
             Tcm.S.request_id;
+            brand;
             account_status;
             tier_runs;
             config;
@@ -2929,7 +2931,7 @@ module Comment = struct
     end
   end
 
-  let repo_config_failure ~request_id ~client ~pull_request ~title err =
+  let repo_config_failure ~request_id ~brand ~client ~pull_request ~title err =
     (* A bit of a cheap trick here to make it look like a code section in this
          context *)
     let module Comment_api = Terrat_vcs_gitlab_comment_publishers.Comment_api in
@@ -2940,10 +2942,10 @@ module Comment = struct
       client
       pull_request
       "REPO_CONFIG_GENERIC_FAILURE"
-      Tmpl.repo_config_generic_failure
+      (Tmpl.repo_config_generic_failure brand)
       kv
 
-  let repo_config_err ~request_id ~client ~pull_request ~title:_ err =
+  let repo_config_err ~request_id ~brand ~client ~pull_request ~title:_ err =
     let module Gcm_api = Terrat_vcs_gitlab_comment_publishers.Comment_api in
     match err with
     | `Access_control_ci_config_update_match_parse_err m ->
@@ -2953,7 +2955,7 @@ module Comment = struct
           client
           pull_request
           "ACCESS_CONTROL_CI_CONFIG_UPDATE_MATCH_PARSE_ERR"
-          Tmpl.repo_config_err_access_control_ci_config_update_match_parse_err
+          (Tmpl.repo_config_err_access_control_ci_config_update_match_parse_err brand)
           kv
     | `Access_control_file_match_parse_err (path, m) ->
         let kv = Snabela.Kv.(Map.of_list [ ("path", string path); ("match", string m) ]) in
@@ -2962,7 +2964,7 @@ module Comment = struct
           client
           pull_request
           "ACCESS_CONTROL_FILE_MATCH_PARSE_ERR"
-          Tmpl.repo_config_err_access_control_file_match_parse_err
+          (Tmpl.repo_config_err_access_control_file_match_parse_err brand)
           kv
     | `Access_control_policy_apply_autoapprove_match_parse_err m ->
         let kv = Snabela.Kv.(Map.of_list [ ("match", string m) ]) in
@@ -2971,7 +2973,7 @@ module Comment = struct
           client
           pull_request
           "ACCESS_CONTROL_POLICY_APPLY_AUTOAPPROVE_MATCH_PARSE_ERR"
-          Tmpl.repo_config_err_access_control_policy_apply_autoapprove_match_parse_err
+          (Tmpl.repo_config_err_access_control_policy_apply_autoapprove_match_parse_err brand)
           kv
     | `Access_control_policy_apply_force_match_parse_err m ->
         let kv = Snabela.Kv.(Map.of_list [ ("match", string m) ]) in
@@ -2980,7 +2982,7 @@ module Comment = struct
           client
           pull_request
           "ACCESS_CONTROL_POLICY_APPLY_FORCE_MATCH_PARSE_ERR"
-          Tmpl.repo_config_err_access_control_policy_apply_force_match_parse_err
+          (Tmpl.repo_config_err_access_control_policy_apply_force_match_parse_err brand)
           kv
     | `Access_control_policy_apply_match_parse_err m ->
         let kv = Snabela.Kv.(Map.of_list [ ("match", string m) ]) in
@@ -2989,7 +2991,7 @@ module Comment = struct
           client
           pull_request
           "ACCESS_CONTROL_POLICY_APPLY_MATCH_PARSE_ERR"
-          Tmpl.repo_config_err_access_control_policy_apply_match_parse_err
+          (Tmpl.repo_config_err_access_control_policy_apply_match_parse_err brand)
           kv
     | `Access_control_policy_apply_with_superapproval_match_parse_err m ->
         let kv = Snabela.Kv.(Map.of_list [ ("match", string m) ]) in
@@ -2998,7 +3000,8 @@ module Comment = struct
           client
           pull_request
           "ACCESS_CONTROL_POLICY_APPLY_WITH_SUPERAPPROVAL_MATCH_PARSE_ERR"
-          Tmpl.repo_config_err_access_control_policy_apply_with_superapproval_match_parse_err
+          (Tmpl.repo_config_err_access_control_policy_apply_with_superapproval_match_parse_err
+             brand)
           kv
     | `Access_control_policy_plan_match_parse_err m ->
         let kv = Snabela.Kv.(Map.of_list [ ("match", string m) ]) in
@@ -3007,7 +3010,7 @@ module Comment = struct
           client
           pull_request
           "ACCESS_CONTROL_POLICY_PLAN_MATCH_PARSE_ERR"
-          Tmpl.repo_config_err_access_control_policy_plan_match_parse_err
+          (Tmpl.repo_config_err_access_control_policy_plan_match_parse_err brand)
           kv
     | `Access_control_policy_superapproval_match_parse_err m ->
         let kv = Snabela.Kv.(Map.of_list [ ("match", string m) ]) in
@@ -3016,7 +3019,7 @@ module Comment = struct
           client
           pull_request
           "ACCESS_CONTROL_POLICY_SUPERAPPROVAL_MATCH_PARSE_ERR"
-          Tmpl.repo_config_err_access_control_policy_superapproval_match_parse_err
+          (Tmpl.repo_config_err_access_control_policy_superapproval_match_parse_err brand)
           kv
     | `Access_control_policy_tag_query_err (q, err) ->
         let kv = Snabela.Kv.(Map.of_list [ ("query", string q); ("error", string err) ]) in
@@ -3025,7 +3028,7 @@ module Comment = struct
           client
           pull_request
           "ACCESS_CONTROL_POLICY_TAG_QUERY_ERR"
-          Tmpl.repo_config_err_access_control_policy_tag_query_err
+          (Tmpl.repo_config_err_access_control_policy_tag_query_err brand)
           kv
     | `Access_control_terrateam_config_update_match_parse_err m ->
         let kv = Snabela.Kv.(Map.of_list [ ("match", string m) ]) in
@@ -3034,7 +3037,7 @@ module Comment = struct
           client
           pull_request
           "ACCESS_CONTROL_TERRATEAM_CONFIG_UPDATE_MATCH_PARSE_ERR"
-          Tmpl.repo_config_err_access_control_terrateam_config_update_match_parse_err
+          (Tmpl.repo_config_err_access_control_terrateam_config_update_match_parse_err brand)
           kv
     | `Access_control_unlock_match_parse_err m ->
         let kv = Snabela.Kv.(Map.of_list [ ("match", string m) ]) in
@@ -3043,7 +3046,7 @@ module Comment = struct
           client
           pull_request
           "ACCESS_CONTROL_UNLOCK_MATCH_PARSE_ERR"
-          Tmpl.repo_config_err_access_control_unlock_match_parse_err
+          (Tmpl.repo_config_err_access_control_unlock_match_parse_err brand)
           kv
     | `Apply_requirements_approved_all_of_match_parse_err m ->
         let kv = Snabela.Kv.(Map.of_list [ ("match", string m) ]) in
@@ -3052,7 +3055,7 @@ module Comment = struct
           client
           pull_request
           "APPLY_REQUIREMENTS_APPROVED_ALL_OF_MATCH_PARSE_ERR"
-          Tmpl.repo_config_err_apply_requirements_approved_all_of_match_parse_err
+          (Tmpl.repo_config_err_apply_requirements_approved_all_of_match_parse_err brand)
           kv
     | `Apply_requirements_approved_any_of_match_parse_err m ->
         let kv = Snabela.Kv.(Map.of_list [ ("match", string m) ]) in
@@ -3061,7 +3064,7 @@ module Comment = struct
           client
           pull_request
           "APPLY_REQUIREMENTS_APPROVED_ANY_OF_MATCH_PARSE_ERR"
-          Tmpl.repo_config_err_apply_requirements_approved_any_of_match_parse_err
+          (Tmpl.repo_config_err_apply_requirements_approved_any_of_match_parse_err brand)
           kv
     | `Apply_requirements_check_tag_query_err (q, err) ->
         let kv = Snabela.Kv.(Map.of_list [ ("query", string q); ("error", string err) ]) in
@@ -3070,7 +3073,7 @@ module Comment = struct
           client
           pull_request
           "APPLY_REQUIREMENTS_CHECK_TAG_QUERY_ERR"
-          Tmpl.repo_config_err_apply_requirements_check_tag_query_err
+          (Tmpl.repo_config_err_apply_requirements_check_tag_query_err brand)
           kv
     | `Bad_glob_err { Terrat_base_repo_config_v1.Bad_glob.location; pattern; glob; err } ->
         let kv =
@@ -3088,7 +3091,7 @@ module Comment = struct
              client
              pull_request
              "BAD_GLOB_ERR"
-             Tmpl.repo_config_err_bad_glob_err
+             (Tmpl.repo_config_err_bad_glob_err brand)
              kv
     | `Depends_on_err (q, err) ->
         let kv = Snabela.Kv.(Map.of_list [ ("query", string q); ("error", string err) ]) in
@@ -3097,7 +3100,7 @@ module Comment = struct
           client
           pull_request
           "DRIFT_TAG_QUERY_ERR"
-          Tmpl.repo_config_err_depends_on_err
+          (Tmpl.repo_config_err_depends_on_err brand)
           kv
     | `Drift_tag_query_err (q, err) ->
         let kv = Snabela.Kv.(Map.of_list [ ("query", string q); ("error", string err) ]) in
@@ -3106,7 +3109,7 @@ module Comment = struct
           client
           pull_request
           "DRIFT_TAG_QUERY_ERR"
-          Tmpl.repo_config_err_drift_tag_query_err
+          (Tmpl.repo_config_err_drift_tag_query_err brand)
           kv
     | `Glob_parse_err (s, err) ->
         let kv = Snabela.Kv.(Map.of_list [ ("glob", string s); ("error", string err) ]) in
@@ -3115,7 +3118,7 @@ module Comment = struct
           client
           pull_request
           "GLOB_PARSE_ERR"
-          Tmpl.repo_config_err_glob_parse_err
+          (Tmpl.repo_config_err_glob_parse_err brand)
           kv
     | `Pattern_parse_err s ->
         let kv = Snabela.Kv.(Map.of_list [ ("pattern", string s) ]) in
@@ -3124,7 +3127,7 @@ module Comment = struct
           client
           pull_request
           "PATTERN_PARSE_ERR"
-          Tmpl.repo_config_err_pattern_parse_err
+          (Tmpl.repo_config_err_pattern_parse_err brand)
           kv
     | `Window_parse_timezone_err tz ->
         let kv = Snabela.Kv.(Map.of_list [ ("tz", string tz) ]) in
@@ -3133,7 +3136,7 @@ module Comment = struct
           client
           pull_request
           "WINDOW_PARSE_TIMEZONE_ERR"
-          Tmpl.repo_config_err_window_parse_timezone_err
+          (Tmpl.repo_config_err_window_parse_timezone_err brand)
           kv
     | `Workflows_missing_apply_step_err (idx, tag_query) ->
         let kv = `Assoc [ ("idx", `Int idx); ("tag_query", `String tag_query) ] in
@@ -3143,7 +3146,7 @@ module Comment = struct
              client
              pull_request
              "WORKFLOWS_MISSING_APPLY_STEP_ERR"
-             Tmpl.repo_config_err_workflows_missing_apply_step_err
+             (Tmpl.repo_config_err_workflows_missing_apply_step_err brand)
              kv
     | `Workflows_missing_plan_step_err (idx, tag_query) ->
         let kv = `Assoc [ ("idx", `Int idx); ("tag_query", `String tag_query) ] in
@@ -3153,7 +3156,7 @@ module Comment = struct
              client
              pull_request
              "WORKFLOWS_MISSING_PLAN_STEP_ERR"
-             Tmpl.repo_config_err_workflows_missing_plan_step_err
+             (Tmpl.repo_config_err_workflows_missing_plan_step_err brand)
              kv
     | `Workflows_tag_query_parse_err (q, err) ->
         let kv = Snabela.Kv.(Map.of_list [ ("query", string q); ("error", string err) ]) in
@@ -3162,7 +3165,7 @@ module Comment = struct
           client
           pull_request
           "WORKFLOWS_TAG_QUERY_PARSE_ERR"
-          Tmpl.repo_config_err_workflows_tag_query_parse_err
+          (Tmpl.repo_config_err_workflows_tag_query_parse_err brand)
           kv
     | `Repo_config_schema_err errs ->
         let errors =
@@ -3179,7 +3182,7 @@ module Comment = struct
           client
           pull_request
           "REPO_CONFIG_SCHEMA_ERR"
-          Tmpl.repo_config_schema_err
+          (Tmpl.repo_config_schema_err brand)
           kv
     | `Notification_policy_tag_query_err (query, err) ->
         let kv = `Assoc [ ("query", `String query); ("error", `String err) ] in
@@ -3189,7 +3192,7 @@ module Comment = struct
              client
              pull_request
              "NOTIFICATION_POLICY_TAG_QUERY_ERR"
-             Tmpl.notification_policy_tag_query_err
+             (Tmpl.notification_policy_tag_query_err brand)
              kv
     | `Stack_config_tag_query_err _err -> raise (Failure "nyi")
 
@@ -3251,7 +3254,7 @@ module Comment = struct
     |> CCList.sort_uniq ~cmp:(fun (a, _) (b, _) -> Key.compare a b)
     |> CCList.map snd
 
-  let publish_comment ~request_id client user pull_request =
+  let publish_comment ~request_id ~brand client user pull_request =
     let module Gcm_api = Terrat_vcs_gitlab_comment_publishers.Comment_api in
     let module Msg = Terrat_vcs_provider2.Msg in
     function
@@ -3308,7 +3311,7 @@ module Comment = struct
           client
           pull_request
           "ACCESS_CONTROL_ALL_DIRSPACES_DENIED"
-          Tmpl.access_control_all_dirspaces_denied
+          (Tmpl.access_control_all_dirspaces_denied brand)
           kv
     | Msg.Access_control_denied (default_branch, `Ci_config_update match_list) ->
         let kv =
@@ -3335,7 +3338,7 @@ module Comment = struct
           client
           pull_request
           "ACCESS_CONTROL_CI_CONFIG_UPDATE_DENIED"
-          Tmpl.access_control_ci_config_update_denied
+          (Tmpl.access_control_ci_config_update_denied brand)
           kv
     | Msg.Access_control_denied (default_branch, `Dirspaces denies) ->
         let kv =
@@ -3390,7 +3393,7 @@ module Comment = struct
           client
           pull_request
           "ACCESS_CONTROL_DIRSPACES_DENIED"
-          Tmpl.access_control_dirspaces_denied
+          (Tmpl.access_control_dirspaces_denied brand)
           kv
     | Msg.Access_control_denied (default_branch, `Files (fname, match_list)) ->
         let kv =
@@ -3418,7 +3421,7 @@ module Comment = struct
           client
           pull_request
           "ACCESS_CONTROL_FILES"
-          Tmpl.access_control_files_denied
+          (Tmpl.access_control_files_denied brand)
           kv
     | Msg.Access_control_denied (default_branch, `Terrateam_config_update match_list) ->
         let kv =
@@ -3445,7 +3448,7 @@ module Comment = struct
           client
           pull_request
           "ACCESS_CONTROL_TERRATEAM_CONFIG_UPDATE_DENIED"
-          Tmpl.access_control_terrateam_config_update_denied
+          (Tmpl.access_control_terrateam_config_update_denied brand)
           kv
     | Msg.Access_control_denied (default_branch, `Lookup_err) ->
         let kv =
@@ -3457,7 +3460,7 @@ module Comment = struct
           client
           pull_request
           "ACCESS_CONTROL_LOOKUP_ERR"
-          Tmpl.access_control_lookup_err
+          (Tmpl.access_control_lookup_err brand)
           kv
     | Msg.Access_control_denied (default_branch, `Unlock match_list) ->
         let kv =
@@ -3484,7 +3487,7 @@ module Comment = struct
           client
           pull_request
           "ACCESS_CONTROL_UNLOCK_DENIED"
-          Tmpl.access_control_unlock_denied
+          (Tmpl.access_control_unlock_denied brand)
           kv
     | Msg.Account_expired ->
         let kv = Snabela.Kv.(Map.of_list []) in
@@ -3493,7 +3496,7 @@ module Comment = struct
           client
           pull_request
           "ACCOUNT_EXPIRED"
-          Tmpl.account_expired_err
+          (Tmpl.account_expired_err brand)
           kv
     | Msg.Apply_no_matching_dirspaces tag_query ->
         let kv = Msg.no_matching_dirspaces_kv tag_query in
@@ -3503,7 +3506,7 @@ module Comment = struct
              client
              pull_request
              "APPLY_NO_MATCHING_DIRSPACES"
-             Tmpl.apply_no_matching_dirspaces
+             (Tmpl.apply_no_matching_dirspaces brand)
              kv
     | Msg.Apply_requirements_config_err (`Tag_query_error (query, err)) ->
         let kv = Snabela.Kv.(Map.of_list [ ("query", string query); ("error", string err) ]) in
@@ -3512,7 +3515,7 @@ module Comment = struct
           client
           pull_request
           "APPLY_REQUIREMENTS_CONFIG_ERR_TAG_QUERY"
-          Tmpl.apply_requirements_config_err_tag_query
+          (Tmpl.apply_requirements_config_err_tag_query brand)
           kv
     | Msg.Apply_requirements_config_err (`Invalid_query query) ->
         let kv = Snabela.Kv.(Map.of_list [ ("query", string query) ]) in
@@ -3521,7 +3524,7 @@ module Comment = struct
           client
           pull_request
           "APPLY_REQUIREMENTS_CONFIG_ERR_INVALID_QUERY"
-          Tmpl.apply_requirements_config_err_invalid_query
+          (Tmpl.apply_requirements_config_err_invalid_query brand)
           kv
     | Msg.Apply_requirements_validation_err ->
         let kv = Snabela.Kv.(Map.of_list []) in
@@ -3530,7 +3533,7 @@ module Comment = struct
           client
           pull_request
           "APPLY_REQUIREMENTS_VALIDATION_ERR"
-          Tmpl.apply_requirements_validation_err
+          (Tmpl.apply_requirements_validation_err brand)
           kv
     | Msg.Apply_queued_behind_work_manifests wms ->
         let kv =
@@ -3548,7 +3551,7 @@ module Comment = struct
           client
           pull_request
           "APPLY_QUEUED_BEHIND_WORK_MANIFESTS"
-          Tmpl.apply_queued_behind_work_manifests
+          (Tmpl.apply_queued_behind_work_manifests brand)
           kv
     | Msg.Autoapply_running ->
         let kv = Snabela.Kv.(Map.of_list []) in
@@ -3557,7 +3560,7 @@ module Comment = struct
           client
           pull_request
           "AUTO_APPLY_RUNNING"
-          Tmpl.auto_apply_running
+          (Tmpl.auto_apply_running brand)
           kv
     | Msg.Automerge_failure (_pr, msg) ->
         let kv = Snabela.Kv.(Map.of_list [ ("msg", string msg) ]) in
@@ -3566,7 +3569,7 @@ module Comment = struct
           client
           pull_request
           "AUTOMERGE_FAILURE"
-          Tmpl.automerge_failure
+          (Tmpl.automerge_failure brand)
           kv
     | Msg.Bad_custom_branch_tag_pattern (tag, pat) ->
         let kv = Snabela.Kv.(Map.of_list [ ("tag", string tag); ("pattern", string pat) ]) in
@@ -3575,7 +3578,7 @@ module Comment = struct
           client
           pull_request
           "BAD_CUSTOM_BRANCH_TAG_PATTERN"
-          Tmpl.bad_custom_branch_tag_pattern
+          (Tmpl.bad_custom_branch_tag_pattern brand)
           kv
     | Msg.Bad_glob s ->
         let kv = Snabela.Kv.(Map.of_list [ ("glob", string s) ]) in
@@ -3584,11 +3587,12 @@ module Comment = struct
           client
           pull_request
           "BAD_GLOB"
-          Tmpl.bad_glob
+          (Tmpl.bad_glob brand)
           kv
-    | Msg.Build_config_err err -> repo_config_err ~request_id ~client ~pull_request ~title:"" err
+    | Msg.Build_config_err err ->
+        repo_config_err ~request_id ~brand ~client ~pull_request ~title:"" err
     | Msg.Build_config_failure err ->
-        repo_config_failure ~request_id ~client ~pull_request ~title:"built" err
+        repo_config_failure ~request_id ~brand ~client ~pull_request ~title:"built" err
     | Msg.Build_tree_failure msg ->
         let kv = Snabela.Kv.(Map.of_list [ ("msg", string msg) ]) in
         Gcm_api.apply_template_and_publish
@@ -3596,7 +3600,7 @@ module Comment = struct
           client
           pull_request
           "BUILD_TREE_FAILURE"
-          Tmpl.build_tree_failure
+          (Tmpl.build_tree_failure brand)
           kv
     | Msg.Conflicting_work_manifests wms ->
         let kv =
@@ -3614,7 +3618,7 @@ module Comment = struct
           client
           pull_request
           "CONFLICTING_WORK_MANIFESTS"
-          Tmpl.conflicting_work_manifests
+          (Tmpl.conflicting_work_manifests brand)
           kv
     | Msg.Synthesize_config_err (`Stack_cycle_err cycle) ->
         let kv = `Assoc [ ("cycle", `List (CCList.map (fun stack -> `String stack) cycle)) ] in
@@ -3624,7 +3628,7 @@ module Comment = struct
              client
              pull_request
              "STACK_CYCLE"
-             Tmpl.synthesize_config_err_stack_cycle
+             (Tmpl.synthesize_config_err_stack_cycle brand)
              kv
     | Msg.Synthesize_config_err (`Depends_on_cycle_err cycle) ->
         let dirspace { Terrat_dirspace.dir; workspace } = (`String dir, `String workspace) in
@@ -3654,7 +3658,7 @@ module Comment = struct
              client
              pull_request
              "DEPENDS_ON_CYCLE"
-             Tmpl.synthesize_config_err_cycle
+             (Tmpl.synthesize_config_err_cycle brand)
              kv
     | Msg.Synthesize_config_err
         (`Depends_on_crosses_stack_err
@@ -3681,7 +3685,7 @@ module Comment = struct
              client
              pull_request
              "DEPENDS_ON_CROSSES_STACK"
-             Tmpl.synthesize_config_err_depends_on_crosses_stack
+             (Tmpl.synthesize_config_err_depends_on_crosses_stack brand)
              kv
     | Msg.Synthesize_config_err
         (`Workspace_in_multiple_stacks_err { Terrat_dirspace.dir; workspace }) ->
@@ -3692,7 +3696,7 @@ module Comment = struct
              client
              pull_request
              "WORKSPACE_IN_MULTIPLE_STACKS"
-             Tmpl.synthesize_config_err_workspace_in_multiple_stacks
+             (Tmpl.synthesize_config_err_workspace_in_multiple_stacks brand)
              kv
     | Msg.Synthesize_config_err
         (`Workspace_matches_no_stacks_err { Terrat_dirspace.dir; workspace }) ->
@@ -3703,7 +3707,7 @@ module Comment = struct
              client
              pull_request
              "WORKSPACE_MATCHES_NO_STACKS"
-             Tmpl.synthesize_config_err_workspace_matches_no_stacks
+             (Tmpl.synthesize_config_err_workspace_matches_no_stacks brand)
              kv
     | Msg.Synthesize_config_err (`Stack_not_found_err stack) ->
         let kv = `Assoc [ ("stack", `String stack) ] in
@@ -3713,7 +3717,7 @@ module Comment = struct
              client
              pull_request
              "STACK_NOT_FOUND"
-             Tmpl.synthesize_config_err_stack_not_found
+             (Tmpl.synthesize_config_err_stack_not_found brand)
              kv
     | Msg.Str_template_err (`Missing_var_err name) ->
         let kv = `Assoc [ ("var_name", `String name) ] in
@@ -3723,7 +3727,7 @@ module Comment = struct
              client
              pull_request
              "STR_TEMPLATE"
-             Tmpl.str_template_err_missing_var
+             (Tmpl.str_template_err_missing_var brand)
              kv
     | Msg.Dest_branch_no_match pull_request ->
         let kv =
@@ -3747,7 +3751,7 @@ module Comment = struct
           client
           pull_request
           "DEST_BRANCH_NO_MATCH"
-          Tmpl.base_branch_not_default_branch
+          (Tmpl.base_branch_not_default_branch brand)
           kv
     | Msg.Dirspaces_owned_by_other_pull_request prs ->
         let unique_pull_request_ids =
@@ -3793,7 +3797,7 @@ module Comment = struct
           client
           pull_request
           "DIRSPACES_OWNED_BY_OTHER_PRS"
-          Tmpl.dirspaces_owned_by_other_pull_requests
+          (Tmpl.dirspaces_owned_by_other_pull_requests brand)
           kv
     | Msg.Gate_check_failure denied ->
         let module G = Terrat_vcs_provider2.Gate_eval in
@@ -3843,7 +3847,7 @@ module Comment = struct
              client
              pull_request
              "GATE_CHECK_FAILURE"
-             Tmpl.gate_check_failure
+             (Tmpl.gate_check_failure brand)
              kv
     | Msg.Help ->
         let kv = Snabela.Kv.(Map.of_list []) in
@@ -3852,7 +3856,7 @@ module Comment = struct
           client
           pull_request
           "HELP"
-          Tmpl.terrateam_comment_help
+          (Tmpl.terrateam_comment_help brand)
           kv
     | Msg.Index_complete (success, failures) ->
         let kv =
@@ -3881,7 +3885,7 @@ module Comment = struct
           client
           pull_request
           "INDEX_COMPLETE"
-          Tmpl.index_complete
+          (Tmpl.index_complete brand)
           kv
     | Msg.Invalid_unlock_id unlock_id ->
         let kv = Snabela.Kv.(Map.of_list [ ("unlock_id", string unlock_id) ]) in
@@ -3890,7 +3894,7 @@ module Comment = struct
           client
           pull_request
           "INVALID_UNLOCK_ID"
-          Tmpl.invalid_lock_id
+          (Tmpl.invalid_lock_id brand)
           kv
     | Msg.Maybe_stale_work_manifests wms ->
         let kv =
@@ -3903,7 +3907,7 @@ module Comment = struct
           client
           pull_request
           "MAYBE_STALE_WORK_MANIFESTS"
-          Tmpl.maybe_stale_work_manifests
+          (Tmpl.maybe_stale_work_manifests brand)
           kv
     | Msg.Mismatched_refs ->
         let kv = Snabela.Kv.(Map.of_list []) in
@@ -3912,7 +3916,7 @@ module Comment = struct
           client
           pull_request
           "MISMATCHED_REFS"
-          Tmpl.mismatched_refs
+          (Tmpl.mismatched_refs brand)
           kv
     | Msg.Missing_plans dirspaces ->
         let module Mp = Terrat_vcs_provider2.Missing_plan in
@@ -3968,35 +3972,35 @@ module Comment = struct
           client
           pull_request
           "MISSING_PLANS"
-          Tmpl.missing_plans
+          (Tmpl.missing_plans brand)
           kv
     | Msg.Operation_failed reason ->
         let msg_type, tmpl, extra =
           match reason with
           | `Branch_not_found_err branch ->
               ( "OPERATION_FAILED_BRANCH_NOT_FOUND",
-                Tmpl.operation_failed_branch_not_found,
+                Tmpl.operation_failed_branch_not_found brand,
                 [ ("branch", `String branch) ] )
           | `Compute_aborted_err num_aborts ->
               ( "OPERATION_FAILED_COMPUTE_ABORTED",
-                Tmpl.operation_failed_compute_aborted,
+                Tmpl.operation_failed_compute_aborted brand,
                 [ ("num_aborts", `Int num_aborts) ] )
-          | `Db_err -> ("OPERATION_FAILED_DB_ERR", Tmpl.operation_failed_db_err, [])
+          | `Db_err -> ("OPERATION_FAILED_DB_ERR", Tmpl.operation_failed_db_err brand, [])
           | `Internal_err tag ->
               ( "OPERATION_FAILED_INTERNAL_ERR",
-                Tmpl.operation_failed_internal_err,
+                Tmpl.operation_failed_internal_err brand,
                 [ ("tag", `String tag) ] )
           | `Vcs_api_err operation ->
               ( "OPERATION_FAILED_VCS_API_ERR",
-                Tmpl.operation_failed_vcs_api_err,
+                Tmpl.operation_failed_vcs_api_err brand,
                 [ ("operation", `String operation) ] )
           | `Vcs_api_timeout_err operation ->
               ( "OPERATION_FAILED_VCS_API_TIMEOUT_ERR",
-                Tmpl.operation_failed_vcs_api_timeout_err,
+                Tmpl.operation_failed_vcs_api_timeout_err brand,
                 [ ("operation", `String operation) ] )
           | `Work_manifest_start_err ->
               ( "OPERATION_FAILED_WORK_MANIFEST_START_ERR",
-                Tmpl.operation_failed_work_manifest_start_err,
+                Tmpl.operation_failed_work_manifest_start_err brand,
                 [] )
         in
         Logs.info (fun m ->
@@ -4020,7 +4024,7 @@ module Comment = struct
           client
           pull_request
           "PLAN_ALL_CHANGES_APPLIED"
-          Tmpl.plan_all_changes_applied
+          (Tmpl.plan_all_changes_applied brand)
           kv
     | Msg.Tag_query_dropped_dirspaces { command; suggestion; dirspaces } ->
         let kv =
@@ -4042,7 +4046,7 @@ module Comment = struct
              client
              pull_request
              "TAG_QUERY_DROPPED_DIRSPACES"
-             Tmpl.tag_query_dropped_dirspaces
+             (Tmpl.tag_query_dropped_dirspaces brand)
              kv
     | Msg.Matches_in_later_layer dirspaces ->
         let kv =
@@ -4062,7 +4066,7 @@ module Comment = struct
              client
              pull_request
              "MATCHES_IN_LATER_LAYER"
-             Tmpl.matches_in_later_layer
+             (Tmpl.matches_in_later_layer brand)
              kv
     | Msg.Plan_no_matching_dirspaces tag_query ->
         let kv = Msg.no_matching_dirspaces_kv tag_query in
@@ -4072,7 +4076,7 @@ module Comment = struct
              client
              pull_request
              "PLAN_NO_MATCHING_DIRSPACES"
-             Tmpl.plan_no_matching_dirspaces
+             (Tmpl.plan_no_matching_dirspaces brand)
              kv
     | Msg.Premium_feature_err `Access_control ->
         let kv = Snabela.Kv.(Map.of_list []) in
@@ -4081,7 +4085,7 @@ module Comment = struct
           client
           pull_request
           "PREMIUM_FEATURE_ACCESS_CONTROL"
-          Tmpl.premium_feature_err_access_control
+          (Tmpl.premium_feature_err_access_control brand)
           kv
     | Msg.Premium_feature_err `Multiple_drift_schedules ->
         let kv = Snabela.Kv.(Map.of_list []) in
@@ -4090,7 +4094,7 @@ module Comment = struct
           client
           pull_request
           "PREMIUM_FEATURE_MULTIPLE_DRIFT_SCHEDULES"
-          Tmpl.premium_feature_err_multiple_drift_schedules
+          (Tmpl.premium_feature_err_multiple_drift_schedules brand)
           kv
     | Msg.Premium_feature_err `Gatekeeping ->
         let kv = Snabela.Kv.(Map.of_list []) in
@@ -4099,7 +4103,7 @@ module Comment = struct
           client
           pull_request
           "PREMIUM_FEATURE_GATEKEEPING"
-          Tmpl.premium_feature_err_gatekeeping
+          (Tmpl.premium_feature_err_gatekeeping brand)
           kv
     | Msg.Premium_feature_err `Require_completed_reviews ->
         let kv = Snabela.Kv.(Map.of_list []) in
@@ -4108,7 +4112,7 @@ module Comment = struct
           client
           pull_request
           "PREMIUM_FEATURE_REQUIRE_COMPLETED_REVIEWS"
-          Tmpl.premium_feature_err_require_completed_reviews
+          (Tmpl.premium_feature_err_require_completed_reviews brand)
           kv
     | Msg.Premium_feature_err `Notifications_summary ->
         let kv = Snabela.Kv.(Map.of_list []) in
@@ -4117,7 +4121,7 @@ module Comment = struct
           client
           pull_request
           "PREMIUM_FEATURE_NOTIFICATIONS_SUMMARY"
-          Tmpl.premium_feature_err_notifications_summary
+          (Tmpl.premium_feature_err_notifications_summary brand)
           kv
     | Msg.Pull_request_not_appliable (_, apply_requirements) ->
         let module Dc = Terrat_change_match3.Dirspace_config in
@@ -4189,7 +4193,7 @@ module Comment = struct
              client
              pull_request
              "PULL_REQUEST_NOT_APPLIABLE"
-             Tmpl.pull_request_not_appliable
+             (Tmpl.pull_request_not_appliable brand)
              kv
     | Msg.Pull_request_not_mergeable ->
         let kv = Snabela.Kv.(Map.of_list []) in
@@ -4198,7 +4202,7 @@ module Comment = struct
           client
           pull_request
           "PULL_REQUEST_NOT_MERGEABLE"
-          Tmpl.pull_request_not_mergeable
+          (Tmpl.pull_request_not_mergeable brand)
           kv
     | Msg.Repo_config (provenance, repo_config) ->
         let repo_config_json =
@@ -4220,11 +4224,18 @@ module Comment = struct
           client
           pull_request
           "REPO_CONFIG"
-          Tmpl.repo_config
+          (Tmpl.repo_config brand)
           kv
-    | Msg.Repo_config_err err -> repo_config_err ~request_id ~client ~pull_request ~title:"" err
+    | Msg.Repo_config_err err ->
+        repo_config_err ~request_id ~brand ~client ~pull_request ~title:"" err
     | Msg.Repo_config_failure err ->
-        repo_config_failure ~request_id ~client ~pull_request ~title:"Terrateam repository" err
+        repo_config_failure
+          ~request_id
+          ~brand
+          ~client
+          ~pull_request
+          ~title:"Terrateam repository"
+          err
     | Msg.Repo_config_merge_err ((base, src), (key, base_value, src_value)) ->
         let base_value = Jsonu.to_yaml_string base_value in
         let src_value = Jsonu.to_yaml_string src_value in
@@ -4245,7 +4256,7 @@ module Comment = struct
           client
           pull_request
           "REPO_CONFIG_MERGE_ERR"
-          Tmpl.repo_config_merge_err
+          (Tmpl.repo_config_merge_err brand)
           kv
     | Msg.Repo_config_parse_failure (fname, err) ->
         let kv = Snabela.Kv.(Map.of_list [ ("fname", string fname); ("msg", string err) ]) in
@@ -4254,7 +4265,7 @@ module Comment = struct
           client
           pull_request
           "REPO_CONFIG_PARSE_FAILURE"
-          Tmpl.repo_config_parse_failure
+          (Tmpl.repo_config_parse_failure brand)
           kv
     | Msg.Repo_config_schema_err (fname, errs) ->
         let errors =
@@ -4269,7 +4280,7 @@ module Comment = struct
           client
           pull_request
           "REPO_CONFIG_SCHEMA_ERR"
-          Tmpl.repo_config_schema_err
+          (Tmpl.repo_config_schema_err brand)
           kv
     | Msg.Run_work_manifest_err (`Failed_to_start_with_msg_err "IDENTITY_VERIFICATION_ERR") ->
         let kv = Snabela.Kv.(Map.of_list []) in
@@ -4278,7 +4289,7 @@ module Comment = struct
           client
           pull_request
           "RUN_WORK_MANIFEST_ERR_FAILED_TO_START_IDENTITY_VERIFICATION"
-          Tmpl.failed_to_start_identity_verification_workflow
+          (Tmpl.failed_to_start_identity_verification_workflow brand)
           kv
     | Msg.Run_work_manifest_err (`Failed_to_start_with_msg_err "GITLAB_INPUTS_MISSING_DEFAULTS") ->
         let kv = Snabela.Kv.(Map.of_list []) in
@@ -4287,7 +4298,7 @@ module Comment = struct
           client
           pull_request
           "RUN_WORK_MANIFEST_ERR_FAILED_TO_START_MISSING_INPUTS"
-          Tmpl.failed_to_start_missing_inputs
+          (Tmpl.failed_to_start_missing_inputs brand)
           kv
     | Msg.Run_work_manifest_err (`Failed_to_start | `Failed_to_start_with_msg_err _) ->
         let kv = Snabela.Kv.(Map.of_list []) in
@@ -4296,7 +4307,7 @@ module Comment = struct
           client
           pull_request
           "RUN_WORK_MANIFEST_ERR_FAILED_TO_START"
-          Tmpl.failed_to_start_workflow
+          (Tmpl.failed_to_start_workflow brand)
           kv
     | Msg.Run_work_manifest_err `Missing_workflow ->
         let kv = Snabela.Kv.(Map.of_list []) in
@@ -4305,7 +4316,7 @@ module Comment = struct
           client
           pull_request
           "RUN_WORK_MANIFEST_ERR_MISSING_WORKFLOW"
-          Tmpl.failed_to_find_workflow
+          (Tmpl.failed_to_find_workflow brand)
           kv
     | Msg.Tag_query_err (`Tag_query_error (s, err)) ->
         let kv = Snabela.Kv.(Map.of_list [ ("query", string s); ("err", string err) ]) in
@@ -4314,7 +4325,7 @@ module Comment = struct
           client
           pull_request
           "TAG_QUERY_ERR"
-          Tmpl.tag_query_error
+          (Tmpl.tag_query_error brand)
           kv
     | Msg.Tf_op_result2
         {
@@ -4331,6 +4342,7 @@ module Comment = struct
         let open Abb.Future.Infix_monad in
         Result.Publisher3.post_comment
           request_id
+          brand
           account_status
           config
           client
@@ -4385,7 +4397,7 @@ module Comment = struct
           client
           pull_request
           "TIER_CHECK"
-          Tmpl.tier_check
+          (Tmpl.tier_check brand)
           kv
     | Msg.Unlock_success ->
         let kv = Snabela.Kv.(Map.of_list []) in
@@ -4394,7 +4406,7 @@ module Comment = struct
           client
           pull_request
           "UNLOCK_SUCCESS"
-          Tmpl.unlock_success
+          (Tmpl.unlock_success brand)
           kv
     | Msg.Work_manifest_run_failed { run_id } ->
         let kv = `Assoc [ ("run_id", `String run_id) ] in
@@ -4404,54 +4416,44 @@ module Comment = struct
              client
              pull_request
              "WORK_MANIFEST_RUN_FAILED"
-             Tmpl.work_manifest_run_failed
+             (Tmpl.work_manifest_run_failed brand)
              kv
 
   (* The unified summary comment is not implemented for GitLab yet. *)
-  let drain_unified_comment ~request_id:_ _config _storage _work_manifest_id = Abb.Future.return ()
+  let drain_unified_comment ~request_id:_ ~fetch_brand:_ _config _storage _work_manifest_id =
+    Abb.Future.return ()
 
   let mark_unified_comment_dirty ~request_id:_ _db _work_manifest_id =
     Abbs_future_combinators.return_ok ()
 
-  let publish_unified_comment_at_start ~request_id:_ ~repo_config:_ _config _db _work_manifest_id =
+  let publish_unified_comment_at_start
+      ~request_id:_
+      ~fetch_brand:_
+      ~repo_config:_
+      _config
+      _db
+      _work_manifest_id =
     Abbs_future_combinators.return_ok ()
 end
 
 module Repo_config = struct
-  let fetch_repo_config_file request_id client repo ref_ basename =
-    let open Abbs_future_combinators.Infix_result_monad in
-    Abbs_future_combinators.Infix_result_app.(
-      (fun yml yaml ->
-        match (yml, yaml) with
-        | Some yml, _ ->
-            Some
-              (Api.Repo.to_string repo ^ ":" ^ Api.Ref.to_string ref_ ^ ":" ^ basename ^ ".yml", yml)
-        | _, Some yaml ->
-            Some
-              ( Api.Repo.to_string repo ^ ":" ^ Api.Ref.to_string ref_ ^ ":" ^ basename ^ ".yaml",
-                yaml )
-        | _, _ -> None)
-      <$> Api.fetch_file ~request_id client repo ref_ (basename ^ ".yml")
-      <*> Api.fetch_file ~request_id client repo ref_ (basename ^ ".yaml"))
-    >>= function
-    | None -> Abbs_future_combinators.return_ok None
-    | Some (_, content) when CCString.is_empty (CCString.trim content) ->
-        Abbs_future_combinators.return_ok None
-    | Some (fname, content) ->
-        Abb.Future.return
-        @@ CCResult.map_err
-             (fun (`Yaml_decode_err err) -> `Yaml_decode_err (fname, err))
-             (Jsonu.of_yaml_string content)
-        >>| fun json -> Some (fname, json)
+  module Rc = Terrat_vcs_service_gitlab_repo_config
 
-  (* Config parity (#1442): [.stategraph/config] wins when both exist;
-       [.terrateam/config] keeps working so existing repos need no rename. *)
-  let fetch_repo_config_file_with_fallback request_id client repo ref_ =
-    let open Abbs_future_combinators.Infix_result_monad in
-    fetch_repo_config_file request_id client repo ref_ ".stategraph/config"
-    >>= function
-    | Some _ as r -> Abb.Future.return (Ok r)
-    | None -> fetch_repo_config_file request_id client repo ref_ ".terrateam/config"
+  module Brand =
+    Terrat_vcs_provider2.Brand.Make
+      (Api)
+      (struct
+        let provider = "gitlab"
+      end)
+
+  let fetch_brand ~request_id client repo =
+    Brand.fetch
+      ~request_id
+      ~fetch_branch_sha:(Api.fetch_branch_sha ~request_id)
+      ~config_brand:(Rc.fetch_config_brand ~request_id)
+      ~centralized:Brand.no_centralized
+      client
+      repo
 
   let repo_config_system_defaults system_defaults =
     (* Access control should be disabled for OSS *)
@@ -4501,8 +4503,8 @@ module Repo_config = struct
     in
     Abbs_future_combinators.Infix_result_app.(
       (fun default_repo_config repo_config -> (default_repo_config, repo_config))
-      <$> fetch_repo_config_file_with_fallback request_id client repo default_branch_ref
-      <*> fetch_repo_config_file_with_fallback request_id client repo ref_)
+      <$> Rc.fetch ~request_id client repo default_branch_ref
+      <*> Rc.fetch ~request_id client repo ref_)
     >>= fun (default_repo_config, repo_config) ->
     let wrap_err fname =
       Abbs_future_combinators.Result.map_err ~f:(function

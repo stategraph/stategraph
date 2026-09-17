@@ -233,8 +233,11 @@ struct
             Logs.err (fun m -> m "Migration failed");
             Logs.err (fun m -> m "%s" (Pgsql_pool.show_err err));
             exit 1
-        | `Det (Error `Consistency_err) ->
-            Logs.err (fun m -> m "Migration failed - inconsistent migrations");
+        | `Det (Error (`Consistency_err consistency)) ->
+            Logs.err (fun m ->
+                m
+                  "Migration failed - inconsistent migrations: %s"
+                  (Data_mig.Error.Consistency.to_string consistency));
             exit 1
         | `Aborted -> assert false
         | `Exn (exn, bt_opt) ->

@@ -325,21 +325,66 @@ let fetch_remote_repo ~request_id client repo =
             err);
       Abbs_future_combinators.return_err `Error
 
+(* A project is read by its path, [owner/name], which the client sends
+   percent-encoded.  The tree of [config] is read recursively, one page at a
+   time. *)
 let fetch_centralized_repo ~request_id client owner =
-  let open Abb.Future.Infix_monad in
-  fetch_remote_repo' ~request_id client (Repo.make ~id:0 ~owner ~name:"terrateam" ())
-  >>= function
-  | Ok _ as r -> Abb.Future.return r
-  | Error `Timeout -> vcs_api_timeout_err ~request_id "FETCH_CENTRALIZED_REPO"
-  | Error (#Openapic_abb.call_err as err) ->
-      Logs.err (fun m ->
-          m
-            "%s : FETCH_CENTRALIZED_REPO : owner=%s : %a"
-            request_id
-            owner
-            Openapic_abb.pp_call_err
-            err);
-      Abbs_future_combinators.return_err `Error
+  let module Gl = Gitlabc_projects.GetApiV4ProjectsId in
+  let module Glt = Gitlabc_projects_repository.GetApiV4ProjectsIdRepositoryTree in
+  let module T = Gitlabc_components_api_entities_treeobject in
+  let module Cr = Terrat_vcs_api.Centralized_repo in
+  let holds_config remote_repo =
+    let repo = Remote_repo.to_repo remote_repo in
+    Openapic_abb.fold
+      ~page:Openapic_abb.Page.gitlab
+      client.Client.client
+      ~init:false
+      ~f:(fun holds resp ->
+        match Openapi.Response.value resp with
+        | `OK tree ->
+            Abbs_future_combinators.return_ok
+              (holds
+              || CCList.exists
+                   (fun { T.path; type_; _ } ->
+                     CCString.equal type_ "blob" && Cr.is_config_path path)
+                   tree)
+        | `Not_found -> Abbs_future_combinators.return_ok holds)
+      Glt.(
+        make
+          (Parameters.make
+             ~id:(CCInt.to_string @@ Repo.id repo)
+             ~path:(Some Cr.directory)
+             ~ref_:(Some (Remote_repo.default_branch remote_repo))
+             ~recursive:true
+             ()))
+  in
+  let lookup name =
+    let run =
+      let open Abbs_future_combinators.Infix_result_monad in
+      call client.Client.client Gl.(make (Parameters.make ~id:(owner ^ "/" ^ name) ()))
+      >>= fun resp ->
+      match Openapi.Response.value resp with
+      | `Not_found -> Abbs_future_combinators.return_ok None
+      | `OK remote_repo ->
+          holds_config remote_repo >>| fun holds -> if holds then Some remote_repo else None
+    in
+    let open Abb.Future.Infix_monad in
+    run
+    >>= function
+    | Ok _ as r -> Abb.Future.return r
+    | Error `Timeout -> vcs_api_timeout_err ~request_id "FETCH_CENTRALIZED_REPO"
+    | Error (#Openapic_abb.call_err as err) ->
+        Logs.err (fun m ->
+            m
+              "%s : FETCH_CENTRALIZED_REPO : repo=%s/%s : %a"
+              request_id
+              owner
+              name
+              Openapic_abb.pp_call_err
+              err);
+        Abbs_future_combinators.return_err `Error
+  in
+  Cr.select lookup
 
 let fetch_diff_files ~request_id ~base_ref ~branch_ref repo client =
   let module R = Gitlabc_projects_repository.GetApiV4ProjectsIdRepositoryCompare in
@@ -650,7 +695,7 @@ let react_to_comment ~request_id client pull_request comment_id =
       Logs.err (fun m -> m "%s : REACT_TO_COMMENT : %a" request_id Openapic_abb.pp_call_err err);
       Abbs_future_combinators.return_err `Error
 
-let create_commit_checks ~request_id client repo ref_ checks =
+let create_commit_checks ~request_id ~brand client repo ref_ checks =
   let module Gl = Gitlabc_projects_statuses.PostApiV4ProjectsIdStatusesSha in
   let run =
     let open Abbs_future_combinators.Infix_result_monad in
@@ -708,7 +753,7 @@ let create_commit_checks ~request_id client repo ref_ checks =
                 (Parameters.make
                    ~id:(CCInt.to_string @@ Repo.id repo)
                    ~sha:ref_
-                   ~name:(Some (Terrat_check_title.branded "terrateam apply"))
+                   ~name:(Some (Terrat_check_title.branded_with ~brand "terrateam apply"))
                    ()))
           >>| fun existing_checks ->
           let pipeline_id =
@@ -736,10 +781,10 @@ let create_commit_checks ~request_id client repo ref_ checks =
         let body =
           {
             (* Canonical internally; brand applied at the VCS boundary. *)
-            Body.context = Terrat_check_title.branded "terrateam external";
+            Body.context = Terrat_check_title.branded_with ~brand "terrateam external";
             coverage = None;
             description = Some description;
-            name = Terrat_check_title.branded title;
+            name = Terrat_check_title.branded_with ~brand title;
             pipeline_id;
             ref_ = None;
             state =

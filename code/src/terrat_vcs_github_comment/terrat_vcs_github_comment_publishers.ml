@@ -376,6 +376,7 @@ end
 
 module Publisher_tools = struct
   let create_run_output
+      ~brand
       ~view
       ~compacted_dirspaces
       ~summary
@@ -623,8 +624,8 @@ module Publisher_tools = struct
       match CCList.rev work_manifest.Wm.steps with
       | [] | Wm.Step.Index :: _ | Wm.Step.Build_config :: _ | Wm.Step.Build_tree :: _ ->
           assert false
-      | Wm.Step.Plan :: _ -> Tmpl.plan_complete2
-      | Wm.Step.(Apply | Unsafe_apply) :: _ -> Tmpl.apply_complete2
+      | Wm.Step.Plan :: _ -> Tmpl.plan_complete2 brand
+      | Wm.Step.(Apply | Unsafe_apply) :: _ -> Tmpl.apply_complete2 brand
     in
     match Minijinja.render_template tmpl kv with
     | Ok body -> body

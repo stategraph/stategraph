@@ -166,9 +166,9 @@ ENTRYPOINT ["/usr/local/bin/ttm"]
 FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS terrat-final-base
 # The minirootfs lags its own package branch, so upgrade what it pre-installed.
 RUN apk upgrade --no-cache
-# These are the Terrateam-branded images, so comment templates render with the
-# Terrateam brand. The unified stategraph image leaves this unset and gets the
-# stategraph default.
+# These are the Terrateam-branded images, so a repository whose configuration
+# names no brand gets Terrateam comments and check names. The unified
+# stategraph image leaves this unset and gets the stategraph default.
 ENV TERRAT_BRAND=terrateam
 RUN apk add --no-cache \
     bash \

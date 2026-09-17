@@ -562,6 +562,7 @@ struct
       Builder.run_db s ~f:(fun db ->
           S.Comment.publish_unified_comment_at_start
             ~request_id:(Builder.log_id s)
+            ~fetch_brand:(S.Repo_config.fetch_brand ~request_id:(Builder.log_id s))
             ~repo_config
             (Builder.State.config s)
             db
@@ -961,6 +962,7 @@ struct
       Builder.run_db s ~f:(fun db ->
           S.Comment.publish_unified_comment_at_start
             ~request_id:(Builder.log_id s)
+            ~fetch_brand:(S.Repo_config.fetch_brand ~request_id:(Builder.log_id s))
             ~repo_config
             (Builder.State.config s)
             db

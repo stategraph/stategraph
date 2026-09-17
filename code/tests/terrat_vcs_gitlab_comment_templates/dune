@@ -4,5 +4,6 @@
   containers
   minijinja
   oth
+  terrat_brand
   terrat_vcs_gitlab_comment_templates
   yojson))

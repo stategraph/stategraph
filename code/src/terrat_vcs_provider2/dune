@@ -2,13 +2,17 @@
  (name terrat_vcs_provider2)
  (libraries
   abb
+  abbs
+  duration
   jsonu
   pgsql_io
   pgsql_pool
+  prmths
   str_template
   terrat_access_control2
   terrat_api
   terrat_base_repo_config_v1
+  terrat_brand
   terrat_change
   terrat_commit_check
   terrat_config

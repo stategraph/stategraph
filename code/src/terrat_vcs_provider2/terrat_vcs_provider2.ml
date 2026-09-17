@@ -364,6 +364,79 @@ module Msg = struct
       ]
 end
 
+(* The brand of a repository comes from the configuration on the default branch
+   of the repository and from the centralized repository of its owner.  It
+   changes only when that configuration moves, thus an answer is kept for a
+   minute.  A failed lookup is not kept. *)
+module Brand = struct
+  let call_count =
+    let help = "Count of brand cache calls by provider with hit or miss or evict" in
+    let family =
+      Prmths.Counter.v_labels
+        ~label_names:[ "provider"; "type" ]
+        ~help
+        ~namespace:"terrat"
+        ~subsystem:"vcs_provider"
+        "brand_cache_call_count"
+    in
+    fun ~provider t -> Prmths.Counter.labels family [ provider; t ]
+
+  module Make
+      (Api : Terrat_vcs_api.S)
+      (M : sig
+        val provider : string
+      end) =
+  struct
+    module Cache = Abbs_cache.Expiring.Make (struct
+      type k = Api.Repo.t [@@deriving eq]
+      type v = Terrat_brand.t
+      type err = Terrat_vcs_api.call_err
+      type args = unit -> (v, err) result Abb.Future.t
+
+      let fetch f = f ()
+      let weight _ = 1
+    end)
+
+    let count t () = Prmths.Counter.inc_one (call_count ~provider:M.provider t)
+
+    let cache =
+      Cache.create
+        {
+          Abbs_cache.Expiring.on_hit = count "hit";
+          on_miss = count "miss";
+          on_evict = count "evict";
+          duration = Duration.of_min 1;
+          capacity = 10_000;
+        }
+
+    (* [centralized] answers the brand of the selected centralized repository,
+       and the same brand again when that repository holds a forced config for
+       this repository. *)
+    let fetch ~request_id ~fetch_branch_sha ~config_brand ~centralized client repo =
+      let open Abb.Future.Infix_monad in
+      Cache.fetch cache repo (fun () ->
+          let open Abbs_future_combinators.Infix_result_monad in
+          Api.fetch_remote_repo ~request_id client repo
+          >>= fun remote_repo ->
+          let default_branch = Api.Remote_repo.default_branch remote_repo in
+          fetch_branch_sha client (Api.Remote_repo.to_repo remote_repo) default_branch
+          >>= fun default_branch_sha ->
+          let default_branch_ref = CCOption.get_or ~default:default_branch default_branch_sha in
+          Abbs_future_combinators.Result.all2
+            (config_brand client repo default_branch_ref)
+            (centralized client repo)
+          >>| fun (repo_config, (forced_config, centralized)) ->
+          Terrat_brand.resolve
+            ~forced_config
+            ~repo_config
+            ~centralized
+            ~fallback:(Terrat_brand.fallback ()))
+      >>| CCResult.map_err (fun (#Terrat_vcs_api.call_err as err) -> err)
+
+    let no_centralized _ _ = Abbs_future_combinators.return_ok (None, None)
+  end
+end
+
 module type S = sig
   val name : string
 
@@ -730,6 +803,7 @@ module type S = sig
   module Comment : sig
     val publish_comment :
       request_id:string ->
+      brand:Terrat_brand.t ->
       Api.Client.t ->
       string ->
       'diff Api.Pull_request.t ->
@@ -746,7 +820,15 @@ module type S = sig
         if it has been marked dirty. Runs on its own connections after the result transaction
         commits and is best effort: it must log and swallow its errors. *)
     val drain_unified_comment :
-      request_id:string -> Api.Config.t -> Pgsql_pool.t -> Uuidm.t -> unit Abb.Future.t
+      request_id:string ->
+      fetch_brand:
+        (Api.Client.t ->
+        Api.Repo.t ->
+        (Terrat_brand.t, Terrat_vcs_api.call_err) result Abb.Future.t) ->
+      Api.Config.t ->
+      Pgsql_pool.t ->
+      Uuidm.t ->
+      unit Abb.Future.t
 
     (** Mark the unified summary comment of the work manifest's pull request as needing a refresh,
         but only if the pull request already tracks one. Used by failure paths so aborted runs show
@@ -760,6 +842,10 @@ module type S = sig
         effort: errors are logged and swallowed. *)
     val publish_unified_comment_at_start :
       request_id:string ->
+      fetch_brand:
+        (Api.Client.t ->
+        Api.Repo.t ->
+        (Terrat_brand.t, Terrat_vcs_api.call_err) result Abb.Future.t) ->
       repo_config:Terrat_base_repo_config_v1.derived Terrat_base_repo_config_v1.t ->
       Api.Config.t ->
       Db.t ->
@@ -768,6 +854,13 @@ module type S = sig
   end
 
   module Repo_config : sig
+    (** The brand of a repository, from [Terrat_brand.resolve]. *)
+    val fetch_brand :
+      request_id:string ->
+      Api.Client.t ->
+      Api.Repo.t ->
+      (Terrat_brand.t, [> Terrat_vcs_api.call_err ]) result Abb.Future.t
+
     val fetch_with_provenance :
       ?system_defaults:Terrat_base_repo_config_v1.raw Terrat_base_repo_config_v1.t ->
       ?built_config:Yojson.Safe.t ->

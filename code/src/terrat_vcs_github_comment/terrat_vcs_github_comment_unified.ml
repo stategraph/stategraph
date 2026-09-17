@@ -183,6 +183,7 @@ end
 module S = struct
   type t = {
     account : Api.Account.t;
+    brand : Terrat_brand.t;
     client : Githubc2_abb.t;
     comment_id : Api.Comment.Id.t option;
     config : Api.Config.t;
@@ -412,7 +413,7 @@ module S = struct
             | T.Truncated _ -> `Null );
         ]
     in
-    match Minijinja.render_template Tmpl.unified_comment kv with
+    match Minijinja.render_template (Tmpl.unified_comment t.brand) kv with
     | Ok body -> body
     | Error err ->
         Logs.err (fun m -> m "%s : ERROR : %s" t.request_id err);
@@ -510,7 +511,7 @@ let mark_dirty_if_tracked ~request_id db work_manifest_id =
    [lock] did not wait and another publisher holds the lock, [`Done] when the
    comment was published (or there was nothing to do), and [`Race] when the
    observed dirty counter moved while publishing. *)
-let publish_core ~request_id ~lock config db work_manifest_id =
+let publish_core ~request_id ~fetch_brand ~lock config db work_manifest_id =
   let open Abbs_future_combinators.Infix_result_monad in
   Pgsql_io.Prepared_stmt.fetch
     db
@@ -556,9 +557,16 @@ let publish_core ~request_id ~lock config db work_manifest_id =
           let account = Api.Account.make (CCInt64.to_int installation_id) in
           Api.create_client ~request_id config account db
           >>= fun client ->
+          Abbs_future_combinators.Result.map_err
+            ~f:(fun (#Terrat_vcs_api.call_err as err) -> err)
+            (fetch_brand
+               client
+               (Api.Repo.make ~id:(CCInt64.to_int repository) ~name:repo_name ~owner:repo_owner ()))
+          >>= fun brand ->
           let t =
             {
               S.account;
+              brand;
               client = Api.Client.to_native client;
               comment_id =
                 CCOption.flat_map CCFun.(Int64.to_string %> Api.Comment.Id.of_string) comment_id;
@@ -590,11 +598,17 @@ let publish_core ~request_id ~lock config db work_manifest_id =
    the advisory lock and the GitHub API calls never extend a result
    transaction.  Returns [`Race] when new results marked the comment dirty
    while we were publishing, in which case the caller retries. *)
-let refresh ~request_id config storage work_manifest_id =
+let refresh ~request_id ~fetch_brand config storage work_manifest_id =
   let open Abb.Future.Infix_monad in
   Pgsql_pool.with_conn storage ~f:(fun db ->
       Pgsql_io.tx db ~f:(fun () ->
-          publish_core ~request_id ~lock:Sql.try_advisory_lock config db work_manifest_id))
+          publish_core
+            ~request_id
+            ~fetch_brand
+            ~lock:Sql.try_advisory_lock
+            config
+            db
+            work_manifest_id))
   >>= function
   | Ok (`Done | `Skip) -> Abbs_future_combinators.return_ok `Done
   | Ok `Race -> Abbs_future_combinators.return_ok `Race
@@ -607,7 +621,7 @@ let refresh ~request_id config storage work_manifest_id =
    each publish recomputes every dirspace, so the last writer leaves complete
    state.  Best effort: the caller logs failures and carries on -- the result
    drain still creates or refreshes the comment. *)
-let publish_at_start ~request_id ~config ~output_details db work_manifest_id =
+let publish_at_start ~request_id ~fetch_brand ~config ~output_details db work_manifest_id =
   let go () =
     let open Abbs_future_combinators.Infix_result_monad in
     Pgsql_io.Prepared_stmt.fetch
@@ -629,7 +643,7 @@ let publish_at_start ~request_id ~config ~output_details db work_manifest_id =
             >>= fun _locked ->
             mark_dirty ~request_id ~output_details db work_manifest_id
             >>= fun () ->
-            publish_core ~request_id ~lock:Sql.advisory_lock config db work_manifest_id
+            publish_core ~request_id ~fetch_brand ~lock:Sql.advisory_lock config db work_manifest_id
             >>= function
             | `Done | `Skip -> Abbs_future_combinators.return_ok ()
             | `Race -> attempt (n - 1)
@@ -643,7 +657,7 @@ let publish_at_start ~request_id ~config ~output_details db work_manifest_id =
   | Ok () -> Abbs_future_combinators.return_ok ()
   | Error _ -> Abbs_future_combinators.return_err `Error
 
-let drain ~request_id config storage work_manifest_id =
+let drain ~request_id ~fetch_brand config storage work_manifest_id =
   let open Abb.Future.Infix_monad in
   let rec attempt n =
     if n <= 0 then (
@@ -657,7 +671,7 @@ let drain ~request_id config storage work_manifest_id =
             work_manifest_id);
       Abbs_future_combinators.return_ok `Done)
     else
-      refresh ~request_id config storage work_manifest_id
+      refresh ~request_id ~fetch_brand config storage work_manifest_id
       >>= function
       | Ok `Done -> Abbs_future_combinators.return_ok `Done
       | Ok `Race -> attempt (n - 1)

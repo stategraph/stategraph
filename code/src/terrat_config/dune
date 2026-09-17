@@ -1,5 +1,12 @@
 (library
  (name terrat_config)
- (libraries containers dynamic_gc mirage-crypto-pk ppx_deriving uri x509)
+ (libraries
+  containers
+  dynamic_gc
+  mirage-crypto-pk
+  ppx_deriving
+  terrat_brand
+  uri
+  x509)
  (preprocess
   (pps ppx_deriving.show)))

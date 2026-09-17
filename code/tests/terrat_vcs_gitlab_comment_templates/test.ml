@@ -1,9 +1,13 @@
 module Tmpl = Terrat_vcs_gitlab_comment_templates.Tmpl
 
-let render tmpl kv =
-  match Minijinja.render_template tmpl kv with
+(* Every template is a function of the brand.  This helper renders the
+   Stategraph text; the brand test renders both brands. *)
+let render_brand brand tmpl kv =
+  match Minijinja.render_template (tmpl brand) kv with
   | Ok body -> body
   | Error err -> failwith err
+
+let render tmpl kv = render_brand Terrat_brand.Stategraph tmpl kv
 
 (* Every [<details>] the apply comment opens must close, and no [</details>] may
    run ahead of its open.  #1975: the per-dirspace [<details>] opened under
@@ -350,9 +354,21 @@ let test_cycle_names_the_rule =
             "`d2:default` waits for `d1:default` because of `depends_on`";
           ])
 
+(* One load of the module renders a template for both brands. *)
+let test_plan_complete2_brand =
+  Oth.test ~tags:[ "brand" ] ~name:"Plan complete: the heading follows the brand" (fun _ ->
+      let kv = plan_complete2_kv ~changes:[ true ] ~is_layered_run:false ~num_more_layers:0 () in
+      let stategraph = render_brand Terrat_brand.Stategraph Tmpl.plan_complete2 kv in
+      Oth.Assert.str_contains ~haystack:stategraph ~needle:"## Stategraph Plan Output";
+      Oth.Assert.str_doesnt_contain ~haystack:stategraph ~needle:"Terrateam";
+      let terrateam = render_brand Terrat_brand.Terrateam Tmpl.plan_complete2 kv in
+      Oth.Assert.str_contains ~haystack:terrateam ~needle:"## Terrateam Plan Output";
+      Oth.Assert.str_doesnt_contain ~haystack:terrateam ~needle:"Stategraph")
+
 let test =
   Oth.parallel
     [
+      test_plan_complete2_brand;
       test_plan_complete2_no_changes_more_layers;
       test_plan_complete2_no_changes_last_layer;
       test_plan_complete2_no_changes_not_layered;

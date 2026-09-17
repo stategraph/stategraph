@@ -28,6 +28,10 @@ val mark_dirty_if_tracked :
     errors are logged and returned for the caller to ignore. *)
 val publish_at_start :
   request_id:string ->
+  fetch_brand:
+    (Terrat_vcs_api_github.Client.t ->
+    Terrat_vcs_api_github.Repo.t ->
+    (Terrat_brand.t, Terrat_vcs_api.call_err) result Abb.Future.t) ->
   config:Terrat_vcs_api_github.Config.t ->
   output_details:bool ->
   Pgsql_io.t ->
@@ -36,6 +40,10 @@ val publish_at_start :
 
 val drain :
   request_id:string ->
+  fetch_brand:
+    (Terrat_vcs_api_github.Client.t ->
+    Terrat_vcs_api_github.Repo.t ->
+    (Terrat_brand.t, Terrat_vcs_api.call_err) result Abb.Future.t) ->
   Terrat_vcs_api_github.Config.t ->
   Pgsql_pool.t ->
   Uuidm.t ->
