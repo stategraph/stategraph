@@ -1,0 +1,9 @@
+(library
+ (name terrat_precheck)
+ (libraries
+  containers
+  terrat_base_repo_config_v1
+  terrat_change
+  terrat_change_match3
+  terrat_repo_config_file
+  yojson))

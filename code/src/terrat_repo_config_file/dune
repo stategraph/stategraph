@@ -1,0 +1,3 @@
+(library
+ (name terrat_repo_config_file)
+ (libraries containers sln terrat_change))

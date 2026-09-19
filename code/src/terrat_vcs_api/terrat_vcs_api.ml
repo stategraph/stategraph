@@ -178,6 +178,19 @@ module type S = sig
     string ->
     (string option, [> call_err ]) result Abb.Future.t
 
+  (** The most recent commits of a branch, newest first, at most one page. This is the lineage of
+      the branch, and it is what makes a stored artifact of an earlier commit safe to re-use: a sha
+      in this list is an ancestor of the branch head, thus the artifact belongs to this branch and
+      not to some other branch that shares the repository. A branch with a longer history than one
+      page gives only its newest commits, which is enough, because an older artifact is of no
+      interest. *)
+  val fetch_branch_commits :
+    request_id:string ->
+    Client.t ->
+    Repo.t ->
+    Ref.t ->
+    (Ref.t list, [> call_err ]) result Abb.Future.t
+
   val fetch_remote_repo :
     request_id:string -> Client.t -> Repo.t -> (Remote_repo.t, [> call_err ]) result Abb.Future.t
 

@@ -482,6 +482,29 @@ let fetch_branch_sha_cached ~request_id client repo ref_ =
     (fun () -> fetch_branch_sha' client repo ref_)
   >>= fetch_branch_sha_res ~request_id
 
+let fetch_branch_commits ~request_id client repo ref_ =
+  let open Abb.Future.Infix_monad in
+  Terrat_github.fetch_branch_commits
+    ~owner:repo.Repo.owner
+    ~repo:repo.Repo.name
+    ~branch:ref_
+    client.Client.client
+  >>= function
+  | Ok commits ->
+      let module C = Githubc2_components.Commit in
+      Abbs_future_combinators.return_ok
+        (CCList.map (fun { C.primary = { C.Primary.sha; _ }; _ } -> sha) commits)
+  | Error `Rate_limit_err -> vcs_api_rate_limit_err ~request_id "FETCH_BRANCH_COMMITS"
+  | Error `Timeout -> vcs_api_timeout_err ~request_id "FETCH_BRANCH_COMMITS"
+  | Error (#Terrat_github.fetch_branch_commits_err as err) ->
+      Logs.info (fun m ->
+          m
+            "%s : FETCH_BRANCH_COMMITS : %a"
+            request_id
+            Terrat_github.pp_fetch_branch_commits_err
+            err);
+      Abbs_future_combinators.return_err `Error
+
 let fetch_directory ~request_id client repo ref_ path =
   let module D = Githubc2_components.Content_directory.Items in
   let open Abb.Future.Infix_monad in

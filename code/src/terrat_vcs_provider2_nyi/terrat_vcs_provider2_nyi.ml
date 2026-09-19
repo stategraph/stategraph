@@ -38,6 +38,10 @@ module Db = struct
   let query_account_status ~request_id db account = raise (Failure "nyi")
   let query_index ~request_id db account ref_ = raise (Failure "nyi")
   let query_repo_config_json ~request_id db account ref_ = raise (Failure "nyi")
+
+  let query_recent_derived_repo_config ~request_id db account repo ~branch ~shas ~stale_min =
+    raise (Failure "nyi")
+
   let query_repo_tree ?base_ref ~request_id db accoutn ref_ = raise (Failure "nyi")
   let query_repo_tree_built ~request_id db account ref_ = raise (Failure "nyi")
   let query_repo_tree_changes ~request_id ~base_ref db account ref_ = raise (Failure "nyi")
@@ -219,6 +223,7 @@ module Job_context = struct
     let query ~request_id db ~job_id = raise (Failure "nyi")
     let query_all_by_context_id ~request_id db ~context_id () = raise (Failure "nyi")
     let query_pending_by_context_id ~request_id db ~context_id () = raise (Failure "nyi")
+    let query_explicit_plan_exists ~request_id db ~context_id () = raise (Failure "nyi")
     let query_by_work_manifest_id ~request_id db ~work_manifest_id () = raise (Failure "nyi")
     let update_state ~request_id db ~job_id state = raise (Failure "nyi")
     let add_work_manifest ~request_id db ~job_id ~work_manifest_id () = raise (Failure "nyi")

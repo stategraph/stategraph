@@ -129,6 +129,15 @@ type fetch_branch_err =
   ]
 [@@deriving show]
 
+type fetch_branch_commits_err =
+  [ Githubc2_abb.call_err
+  | `Bad_request of Githubc2_repos.List_commits.Responses.Bad_request.t
+  | `Not_found of Githubc2_repos.List_commits.Responses.Not_found.t
+  | `Conflict of Githubc2_repos.List_commits.Responses.Conflict.t
+  | `Internal_server_error of Githubc2_repos.List_commits.Responses.Internal_server_error.t
+  ]
+[@@deriving show]
+
 type publish_comment_err =
   [ Githubc2_abb.call_err
   | `Forbidden of Githubc2_components.Basic_error.t
@@ -371,6 +380,22 @@ let fetch_branch ~owner ~repo ~branch client =
   match Openapi.Response.value resp with
   | `OK branch -> Ok branch
   | (`Moved_permanently _ | `Not_found _) as err -> Error err
+
+(* 100 is the largest page GitHub gives. One page bounds the cost of the call
+   and bounds how far back a lineage test can look. *)
+let commits_page_size = 100
+
+let fetch_branch_commits ~owner ~repo ~branch client =
+  Prmths.Counter.inc_one (Metrics.fn_call_total "fetch_branch_commits");
+  let open Abbs_future_combinators.Infix_result_monad in
+  call
+    client
+    Githubc2_repos.List_commits.(
+      make (Parameters.make ~owner ~repo ~sha:(Some branch) ~per_page:commits_page_size ()))
+  >>? fun resp ->
+  match Openapi.Response.value resp with
+  | `OK commits -> Ok commits
+  | (`Bad_request _ | `Not_found _ | `Conflict _ | `Internal_server_error _) as err -> Error err
 
 let fetch_file ~owner ~repo ~ref_ ~path client =
   Prmths.Counter.inc_one (Metrics.fn_call_total "fetch_file");

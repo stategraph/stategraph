@@ -9,6 +9,7 @@
   terrat_base_repo_config_v1
   terrat_change
   terrat_change_match3
-  terrat_config)
+  terrat_config
+  terrat_repo_config_file)
  (preprocess
   (pps ppx_deriving.show)))

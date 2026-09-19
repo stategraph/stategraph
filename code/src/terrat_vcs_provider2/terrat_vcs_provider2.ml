@@ -577,6 +577,29 @@ module type S = sig
       Api.Ref.t ->
       (Yojson.Safe.t option, [> `Error ]) result Abb.Future.t
 
+    (** The fully-derived configuration of the commit of [branch] that is nearest to its head, out
+        of [shas], if that configuration is younger than [stale_min] minutes. [shas] is the lineage
+        of [branch], newest first, as {!Terrat_vcs_api.S.fetch_branch_commits} gives it.
+
+        The lineage is what makes the answer safe. A repository holds a derived configuration for
+        many branches, and the newest of them can belong to a branch that changed the dirs
+        completely. A configuration that a commit of the lineage produced is a true earlier state of
+        [branch] itself.
+
+        Every push to the default branch records one, and so does each evaluation of a pull request
+        against it. The answer tells what dirs the destination branch holds without any setup job,
+        thus it is cheap enough to read before one starts. [None] when no commit of the lineage
+        recorded one or the nearest one is too old. A [stale_min] of [0] makes every row too old. *)
+    val query_recent_derived_repo_config :
+      request_id:string ->
+      t ->
+      Api.Account.t ->
+      Api.Repo.t ->
+      branch:Api.Ref.t ->
+      shas:Api.Ref.t list ->
+      stale_min:int ->
+      (Yojson.Safe.t option, [> `Error ]) result Abb.Future.t
+
     val query_repo_tree :
       ?base_ref:Api.Ref.t ->
       request_id:string ->
@@ -1131,6 +1154,18 @@ module type S = sig
           [> `Error ] )
         result
         Abb.Future.t
+
+      (** [true] if a user has asked for a plan in this context.
+
+          An autoplan and a [terrateam plan] both write a job of type [plan]; only the explicit one
+          carries a tag query. Once a user has forced a run in a pull request, the prechecks of RFD
+          2111 no longer apply to it. This tells the caller if that has happened. *)
+      val query_explicit_plan_exists :
+        request_id:string ->
+        Db.t ->
+        context_id:Uuidm.t ->
+        unit ->
+        (bool, [> `Error ]) result Abb.Future.t
 
       val query_by_work_manifest_id :
         request_id:string ->

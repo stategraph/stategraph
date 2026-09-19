@@ -103,6 +103,30 @@ struct
             Abbs_future_combinators.return_err err
         | Error `Error -> Abbs_future_combinators.return_err (`Vcs_api_err "CREATE_COMMIT_CHECKS"))
 
+  (* A precheck answers before the tree, the config and the index exist, and a
+     read of the matches would build all three. *)
+  let create_completed_apply_check s { Builder.Bs.Fetcher.fetch } =
+    let open Abbs_future_combinators.Infix_result_monad in
+    fetch Keys.account
+    >>= fun account ->
+    fetch Keys.repo
+    >>= fun repo ->
+    let checks =
+      [
+        S.Commit_check.make_str
+          ~config:(Builder.State.config s)
+          ~description:"Completed"
+          ~status:Terrat_commit_check.Status.Completed
+          ~repo
+          ~account
+          "terrateam apply";
+      ]
+    in
+    fetch Keys.branch_ref
+    >>= fun branch_ref ->
+    fetch Keys.create_commit_checks
+    >>= fun create_commit_checks -> create_commit_checks' create_commit_checks branch_ref checks
+
   (* The comment, if any, a user should see for an evaluation error.  [None]
      means say nothing: either nothing went wrong ([`Noop], [`Suspend_eval],
      [`Rerun]) or everything worth saying has already been said

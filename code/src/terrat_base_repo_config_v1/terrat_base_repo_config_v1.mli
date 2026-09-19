@@ -482,6 +482,40 @@ module Depends_on : sig
 end
 
 module When_modified : sig
+  (** One entry of the global [when_modified.prechecks] list.
+
+      A precheck decides, from the static repository configuration alone, whether a pull request is
+      worth any work at all. If any precheck gives [false], the operation becomes a noop, and the
+      tree builder, the config builder and the indexer never run. That is the point: those three
+      setup jobs cost an action run on every pull request, and a precheck answers before any of them
+      starts.
+
+      Prechecks are permitted only in the global [when_modified]. The repository configuration
+      schema has no [prechecks] key under a dir, so a dir always carries the empty list. *)
+  module Precheck : sig
+    module Config_file_patterns : sig
+      type t = {
+        stale_config_min : int;
+            (** How old, in minutes, the config of the destination branch may be and still be reused
+                to answer the check. A config older than this gives no answer, and the usual
+                evaluation continues. *)
+      }
+      [@@deriving make, show, yojson, eq]
+    end
+
+    type t =
+      | User of string list
+          (** The pull request user matches the list. An entry that starts with [!] is a negation. A
+              list of negations only carries an implicit ['*']; a mixed list does not. *)
+      | File_patterns of File_pattern_list.t
+          (** The changed files of the pull request match the list. Negation works as it does for
+              {!User}. These globs are repository paths, so they carry no [${DIR}] prefix. *)
+      | Config_file_patterns of Config_file_patterns.t
+          (** The changed files of the pull request match a dir of the config that the config
+              builder wrote for the destination branch. *)
+    [@@deriving show, yojson, eq]
+  end
+
   type t = {
     autoapply : bool; [@default false]
     autoplan : bool; [@default false]
@@ -493,6 +527,7 @@ module When_modified : sig
             CCResult.get_exn (File_pattern.make "**/*.tf");
             CCResult.get_exn (File_pattern.make "**/*.tfvars");
           ]]
+    prechecks : Precheck.t list; [@default []]
   }
   [@@deriving make, show, yojson, eq]
 end

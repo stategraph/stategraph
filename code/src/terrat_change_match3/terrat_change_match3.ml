@@ -424,6 +424,7 @@ let topology_of_dirspace_configs dirspaces =
                    autoplan = _;
                    autoplan_draft_pr = _;
                    file_patterns = _;
+                   prechecks = _;
                  };
                stack_config =
                  {

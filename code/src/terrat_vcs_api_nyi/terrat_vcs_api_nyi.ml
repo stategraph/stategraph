@@ -110,6 +110,7 @@ module Client = struct
 end
 
 let fetch_branch_sha ~request_id client repo ref_ = raise (Failure "nyi")
+let fetch_branch_commits ~request_id client repo ref_ = raise (Failure "nyi")
 let fetch_file ~request_id client repo ref_ path = raise (Failure "nyi")
 let fetch_remote_repo ~request_id client repo = raise (Failure "nyi")
 let fetch_centralized_repo ~request_id client owner = raise (Failure "nyi")

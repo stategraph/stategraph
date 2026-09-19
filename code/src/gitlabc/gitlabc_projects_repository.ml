@@ -1560,13 +1560,17 @@ module GetApiV4ProjectsIdRepositoryCommits = struct
   end
 
   module Responses = struct
-    module OK = struct end
+    module OK = struct
+      type t = Gitlabc_components.API_Entities_Commit.t list
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
     module Bad_request = struct end
     module Unauthorized = struct end
     module Not_found = struct end
 
     type t =
-      [ `OK
+      [ `OK of OK.t
       | `Bad_request
       | `Unauthorized
       | `Not_found
@@ -1575,7 +1579,7 @@ module GetApiV4ProjectsIdRepositoryCommits = struct
 
     let t =
       [
-        ("200", fun _ -> Ok `OK);
+        ("200", Openapi.of_json_body (fun v -> `OK v) OK.of_yojson);
         ("400", fun _ -> Ok `Bad_request);
         ("401", fun _ -> Ok `Unauthorized);
         ("404", fun _ -> Ok `Not_found);

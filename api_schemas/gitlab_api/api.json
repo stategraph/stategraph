@@ -72425,13 +72425,17 @@
         ],
         "responses": {
           "200": {
-            "description": "Get a project repository commits",
-            "schema": {
-              "items": {
-                "$ref": "#/components/schemas/API_Entities_Commit"
-              },
-              "type": "array"
-            }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/API_Entities_Commit"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Get a project repository commits"
           },
           "400": {
             "description": "Bad request"
