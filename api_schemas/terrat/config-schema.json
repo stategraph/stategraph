@@ -1335,6 +1335,73 @@
       },
       "type": "array"
     },
+    "precheck": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/precheck-user"
+        },
+        {
+          "$ref": "#/definitions/precheck-file-patterns"
+        },
+        {
+          "$ref": "#/definitions/precheck-config-file-patterns"
+        }
+      ]
+    },
+    "precheck-config-file-patterns": {
+      "additionalProperties": false,
+      "properties": {
+        "config_file_patterns": {
+          "$ref": "#/definitions/precheck-config-file-patterns-value"
+        }
+      },
+      "required": [
+        "config_file_patterns"
+      ],
+      "type": "object"
+    },
+    "precheck-config-file-patterns-value": {
+      "additionalProperties": false,
+      "properties": {
+        "stale_config_min": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "stale_config_min"
+      ],
+      "type": "object"
+    },
+    "precheck-file-patterns": {
+      "additionalProperties": false,
+      "properties": {
+        "file_patterns": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "file_patterns"
+      ],
+      "type": "object"
+    },
+    "precheck-user": {
+      "additionalProperties": false,
+      "properties": {
+        "user": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "user"
+      ],
+      "type": "object"
+    },
     "retry": {
       "additionalProperties": false,
       "properties": {
@@ -1830,6 +1897,13 @@
           ],
           "items": {
             "type": "string"
+          },
+          "type": "array"
+        },
+        "prechecks": {
+          "default": [],
+          "items": {
+            "$ref": "#/definitions/precheck"
           },
           "type": "array"
         }

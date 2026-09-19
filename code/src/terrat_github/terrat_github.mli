@@ -84,6 +84,15 @@ type fetch_branch_err =
   ]
 [@@deriving show]
 
+type fetch_branch_commits_err =
+  [ Githubc2_abb.call_err
+  | `Bad_request of Githubc2_repos.List_commits.Responses.Bad_request.t
+  | `Not_found of Githubc2_repos.List_commits.Responses.Not_found.t
+  | `Conflict of Githubc2_repos.List_commits.Responses.Conflict.t
+  | `Internal_server_error of Githubc2_repos.List_commits.Responses.Internal_server_error.t
+  ]
+[@@deriving show]
+
 type publish_comment_err =
   [ Githubc2_abb.call_err
   | `Forbidden of Githubc2_components.Basic_error.t
@@ -261,6 +270,15 @@ val fetch_branch :
   branch:string ->
   Githubc2_abb.t ->
   (Githubc2_components.Branch_with_protection.t, [> fetch_branch_err ]) result Abb.Future.t
+
+(** The newest commits of [branch], newest first, at most one page. The page is what bounds how far
+    back a caller can test a lineage. *)
+val fetch_branch_commits :
+  owner:string ->
+  repo:string ->
+  branch:string ->
+  Githubc2_abb.t ->
+  (Githubc2_components.Commit.t list, [> fetch_branch_commits_err ]) result Abb.Future.t
 
 val fetch_file :
   owner:string ->

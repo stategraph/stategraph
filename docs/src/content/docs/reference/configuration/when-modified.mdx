@@ -33,9 +33,81 @@ when_modified:
 | autoplan_draft_pr    | Boolean | Automatically run a plan operation on a new draft pull request or an update on an existing one. Default is true. |
 | autoapply            | Boolean | Automatically run an apply operation after merging a pull request. Default is false. |
 | depends_on           | String or Object | Defines dependencies between different directories or environments, allowing for sequential operations. Supports `dir:` for absolute paths or `relative_dir:` for relative paths within the repository. Can also combine dependencies using [tag queries](/advanced-workflows/tags/#tag-query-syntax). Default is an empty string. May also be an object to enable additional behavior such as `prune_on_no_change` (see [Depends-On](#depends-on)). |
+| prechecks            | List    | Cheap checks that decide, before any setup job runs, whether a pull request is worth any work. Only valid in the global `when_modified`. Default is an empty list. See [Prechecks](#prechecks). |
 
 ### File Patterns
 The `file_patterns` key specifies a list of file globs that identify changes in a directory. These patterns are relative to the root of the repository.
+
+### Prechecks
+
+Autoplan normally has to run the [tree builder](/reference/configuration/tree-builder), the [config builder](/reference/configuration/config-builder) and the [indexer](/reference/configuration/indexer) before Terrateam can tell whether a pull request changes anything it manages. Each of those costs a CI run on every pull request, including the ones that turn out to need no work at all.
+
+`prechecks` lets you give Terrateam a hint so it can answer sooner. Every check is evaluated against the static configuration in your repository and the pull request itself. If **any** check is false, Terrateam does nothing and no CI run is started.
+
+```yaml
+when_modified:
+  prechecks:
+    - user: ['!renovate[bot]']
+    - file_patterns: ['!docs/**']
+    - config_file_patterns:
+        stale_config_min: 60
+```
+
+`prechecks` is only valid in the **global** `when_modified`. Setting it under `dirs.<directory>.when_modified` is a configuration error: a precheck is a decision about the whole pull request, taken before any directory is known.
+
+Prechecks are read only from the configuration committed to your repository. A `prechecks` list that the config builder produces is ignored, because a precheck exists to decide whether the config builder should run at all.
+
+#### Checks
+
+| Check | Description |
+|-------|-------------|
+| `user` | A list of user names. The check passes when the user who **opened** the pull request matches the list. The pusher is not considered. |
+| `file_patterns` | A list of file globs. The check passes when any file the pull request changes matches the list. These globs are repository paths and take no `${DIR}` prefix. |
+| `config_file_patterns` | The check passes when a file the pull request changes matches a directory in the configuration Terrateam derived for the destination branch. Takes `stale_config_min`, how many minutes may pass since that configuration was last derived. |
+
+#### Negation and the implicit `'*'`
+
+Both `user` and `file_patterns` accept entries prefixed with `!`, which exclude rather than include. The rule for a list is:
+
+- a list of **only** negations carries an implicit `'*'`, so it matches everything the negations do not exclude;
+- a **mixed** list carries no implicit `'*'`, so at least one positive entry must also match;
+- an **empty** list matches nothing.
+
+So `['!docs/**']` means "any change outside `docs/`", while `['infra/**', '!docs/**']` means "a change under `infra/` that is not under `docs/`".
+
+#### When a check cannot answer
+
+A check that cannot read the data it needs passes, so that the usual evaluation continues. `config_file_patterns` passes when no configuration has been derived for the destination branch yet, when the one it finds is older than `stale_config_min`, or when the pull request changes the Terrateam configuration file itself. A `stale_config_min` of `0` makes every configuration stale, which disables the check.
+
+`file_patterns` and `config_file_patterns` also pass when the pull request is large enough that the VCS truncates the file list it reports. GitHub stops at 3000 files and does not say that it stopped, so a longer list may be missing the very file a check looks for. Terrateam treats such a list as no answer rather than as an answer of "nothing matched", so a very large pull request is always evaluated normally.
+
+The age is measured from the last time Terrateam derived that configuration, not from the first. A pull request that falls through because the configuration went stale derives it again on the way past, so the next pull request against that branch finds a fresh one. The check therefore recovers by itself on a branch nobody pushes to; it costs the first pull request after the window a full evaluation.
+
+A derived configuration is recorded by a push to the default branch, and by the evaluation of any pull request against a branch. So `config_file_patterns` cannot answer for a destination branch that nothing has evaluated yet, and that pull request is evaluated normally.
+
+#### Which configuration the check reads
+
+Terrateam reads the recent commits of the destination branch and keeps only the configurations that were derived at one of those commits. Of those, it takes the one derived at the commit nearest to the branch head.
+
+This matters because a repository holds a derived configuration for every branch Terrateam has evaluated, and the most recently derived one can belong to a branch that rearranged the directories completely. A configuration produced at a commit of the destination branch is a real earlier state of that branch, so it is the safe one to reuse. It also means a force push or a rebase of the destination branch cannot leave the check reading a configuration for a commit that no longer exists there.
+
+Only recent commits are read, so a configuration derived far back in the history is not found. That costs nothing in practice, because `stale_config_min` would reject it anyway.
+
+#### Prechecks read the VCS diff
+
+The checks that read the changed files — `file_patterns` and `config_file_patterns` — use the file list the VCS reports for the pull request. That is deliberate, and it is what makes them prechecks: they answer before Terrateam does any work, using only what is already at hand.
+
+If you enable the [tree builder](/reference/configuration/tree-builder), the rest of the evaluation works from a different list. The tree builder decides for itself which files a pull request changes, and it can mark a file that the VCS diff does not list at all — a directory whose module dependency moved, for instance. Getting that list means running the tree builder, which is the CI run the precheck exists to skip, so a precheck cannot wait for it.
+
+The consequence is worth knowing when you write the checks: a precheck decides on the VCS diff alone, so a pull request whose only relevant change is one the tree builder would have found is stopped. That is the trade the hint buys you. Write your patterns against the paths the VCS reports.
+
+#### Overriding a precheck
+
+Prechecks apply only to autoplan. Commenting `terrateam plan` runs the pull request regardless, and from that point the prechecks no longer apply to a later commit on it. The later layers of a layered run never consult prechecks at all.
+
+#### Prechecks and the apply check
+
+A pull request that a precheck stopped still has to be mergeable. If [`apply_requirements.create_completed_apply_check_on_noop`](/reference/configuration/apply-requirements) is `true`, the completed `terrateam apply` check is created even though no work was done.
 
 ### Auto-Plan
 The `autoplan` key enables or disables automatic plan operations on new pull requests or updates to existing ones.

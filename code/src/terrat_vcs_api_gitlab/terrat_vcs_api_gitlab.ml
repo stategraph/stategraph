@@ -325,6 +325,42 @@ let fetch_branch_sha ~request_id client repo ref_ =
       Logs.err (fun m -> m "%s : FETCH_BRANCH_SHA : %a" request_id Openapic_abb.pp_call_err err);
       Abbs_future_combinators.return_err `Error
 
+(* 100 is the largest page GitLab gives. One page bounds the cost of the call
+   and bounds how far back a lineage test can look. *)
+let commits_page_size = 100
+
+let fetch_branch_commits ~request_id client repo ref_ =
+  let run =
+    let module Gl = Gitlabc_projects_repository.GetApiV4ProjectsIdRepositoryCommits in
+    let open Abbs_future_combinators.Infix_result_monad in
+    call
+      client.Client.client
+      Gl.(
+        make
+          (Parameters.make
+             ~id:(CCInt.to_string @@ Repo.id repo)
+             ~ref_name:(Some ref_)
+             ~per_page:commits_page_size
+             ()))
+    >>= fun resp ->
+    let module C = Gitlabc_components_api_entities_commit in
+    match Openapi.Response.value resp with
+    | `OK commits -> Abbs_future_combinators.return_ok (CCList.map (fun { C.id; _ } -> id) commits)
+    | (`Bad_request | `Unauthorized | `Not_found) as err -> Abbs_future_combinators.return_err err
+  in
+  let open Abb.Future.Infix_monad in
+  run
+  >>= function
+  | Ok _ as ret -> Abb.Future.return ret
+  | Error `Rate_limit_err -> vcs_api_rate_limit_err ~request_id "FETCH_BRANCH_COMMITS"
+  | Error `Timeout -> vcs_api_timeout_err ~request_id "FETCH_BRANCH_COMMITS"
+  | Error (#Openapic_abb.call_err as err) ->
+      Logs.err (fun m -> m "%s : FETCH_BRANCH_COMMITS : %a" request_id Openapic_abb.pp_call_err err);
+      Abbs_future_combinators.return_err `Error
+  | Error (`Bad_request | `Unauthorized | `Not_found) ->
+      Logs.err (fun m -> m "%s : FETCH_BRANCH_COMMITS : REFUSED" request_id);
+      Abbs_future_combinators.return_err `Error
+
 let fetch_file ~request_id client repo ref_ path =
   let run =
     let module Gl = Gitlabc_projects_repository.GetApiV4ProjectsIdRepositoryFilesFilePath in

@@ -1,0 +1,9 @@
+(test
+ (name test)
+ (libraries
+  containers
+  oth
+  terrat_base_repo_config_v1
+  terrat_change
+  terrat_precheck
+  terrat_repo_config))

@@ -34,6 +34,15 @@ module Make
     result
     Abb.Future.t
 
+  (** Create the completed [terrateam apply] commit check at the head of the pull request.
+
+      A pull request that reached a noop still has to be mergeable, thus an operator who needs that
+      check green to merge gets it even though no work was done. The caller decides that no work is
+      left; this reads no matches of its own, so a caller that must not start a setup job can use
+      it. *)
+  val create_completed_apply_check :
+    Builder.Bs.state -> Builder.Bs.Fetcher.t -> (unit, Builder.err) result Abb.Future.t
+
   (** The comment, if any, to publish for an evaluation error. [None] means publish nothing: either
       nothing went wrong or the user has already been told. *)
   val msg_of_err : Builder.err -> Keys.msg option

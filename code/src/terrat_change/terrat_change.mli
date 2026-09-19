@@ -9,6 +9,15 @@ module Diff : sig
         previous_filename : string;
       }
   [@@deriving yojson, eq, show]
+
+  (** The largest number of files that a VCS reports for one pull request. GitHub stops at this
+      number and does not say that it stopped. *)
+  val max_reported_files : int
+
+  (** [true] when the diff is as long as the VCS reports at most. Such a diff can be short of the
+      true change, thus a test that reads it can give a wrong answer, and a caller that cannot
+      afford a wrong answer must treat it as no answer at all. *)
+  val may_be_truncated : t list -> bool
 end
 
 module Dirspace = Terrat_dirspace

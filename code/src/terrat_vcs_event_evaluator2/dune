@@ -16,6 +16,7 @@
   terrat_job_context
   terrat_kv_store
   terrat_metrics
+  terrat_precheck
   terrat_storage
   terrat_vcs_event_evaluator
   terrat_vcs_event_evaluator2_targets

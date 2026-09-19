@@ -448,6 +448,19 @@ module Db = struct
         /% Var.bigint "installation_id"
         /% Var.text "sha")
 
+    let select_recent_derived_repo_config =
+      Pgsql_io.Typed_sql.(
+        sql
+        //
+        (* repo_config *)
+        Ret.json
+        /^ read [%blob "sql/select_recent_derived_repo_config.sql"]
+        /% Var.bigint "installation_id"
+        /% Var.bigint "repository_id"
+        /% Var.text "branch"
+        /% Var.(str_array (text "shas"))
+        /% Var.integer "stale_min")
+
     let select_repo_tree =
       Pgsql_io.Typed_sql.(
         sql
@@ -1756,6 +1769,27 @@ module Db = struct
     >>= function
     | Ok (repo_config :: _) -> Abbs_future_combinators.return_ok (Some repo_config)
     | Ok [] -> Abbs_future_combinators.return_ok None
+    | Error (#Pgsql_io.err as err) ->
+        Prmths.Counter.inc_one Metrics.pgsql_errors_total;
+        Logs.err (fun m -> m "%s : ERROR : %a" request_id Pgsql_io.pp_err err);
+        Abbs_future_combinators.return_err `Error
+
+  let query_recent_derived_repo_config ~request_id db account repo ~branch ~shas ~stale_min =
+    let open Abb.Future.Infix_monad in
+    Metrics.Psql_query_time.time
+      (Metrics.psql_query_time "select_recent_derived_repo_config")
+      (fun () ->
+        Pgsql_io.Prepared_stmt.fetch
+          db
+          Sql.select_recent_derived_repo_config
+          ~f:CCFun.id
+          (CCInt64.of_int @@ Api.Account.id account)
+          (CCInt64.of_int @@ Api.Repo.id repo)
+          (Api.Ref.to_string branch)
+          (CCList.map Api.Ref.to_string shas)
+          (CCInt32.of_int stale_min))
+    >>= function
+    | Ok repo_configs -> Abbs_future_combinators.return_ok (CCList.head_opt repo_configs)
     | Error (#Pgsql_io.err as err) ->
         Prmths.Counter.inc_one Metrics.pgsql_errors_total;
         Logs.err (fun m -> m "%s : ERROR : %a" request_id Pgsql_io.pp_err err);
@@ -6095,6 +6129,15 @@ module Job_context = struct
         /^ read [%blob "sql/select_job_by_id.sql"]
         /% Var.uuid "id")
 
+    let select_explicit_plan_job =
+      Pgsql_io.Typed_sql.(
+        sql
+        //
+        (* id *)
+        Ret.uuid
+        /^ read [%blob "sql/select_explicit_plan_job.sql"]
+        /% Var.uuid "context_id")
+
     let select_job_by_work_manifest_id =
       Pgsql_io.Typed_sql.(
         sql
@@ -6444,6 +6487,21 @@ module Job_context = struct
 
     let query_all_by_context_id ~request_id:_ _db ~context_id:_ () = raise (Failure "nyi")
     let query_pending_by_context_id ~request_id:_ _db ~context_id:_ () = raise (Failure "nyi")
+
+    let query_explicit_plan_exists ~request_id db ~context_id () =
+      let run =
+        let open Abbs_future_combinators.Infix_result_monad in
+        Pgsql_io.Prepared_stmt.fetch db Sql.select_explicit_plan_job ~f:CCFun.id context_id
+        >>= fun rows -> Abbs_future_combinators.return_ok (not (CCList.is_empty rows))
+      in
+      let open Abb.Future.Infix_monad in
+      run
+      >>= function
+      | Ok _ as r -> Abb.Future.return r
+      | Error (#Pgsql_io.err as err) ->
+          Logs.err (fun m ->
+              m "%s : JOB : QUERY_EXPLICIT_PLAN_EXISTS : %a" request_id Pgsql_io.pp_err err);
+          Abbs_future_combinators.return_err `Error
 
     let query_by_work_manifest_id ~request_id db ~work_manifest_id () =
       let run =

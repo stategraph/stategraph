@@ -1965,6 +1965,11 @@ struct
                 (fun () ->
                   S.Db.query_applied_dirspaces_for_context ~request_id:(Builder.log_id s) db context)))
 
+    (* Prechecks read the pull request, thus only the pull request flow answers this.  The branch
+       flow keeps this default, which stops nothing. *)
+    let check_prechecks =
+      run ~name:"check_prechecks" (fun _s _fetcher -> Abbs_future_combinators.return_ok ())
+
     let check_account_tier =
       run ~name:"check_account_tier" (fun s { Bs.Fetcher.fetch } ->
           let open Irm in
@@ -2856,6 +2861,11 @@ struct
             let module V1 = Terrat_base_repo_config_v1 in
             match V1.enabled repo_config with
             | true -> (
+                (* The prechecks answer here because this is the last point at which no setup work
+                   manifest exists.  [run_plan] below reaches [can_run_plan] and [matches], and each
+                   of those builds the tree, the config and the index. *)
+                fetch Keys.check_prechecks
+                >>= fun () ->
                 fetch Keys.job
                 >>= fun job ->
                 match job.Tjc.Job.type_ with
@@ -3304,7 +3314,7 @@ struct
           >>= fun () -> Abbs_future_combinators.return_ok (CCList.length schedules))
 
     let maybe_create_completed_apply_check =
-      run ~name:"maybe_create_completed_apply_check" (fun s { Bs.Fetcher.fetch } ->
+      run ~name:"maybe_create_completed_apply_check" (fun s ({ Bs.Fetcher.fetch } as fetcher) ->
           let module R = Terrat_base_repo_config_v1 in
           let open Irm in
           fetch Keys.repo_config
@@ -3318,27 +3328,7 @@ struct
           fetch Keys.all_unapplied_matches
           >>= fun all_unapplied_matches ->
           match (all_unapplied_matches, all_matches, create_completed_apply_check_on_noop) with
-          | [], [], true | [], _, _ ->
-              fetch Keys.account
-              >>= fun account ->
-              fetch Keys.repo
-              >>= fun repo ->
-              let checks =
-                [
-                  S.Commit_check.make_str
-                    ~config:(Builder.State.config s)
-                    ~description:"Completed"
-                    ~status:Terrat_commit_check.Status.Completed
-                    ~repo
-                    ~account
-                    "terrateam apply";
-                ]
-              in
-              fetch Keys.branch_ref
-              >>= fun branch_ref ->
-              fetch Keys.create_commit_checks
-              >>= fun create_commit_checks ->
-              create_commit_checks' create_commit_checks branch_ref checks
+          | [], [], true | [], _, _ -> Tasks_base.create_completed_apply_check s fetcher
           | _ -> Abbs_future_combinators.return_ok ())
 
     let finalize_unfinished_terrateam_checks =
@@ -3654,6 +3644,7 @@ struct
     |> Hmap.add (coerce Keys.built_repo_tree_dest_branch) Tasks.built_repo_tree_dest_branch
     |> Hmap.add (coerce Keys.check_account_status_expired) Tasks.check_account_status_expired
     |> Hmap.add (coerce Keys.check_account_tier) Tasks.check_account_tier
+    |> Hmap.add (coerce Keys.check_prechecks) Tasks.check_prechecks
     |> Hmap.add (coerce Keys.check_valid_destination_branch) Tasks.check_valid_destination_branch
     |> Hmap.add (coerce Keys.client) Tasks.client
     |> Hmap.add (coerce Keys.commit_checks) Tasks.commit_checks

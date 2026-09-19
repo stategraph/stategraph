@@ -850,6 +850,185 @@ struct
                 (S.Api.Pull_request.Id.to_string @@ S.Api.Pull_request.id pull_request));
           Builder.run_db s ~f:(fun db -> store_pull_request s db pull_request))
 
+    (* A precheck names itself in the log line that stops the work, because the answer is otherwise
+       silent: a stopped autoplan writes no comment. *)
+    let precheck_name =
+      let module Pc = Terrat_base_repo_config_v1.When_modified.Precheck in
+      function
+      | Pc.User _ -> "user"
+      | Pc.File_patterns _ -> "file_patterns"
+      | Pc.Config_file_patterns _ -> "config_file_patterns"
+
+    let eval_config_file_patterns s { Bs.Fetcher.fetch } ~files ~pull_request ~stale_config_min =
+      let open Irm in
+      (* A pull request that rewrites the configuration always continues: the configuration of the
+         destination branch cannot describe one that the pull request changes. *)
+      if Terrat_precheck.changes_repo_config files then Abbs_future_combinators.return_ok true
+      else
+        Ee2_fc.all3 (fetch Keys.account) (fetch Keys.repo) (fetch Keys.dest_branch_name)
+        >>= fun (account, repo, dest_branch_name) ->
+        fetch Keys.client
+        >>= fun client ->
+        let open Abb.Future.Infix_monad in
+        (* The lineage of the destination branch decides which stored configuration to read. Without
+           it the query can only take the newest row of the branch, and a branch that a pull request
+           evaluation wrote against at a commit which a later rewrite removed is then not an earlier
+           state of this branch at all. *)
+        (let open Irm in
+         S.Api.fetch_branch_commits ~request_id:(Builder.log_id s) client repo dest_branch_name
+         >>= fun shas ->
+         Builder.run_db s ~f:(fun db ->
+             S.Db.query_recent_derived_repo_config
+               ~request_id:(Builder.log_id s)
+               db
+               account
+               repo
+               ~branch:dest_branch_name
+               ~shas
+               ~stale_min:stale_config_min))
+        >>= function
+        | Error _ ->
+            (* The error stops here. Every other task lets a failure end the job, which writes an
+               internal error on the pull request, but a precheck that cannot get its data must
+               pass: an opt-in hint must never make a pull request fail that would otherwise have
+               run. *)
+            Logs.info (fun m -> m "%s : PRECHECK_CONFIG_UNAVAILABLE" (Builder.log_id s));
+            Abbs_future_combinators.return_ok true
+        | Ok None -> Abbs_future_combinators.return_ok true
+        | Ok (Some repo_config_json) -> (
+            let diff = S.Api.Pull_request.diff pull_request in
+            (* The parse and the dir match are real work on a repository with many dirs, thus they
+               go off the event loop, as every other use of them in this evaluator does. *)
+            Abb.Thread.run (fun () -> Terrat_precheck.match_derived_config ~diff repo_config_json)
+            >>= function
+            | Some matched -> Abbs_future_combinators.return_ok matched
+            | None ->
+                (* A stored configuration that does not parse gives [true], as an absent one does:
+                   the answer comes from a cache, thus a cache that cannot be read must not stop a
+                   pull request. *)
+                Logs.err (fun m -> m "%s : PRECHECK_CONFIG_UNREADABLE" (Builder.log_id s));
+                Abbs_future_combinators.return_ok true)
+
+    let eval_precheck s fetcher ~files ~files_truncated ~pull_request =
+      let module Pc = Terrat_base_repo_config_v1.When_modified.Precheck in
+      function
+      | Pc.User users ->
+          Abbs_future_combinators.return_ok
+            (Terrat_precheck.match_user ~users (S.Api.Pull_request.user pull_request))
+      | Pc.File_patterns file_patterns ->
+          if files_truncated then Abbs_future_combinators.return_ok true
+          else
+            Abbs_future_combinators.return_ok
+              (Terrat_precheck.match_file_patterns ~files file_patterns)
+      | Pc.Config_file_patterns { Pc.Config_file_patterns.stale_config_min } ->
+          if files_truncated then Abbs_future_combinators.return_ok true
+          else eval_config_file_patterns s fetcher ~files ~pull_request ~stale_config_min
+
+    (* The checks are an "and", thus the first one that gives [false] is the answer and the rest
+       need no work. *)
+    let rec first_failed_precheck s fetcher ~files ~files_truncated ~pull_request = function
+      | [] -> Abbs_future_combinators.return_ok None
+      | precheck :: rest -> (
+          let open Irm in
+          eval_precheck s fetcher ~files ~files_truncated ~pull_request precheck
+          >>= function
+          | true -> first_failed_precheck s fetcher ~files ~files_truncated ~pull_request rest
+          | false -> Abbs_future_combinators.return_ok (Some precheck))
+
+    let check_prechecks =
+      run ~name:"check_prechecks" (fun s ({ Bs.Fetcher.fetch } as fetcher) ->
+          let module V1 = Terrat_base_repo_config_v1 in
+          let open Irm in
+          fetch Keys.job
+          >>= fun ({ Tjc.Job.context; _ } as job) ->
+          match job.Tjc.Job.type_ with
+          | Tjc.Job.Type_.Autoplan -> (
+              (* The static configuration, never the one that the config builder makes: a precheck
+                 exists to stop that builder, thus a precheck it produced is too late to read. *)
+              fetch Keys.repo_config_raw'
+              >>= fun (_, repo_config) ->
+              match (V1.when_modified repo_config).V1.When_modified.prechecks with
+              | [] -> Abbs_future_combinators.return_ok ()
+              | prechecks -> (
+                  (* [iter_job] runs again for every work manifest event that the job owns, thus a
+                     precheck that answers a second time could stop a job that already dispatched
+                     work.  [config_file_patterns] can give a different answer on a later pass,
+                     because the evaluation of this pull request itself records the configuration of
+                     the destination branch that the check reads.  A job that owns a work manifest
+                     has passed the prechecks already. *)
+                  fetch Keys.work_manifests_for_job
+                  >>= function
+                  | _ :: _ -> Abbs_future_combinators.return_ok ()
+                  | [] -> (
+                      Builder.run_db s ~f:(fun db ->
+                          S.Job_context.Job.query_explicit_plan_exists
+                            ~request_id:(Builder.log_id s)
+                            db
+                            ~context_id:context.Tjc.Context.id
+                            ())
+                      >>= function
+                      | true ->
+                          Logs.info (fun m -> m "%s : PRECHECK_OVERRIDDEN" (Builder.log_id s));
+                          Abbs_future_combinators.return_ok ()
+                      | false -> (
+                          fetch Keys.pull_request
+                          >>= fun pull_request ->
+                          (* The files the VCS reports, never [Keys.pull_request_diff].  That key
+                             gives the verdict of the tree builder when the tree builder is
+                             enabled, and to build it the tree builder must run.  A precheck
+                             answers before the system does anything, thus it reads only what it
+                             already has. *)
+                          let diff = S.Api.Pull_request.diff pull_request in
+                          (* A diff that the VCS cut short can hide the very file that a check
+                             looks for, thus the checks that read files must treat it as no answer
+                             rather than as an answer of "no match". *)
+                          let files_truncated = Terrat_change.Diff.may_be_truncated diff in
+                          let files =
+                            CCList.flat_map
+                              (function
+                                | Terrat_change.Diff.Add { filename }
+                                | Terrat_change.Diff.Change { filename }
+                                | Terrat_change.Diff.Remove { filename } -> [ filename ]
+                                | Terrat_change.Diff.Move { filename; previous_filename } ->
+                                    [ filename; previous_filename ])
+                              diff
+                          in
+                          first_failed_precheck
+                            s
+                            fetcher
+                            ~files
+                            ~files_truncated
+                            ~pull_request
+                            prechecks
+                          >>= function
+                          | None -> Abbs_future_combinators.return_ok ()
+                          | Some precheck ->
+                              Logs.info (fun m ->
+                                  m
+                                    "%s : PRECHECK_STOP : check=%s"
+                                    (Builder.log_id s)
+                                    (precheck_name precheck));
+                              (* The pull request still has to be mergeable, thus the operator that
+                             needs the apply check green to merge gets it, even though the
+                             prechecks stopped every run. *)
+                              let { V1.Apply_requirements.create_completed_apply_check_on_noop; _ }
+                                  =
+                                V1.apply_requirements repo_config
+                              in
+                              (if create_completed_apply_check_on_noop then
+                                 Tasks_base.create_completed_apply_check s fetcher
+                               else Abbs_future_combinators.return_ok ())
+                              >>= fun () -> Abbs_future_combinators.return_err `Noop))))
+          | Tjc.Job.Type_.Apply _
+          | Tjc.Job.Type_.Autoapply
+          | Tjc.Job.Type_.Gate_approval _
+          | Tjc.Job.Type_.Help
+          | Tjc.Job.Type_.Index
+          | Tjc.Job.Type_.Plan _
+          | Tjc.Job.Type_.Push
+          | Tjc.Job.Type_.Repo_config
+          | Tjc.Job.Type_.Unlock _ -> Abbs_future_combinators.return_ok ())
+
     let check_pull_request_state =
       run ~name:"check_pull_request_state" (fun s { Bs.Fetcher.fetch } ->
           let module Pr = Terrat_pull_request in
@@ -1989,6 +2168,7 @@ struct
          (coerce Keys.warn_tag_query_dropped_dirspaces)
          Tasks.warn_tag_query_dropped_dirspaces
     |> Hmap.add (coerce Keys.check_merge_conflict) Tasks.check_merge_conflict
+    |> Hmap.add (coerce Keys.check_prechecks) Tasks.check_prechecks
     |> Hmap.add (coerce Keys.check_pull_request_state) Tasks.check_pull_request_state
     |> Hmap.add (coerce Keys.comment_id) Tasks.comment_id
     |> Hmap.add (coerce Keys.commit_checks) Tasks.commit_checks

@@ -8,6 +8,9 @@ module Diff = struct
         previous_filename : string;
       }
   [@@deriving yojson, eq, show]
+
+  let max_reported_files = 3000
+  let may_be_truncated diff = List.length diff >= max_reported_files
 end
 
 module Dirspace = Terrat_dirspace

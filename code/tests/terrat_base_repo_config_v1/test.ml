@@ -1091,6 +1091,174 @@ let test_batch_runs_merge_steps_by_phase_round_trip =
           | Some _ | None -> failwith "Round-trip to Version_1 did not produce by_phase")
       | Error err -> failwith ("of_version_1_json failed: " ^ V1.show_of_version_1_json_err err))
 
+(* Tests for the global [when_modified.prechecks] key (RFD 2111).  These pin the parse, the round
+   trip, and the two boundaries that the evaluator relies on: a precheck glob is a repository path
+   (no [${DIR}] rewrite), and no dir ever carries prechecks. *)
+
+let precheck_json prechecks =
+  `Assoc [ ("when_modified", `Assoc [ ("prechecks", `List prechecks) ]) ]
+
+let prechecks_of_json json = (V1.when_modified (config_of_json json)).V1.When_modified.prechecks
+
+let pp_precheck = function
+  | V1.When_modified.Precheck.User _ -> "User"
+  | V1.When_modified.Precheck.File_patterns _ -> "File_patterns"
+  | V1.When_modified.Precheck.Config_file_patterns _ -> "Config_file_patterns"
+
+let test_prechecks_default_empty =
+  Oth.test ~name:"prechecks: an absent key gives the empty list" (fun _ ->
+      Oth.Assert.List.empty (prechecks_of_json (`Assoc [])))
+
+let test_prechecks_parse_all_kinds =
+  Oth.test ~name:"prechecks: all three kinds parse, in order" (fun _ ->
+      let json =
+        precheck_json
+          [
+            `Assoc [ ("user", `List [ `String "!test_user" ]) ];
+            `Assoc [ ("file_patterns", `List [ `String "infra/**/*.tf" ]) ];
+            `Assoc [ ("config_file_patterns", `Assoc [ ("stale_config_min", `Int 1) ]) ];
+          ]
+      in
+      match prechecks_of_json json with
+      | [
+       V1.When_modified.Precheck.User [ "!test_user" ];
+       V1.When_modified.Precheck.File_patterns [ fp ];
+       V1.When_modified.Precheck.Config_file_patterns
+         { V1.When_modified.Precheck.Config_file_patterns.stale_config_min = 1 };
+      ] ->
+          if not (CCString.equal "infra/**/*.tf" (V1.File_pattern.file_pattern fp)) then
+            failwith
+              (Printf.sprintf
+                 "Expected glob infra/**/*.tf, got %s"
+                 (V1.File_pattern.file_pattern fp))
+      | l ->
+          failwith
+            (Printf.sprintf
+               "Unexpected prechecks: [%s]"
+               (CCString.concat "; " (CCList.map pp_precheck l))))
+
+(* [of_version_1_when_modified] puts a [${DIR}/] in front of its own [file_patterns], because the
+   global [when_modified] becomes the default of every dir.  A precheck matches the changed files of
+   the pull request, which are repository paths, so it must NOT get that rewrite. *)
+let test_prechecks_globs_are_repo_paths =
+  Oth.test ~name:"prechecks: a file_patterns glob keeps no ${DIR} prefix" (fun _ ->
+      let json =
+        `Assoc
+          [
+            ( "when_modified",
+              `Assoc
+                [
+                  ("file_patterns", `List [ `String "*.tf" ]);
+                  ("prechecks", `List [ `Assoc [ ("file_patterns", `List [ `String "*.tf" ]) ] ]);
+                ] );
+          ]
+      in
+      let wm = V1.when_modified (config_of_json json) in
+      Oth.Assert.Eq.string_list
+        ~expected:[ "${DIR}/*.tf" ]
+        ~actual:(CCList.map V1.File_pattern.file_pattern wm.V1.When_modified.file_patterns);
+      match wm.V1.When_modified.prechecks with
+      | [ V1.When_modified.Precheck.File_patterns [ fp ] ]
+        when CCString.equal "*.tf" (V1.File_pattern.file_pattern fp) -> ()
+      | _ -> failwith "Expected the precheck glob to stay *.tf")
+
+let test_prechecks_bad_glob_rejected =
+  Oth.test ~name:"prechecks: a glob the parser rejects fails the parse" (fun _ ->
+      let json = precheck_json [ `Assoc [ ("file_patterns", `List [ `String "<[" ]) ] ] in
+      match Oth.Assert.error (V1.of_version_1_json json) with
+      | `Glob_parse_err ("<[", _) -> ()
+      | err ->
+          Oth.Assert.false_
+            (Printf.sprintf
+               "Expected Glob_parse_err for a bad precheck glob, got %s"
+               (V1.show_of_version_1_json_err err)))
+
+let test_prechecks_round_trip =
+  Oth.test ~name:"prechecks: the list round-trips through Version_1" (fun _ ->
+      let json =
+        precheck_json
+          [
+            `Assoc [ ("user", `List [ `String "!test_user" ]) ];
+            `Assoc [ ("file_patterns", `List [ `String "infra/**/*.tf" ]) ];
+            `Assoc [ ("config_file_patterns", `Assoc [ ("stale_config_min", `Int 60) ]) ];
+          ]
+      in
+      let v1 = V1.to_version_1 (config_of_json json) in
+      match v1.Repo.Version_1.when_modified with
+      | Some
+          {
+            Repo.When_modified.prechecks =
+              [
+                Repo.Precheck.Precheck_user { Repo.Precheck_user.user = [ "!test_user" ] };
+                Repo.Precheck.Precheck_file_patterns
+                  { Repo.Precheck_file_patterns.file_patterns = [ "infra/**/*.tf" ] };
+                Repo.Precheck.Precheck_config_file_patterns
+                  {
+                    Repo.Precheck_config_file_patterns.config_file_patterns =
+                      { Repo.Precheck_config_file_patterns_value.stale_config_min = 60 };
+                  };
+              ];
+            _;
+          } -> ()
+      | _ -> failwith "prechecks did not round-trip through Version_1")
+
+(* The schema has no [prechecks] key under a dir [when_modified], so the schema check rejects the
+   configuration before [of_version_1] ever sees it. *)
+let test_prechecks_rejected_in_a_dir =
+  Oth.test ~name:"prechecks: a dir that sets prechecks is a schema error" (fun _ ->
+      let json =
+        `Assoc
+          [
+            ( "dirs",
+              `Assoc
+                [
+                  ( "infra",
+                    `Assoc
+                      [
+                        ( "when_modified",
+                          `Assoc
+                            [
+                              ( "prechecks",
+                                `List [ `Assoc [ ("user", `List [ `String "!test_user" ]) ] ] );
+                            ] );
+                      ] );
+                ] );
+          ]
+      in
+      match Oth.Assert.error (V1.of_version_1_json json) with
+      | `Repo_config_schema_err _ -> ()
+      | err ->
+          Oth.Assert.false_
+            (Printf.sprintf
+               "Expected a schema error for prechecks in a dir, got %s"
+               (V1.show_of_version_1_json_err err)))
+
+(* A dir that sets no [when_modified] of its own takes the global one whole.  It must not take the
+   prechecks with it, or a later consumer could read a per-dir copy of a whole-pull-request
+   decision. *)
+let test_prechecks_not_inherited_by_a_dir =
+  Oth.test ~name:"prechecks: a dir does not inherit the global list" (fun _ ->
+      let json =
+        `Assoc
+          [
+            ("dirs", `Assoc [ ("infra", `Assoc []) ]);
+            ( "when_modified",
+              `Assoc
+                [ ("prechecks", `List [ `Assoc [ ("user", `List [ `String "!test_user" ]) ] ]) ] );
+          ]
+      in
+      let cfg = config_of_json json in
+      ignore (Oth.Assert.List.length_one (V1.when_modified cfg).V1.When_modified.prechecks);
+      let dir =
+        Oth.Assert.some
+          ~fail_msg:"Expected a dir named infra"
+          (Sln_map.String.find_opt "infra" (V1.dirs cfg))
+      in
+      Sln_map.String.iter
+        (fun _name { V1.Dirs.Workspace.when_modified; _ } ->
+          Oth.Assert.List.empty when_modified.V1.When_modified.prechecks)
+        dir.V1.Dirs.Dir.workspaces)
+
 let test =
   Oth.parallel
     [
@@ -1144,6 +1312,13 @@ let test =
       test_batch_runs_merge_steps_each_value;
       test_batch_runs_merge_steps_round_trip;
       test_batch_runs_merge_steps_by_phase_round_trip;
+      test_prechecks_default_empty;
+      test_prechecks_parse_all_kinds;
+      test_prechecks_globs_are_repo_paths;
+      test_prechecks_bad_glob_rejected;
+      test_prechecks_round_trip;
+      test_prechecks_rejected_in_a_dir;
+      test_prechecks_not_inherited_by_a_dir;
     ]
 
 let () =

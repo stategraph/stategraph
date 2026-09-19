@@ -11,4 +11,4 @@ inner join gitlab_repositories_map as grm
       on grm.repository_id = $repository_id
 where gim.installation_id = $installation_id
 on conflict (installation, repo, branch, sha) where kind = 'derived'
-do update set data = excluded.data
+do update set data = excluded.data, created_at = now()

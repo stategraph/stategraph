@@ -1,34 +1,9 @@
 type query_err = [ `Error ] [@@deriving show]
 type err = query_err [@@deriving show]
 
-(* Both spellings of the repo config file, in both extensions the providers
-   probe. [.stategraph/config] takes precedence over [.terrateam/config] at
-   read time (see [fetch_repo_config_file_with_fallback] in the VCS services),
-   so a change to EITHER must count as a repo-config change for the
-   [access_control.terrateam_config_update] policy. *)
-let repo_config_files =
-  [
-    ".stategraph/config.yml";
-    ".stategraph/config.yaml";
-    ".terrateam/config.yml";
-    ".terrateam/config.yaml";
-  ]
-
-let repo_config_files_mem searched = Sln_list.String.mem searched repo_config_files
-
-let is_repo_config_change =
-  CCList.exists
-    Terrat_change.Diff.(
-      function
-      | Add { filename } | Change { filename } | Remove { filename } ->
-          repo_config_files_mem filename
-      | Move { filename; previous_filename } ->
-          repo_config_files_mem filename || repo_config_files_mem previous_filename)
-
-(* GitHub reports at most 3000 files for a pull request, and it does not say
-   that it stopped there.  A diff of that length may therefore be short of the
-   true change. *)
-let max_reported_diff_files = 3000
+let repo_config_files = Terrat_repo_config_file.paths
+let is_repo_config_change = Terrat_repo_config_file.is_changed
+let max_reported_diff_files = Terrat_change.Diff.max_reported_files
 
 (* A diff that the VCS cut short can hide a change to the configuration file.
    Trusting it would let a large pull request change the configuration without
@@ -36,7 +11,7 @@ let max_reported_diff_files = 3000
    instead: an operator who is refused can see why, whereas a configuration
    change that slips through is silent. *)
 let may_be_repo_config_change diff =
-  CCList.length diff >= max_reported_diff_files || is_repo_config_change diff
+  Terrat_change.Diff.may_be_truncated diff || is_repo_config_change diff
 
 module Policy = struct
   type t = {

@@ -864,6 +864,18 @@ module Depends_on = struct
 end
 
 module When_modified = struct
+  module Precheck = struct
+    module Config_file_patterns = struct
+      type t = { stale_config_min : int } [@@deriving make, show, yojson, eq]
+    end
+
+    type t =
+      | User of string list
+      | File_patterns of File_pattern_list.t
+      | Config_file_patterns of Config_file_patterns.t
+    [@@deriving show, yojson, eq]
+  end
+
   type t = {
     autoapply : bool; [@default false]
     autoplan : bool; [@default true]
@@ -875,6 +887,7 @@ module When_modified = struct
             CCResult.get_exn (File_pattern.make "${DIR}/*.tf");
             CCResult.get_exn (File_pattern.make "${DIR}/*.tfvars");
           ]]
+    prechecks : Precheck.t list; [@default []]
   }
   [@@deriving make, show, yojson, eq]
 end
@@ -1669,6 +1682,27 @@ let of_version_1_apply_requirements_checks =
 
 let of_version_1_file_patterns fp = CCResult.map_l File_pattern.make fp
 
+(* The globs of a precheck are NOT run through the [${DIR}] rewrite that
+   [of_version_1_when_modified] applies to its own [file_patterns].  A precheck matches the changed
+   files of the pull request, which are repository paths, whereas a [when_modified] entry becomes
+   the default of every dir and so has to be written as a dir would write it. *)
+let of_version_1_prechecks prechecks =
+  let open CCResult.Infix in
+  let module P = Terrat_repo_config_precheck in
+  let module Pu = Terrat_repo_config_precheck_user in
+  let module Pfp = Terrat_repo_config_precheck_file_patterns in
+  let module Pcfp = Terrat_repo_config_precheck_config_file_patterns in
+  let module Pcfpv = Terrat_repo_config_precheck_config_file_patterns_value in
+  let module Pc = When_modified.Precheck in
+  CCResult.map_l
+    (function
+      | P.Precheck_user { Pu.user } -> Ok (Pc.User user)
+      | P.Precheck_file_patterns { Pfp.file_patterns } ->
+          of_version_1_file_patterns file_patterns >>= fun fp -> Ok (Pc.File_patterns fp)
+      | P.Precheck_config_file_patterns { Pcfp.config_file_patterns = { Pcfpv.stale_config_min } }
+        -> Ok (Pc.Config_file_patterns (Pc.Config_file_patterns.make ~stale_config_min)))
+    prechecks
+
 let of_version_1_depends_on depends_on =
   let module D = Terrat_repo_config_depends_on in
   let module Obj = Terrat_repo_config_depends_on_object in
@@ -1708,13 +1742,21 @@ let of_version_1_dirs_when_modified default_when_modified when_modified =
          (CCOption.get_or ~default:default_when_modified.Wm.file_patterns file_patterns)
        ())
 
+(* A dir or a workspace that sets no [when_modified] of its own takes the global one whole, but
+   never its [prechecks].  A precheck is a decision about the entire pull request, taken before any
+   dir is known, so a copy hanging off a dir could only ever be read by mistake. *)
+let inherit_when_modified default_when_modified when_modified =
+  CCOption.or_
+    ~else_:(CCOption.map (fun wm -> { wm with When_modified.prechecks = [] }) default_when_modified)
+    when_modified
+
 let of_version_1_workspace default_when_modified workspace =
   let open CCResult.Infix in
   let module Ws = Terrat_repo_config_workspaces in
   let { Ws.Additional.tags; when_modified } = workspace in
   map_opt (of_version_1_dirs_when_modified default_when_modified) when_modified
   >>= fun when_modified ->
-  let when_modified = CCOption.or_ ~else_:default_when_modified when_modified in
+  let when_modified = inherit_when_modified default_when_modified when_modified in
   Ok (Dirs.Workspace.make ?tags ?when_modified ())
 
 let of_version_1_run_on =
@@ -2403,7 +2445,9 @@ let of_version_1_when_modified when_modified =
       | s when CCString.prefix ~pre:"*" s -> "${DIR}/" ^ s
       | s -> s)
   in
-  let { Wm.autoapply; autoplan; autoplan_draft_pr; depends_on; file_patterns } = when_modified in
+  let { Wm.autoapply; autoplan; autoplan_draft_pr; depends_on; file_patterns; prechecks } =
+    when_modified
+  in
   CCResult.map_err
     (function
       | `Tag_query_error err -> `Depends_on_err err)
@@ -2411,7 +2455,17 @@ let of_version_1_when_modified when_modified =
   >>= fun depends_on ->
   of_version_1_file_patterns (update_file_patterns file_patterns)
   >>= fun file_patterns ->
-  Ok (When_modified.make ?depends_on ~autoapply ~autoplan ~autoplan_draft_pr ~file_patterns ())
+  of_version_1_prechecks prechecks
+  >>= fun prechecks ->
+  Ok
+    (When_modified.make
+       ?depends_on
+       ~autoapply
+       ~autoplan
+       ~autoplan_draft_pr
+       ~file_patterns
+       ~prechecks
+       ())
 
 let of_version_1_dirs default_when_modified { V1.Dirs.additional; _ } =
   let open CCResult.Infix in
@@ -2447,7 +2501,7 @@ let of_version_1_dirs default_when_modified { V1.Dirs.additional; _ } =
       >>= fun () ->
       map_opt (of_version_1_dirs_when_modified default_when_modified) when_modified
       >>= fun when_modified ->
-      let when_modified = CCOption.or_ ~else_:default_when_modified when_modified in
+      let when_modified = inherit_when_modified default_when_modified when_modified in
       let stacks, workspaces =
         if CCOption.is_none stacks && CCOption.is_none workspaces then
           ( stacks,
@@ -3222,9 +3276,20 @@ let to_version_1_depends_on { Depends_on.tag_query; prune_on_no_change } =
       prune_on_no_change;
     }
 
+(* [prechecks] is dropped: the schema permits it only in the global [when_modified], so
+   [When_modified_nullable] has no key to write it to, and a dir always carries the empty list. *)
 let to_version_1_dirs_dir_when_modified wm =
   let module Wm = Terrat_repo_config.When_modified_nullable in
-  let { When_modified.autoapply; autoplan; autoplan_draft_pr; depends_on; file_patterns } = wm in
+  let {
+    When_modified.autoapply;
+    autoplan;
+    autoplan_draft_pr;
+    depends_on;
+    file_patterns;
+    prechecks = _;
+  } =
+    wm
+  in
   {
     Wm.autoapply = Some autoapply;
     autoplan = Some autoplan;
@@ -3803,9 +3868,25 @@ let to_version_1_tags tags =
     dest_branch = Some (to_version_1_tags_branch dest_branch);
   }
 
+let to_version_1_precheck =
+  let module P = Terrat_repo_config_precheck in
+  let module Pu = Terrat_repo_config_precheck_user in
+  let module Pfp = Terrat_repo_config_precheck_file_patterns in
+  let module Pcfp = Terrat_repo_config_precheck_config_file_patterns in
+  let module Pcfpv = Terrat_repo_config_precheck_config_file_patterns_value in
+  let module Pc = When_modified.Precheck in
+  function
+  | Pc.User user -> P.Precheck_user { Pu.user }
+  | Pc.File_patterns file_patterns ->
+      P.Precheck_file_patterns
+        { Pfp.file_patterns = CCList.map File_pattern.to_string file_patterns }
+  | Pc.Config_file_patterns { Pc.Config_file_patterns.stale_config_min } ->
+      P.Precheck_config_file_patterns { Pcfp.config_file_patterns = { Pcfpv.stale_config_min } }
+
 let to_version_1_when_modified when_modified =
   let module Wm = Terrat_repo_config.When_modified in
-  let { When_modified.autoapply; autoplan; autoplan_draft_pr; depends_on; file_patterns } =
+  let { When_modified.autoapply; autoplan; autoplan_draft_pr; depends_on; file_patterns; prechecks }
+      =
     when_modified
   in
   {
@@ -3814,6 +3895,7 @@ let to_version_1_when_modified when_modified =
     autoplan_draft_pr;
     depends_on = CCOption.map to_version_1_depends_on depends_on;
     file_patterns = CCList.map File_pattern.to_string file_patterns;
+    prechecks = CCList.map to_version_1_precheck prechecks;
   }
 
 let to_version_1_workflow_retry retry =
@@ -4360,7 +4442,11 @@ let derive ~ctx ~index ~file_list repo_config =
              Dirs.Dir.workspaces =
                Sln_map.String.map
                  (fun config ->
-                   { config with Dirs.Workspace.when_modified = default_when_modified })
+                   {
+                     config with
+                     Dirs.Workspace.when_modified =
+                       { default_when_modified with When_modified.prechecks = [] };
+                   })
                  dir.Dirs.Dir.workspaces;
            }
          in

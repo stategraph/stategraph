@@ -455,6 +455,7 @@ module Make (S : Terrat_vcs_provider2.S) = struct
   let check_access_control_repo_config : unit Key.t =
     Hmap.Key.create "check_access_control_repo_config"
 
+  let check_prechecks : unit Key.t = Hmap.Key.create "check_prechecks"
   let check_valid_destination_branch : unit Key.t = Hmap.Key.create "check_valid_destination_branch"
   let check_access_control_plan : unit Key.t = Hmap.Key.create "check_access_control_plan"
   let check_access_control_apply : unit Key.t = Hmap.Key.create "check_access_control_apply"
