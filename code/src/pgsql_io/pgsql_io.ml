@@ -58,6 +58,15 @@ type t = {
      rolled-back transaction is dropped by the server) and evicted on a
      stale-statement error. *)
   stmt_cache : (string, string) Hashtbl.t;
+  (* Wire bytes, in each direction.  The two counters are incremented at the four
+     places this module touches the socket: the two reads in [wait_for_frames] and
+     [wait_for_frame_needed_bytes], and the two writes in [send_frame] and
+     [send_frames].
+
+     They are plain [mutable int] and not [Atomic], because [busy] gives one
+     connection to one caller at a time, thus no two writers exist. *)
+  mutable rx_bytes : int;
+  mutable tx_bytes : int;
 }
 [@@warning "-69"]
 
@@ -124,6 +133,7 @@ module Io = struct
             m "%s Tx %a" (Uuidm.to_string conn.id) Pgsql_codec.Frame.Frontend.pp frame);
         let open Abbs_future_combinators.Infix_result_monad in
         let bytes = encode_frame conn.scratch frame in
+        conn.tx_bytes <- conn.tx_bytes + Bytes.length bytes;
         Abbs_io_buffered.write conn.w ~bufs:[ write_buf bytes ]
         >>= fun _ -> Abbs_io_buffered.flushed conn.w
       in
@@ -152,6 +162,8 @@ module Io = struct
           frames;
         let open Abbs_future_combinators.Infix_result_monad in
         let bufs = List.map (fun frame -> write_buf (encode_frame conn.scratch frame)) frames in
+        conn.tx_bytes <-
+          conn.tx_bytes + List.fold_left (fun a b -> a + b.Abb_intf.Write_buf.len) 0 bufs;
         Abbs_io_buffered.write conn.w ~bufs >>= fun _ -> Abbs_io_buffered.flushed conn.w
       in
       let open Abb.Future.Infix_monad in
@@ -220,6 +232,7 @@ module Io = struct
             Abbs_future_combinators.return_err `Disconnected
         | Ok n ->
             (* Logs.debug (fun m -> m "Rx = %S%!" (Bytes.to_string (Bytes.sub conn.buf 0 n))); *)
+            conn.rx_bytes <- conn.rx_bytes + n;
             backend_msg_dispatch conn n conn.buf >>= fun ret -> wait_for_frames' conn ret)
     | r -> wait_for_frames' conn r
 
@@ -262,6 +275,7 @@ module Io = struct
             Abbs_future_combinators.return_err `Disconnected
         | Ok _ -> (
             let buf = Buffer.to_bytes b in
+            conn.rx_bytes <- conn.rx_bytes + Bytes.length buf;
             backend_msg_dispatch conn (Bytes.length buf) buf
             >>= fun ret ->
             match ret with
@@ -1622,6 +1636,8 @@ and create_sm_perform_login r w ?passwd ~notice_response ~buf_size_threshold ~us
       buf_size_threshold;
       id = Ouuid.v4 ();
       stmt_cache = Hashtbl.create 64;
+      rx_bytes = 0;
+      tx_bytes = 0;
     }
   in
   let msgs = [ ("user", user); ("database", database) ] in
@@ -1754,6 +1770,11 @@ let create
 
 let connected t = t.connected
 let id t = t.id
+let io_bytes t = (t.rx_bytes, t.tx_bytes)
+
+let reset_io_bytes t =
+  t.rx_bytes <- 0;
+  t.tx_bytes <- 0
 
 let ping t =
   if t.connected then (

@@ -272,6 +272,19 @@ val connected : t -> bool
 (** Each connection is given a unique ID *)
 val id : t -> Uuidm.t
 
+(** The bytes this connection has moved, as [(received, sent)]. Both counters start at zero when the
+    connection is created, and nothing inside this module sets them back.
+
+    The two numbers are taken where this module touches the socket, so what they hold is the
+    PostgreSQL frame stream itself rather than a model of it: a proxy of the wire protocol measured
+    the same figures to within 1%, the difference being the row header the server omits from its own
+    [Serialization: output]. They count the whole connection, thus a caller that wants the cost of
+    one phase takes the difference across that phase. *)
+val io_bytes : t -> int * int
+
+(** Set both counters of {!io_bytes} back to zero. *)
+val reset_io_bytes : t -> unit
+
 (** Perform a network operation to test if the connection is alive. Return [true] if it succeeds and
     [false] if it not. This also sets [connected] to [false] if the connection is not alive. *)
 val ping : t -> bool Abb.Future.t
