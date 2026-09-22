@@ -256,12 +256,11 @@ jobs:
           set -euo pipefail
           docker run --rm --entrypoint sh "$IMAGE" -c '
             set -eu
-            openssl list -providers | grep -q "OpenSSL FIPS Provider"
-            openssl list -providers | grep -q "status: active"
-            if openssl list -providers | grep -q "OpenSSL Default Provider"; then
-              echo "the default provider is loaded alongside fips" >&2
-              exit 1
-            fi
+            openssl list -providers > /tmp/providers.txt
+            for p in fips base default; do
+              grep -A3 -E "^ *${p}\$" /tmp/providers.txt | grep -q "status: active" \
+                || { echo "the $p provider is not active" >&2; exit 1; }
+            done
             if echo fips | openssl dgst -md5 >/dev/null 2>&1; then
               echo "MD5 is reachable: the FIPS properties are not in force" >&2
               exit 1
