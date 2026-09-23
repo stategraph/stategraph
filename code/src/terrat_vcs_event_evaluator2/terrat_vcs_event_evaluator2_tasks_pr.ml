@@ -1519,29 +1519,41 @@ struct
                   (if all_changes_applied then fetch Keys.maybe_automerge
                    else Abbs_future_combinators.return_ok ())
                   >>? fun () -> Error `Noop
-              | _ :: _ ->
-                  fetch Keys.repo
-                  >>= fun repo ->
-                  fetch Keys.account
-                  >>= fun account ->
-                  fetch Keys.client
-                  >>= fun _client ->
-                  fetch Keys.working_branch_ref
-                  >>= fun working_branch_ref ->
-                  let checks =
-                    [
-                      S.Commit_check.make_str
-                        ~config:(Builder.State.config s)
-                        ~description:"Waiting"
-                        ~status:Terrat_commit_check.Status.Queued
-                        ~repo
-                        ~account
-                        "terrateam apply";
-                    ]
-                  in
-                  fetch Keys.create_commit_checks
-                  >>= fun create_commit_checks ->
-                  create_commit_checks' create_commit_checks working_branch_ref checks)
+              | _ :: _ -> (
+                  fetch Keys.repo_config
+                  >>= fun repo_config ->
+                  let module R = Terrat_base_repo_config_v1 in
+                  match R.apply_requirements repo_config with
+                  | { R.Apply_requirements.create_pending_apply_check = false; _ } ->
+                      Abbs_future_combinators.return_ok ()
+                  | { R.Apply_requirements.create_pending_apply_check = true; _ } ->
+                      fetch Keys.repo
+                      >>= fun repo ->
+                      fetch Keys.account
+                      >>= fun account ->
+                      (* The pending check goes on the pull request's head, which is
+                         [branch_ref], because that is the ref the completed check and
+                         [finalize_unfinished_terrateam_checks] later write to.
+                         [working_branch_ref] is the destination branch once the pull
+                         request is merged, so a later layer planned after the merge
+                         used to leave a "Waiting" check on the destination branch
+                         that nothing ever completed. *)
+                      fetch Keys.branch_ref
+                      >>= fun branch_ref ->
+                      let checks =
+                        [
+                          S.Commit_check.make_str
+                            ~config:(Builder.State.config s)
+                            ~description:"Waiting"
+                            ~status:Terrat_commit_check.Status.Queued
+                            ~repo
+                            ~account
+                            "terrateam apply";
+                        ]
+                      in
+                      fetch Keys.create_commit_checks
+                      >>= fun create_commit_checks ->
+                      create_commit_checks' create_commit_checks branch_ref checks))
           | _ -> Abbs_future_combinators.return_ok ())
 
     let check_dirspaces_to_apply =
