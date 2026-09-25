@@ -492,7 +492,17 @@ struct
           fetch Keys.dest_branch_ref
           >>= fun base_ref ->
           fetch Keys.branch_ref
-          >>| fun branch_ref ->
+          >>= fun branch_ref ->
+          fetch Keys.client
+          >>= fun client ->
+          fetch Keys.repo
+          >>= fun repo ->
+          fetch Keys.repo_config_raw'
+          >>| fun (_, repo_config_raw) ->
+          let tree_builder_enabled =
+            let module V1 = Terrat_base_repo_config_v1 in
+            (V1.tree_builder repo_config_raw).V1.Tree_builder.enabled
+          in
           (* The comparison of two trees is the expensive part of this rule: the database reads
              both trees whole, thus its cost follows the size of the repository and not the number
              of paths which moved.  The answer is a function of the two shas and of nothing else,
@@ -579,11 +589,54 @@ struct
                       dirspace)
                   |> Terrat_data.Dirspace_set.of_list
                 in
-                (* [None] when the tree of that sha is not stored.  The comparison would answer the
-                  same thing -- a tree which is not there must mean "run it" -- but it would do it
-                  by giving back every path of the head and walking the whole repository through
-                  the change match.  A pull request whose runs are older than this feature meets
-                  this, and so does one whose trees the cleanup has removed. *)
+                let compare_with_head ref_ =
+                  Builder.run_db s ~f:(fun db ->
+                      query_repo_tree_changes ~base_ref:ref_ s db account branch_ref)
+                  >>| fun paths -> Some (dirspaces_of_paths paths)
+                in
+                let no_run_tree sha reason =
+                  Logs.info (fun m ->
+                      m
+                        "%s : INTRA_PR_SELECTION : NO_RUN_TREE : sha=%s : %s"
+                        (Builder.log_id s)
+                        sha
+                        reason);
+                  Abbs_future_combinators.return_ok None
+                in
+                (* A run whose tree is not stored.  The tree of a pull request's head is stored when
+                  it is evaluated, but a run can be at a sha that nothing evaluated: an apply on
+                  merge runs at the merge commit, and the runs of a pull request older than this
+                  feature, or whose trees the cleanup removed, are the same.  Without the tree the
+                  dirspaces of that run count as changed, so an apply on merge never counts as
+                  applied and the pull request's apply check is never completed.  Fetch the tree
+                  the same way [repo_tree_branch] fetches the head's, then compare.  A repository
+                  whose trees come from the tree builder keeps the old answer, and a fetch that
+                  fails answers "changed", which runs the dirspace rather than skipping it. *)
+                let fetch_run_tree sha ref_ =
+                  if tree_builder_enabled then no_run_tree sha "tree builder enabled"
+                  else
+                    let open Abb.Future.Infix_monad in
+                    S.Api.fetch_tree ~request_id:(Builder.log_id s) client repo ref_
+                    >>= function
+                    | Error _ -> no_run_tree sha "fetch failed"
+                    | Ok files -> (
+                        Builder.run_db s ~f:(fun db ->
+                            S.Db.store_repo_tree
+                              ~request_id:(Builder.log_id s)
+                              db
+                              account
+                              ref_
+                              files)
+                        >>= function
+                        | Error _ -> no_run_tree sha "store failed"
+                        | Ok () ->
+                            Logs.info (fun m ->
+                                m
+                                  "%s : INTRA_PR_SELECTION : FETCHED_RUN_TREE : sha=%s"
+                                  (Builder.log_id s)
+                                  sha);
+                            compare_with_head ref_)
+                in
                 let changed_of_sha sha =
                   match Sln_list.String.assoc_opt sha !changed_cache with
                   | Some changed -> Abbs_future_combinators.return_ok changed
@@ -592,17 +645,8 @@ struct
                       Builder.run_db s ~f:(fun db ->
                           S.Db.query_repo_tree_built ~request_id:(Builder.log_id s) db account ref_)
                       >>= (function
-                      | false ->
-                          Logs.info (fun m ->
-                              m
-                                "%s : INTRA_PR_SELECTION : NO_RUN_TREE : sha=%s"
-                                (Builder.log_id s)
-                                sha);
-                          Abbs_future_combinators.return_ok None
-                      | true ->
-                          Builder.run_db s ~f:(fun db ->
-                              query_repo_tree_changes ~base_ref:ref_ s db account branch_ref)
-                          >>| fun paths -> Some (dirspaces_of_paths paths))
+                      | false -> fetch_run_tree sha ref_
+                      | true -> compare_with_head ref_)
                       >>| fun changed ->
                       changed_cache := (sha, changed) :: !changed_cache;
                       changed
@@ -1519,29 +1563,41 @@ struct
                   (if all_changes_applied then fetch Keys.maybe_automerge
                    else Abbs_future_combinators.return_ok ())
                   >>? fun () -> Error `Noop
-              | _ :: _ ->
-                  fetch Keys.repo
-                  >>= fun repo ->
-                  fetch Keys.account
-                  >>= fun account ->
-                  fetch Keys.client
-                  >>= fun _client ->
-                  fetch Keys.working_branch_ref
-                  >>= fun working_branch_ref ->
-                  let checks =
-                    [
-                      S.Commit_check.make_str
-                        ~config:(Builder.State.config s)
-                        ~description:"Waiting"
-                        ~status:Terrat_commit_check.Status.Queued
-                        ~repo
-                        ~account
-                        "terrateam apply";
-                    ]
-                  in
-                  fetch Keys.create_commit_checks
-                  >>= fun create_commit_checks ->
-                  create_commit_checks' create_commit_checks working_branch_ref checks)
+              | _ :: _ -> (
+                  fetch Keys.repo_config
+                  >>= fun repo_config ->
+                  let module R = Terrat_base_repo_config_v1 in
+                  match R.apply_requirements repo_config with
+                  | { R.Apply_requirements.create_pending_apply_check = false; _ } ->
+                      Abbs_future_combinators.return_ok ()
+                  | { R.Apply_requirements.create_pending_apply_check = true; _ } ->
+                      fetch Keys.repo
+                      >>= fun repo ->
+                      fetch Keys.account
+                      >>= fun account ->
+                      (* The pending check goes on the pull request's head, which is
+                         [branch_ref], because that is the ref the completed check and
+                         [finalize_unfinished_terrateam_checks] later write to.
+                         [working_branch_ref] is the destination branch once the pull
+                         request is merged, so a later layer planned after the merge
+                         used to leave a "Waiting" check on the destination branch
+                         that nothing ever completed. *)
+                      fetch Keys.branch_ref
+                      >>= fun branch_ref ->
+                      let checks =
+                        [
+                          S.Commit_check.make_str
+                            ~config:(Builder.State.config s)
+                            ~description:"Waiting"
+                            ~status:Terrat_commit_check.Status.Queued
+                            ~repo
+                            ~account
+                            "terrateam apply";
+                        ]
+                      in
+                      fetch Keys.create_commit_checks
+                      >>= fun create_commit_checks ->
+                      create_commit_checks' create_commit_checks branch_ref checks))
           | _ -> Abbs_future_combinators.return_ok ())
 
     let check_dirspaces_to_apply =
