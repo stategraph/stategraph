@@ -285,6 +285,16 @@ module Client = struct
         v
   end)
 
+  module Find_known_workflow_file_cache = Abbs_cache.Expiring.Make (struct
+    type k = Account.t * Repo.t * Ref.t [@@deriving eq]
+    type v = string option
+    type err = Terrat_github.fetch_file_err
+    type args = unit -> (v, err) result Abb.Future.t
+
+    let fetch f = f ()
+    let weight _ = 1
+  end)
+
   (* Only [fetch_branch_sha_cached] reads this. *)
   module Fetch_branch_sha_cache = Abbs_cache.Expiring.Make (struct
     type k = Account.t * Repo.t * Ref.t [@@deriving eq]
@@ -373,6 +383,16 @@ module Client = struct
           capacity = 5000;
         }
 
+    let find_known_workflow_file_cache =
+      Find_known_workflow_file_cache.create
+        {
+          Abbs_cache.Expiring.on_hit = on_hit "find_known_workflow_file";
+          on_miss = on_miss "find_known_workflow_file";
+          on_evict = on_evict "find_known_workflow_file";
+          duration = Duration.of_min 1;
+          capacity = 10_000;
+        }
+
     let fetch_centralized_repo_cache =
       Fetch_centralized_repo_cache.create
         {
@@ -406,6 +426,7 @@ module Client = struct
     fetch_file_by_rev_cache : Fetch_file_cache.By_rev.t;
     fetch_repo_cache : Fetch_repo_cache.t;
     fetch_tree_by_rev_cache : Fetch_tree_cache.By_rev.t;
+    find_known_workflow_file_cache : Find_known_workflow_file_cache.t;
   }
 
   let make ~account ~client ~config () =
@@ -419,6 +440,7 @@ module Client = struct
       fetch_file_by_rev_cache = Globals.fetch_file_by_rev_cache;
       fetch_repo_cache = Globals.fetch_repo_cache;
       fetch_tree_by_rev_cache = Globals.fetch_tree_by_rev_cache;
+      find_known_workflow_file_cache = Globals.find_known_workflow_file_cache;
     }
 
   let to_native t = t.client
@@ -1637,4 +1659,24 @@ let find_workflow_file ~request_id repo client =
             request_id
             Terrat_github.pp_get_installation_access_token_err
             err);
+      Abbs_future_combinators.return_err `Error
+
+let find_known_workflow_file ~request_id client repo ref_ =
+  let open Abb.Future.Infix_monad in
+  Client.Find_known_workflow_file_cache.fetch
+    client.Client.find_known_workflow_file_cache
+    (client.Client.account, repo, ref_)
+    (fun () ->
+      Terrat_github.find_known_workflow_file
+        ~owner:(Repo.owner repo)
+        ~repo:(Repo.name repo)
+        ~ref_
+        client.Client.client)
+  >>= function
+  | Ok _ as res -> Abb.Future.return res
+  | Error `Rate_limit_err -> vcs_api_rate_limit_err ~request_id "FIND_KNOWN_WORKFLOW_FILE"
+  | Error `Timeout -> vcs_api_timeout_err ~request_id "FIND_KNOWN_WORKFLOW_FILE"
+  | Error (#Terrat_github.fetch_file_err as err) ->
+      Logs.info (fun m ->
+          m "%s : FIND_KNOWN_WORKFLOW_FILE : %a" request_id Terrat_github.pp_fetch_file_err err);
       Abbs_future_combinators.return_err `Error

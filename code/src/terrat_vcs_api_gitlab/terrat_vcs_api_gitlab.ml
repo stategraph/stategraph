@@ -1387,3 +1387,6 @@ let get_org_role ~request_id ~org user client =
 
 let find_workflow_file ~request_id:_ _repo _client =
   Abbs_future_combinators.return_ok (Some ".gitlab-ci.yml")
+
+let find_known_workflow_file ~request_id:_ _client _repo _ref =
+  Abbs_future_combinators.return_ok (Some ".gitlab-ci.yml")

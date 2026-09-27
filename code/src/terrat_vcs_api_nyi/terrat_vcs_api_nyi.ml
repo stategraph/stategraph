@@ -139,3 +139,4 @@ let is_member_of_team ~request_id ~team ~user repo client = raise (Failure "nyi"
 let get_repo_role ~request_id repo user client = raise (Failure "nyi")
 let get_org_role ~request_id ~org user client = raise (Failure "nyi")
 let find_workflow_file ~request_id repo client = raise (Failure "nyi")
+let find_known_workflow_file ~request_id client repo ref_ = raise (Failure "nyi")

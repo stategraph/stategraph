@@ -91,6 +91,74 @@ let test_retry_after_takes_precedence =
            [ ("retry-after", "5"); ("x-ratelimit-remaining", "0"); ("x-ratelimit-reset", "4600") ]);
       ())
 
+let selected ?override_path workflows =
+  CCOption.map (fun (id, _, _) -> id) (Terrat_github.Workflow.select ?override_path workflows)
+
+let assert_selected ~expected actual =
+  Oth.Assert.true_
+    ~fail_msg:
+      (Printf.sprintf
+         "expected %s, got %s"
+         (CCOption.map_or ~default:"none" CCInt.to_string expected)
+         (CCOption.map_or ~default:"none" CCInt.to_string actual))
+    (CCOption.equal CCInt.equal expected actual)
+
+let terrateam = (1, "Terrateam Workflow", ".github/workflows/terrateam.yml")
+let stategraph = (2, "Stategraph", ".github/workflows/stategraph.yml")
+let unrelated = (3, "CI", ".github/workflows/ci.yml")
+
+let test_workflow_old_name =
+  Oth.test ~name:"the Terrateam workflow name matches" (fun _ ->
+      assert_selected
+        ~expected:(Some 1)
+        (selected [ unrelated; (1, "Terrateam Workflow", ".github/workflows/other.yml") ]);
+      ())
+
+let test_workflow_old_path =
+  Oth.test ~name:"the terrateam.yml path matches" (fun _ ->
+      assert_selected
+        ~expected:(Some 1)
+        (selected [ unrelated; (1, "Other", ".github/workflows/terrateam.yml") ]);
+      ())
+
+let test_workflow_new_name =
+  Oth.test ~name:"the Stategraph workflow name matches" (fun _ ->
+      assert_selected
+        ~expected:(Some 2)
+        (selected [ unrelated; (2, "Stategraph", ".github/workflows/other.yml") ]);
+      assert_selected
+        ~expected:(Some 2)
+        (selected [ terrateam; (2, "Stategraph", ".github/workflows/other.yml") ]);
+      ())
+
+let test_workflow_new_path =
+  Oth.test ~name:"the stategraph.yml path matches" (fun _ ->
+      assert_selected
+        ~expected:(Some 2)
+        (selected [ unrelated; (2, "Other", ".github/workflows/stategraph.yml") ]);
+      ())
+
+let test_workflow_neither =
+  Oth.test ~name:"an unrelated workflow does not match" (fun _ ->
+      assert_selected ~expected:None (selected [ unrelated ]);
+      ())
+
+let test_workflow_prefers_stategraph =
+  Oth.test ~name:"the Stategraph workflow wins when both are present" (fun _ ->
+      assert_selected ~expected:(Some 2) (selected [ terrateam; stategraph ]);
+      assert_selected ~expected:(Some 2) (selected [ stategraph; terrateam ]);
+      ())
+
+let test_workflow_override_path =
+  Oth.test ~name:"an override path selects that path alone" (fun _ ->
+      assert_selected
+        ~expected:(Some 1)
+        (selected ~override_path:".github/workflows/terrateam.yml" [ stategraph; terrateam ]);
+      assert_selected
+        ~expected:None
+        (selected ~override_path:".github/workflows/custom.yml" [ stategraph; terrateam ]);
+      ())
+
 let () =
   Oth.run
     ~file:__FILE__
@@ -99,6 +167,13 @@ let () =
     (fun _ ->
       Oth.serial
         [
+          test_workflow_old_name;
+          test_workflow_old_path;
+          test_workflow_new_name;
+          test_workflow_new_path;
+          test_workflow_neither;
+          test_workflow_prefers_stategraph;
+          test_workflow_override_path;
           test_success_is_not_a_rate_limit;
           test_403_without_headers_is_not_a_rate_limit;
           test_retry_after_within_timeout_waits;

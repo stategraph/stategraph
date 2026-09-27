@@ -4,9 +4,26 @@ module Logs = (val Logs.src_log src : Logs.LOG)
 
 let thirty_seconds = Duration.(to_f (of_sec 30))
 let three_minutes = Duration.(to_f (of_min 3))
-let terrateam_workflow_name = "Terrateam Workflow"
-let terrateam_workflow_path = ".github/workflows/terrateam.yml"
 let installation_expiration_sec = three_minutes
+
+module Workflow = struct
+  type t = {
+    names : string list;
+    path : string;
+  }
+
+  let stategraph = { names = [ "Stategraph" ]; path = ".github/workflows/stategraph.yml" }
+  let terrateam = { names = [ "Terrateam Workflow" ]; path = ".github/workflows/terrateam.yml" }
+  let known = [ stategraph; terrateam ]
+
+  let matches known (_, name, path) =
+    CCString.equal path known.path || CCList.mem ~eq:CCString.equal name known.names
+
+  let select ?override_path workflows =
+    match override_path with
+    | Some override -> CCList.find_opt (fun (_, _, path) -> CCString.equal path override) workflows
+    | None -> CCList.find_map (fun known -> CCList.find_opt (matches known) workflows) known
+end
 
 module Metrics = struct
   module Call_retry_wait_histograph = Prmths.Histogram (struct
@@ -509,21 +526,24 @@ let list_workflows ~owner ~repo client =
           Abbs_future_combinators.return_ok (workflows @ acc))
     Githubc2_actions.List_repo_workflows.(make (Parameters.make ~per_page:100 ~owner ~repo ()))
 
+let find_known_workflow_file ~owner ~repo ~ref_ client =
+  let open Abbs_future_combinators.Infix_result_monad in
+  let rec go = function
+    | [] -> Abb.Future.return (Ok None)
+    | { Workflow.path; _ } :: rest -> (
+        fetch_file ~owner ~repo ~ref_ ~path client
+        >>= function
+        | Some _ -> Abb.Future.return (Ok (Some path))
+        | None -> go rest)
+  in
+  go Workflow.known
+
 let find_workflow_file ~owner ~repo client =
   Abbs_future_combinators.retry
     ~f:(fun () ->
       let open Abbs_future_combinators.Infix_result_monad in
       list_workflows ~owner ~repo client
-      >>| fun workflows ->
-      match
-        CCList.filter
-          (fun (_, name, path) ->
-            CCString.equal name terrateam_workflow_name
-            || CCString.equal path terrateam_workflow_path)
-          workflows
-      with
-      | (_, _, path) :: _ -> Some path
-      | [] -> None)
+      >>| fun workflows -> CCOption.map (fun (_, _, path) -> path) (Workflow.select workflows))
     ~while_:
       (Abbs_future_combinators.finite_tries 3 (function
         | Ok (Some _) -> false
@@ -539,19 +559,7 @@ let load_workflow ?override_path ~owner ~repo client =
       let open Abbs_future_combinators.Infix_result_monad in
       list_workflows ~owner ~repo client
       >>| fun workflows ->
-      match
-        CCList.filter
-          (fun (_, name, path) ->
-            (* If override path is specified, choose it, or if override_path is
-               none, then match against the default *)
-            CCOption.map_or ~default:false (CCString.equal path) override_path
-            || CCOption.is_none override_path
-               && (CCString.equal name terrateam_workflow_name
-                  || CCString.equal path terrateam_workflow_path))
-          workflows
-      with
-      | (id, _, _) :: _ -> Some id
-      | [] -> None)
+      CCOption.map (fun (id, _, _) -> id) (Workflow.select ?override_path workflows))
     ~while_:
       (Abbs_future_combinators.finite_tries 3 (function
         | Ok (Some _) -> false

@@ -361,4 +361,14 @@ module type S = sig
 
   val find_workflow_file :
     request_id:string -> Repo.t -> Client.t -> (string option, [> call_err ]) result Abb.Future.t
+
+  (** The path of the first known workflow file present on [ref_], or [None]. The answer is kept for
+      a short time, so a repeat over the same repositories inside that window costs no calls to the
+      forge. *)
+  val find_known_workflow_file :
+    request_id:string ->
+    Client.t ->
+    Repo.t ->
+    Ref.t ->
+    (string option, [> call_err ]) result Abb.Future.t
 end

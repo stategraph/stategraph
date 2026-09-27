@@ -326,6 +326,31 @@ val get_installation_repos :
   Githubc2_abb.t ->
   (Githubc2_components.Repository.t list, [> get_installation_repos_err ]) result Abb.Future.t
 
+(** The workflow files the engine dispatches, in preference order. A workflow matches by its path or
+    by one of [names]. *)
+module Workflow : sig
+  type t = {
+    names : string list;
+    path : string;
+  }
+
+  val stategraph : t
+  val terrateam : t
+  val known : t list
+
+  (** The first workflow, by [known] order, that matches. With [override_path], the workflow at that
+      path alone. *)
+  val select : ?override_path:string -> ('a * string * string) list -> ('a * string * string) option
+end
+
+(** The path of the first [Workflow.known] file present on [ref_], fetched in [known] order. *)
+val find_known_workflow_file :
+  owner:string ->
+  repo:string ->
+  ref_:string ->
+  Githubc2_abb.t ->
+  (string option, [> fetch_file_err ]) result Abb.Future.t
+
 val find_workflow_file :
   owner:string ->
   repo:string ->

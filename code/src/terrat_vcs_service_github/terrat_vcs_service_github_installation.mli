@@ -5,7 +5,7 @@ module Id : sig
 end
 
 type refresh_repos_err =
-  [ Terrat_github.get_installation_access_token_err
+  [ Terrat_vcs_api.call_err
   | Terrat_github.get_installation_repos_err
   | Pgsql_pool.err
   | Pgsql_io.err
