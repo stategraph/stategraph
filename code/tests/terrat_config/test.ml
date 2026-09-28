@@ -61,8 +61,8 @@ let test_default_web_base_url =
       assert_base ~expected:"https://app.terrateam.io" config Terrat_brand.Stategraph;
       ())
 
-(* TERRAT_UI_BASE ends in a slash in Terrateam production
-   (infra/terrateam-prod/apps/app/fly.toml), and a base is joined with a path. *)
+(* TERRAT_UI_BASE ends in a slash in Terrateam production, and a base is joined
+   with a path. *)
 let test_trailing_slash =
   Oth.test ~tags:[ "brand" ] ~name:"a base carries no trailing slash" (fun _ ->
       let config =
