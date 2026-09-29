@@ -43,7 +43,7 @@ You can now build:
 
 ```shell
 cd code
-make terrat        # builds terrat-oss/ee/ttm/code-indexer + iris UI assets
+make terrat        # builds terrat-oss/ee/ttm + iris UI assets
 make test-terrat   # runs the test suite
 ```
 

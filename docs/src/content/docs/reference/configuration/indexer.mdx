@@ -15,7 +15,7 @@ indexer:
 | Key | Type | Description |
 |-----|------|-------------|
 | enabled | Boolean | Specifies whether the indexer is enabled. Default is false. |
-| build_tag | String | The container image the runner pulls to execute the indexer. Default is `ghcr.io/terrateamio/terrat-code-indexer:latest`. Set it to pin a version or to use a mirror. |
+| build_tag | String | Deprecated and ignored. The runner indexes with the Stategraph CLI built into the action image and does not pull an indexer image. |
 
 ## Functionality
 When the indexer is enabled, it creates a map of the repository, including:

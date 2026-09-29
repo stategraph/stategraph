@@ -144,16 +144,6 @@ RUN if [ -n "$GIT_SHA" ]; then \
     make -C code terrat
 
 # [[[cog emit("terrat-images") ]]]
-# Final code-indexer image
-FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS code-indexer
-# The minirootfs lags its own package branch, so upgrade what it pre-installed.
-RUN apk upgrade --no-cache
-RUN addgroup -S terrat && adduser -S -G terrat terrat
-COPY --from=terrat-build /tmp/mono/_build/default/code/src/terrat_code_indexer/terrat_code_indexer.exe /usr/local/bin/terrat_code_indexer
-USER terrat
-WORKDIR /mnt
-ENTRYPOINT ["/usr/local/bin/terrat_code_indexer"]
-
 # Final ttm image
 FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS ttm
 # The minirootfs lags its own package branch, so upgrade what it pre-installed.

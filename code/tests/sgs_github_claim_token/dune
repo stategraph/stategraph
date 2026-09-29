@@ -1,0 +1,10 @@
+(test
+ (name test)
+ (libraries
+  base64
+  containers
+  jwt
+  mirage-crypto-pk
+  mirage-crypto-rng.unix
+  oth
+  sgs_service_orchestration))

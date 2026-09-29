@@ -1,5 +1,5 @@
 .PHONY: all terrat
-.PHONY: terrat_oss terrat_ee terrat_code_indexer ttm iris
+.PHONY: terrat_oss terrat_ee ttm iris
 .PHONY: test-terrat
 .PHONY: generate-api-types check-api-types
 .PHONY: check-migrations
@@ -30,9 +30,6 @@ terrat_oss:
 
 terrat_ee:
 	cd $(ROOT) && $(DUNE) build code/src/terrat_ee/terrat_ee.exe
-
-terrat_code_indexer:
-	cd $(ROOT) && $(DUNE) build code/src/terrat_code_indexer/terrat_code_indexer.exe
 
 ttm:
 	cd $(ROOT) && $(DUNE) build code/src/ttm/ttm.exe
