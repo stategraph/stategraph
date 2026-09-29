@@ -141,7 +141,6 @@
  (deps
   src/terrat_oss/terrat_oss.exe
   src/terrat_ee/terrat_ee.exe
-  src/terrat_code_indexer/terrat_code_indexer.exe
   src/ttm/ttm.exe
   (alias src/iris/all)
   (alias src/terrat/check-migrations)))

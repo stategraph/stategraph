@@ -22,7 +22,7 @@
 ; [src.ttm.selector.linux] depended, plus `pkg-config --static --libs
 ; libcurl` flags carried in via abb_curl's meta_linkopts).
 ;
-; Other terrateam executables (terrat_oss, terrat_ee, terrat_code_indexer)
+; Other terrateam executables (terrat_oss, terrat_ee)
 ; intentionally stay dynamic — they only run inside Docker images that
 ; ship the runtime libs, so static linking would only inflate them.
 ;
