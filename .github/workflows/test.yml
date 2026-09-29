@@ -91,10 +91,10 @@ jobs:
 
   # NOTE: this job must always RUN, never be skipped with a job-level `if:`.
   # A matrix job skipped by `if:` is not expanded — GitHub reports a single
-  # check named "build-test" instead of the eight "build-test (target, arch)"
+  # check named "build-test" instead of the six "build-test (target, arch)"
   # contexts the ruleset requires, which leaves the PR blocked just as the old
   # `paths-ignore` did. So the job runs and each step opts out instead; the
-  # eight checks are reported and pass in seconds for docs-only changes.
+  # six checks are reported and pass in seconds for docs-only changes.
   build-test:
     needs: changes
     runs-on: ${{ matrix.runs-on }}
@@ -104,7 +104,6 @@ jobs:
     strategy:
       matrix:
         target:
-          - code-indexer
           - terrat-ee
           - terrat-oss
           - ttm

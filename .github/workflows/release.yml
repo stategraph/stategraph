@@ -85,7 +85,7 @@ jobs:
 
     strategy:
       matrix:
-        target: [code-indexer, terrat-ee, terrat-oss, ttm]
+        target: [terrat-ee, terrat-oss, ttm]
         arch: [amd64, arm64]
         include:
           - arch: amd64
@@ -322,7 +322,7 @@ jobs:
 
       - name: Create and push multi-arch manifest
         run: |
-          ./scripts/create_manifest code-indexer terrat-ee terrat-oss ttm
+          ./scripts/create_manifest terrat-ee terrat-oss ttm
 
   release-notify:
     needs: [set-version-tag, create-multi-arch-manifest]
