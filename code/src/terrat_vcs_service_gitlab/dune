@@ -21,7 +21,6 @@
   terrat_telemetry
   terrat_vcs_access_token
   terrat_vcs_api_gitlab
-  terrat_vcs_event_evaluator
   terrat_vcs_event_evaluator2
   terrat_vcs_gitlab_comment
   terrat_vcs_kv_store

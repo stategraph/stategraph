@@ -67,6 +67,26 @@ module Rt = struct
 
   let tenant_vcs_installation () =
     Brtl_rtng.Route.(tenant () / "vcs-installations" /% Path.string /% Path.uuid)
+
+  (* GitHub App creation: the manifest form, and GitHub's return with the code
+     of the created App. Both optional on the callback, so a mangled return is
+     redirected rather than answered with a 404. *)
+  let setup_github_app_manifest () =
+    Brtl_rtng.Route.(
+      api_v1 ()
+      / "setup"
+      / "github-app"
+      / "manifest"
+      /* Body.decode ~json:Sgs_api_components_github_app_manifest_request.of_yojson ())
+
+  let setup_github_app_callback () =
+    Brtl_rtng.Route.(
+      api_v1 ()
+      / "setup"
+      / "github-app"
+      / "callback"
+      /? Query.(option (string "code"))
+      /? Query.(option (string "state")))
 end
 
 type t = unit
@@ -112,6 +132,12 @@ let routes () config storage =
       ( `DELETE,
         Rt.tenant_vcs_installation ()
         --> Sgs_service_orchestration_ep_vcs_installation_delete.run config storage );
+      ( `POST,
+        Rt.setup_github_app_manifest ()
+        --> Sgs_service_orchestration_ep_github_app_manifest.run config storage );
+      ( `GET,
+        Rt.setup_github_app_callback ()
+        --> Sgs_service_orchestration_ep_github_app_callback.run config storage );
     ]
 
 let stop () = Abb.Future.return ()

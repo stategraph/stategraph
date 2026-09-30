@@ -1,10 +1,15 @@
 (** Responses shared by the GitHub claim endpoints (#1795). *)
 
-(** Whether the GitHub handshake can run on this server: it needs orchestration enabled and the
-    GitHub App's OAuth client configured. *)
-val availability :
+(** The session signing keys and the GitHub App's OAuth client, on one connection. Resolving the
+    client here is what keeps a console-created App working, so no endpoint reads the configuration
+    on its own. *)
+val keys_and_oauth :
   Sgs_config.t ->
-  [ `Orchestration_disabled | `Oauth_not_configured | `Available of Sgs_config.github_oauth ]
+  Pgsql_io.t ->
+  ( Sgs_user_session.Session.Keys.t * Sgs_config.github_oauth option,
+    [> Sgs_user_session.Session.fetch_key_err | Pgsql_io.err ] )
+  result
+  Abb.Future.t
 
 (** Log why the handshake cannot run: [ORCHESTRATION_UNAVAILABLE] or
     [GITHUB_CLAIM_OAUTH_NOT_CONFIGURED]. [src] defaults to this module's; prefer passing the

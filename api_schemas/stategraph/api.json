@@ -759,8 +759,11 @@
           "dedicated": {
             "$ref": "#/components/schemas/dedicated-availability"
           },
+          "github_app": {
+            "$ref": "#/components/schemas/github-app-availability"
+          },
           "github_app_url": {
-            "description": "URL that starts the Stategraph GitHub App installation flow. Absent when the server has no GITHUB_APP_URL configured, in which case the console tells the operator to install the app from GitHub by hand.",
+            "description": "URL that starts the Stategraph GitHub App installation flow: GITHUB_APP_URL, or the page of the App the console created. Absent when neither exists, in which case the console offers to create the App, or tells the operator to install it from GitHub by hand.",
             "type": "string"
           },
           "orchestration": {
@@ -773,6 +776,7 @@
         "required": [
           "costs",
           "dedicated",
+          "github_app",
           "orchestration",
           "security"
         ],
@@ -1501,6 +1505,63 @@
           "supported_count",
           "unsupported_count",
           "unsupported_resources"
+        ],
+        "type": "object"
+      },
+      "github-app-availability": {
+        "additionalProperties": false,
+        "description": "The orchestration GitHub App. configured: the engine has an App, from its environment or from the row the console created. ready: a running engine process holds that App, so it can be installed. An App from the environment is ready as soon as it is configured. creatable: this server can create an App from the console, which needs orchestration on, the engine's admin channel configured, and a self-hosted deployment. When it is false and no App is configured, the console asks the operator to bring their own.",
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "creatable": {
+            "type": "boolean"
+          },
+          "ready": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "configured",
+          "creatable",
+          "ready"
+        ],
+        "type": "object"
+      },
+      "github-app-manifest-request": {
+        "additionalProperties": false,
+        "description": "What the console needs to send the operator to GitHub to create the orchestration App.",
+        "properties": {
+          "name": {
+            "description": "The App name. GitHub requires a name no other App uses.",
+            "type": "string"
+          },
+          "organization": {
+            "description": "The GitHub organization that owns the App. Absent: the operator's own account.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "github-app-manifest-response": {
+        "additionalProperties": false,
+        "description": "A form for GitHub's manifest flow: post manifest, as a form field of that name, to action_url. The state rides in action_url and comes back to the callback with GitHub's code.",
+        "properties": {
+          "action_url": {
+            "type": "string"
+          },
+          "manifest": {
+            "description": "The App manifest, as JSON text.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action_url",
+          "manifest"
         ],
         "type": "object"
       },
@@ -6959,6 +7020,90 @@
           }
         },
         "summary": "Create first admin user (local auth only)"
+      }
+    },
+    "/api/v1/setup/github-app/callback": {
+      "get": {
+        "description": "GitHub returns the operator here after the App is created from the manifest. Converts the code into the App, stores it for the orchestration engine, and redirects to the console getting-started page with github_app=created; github_app=expired when the state does not verify, github_app=exists when an App is already stored, and github_app=error otherwise. Both parameters are optional so that a mangled return is redirected rather than answered with a 404.",
+        "operationId": "setup/github-app-callback",
+        "parameters": [
+          {
+            "description": "The temporary code GitHub issued. Valid for one hour.",
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The signed state the manifest endpoint issued.",
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {}
+        }
+      }
+    },
+    "/api/v1/setup/github-app/manifest": {
+      "post": {
+        "description": "Builds the GitHub App manifest of this deployment and the form the console posts to GitHub. Instance admin only. 503 when the engine's admin channel is not configured, so the App could not be stored.",
+        "operationId": "setup/github-app-manifest",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github-app-manifest-request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github-app-manifest-response"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-response"
+                }
+              }
+            }
+          },
+          "401": {},
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "capability-denied.json#/definitions/response"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-response"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/setup/magic-claim": {

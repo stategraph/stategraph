@@ -112,6 +112,58 @@ let test_rebrand_url =
         ~actual:(Terrat_config.rebrand_url config Terrat_brand.Terrateam "");
       ())
 
+let () = Mirage_crypto_rng_unix.use_default ()
+let pem = X509.Private_key.encode_pem (`RSA (Mirage_crypto_pk.Rsa.generate ~bits:2048 ()))
+
+let stored ?(pem = pem) () =
+  Terrat_config.github_of_stored
+    ~app_id:"42"
+    ~pem
+    ~client_id:"Iv1.stored"
+    ~client_secret:"stored-secret"
+    ~webhook_secret:"stored-webhook"
+    ~app_url:"https://github.com/apps/stored"
+
+let test_github_of_stored =
+  Oth.test ~tags:[ "github_app" ] ~name:"a stored App row decodes into the GitHub config" (fun _ ->
+      let github = Oth.Assert.ok_show ~show:Terrat_config.show_err (stored ()) in
+      Oth.Assert.Eq.string ~expected:"42" ~actual:(Terrat_config.Github.app_id github);
+      Oth.Assert.Eq.string
+        ~expected:"Iv1.stored"
+        ~actual:(Terrat_config.Github.app_client_id github);
+      Oth.Assert.Eq.string_option
+        ~expected:(Some "stored-webhook")
+        ~actual:(Terrat_config.Github.webhook_secret github);
+      Oth.Assert.Eq.string
+        ~expected:"https://github.com/apps/stored"
+        ~actual:(Uri.to_string (Terrat_config.Github.app_url github));
+      ())
+
+let test_github_of_stored_bad_pem =
+  Oth.test
+    ~tags:[ "github_app" ]
+    ~name:"a stored App row with a bad PEM is a config error"
+    (fun _ ->
+      match stored ~pem:"not a pem" () with
+      | Error (`Bad_pem _) -> ()
+      | Ok _ -> Oth.Assert.false_ "a bad PEM decoded"
+      | Error err -> Oth.Assert.false_ (Terrat_config.show_err err))
+
+let test_with_github =
+  Oth.test ~tags:[ "github_app" ] ~name:"with_github puts the stored App in the config" (fun _ ->
+      let config =
+        config
+          ~stategraph_ui_base:"https://console.example.com"
+          ~terrat_ui_base:unset
+          ~terrat_web_base_url:unset
+      in
+      Oth.Assert.none (Terrat_config.github config);
+      let github = Oth.Assert.ok_show ~show:Terrat_config.show_err (stored ()) in
+      let config = Terrat_config.with_github config github in
+      let github = Oth.Assert.some (Terrat_config.github config) in
+      Oth.Assert.Eq.string ~expected:"42" ~actual:(Terrat_config.Github.app_id github);
+      ())
+
 let test =
   Oth.serial
     [
@@ -120,6 +172,9 @@ let test =
       test_default_web_base_url;
       test_trailing_slash;
       test_rebrand_url;
+      test_github_of_stored;
+      test_github_of_stored_bad_pem;
+      test_with_github;
     ]
 
 let () =

@@ -28,7 +28,6 @@
   terrat_telemetry
   terrat_user
   terrat_vcs_api_github
-  terrat_vcs_event_evaluator
   terrat_vcs_event_evaluator2
   terrat_vcs_github_comment
   terrat_vcs_github_comment_templates
