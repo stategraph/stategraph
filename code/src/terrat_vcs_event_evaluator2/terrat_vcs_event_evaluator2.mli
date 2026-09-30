@@ -83,4 +83,20 @@ module Make (S : Terrat_vcs_provider2.S) : sig
     exec:Exec.t ->
     unit ->
     unit Abb.Future.t
+
+  (** The hourly maintenance entries. They open one connection and run the per-provider cleanup SQL.
+      A pool error is logged and coerced to [`Error] so no [`Pgsql_pool_error] can reach a caller
+      that assumes [`Error]-shaped errors. *)
+
+  val run_plan_cleanup :
+    request_id:string -> storage:Terrat_storage.t -> unit -> (unit, [> `Error ]) result Abb.Future.t
+
+  val run_repo_tree_cleanup :
+    request_id:string -> storage:Terrat_storage.t -> unit -> (unit, [> `Error ]) result Abb.Future.t
+
+  val run_flow_state_cleanup :
+    request_id:string -> storage:Terrat_storage.t -> unit -> (unit, [> `Error ]) result Abb.Future.t
+
+  val run_repo_config_cleanup :
+    request_id:string -> storage:Terrat_storage.t -> unit -> (unit, [> `Error ]) result Abb.Future.t
 end

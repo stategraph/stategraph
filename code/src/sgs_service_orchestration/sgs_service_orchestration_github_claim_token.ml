@@ -9,6 +9,14 @@ module Payload = struct
     [@@deriving yojson { strict = false }]
   end
 
+  module Manifest = struct
+    type t = {
+      user_id : string;
+      exp : float;
+    }
+    [@@deriving yojson { strict = false }]
+  end
+
   (* The proof lives in a token rather than a table, so it cannot outlive its expiry, and there is
      no row to forge or to garbage-collect. *)
   module Proof = struct
@@ -43,11 +51,16 @@ let state_ttl = 300.
    dead end without letting a stale verdict linger. *)
 let proof_ttl = 900.
 
+(* GitHub keeps the code of a created App for one hour, and the operator may
+   take that long on GitHub's form. *)
+let manifest_ttl = 3600.
+
 (* The session signs these tokens and its own JWTs with the same key. The claim
    name is what tells them apart: a session JWT holds its payload under
    "stategraph". *)
 let state_claim = "stategraph_github_claim_state"
 let proof_claim = "stategraph_github_claim_proof"
+let manifest_claim = "stategraph_github_app_manifest"
 
 let mint ~signer ~claim json =
   Sgs_user_session.Session.sign_token ~signer (Jwt.Payload.add_claim claim json Jwt.Payload.empty)
@@ -112,4 +125,26 @@ module Proof = struct
   let covers { user_id = _; tenant_id = _; installation_core_ids; exp = _ } ~installation_core_id =
     if CCList.mem ~eq:CCString.equal installation_core_id installation_core_ids then `Covered
     else `Not_covered
+end
+
+module Manifest = struct
+  type t = Payload.Manifest.t = {
+    user_id : string;
+    exp : float;
+  }
+
+  let mint ~signer ~now ~user_id () =
+    mint
+      ~signer
+      ~claim:manifest_claim
+      (Payload.Manifest.to_yojson { Payload.Manifest.user_id; exp = now +. manifest_ttl })
+
+  let verify ~verifiers ~now token =
+    verify
+      ~verifiers
+      ~now
+      ~claim:manifest_claim
+      ~of_yojson:Payload.Manifest.of_yojson
+      ~exp:(fun { Payload.Manifest.user_id = _; exp } -> exp)
+      token
 end

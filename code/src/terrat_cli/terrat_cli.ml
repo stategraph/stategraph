@@ -167,6 +167,34 @@ struct
             exit 1)
     | None -> Abb.Future.return None
 
+  (* The environment wins over the stored App. With neither, the process waits
+     for a row and exits when one appears, so runit starts it again and the new
+     process loads the App. *)
+  let resolve_github config storage =
+    let open Abb.Future.Infix_monad in
+    match Terrat_config.github config with
+    | Some _ -> Abb.Future.return config
+    | None -> (
+        Terrat_github_app.load storage
+        >>= function
+        | Ok (Some github) ->
+            Logs.info (fun m ->
+                m "GITHUB_APP : LOADED : app_id=%s" (Terrat_config.Github.app_id github));
+            Terrat_github_app.mark_loaded storage
+            >>= fun marked ->
+            (match marked with
+            | Ok () -> ()
+            | Error err ->
+                Logs.err (fun m -> m "GITHUB_APP : MARK_LOADED : %a" Terrat_github_app.pp_err err));
+            Abb.Future.return (Terrat_config.with_github config github)
+        | Ok None ->
+            Logs.info (fun m -> m "GITHUB_APP : WAITING");
+            Abb.Future.fork (Terrat_github_app.exit_when_created storage)
+            >>= fun _ -> Abb.Future.return config
+        | Error err ->
+            Logs.err (fun m -> m "GITHUB_APP : ERROR : %a" Terrat_github_app.pp_err err);
+            exit 1)
+
   let server () =
     let run () =
       match Terrat_config.create () with
@@ -179,6 +207,8 @@ struct
           @@ (Terrat_config.gc config).Terrat_config.Gc.dynamic_gc;
           Terrat_storage.create config
           >>= fun storage ->
+          resolve_github config storage
+          >>= fun config ->
           (match Terrat_config.infracost config with
             | Some (Terrat_config.Infracost.Proxy proxy) ->
                 Abb.Future.return (Some (Terrat_ep_infracost.Proxy proxy))

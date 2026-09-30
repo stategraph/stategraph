@@ -64,6 +64,10 @@ type t = {
      integration (FDW bridge to the terrateam database; the terrat runit service and nginx routes
      read the same variable). *)
   orchestration_enabled : bool;
+  (* Whether STATEGRAPH_ORCHESTRATION_ENABLED said so, rather than the FDW password implying it.
+     An operator who asked for orchestration gets a hard failure when its bridge cannot be built;
+     one who got it by default gets a degraded subsystem, not a server that will not start. *)
+  orchestration_explicit : bool;
   terrat_session_cookie_name : string;
   (* STATEGRAPH_FDW_*: how the stategraph database reaches the terrateam database over
      postgres_fdw. Only meaningful when orchestration is enabled. *)
@@ -78,6 +82,9 @@ type t = {
      the console so the getting-started GitHub card can link to the app install.
      Optional, and with no default on purpose -- see the .mli. *)
   github_app_url : string option;
+  (* TERRAT_API_BASE: the public base of the engine's API, STATEGRAPH_UI_BASE plus /api unless
+     set. The webhook and callback URLs of a GitHub App the console creates are under it. *)
+  terrat_api_base : string;
   pricing_service_url : string;
   pricing_default_region : string;
   cost_schedule_hours : int;
@@ -106,6 +113,15 @@ type t = {
      the engine already requires the same pair whenever GITHUB_APP_ID is set, so in the unified
      image these are the values the engine is started with. *)
   github_oauth : github_oauth option;
+  (* GITHUB_APP_ID: set when the engine's GitHub App comes from the environment. *)
+  github_app_id : string option;
+  (* Set by the caller of [create] when this deployment supplies the orchestration GitHub App
+     itself for every tenant, so the console must not offer to create one. *)
+  github_app_managed : bool;
+  (* GITHUB_API_BASE_URL / GITHUB_WEB_BASE_URL: the GitHub API and web hosts, github.com unless
+     set. *)
+  github_api_base : string;
+  github_web_base : string;
   (* STATEGRAPH_LICENSE_KEY: opaque self-hosted license key, validated at use-site. *)
   license_key : string option;
   ui_base : string;
@@ -267,9 +283,11 @@ let parse_oauth2_config () =
              oauth2_cookie_secret = cookie_secret;
            })
 
-let create () =
+let create ?(github_app_managed = false) () =
   let open CCResult.Infix in
-  env_str "STATEGRAPH_UI_BASE"
+  (* Normalized once: every URL built from it is concatenated with a path, and a
+     trailing slash there is permanent in a GitHub App's callback URLs. *)
+  CCResult.map (CCString.rdrop_while (Char.equal '/')) (env_str "STATEGRAPH_UI_BASE")
   >>= fun ui_base ->
   env_str "DB_HOST"
   >>= fun db_host ->
@@ -346,7 +364,6 @@ let create () =
   in
   let cost_enabled = env_bool "STATEGRAPH_COST_ENABLED" in
   let dedicated_enabled = env_bool "STATEGRAPH_DEDICATED_ENABLED" in
-  let orchestration_enabled = env_bool "STATEGRAPH_ORCHESTRATION_ENABLED" in
   let terrat_session_cookie_name =
     env_str_default "TERRAT_SESSION_COOKIE_NAME" ~default:"session"
   in
@@ -359,7 +376,22 @@ let create () =
     env_str_default "STATEGRAPH_FDW_PROVISIONER_USER" ~default:"stategraph_provisioner"
   in
   let fdw_provisioner_password = env_str_opt "STATEGRAPH_FDW_PROVISIONER_PASSWORD" in
+  (* Unset means on when the FDW password is set: without that password no bridge can be built,
+     so the engine has nothing to serve. The image CMD and the nginx render script apply the same
+     rule. *)
+  let orchestration_explicit =
+    match env_str_opt "STATEGRAPH_ORCHESTRATION_ENABLED" with
+    | Some ("true" | "1" | "false" | "0") -> true
+    | None | Some _ -> false
+  in
+  let orchestration_enabled =
+    match env_str_opt "STATEGRAPH_ORCHESTRATION_ENABLED" with
+    | Some ("true" | "1") -> true
+    | Some ("false" | "0") -> false
+    | None | Some _ -> CCOption.is_some fdw_password
+  in
   let github_app_url = env_str_opt "GITHUB_APP_URL" in
+  let terrat_api_base = env_str_default "TERRAT_API_BASE" ~default:(ui_base ^ "/api") in
   let pricing_service_url =
     env_str_default "STATEGRAPH_PRICING_SERVICE_URL" ~default:"http://localhost:8090"
   in
@@ -390,16 +422,13 @@ let create () =
   (* Both-or-neither: a client id without its secret cannot complete a code exchange, and silently
      half-configuring the flow would surface as an opaque GitHub error at the end of a redirect
      chain rather than as "not configured" up front. *)
+  let github_api_base = env_str_default "GITHUB_API_BASE_URL" ~default:"https://api.github.com" in
+  let github_web_base = env_str_default "GITHUB_WEB_BASE_URL" ~default:"https://github.com" in
+  let github_app_id = env_str_opt "GITHUB_APP_ID" in
   let github_oauth =
     match (env_str_opt "GITHUB_APP_CLIENT_ID", env_str_opt "GITHUB_APP_CLIENT_SECRET") with
     | Some client_id, Some client_secret ->
-        Some
-          {
-            client_id;
-            client_secret;
-            api_base = env_str_default "GITHUB_API_BASE_URL" ~default:"https://api.github.com";
-            web_base = env_str_default "GITHUB_WEB_BASE_URL" ~default:"https://github.com";
-          }
+        Some { client_id; client_secret; api_base = github_api_base; web_base = github_web_base }
     | Some _, None | None, Some _ | None, None -> None
   in
   let license_key = env_str_opt "STATEGRAPH_LICENSE_KEY" in
@@ -433,6 +462,7 @@ let create () =
       cost_enabled;
       dedicated_enabled;
       orchestration_enabled;
+      orchestration_explicit;
       terrat_session_cookie_name;
       fdw_host;
       fdw_port;
@@ -442,6 +472,7 @@ let create () =
       fdw_provisioner_user;
       fdw_provisioner_password;
       github_app_url;
+      terrat_api_base;
       pricing_service_url;
       pricing_default_region;
       cost_schedule_hours;
@@ -458,6 +489,10 @@ let create () =
       aegis_api_base;
       aegis_service_token;
       github_oauth;
+      github_app_id;
+      github_app_managed;
+      github_api_base;
+      github_web_base;
       magic_link_secret;
       invitation_ttl_hours;
       license_key;
@@ -484,6 +519,7 @@ let port t = t.port
 let cost_enabled t = t.cost_enabled
 let dedicated_enabled t = t.dedicated_enabled
 let orchestration_enabled t = t.orchestration_enabled
+let orchestration_explicit t = t.orchestration_explicit
 let terrat_session_cookie_name t = t.terrat_session_cookie_name
 let fdw_host t = t.fdw_host
 let fdw_port t = t.fdw_port
@@ -493,6 +529,7 @@ let fdw_password t = t.fdw_password
 let fdw_provisioner_user t = t.fdw_provisioner_user
 let fdw_provisioner_password t = t.fdw_provisioner_password
 let github_app_url t = t.github_app_url
+let terrat_api_base t = t.terrat_api_base
 let pricing_service_url t = t.pricing_service_url
 let pricing_default_region t = t.pricing_default_region
 let cost_schedule_hours t = t.cost_schedule_hours
@@ -511,6 +548,14 @@ let github_oauth_client_id t = t.client_id
 let github_oauth_client_secret t = t.client_secret
 let github_oauth_api_base t = t.api_base
 let github_oauth_web_base t = t.web_base
+let github_app_id t = t.github_app_id
+let github_app_managed t = t.github_app_managed
+let github_api_base t = t.github_api_base
+let github_web_base t = t.github_web_base
+
+let make_github_oauth t ~client_id ~client_secret =
+  { client_id; client_secret; api_base = t.github_api_base; web_base = t.github_web_base }
+
 let aegis_api_base t = t.aegis_api_base
 let aegis_service_token t = t.aegis_service_token
 let magic_link_secret t = t.magic_link_secret
@@ -519,5 +564,14 @@ let license_key t = t.license_key
 let statement_timeout t = t.statement_timeout
 let ui_base t = t.ui_base
 let oauth_redirect_base t = t.oauth_redirect_base
+
+(* The base of a callback URL handed to a forge. STATEGRAPH_OAUTH_REDIRECT_BASE
+   exists for a dev box whose console and server are on different ports, and it
+   defaults to localhost, which no forge can reach. A GitHub App is created with
+   its callback URLs baked in and its credentials shown once, so registering
+   localhost there is not recoverable: fall back to the public URL instead. *)
+let public_callback_base t =
+  if t.oauth_redirect_base_explicit then t.oauth_redirect_base else t.ui_base
+
 let oauth_redirect_base_explicit t = t.oauth_redirect_base_explicit
 let secure_cookies t = t.secure_cookies

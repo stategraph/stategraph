@@ -89,8 +89,6 @@ end
 let create_exec ~slots () = Exec.create ~logger:Exec_logger.metrics ~slots ()
 
 module Make (S : Terrat_vcs_provider2.S) = struct
-  module Legacy = Terrat_vcs_event_evaluator.Make (S)
-
   let src = Logs.Src.create ("vcs_event_evaluator2." ^ S.name)
 
   module Logs = (val Logs.src_log src : Logs.LOG)
@@ -473,65 +471,30 @@ module Make (S : Terrat_vcs_provider2.S) = struct
       ~pull_request_id
       ~user
       event =
-    match Sys.getenv_opt "TERRAT_EVENT_EVALUATOR_MODE" with
-    | None | Some ("" | "new-age" | "legacy-drift") -> (
-        let store =
-          Hmap.empty
-          |> Keys.Key.add Keys.account account
-          |> Keys.Key.add Keys.pull_request_id pull_request_id
-          |> Keys.Key.add Keys.repo repo
-          |> Keys.Key.add Keys.user (Some user)
-          |> Keys.Key.add Keys.work_manifest_event None
-        in
-        let open Abb.Future.Infix_monad in
-        run_pull_request_event
-          ~request_id
-          ~config
-          ~storage
-          ~exec
-          ~account
-          ~repo
-          ~pull_request_id
-          ~user
-          ~event
-          ~store
-          ()
-        >>= function
-        | Ok _ -> Abbs_fc.return_ok ()
-        | Error _ -> Abbs_fc.return_err `Error)
-    | Some _ ->
-        let run =
-          let ctx = Legacy.Ctx.make ~config ~storage ~request_id () in
-          match event with
-          | Pull_request_event.Open ->
-              Legacy.run_pull_request_open ~ctx ~account ~user ~repo ~pull_request_id ()
-          | Pull_request_event.Close ->
-              Legacy.run_pull_request_close ~ctx ~account ~user ~repo ~pull_request_id ()
-          | Pull_request_event.Sync ->
-              Legacy.run_pull_request_sync ~ctx ~account ~user ~repo ~pull_request_id ()
-          | Pull_request_event.Ready_for_review ->
-              Legacy.run_pull_request_ready_for_review ~ctx ~account ~user ~repo ~pull_request_id ()
-          | Pull_request_event.Comment { comment_id; comment } ->
-              Legacy.run_pull_request_comment
-                ~ctx
-                ~account
-                ~user
-                ~repo
-                ~pull_request_id
-                ~comment_id
-                ~comment
-                ()
-        in
-        Abb.Future.await_bind
-          (function
-            | `Det _ -> Abbs_fc.return_ok ()
-            | `Exn (exn, _) ->
-                Logs.err (fun m -> m "%s : %s" request_id (Printexc.to_string exn));
-                Abbs_fc.return_err `Error
-            | `Aborted ->
-                Logs.err (fun m -> m "%s : ABORTED" request_id);
-                Abbs_fc.return_err `Error)
-          run
+    let store =
+      Hmap.empty
+      |> Keys.Key.add Keys.account account
+      |> Keys.Key.add Keys.pull_request_id pull_request_id
+      |> Keys.Key.add Keys.repo repo
+      |> Keys.Key.add Keys.user (Some user)
+      |> Keys.Key.add Keys.work_manifest_event None
+    in
+    let open Abb.Future.Infix_monad in
+    run_pull_request_event
+      ~request_id
+      ~config
+      ~storage
+      ~exec
+      ~account
+      ~repo
+      ~pull_request_id
+      ~user
+      ~event
+      ~store
+      ()
+    >>= function
+    | Ok _ -> Abbs_fc.return_ok ()
+    | Error _ -> Abbs_fc.return_err `Error
 
   let work_manifest_job_failed ~request_id ~config ~storage ~exec ~account ~repo ~run_id () =
     let run =
@@ -545,37 +508,24 @@ module Make (S : Terrat_vcs_provider2.S) = struct
       in
       with_conn storage ~f:(fun db ->
           S.Work_manifest.query_by_run_id ~request_id db run_id
-          >>= function
-          | Some work_manifest -> (
-              S.Db.query_flow_state ~request_id db work_manifest.Terrat_work_manifest3.id
-              >>| function
-              | Some _ -> `Legacy work_manifest
-              | None -> `New_age (Some work_manifest))
-          | None -> Abbs_fc.return_ok (`New_age None))
-      >>= function
-      | `New_age work_manifest ->
-          with_conn storage ~f:(fun db ->
-              Pgsql_io.tx db ~f:(fun () ->
-                  let open Abb.Future.Infix_monad in
-                  Builder.State.make ~log_id:request_id ~config ~store ~db ~exec ~tasks ()
-                  >>= fun s ->
-                  Logs.info (fun m -> m "%s : target=%s" (Builder.log_id s) (Hmap.Key.info target));
-                  tx_safe ~request_id @@ Builder.eval s target
-                  >>= fun r ->
-                  (* Best effort so the unified comment reflects the failure. *)
-                  match work_manifest with
-                  | Some work_manifest ->
-                      S.Comment.mark_unified_comment_dirty
-                        ~request_id
-                        db
-                        work_manifest.Terrat_work_manifest3.id
-                      >>| fun _ -> r
-                  | None -> Abb.Future.return r))
-          >>| fun _ -> CCOption.map (fun wm -> wm.Terrat_work_manifest3.id) work_manifest
-      | `Legacy work_manifest ->
-          let ctx = Legacy.Ctx.make ~config ~storage ~request_id () in
-          Legacy.run_work_manifest_failure ~ctx work_manifest.Terrat_work_manifest3.id
-          >>| fun _ -> Some work_manifest.Terrat_work_manifest3.id
+          >>= fun work_manifest ->
+          Pgsql_io.tx db ~f:(fun () ->
+              let open Abb.Future.Infix_monad in
+              Builder.State.make ~log_id:request_id ~config ~store ~db ~exec ~tasks ()
+              >>= fun s ->
+              Logs.info (fun m -> m "%s : target=%s" (Builder.log_id s) (Hmap.Key.info target));
+              tx_safe ~request_id @@ Builder.eval s target
+              >>= fun r ->
+              (* Best effort so the unified comment reflects the failure. *)
+              match work_manifest with
+              | Some work_manifest ->
+                  S.Comment.mark_unified_comment_dirty
+                    ~request_id
+                    db
+                    work_manifest.Terrat_work_manifest3.id
+                  >>| fun _ -> r
+              | None -> Abb.Future.return r)
+          >>| fun _ -> CCOption.map (fun wm -> wm.Terrat_work_manifest3.id) work_manifest)
     in
     let open Abb.Future.Infix_monad in
     log_err ~request_id run
@@ -599,57 +549,26 @@ module Make (S : Terrat_vcs_provider2.S) = struct
   let compute_node_poll ~request_id ~config ~storage ~exec ~compute_node_id offering =
     let open Abb.Future.Infix_monad in
     let run =
-      let open Irm in
+      let module Offering = Terrat_api_components.Work_manifest_initiate in
+      let target = Keys.eval_compute_node_poll in
+      let store =
+        Hmap.empty
+        |> Keys.Key.add Keys.compute_node_id (Some compute_node_id)
+        |> Keys.Key.add Keys.compute_node_offering offering
+      in
       with_conn storage ~f:(fun db ->
-          S.Db.query_flow_state ~request_id db compute_node_id
-          >>| function
-          | Some _ -> `Legacy
-          | None -> `New_age)
-      >>= function
-      | `New_age ->
-          let module Offering = Terrat_api_components.Work_manifest_initiate in
-          let target = Keys.eval_compute_node_poll in
-          let store =
-            Hmap.empty
-            |> Keys.Key.add Keys.compute_node_id (Some compute_node_id)
-            |> Keys.Key.add Keys.compute_node_offering offering
-          in
-          with_conn storage ~f:(fun db ->
-              let open Abb.Future.Infix_monad in
-              Pgsql_io.tx db ~f:(fun () ->
-                  Builder.State.make ~log_id:request_id ~config ~store ~db ~exec ~tasks ()
-                  >>= fun s ->
-                  Logs.info (fun m ->
-                      m
-                        "%s : COMPUTE_NODE_POLL : compute_node_id = %a : run_id = %s"
-                        (Builder.log_id s)
-                        Uuidm.pp
-                        compute_node_id
-                        offering.Offering.run_id);
-                  tx_safe ~request_id @@ Builder.eval s target))
-      | `Legacy -> (
-          let select_encryption_key () =
-            (* The hex conversion is so that there are no issues with escaping
-               the string *)
-            Pgsql_io.Typed_sql.(
-              sql
-              //
-              (* data *)
-              Ret.u Ret.text CCFun.(Cstruct.of_hex %> CCOption.return)
-              /^ "select encode(data, 'hex') from encryption_keys order by rank limit 1")
-          in
-          with_conn storage ~f:(fun db ->
-              Pgsql_io.Prepared_stmt.fetch db (select_encryption_key ()) ~f:CCFun.id)
-          >>= function
-          | [] -> assert false
-          | encryption_key :: _ -> (
-              let open Abb.Future.Infix_monad in
-              let ctx = Legacy.Ctx.make ~config ~storage ~request_id () in
-              Legacy.run_work_manifest_initiate ~ctx ~encryption_key compute_node_id offering
-              >>= function
-              | Ok (Some r) -> Abbs_fc.return_ok (`Ok r)
-              | Ok None -> Abbs_fc.return_err `Error
-              | Error err -> Abbs_fc.return_err err))
+          let open Abb.Future.Infix_monad in
+          Pgsql_io.tx db ~f:(fun () ->
+              Builder.State.make ~log_id:request_id ~config ~store ~db ~exec ~tasks ()
+              >>= fun s ->
+              Logs.info (fun m ->
+                  m
+                    "%s : COMPUTE_NODE_POLL : compute_node_id = %a : run_id = %s"
+                    (Builder.log_id s)
+                    Uuidm.pp
+                    compute_node_id
+                    offering.Offering.run_id);
+              tx_safe ~request_id @@ Builder.eval s target))
     in
     Fc.with_finally
       (fun () ->
@@ -666,35 +585,29 @@ module Make (S : Terrat_vcs_provider2.S) = struct
     let open Abb.Future.Infix_monad in
     let request_id = CCOption.get_lazy CCFun.(Ouuid.v4 %> Uuidm.to_string) request_id in
     Logs.info (fun m -> m "RUN_MISSING_DRIFT_SCHEDULES : %s" request_id);
+    let target = Keys.run_missing_drift_schedules in
+    let store = Hmap.empty in
     let run =
-      match Sys.getenv_opt "TERRAT_EVENT_EVALUATOR_MODE" with
-      | None | Some ("" | "new-age") ->
-          let target = Keys.run_missing_drift_schedules in
-          let store = Hmap.empty in
-          with_conn storage ~f:(fun db ->
-              Fc.retry
-                ~f:(fun () ->
-                  Pgsql_io.tx db ~f:(fun () ->
-                      Builder.State.make
-                        ~log_id:request_id
-                        ~config
-                        ~store
-                        ~exec
-                        ~db
-                        ~tasks:(Tasks_branch.tasks tasks)
-                        ()
-                      >>= fun s ->
-                      Logs.info (fun m ->
-                          m "%s : target=%s" (Builder.log_id s) (Hmap.Key.info target));
-                      tx_safe ~request_id @@ Builder.eval s target))
-                ~while_:
-                  (Fc.finite_tries 50 (function
-                    | Ok (`Ok n) -> n > 0
-                    | Ok (`Noop | `Suspend_eval _ | `Rerun _) | Error _ -> true))
-                ~betwixt:(fun _ -> Fc.unit))
-      | Some _ ->
-          let ctx = Legacy.Ctx.make ~config ~storage ~request_id () in
-          Legacy.run_scheduled_drift ctx >>= fun _ -> Abbs_fc.return_ok (`Ok 0)
+      with_conn storage ~f:(fun db ->
+          Fc.retry
+            ~f:(fun () ->
+              Pgsql_io.tx db ~f:(fun () ->
+                  Builder.State.make
+                    ~log_id:request_id
+                    ~config
+                    ~store
+                    ~exec
+                    ~db
+                    ~tasks:(Tasks_branch.tasks tasks)
+                    ()
+                  >>= fun s ->
+                  Logs.info (fun m -> m "%s : target=%s" (Builder.log_id s) (Hmap.Key.info target));
+                  tx_safe ~request_id @@ Builder.eval s target))
+            ~while_:
+              (Fc.finite_tries 50 (function
+                | Ok (`Ok n) -> n > 0
+                | Ok (`Noop | `Suspend_eval _ | `Rerun _) | Error _ -> true))
+            ~betwixt:(fun _ -> Fc.unit))
     in
     Fc.with_finally
       (fun () -> Fc.ignore @@ log_err ~request_id run)
@@ -702,6 +615,64 @@ module Make (S : Terrat_vcs_provider2.S) = struct
         Fc.ignore
         @@ Abb.Future.fork
         @@ run_next_pending_compute ~request_id ~config ~storage ~exec ())
+
+  let cleanup_flow_states request_id db =
+    Abbs_time_it.run
+      (fun time -> Logs.info (fun m -> m "%s : CLEANUP_FLOW_STATE : time=%f" request_id time))
+      (fun () -> S.Db.cleanup_flow_states ~request_id db)
+
+  let cleanup_repo_configs request_id db =
+    Abbs_time_it.run
+      (fun time -> Logs.info (fun m -> m "%s : CLEANUP_REPO_CONFIGS : time=%f" request_id time))
+      (fun () -> S.Db.cleanup_repo_configs ~request_id db)
+
+  let run_plan_cleanup ~request_id ~storage () =
+    let open Abb.Future.Infix_monad in
+    Logs.info (fun m -> m "%s : PLAN_CLEANUP : START" request_id);
+    Abbs_time_it.run
+      (fun t -> Logs.info (fun m -> m "%s : PLAN_CLEANUP : END : time=%f" request_id t))
+      (fun () -> with_conn storage ~f:(fun db -> S.Db.cleanup_plans ~request_id db))
+    >>= function
+    | Ok () -> Fc.return_ok ()
+    | Error `Error -> Fc.return_err `Error
+    | Error (#Pgsql_pool.err as err) ->
+        Logs.err (fun m -> m "%s : PLAN_CLEANUP : %a" request_id Pgsql_pool.pp_err err);
+        Fc.return_err `Error
+
+  let run_repo_tree_cleanup ~request_id ~storage () =
+    let open Abb.Future.Infix_monad in
+    Logs.info (fun m -> m "%s : REPO_TREE_CLEANUP : START" request_id);
+    Abbs_time_it.run
+      (fun t -> Logs.info (fun m -> m "%s : REPO_TREE_CLEANUP : END : time=%f" request_id t))
+      (fun () -> with_conn storage ~f:(fun db -> S.Db.cleanup_repo_trees ~request_id db))
+    >>= function
+    | Ok () -> Fc.return_ok ()
+    | Error `Error -> Fc.return_err `Error
+    | Error (#Pgsql_pool.err as err) ->
+        Logs.err (fun m -> m "%s : REPO_TREE_CLEANUP : %a" request_id Pgsql_pool.pp_err err);
+        Fc.return_err `Error
+
+  let run_flow_state_cleanup ~request_id ~storage () =
+    let open Abb.Future.Infix_monad in
+    Logs.info (fun m -> m "%s : FLOW_STATE_CLEANUP" request_id);
+    with_conn storage ~f:(fun db -> cleanup_flow_states request_id db)
+    >>= function
+    | Ok () -> Fc.return_ok ()
+    | Error `Error -> Fc.return_err `Error
+    | Error (#Pgsql_pool.err as err) ->
+        Logs.err (fun m -> m "%s : FLOW_STATE_CLEANUP : %a" request_id Pgsql_pool.pp_err err);
+        Fc.return_err `Error
+
+  let run_repo_config_cleanup ~request_id ~storage () =
+    let open Abb.Future.Infix_monad in
+    Logs.info (fun m -> m "%s : REPO_CONFIG_CLEANUP" request_id);
+    with_conn storage ~f:(fun db -> cleanup_repo_configs request_id db)
+    >>= function
+    | Ok () -> Fc.return_ok ()
+    | Error `Error -> Fc.return_err `Error
+    | Error (#Pgsql_pool.err as err) ->
+        Logs.err (fun m -> m "%s : REPO_CONFIG_CLEANUP : %a" request_id Pgsql_pool.pp_err err);
+        Fc.return_err `Error
 
   let work_manifest_result ~request_id ~config ~storage ~exec ~work_manifest_id result =
     let query_work_manifest db =
@@ -842,109 +813,160 @@ module Make (S : Terrat_vcs_provider2.S) = struct
       else Abb.Future.fork t >>| CCFun.const ()
     in
     let run =
-      let open Irm in
       Logs.info (fun m ->
           m "%s : WORK_MANIFEST_RESULT : work_manifest_id= %a" request_id Uuidm.pp work_manifest_id);
+      let open Abb.Future.Infix_monad in
       with_conn storage ~f:(fun db ->
-          S.Db.query_flow_state ~request_id db work_manifest_id
-          >>| function
-          | Some _ -> `Legacy
-          | None -> `New_age)
-      >>= function
-      | `New_age -> (
-          let open Abb.Future.Infix_monad in
-          with_conn storage ~f:(fun db ->
-              (* An evaluation that commits something durable ends its
-                 transaction there and asks to be re-run, so the rows it wrote
-                 are not held for the rest of the job.  Each pass is a fresh
-                 transaction on this same connection, as
-                 [run_missing_drift_schedules] already does, and [reruns] carries
-                 what earlier passes committed.
+          (* An evaluation that commits something durable ends its
+             transaction there and asks to be re-run, so the rows it wrote
+             are not held for the rest of the job.  Each pass is a fresh
+             transaction on this same connection, as
+             [run_missing_drift_schedules] already does, and [reruns] carries
+             what earlier passes committed.
 
-                 A payload is recorded only after its transaction committed, so
-                 seeing one twice means the pass committed nothing new and
-                 another would loop.  That is a broken task, not a user error,
-                 so it fails loudly. *)
-              let rec eval_with_reruns reruns =
-                Pgsql_io.tx db ~f:(fun () ->
-                    let open Irm in
-                    query_job db
-                    >>= function
-                    | Some job ->
-                        query_work_manifest db
-                        >>= fun work_manifest ->
-                        query_compute_node db
-                        >>= fun compute_node ->
-                        let work_manifest_event =
-                          Keys.Work_manifest_event.Result { work_manifest; result }
-                        in
-                        let store =
-                          Hmap.empty
-                          |> Keys.Key.add Keys.compute_node (Some compute_node)
-                          |> Keys.Key.add Keys.work_manifest_event (Some work_manifest_event)
-                          |> Keys.Key.add Keys.reruns reruns
-                        in
-                        let open Abb.Future.Infix_monad in
-                        Builder.State.make ~log_id:request_id ~config ~store ~db ~exec ~tasks ()
-                        >>= fun s ->
-                        let open Irm in
-                        let target = Keys.eval_work_manifest_event in
-                        Logs.info (fun m ->
-                            m "%s : target=%s" (Builder.log_id s) (Hmap.Key.info target));
-                        tx_safe ~request_id @@ Builder.eval s target
-                        >>= fun r ->
-                        (* A pass that asks to be re-run has not handled the result
-                           yet, thus only the last pass can decline it. *)
-                        (match r with
-                          | `Rerun _ -> Abbs_fc.return_ok ()
-                          | `Ok _ | `Suspend_eval _ | `Noop -> abort_declined db)
-                        >>| fun () -> (s, work_manifest, job, r)
-                    | None ->
-                        Logs.info (fun m ->
-                            m
-                              "%s : JOB_MISSING_FOR_WORK_MANIFEST : work_manifest_id= %a"
-                              request_id
-                              Uuidm.pp
-                              work_manifest_id);
-                        Abbs_fc.return_err `Error)
+             A payload is recorded only after its transaction committed, so
+             seeing one twice means the pass committed nothing new and
+             another would loop.  That is a broken task, not a user error,
+             so it fails loudly. *)
+          let rec eval_with_reruns reruns =
+            Pgsql_io.tx db ~f:(fun () ->
+                let open Irm in
+                query_job db
                 >>= function
-                (* A guard, not a live path: every producer of [`Rerun] names
-                   what it committed, so the list is never empty.  It is checked
-                   because an empty one adds nothing to [reruns] and the pass
-                   after it would ask for the same nothing, without end. *)
-                | Ok (_, _, _, `Rerun []) ->
-                    Logs.err (fun m -> m "%s : RERUN : NO_PAYLOAD" request_id);
-                    Abbs_fc.return_err `Error
-                (* A task only asks to rerun a payload that is not in [reruns]
-                   yet, so one that is already there came back without the write
-                   it names having landed. *)
-                | Ok (_, _, _, `Rerun ids)
-                  when CCList.exists (fun id -> Sln_list.String.mem id reruns) ids ->
-                    Logs.err (fun m ->
-                        m "%s : RERUN : NO_PROGRESS : ids=%s" request_id (CCString.concat "," ids));
-                    Abbs_fc.return_err `Error
-                | Ok (_, _, _, `Rerun ids) ->
+                | Some job ->
+                    query_work_manifest db
+                    >>= fun work_manifest ->
+                    query_compute_node db
+                    >>= fun compute_node ->
+                    let work_manifest_event =
+                      Keys.Work_manifest_event.Result { work_manifest; result }
+                    in
+                    let store =
+                      Hmap.empty
+                      |> Keys.Key.add Keys.compute_node (Some compute_node)
+                      |> Keys.Key.add Keys.work_manifest_event (Some work_manifest_event)
+                      |> Keys.Key.add Keys.reruns reruns
+                    in
+                    let open Abb.Future.Infix_monad in
+                    Builder.State.make ~log_id:request_id ~config ~store ~db ~exec ~tasks ()
+                    >>= fun s ->
+                    let open Irm in
+                    let target = Keys.eval_work_manifest_event in
                     Logs.info (fun m ->
-                        m "%s : RERUN : ids=%s" request_id (CCString.concat "," ids));
-                    eval_with_reruns (ids @ reruns)
-                (* Spelled out rather than a wildcard so the loop's result type
-                   has no [`Rerun] in it.  The rest of this function then stays
-                   exhaustive without an arm for a case the loop has already
-                   consumed. *)
-                | Ok (s, work_manifest, job, ((`Ok _ | `Suspend_eval _ | `Noop) as r)) ->
-                    Abbs_fc.return_ok (s, work_manifest, job, r)
-                | Error _ as err -> Abb.Future.return err
-              in
-              eval_with_reruns [])
-          >>= function
-          | Ok (s, work_manifest, job, `Ok _) ->
-              let open Abb.Future.Infix_monad in
-              run_next_layer_eval
-                s
-                (Fc.with_finally
-                   (fun () ->
-                     with_conn storage ~f:(fun db ->
-                         Pgsql_io.tx db ~f:(fun () ->
+                        m "%s : target=%s" (Builder.log_id s) (Hmap.Key.info target));
+                    tx_safe ~request_id @@ Builder.eval s target
+                    >>= fun r ->
+                    (* A pass that asks to be re-run has not handled the result
+                       yet, thus only the last pass can decline it. *)
+                    (match r with
+                      | `Rerun _ -> Abbs_fc.return_ok ()
+                      | `Ok _ | `Suspend_eval _ | `Noop -> abort_declined db)
+                    >>| fun () -> (s, work_manifest, job, r)
+                | None ->
+                    Logs.info (fun m ->
+                        m
+                          "%s : JOB_MISSING_FOR_WORK_MANIFEST : work_manifest_id= %a"
+                          request_id
+                          Uuidm.pp
+                          work_manifest_id);
+                    Abbs_fc.return_err `Error)
+            >>= function
+            (* A guard, not a live path: every producer of [`Rerun] names
+               what it committed, so the list is never empty.  It is checked
+               because an empty one adds nothing to [reruns] and the pass
+               after it would ask for the same nothing, without end. *)
+            | Ok (_, _, _, `Rerun []) ->
+                Logs.err (fun m -> m "%s : RERUN : NO_PAYLOAD" request_id);
+                Abbs_fc.return_err `Error
+            (* A task only asks to rerun a payload that is not in [reruns]
+               yet, so one that is already there came back without the write
+               it names having landed. *)
+            | Ok (_, _, _, `Rerun ids)
+              when CCList.exists (fun id -> Sln_list.String.mem id reruns) ids ->
+                Logs.err (fun m ->
+                    m "%s : RERUN : NO_PROGRESS : ids=%s" request_id (CCString.concat "," ids));
+                Abbs_fc.return_err `Error
+            | Ok (_, _, _, `Rerun ids) ->
+                Logs.info (fun m -> m "%s : RERUN : ids=%s" request_id (CCString.concat "," ids));
+                eval_with_reruns (ids @ reruns)
+            (* Spelled out rather than a wildcard so the loop's result type
+               has no [`Rerun] in it.  The rest of this function then stays
+               exhaustive without an arm for a case the loop has already
+               consumed. *)
+            | Ok (s, work_manifest, job, ((`Ok _ | `Suspend_eval _ | `Noop) as r)) ->
+                Abbs_fc.return_ok (s, work_manifest, job, r)
+            | Error _ as err -> Abb.Future.return err
+          in
+          eval_with_reruns [])
+      >>= function
+      | Ok (s, work_manifest, job, `Ok _) ->
+          let open Abb.Future.Infix_monad in
+          run_next_layer_eval
+            s
+            (Fc.with_finally
+               (fun () ->
+                 with_conn storage ~f:(fun db ->
+                     Pgsql_io.tx db ~f:(fun () ->
+                         let { Tjc.Job.context = { Tjc.Context.scope; _ }; _ } = job in
+                         let store =
+                           s
+                           |> Builder.State.orig_store
+                           |> Keys.Key.add Keys.job job
+                           |> Tasks_base.forward_std_keys s
+                           |> add_work_manifest_keys work_manifest
+                         in
+                         let open Abb.Future.Infix_monad in
+                         Builder.State.make
+                           ~log_id:request_id
+                           ~config
+                           ~store
+                           ~db
+                           ~exec
+                           ~tasks:
+                             (match scope with
+                             | Tjc.Context.Scope.Pull_request _ ->
+                                 Tasks_pr.tasks @@ Builder.State.tasks s
+                             | Tjc.Context.Scope.Branch _ ->
+                                 Tasks_branch.tasks @@ Builder.State.tasks s)
+                           ()
+                         >>= fun s -> tx_safe ~request_id @@ Builder.eval s Keys.run_next_layer)))
+               ~finally:(fun () ->
+                 Fc.ignore
+                 @@ Abb.Future.fork
+                 @@ run_next_pending_compute ~request_id ~config ~storage ~exec ()))
+          >>= fun _ -> Abbs_fc.return_ok (`Ok ())
+      | Ok (s, work_manifest, job, `Suspend_eval _) ->
+          let open Abb.Future.Infix_monad in
+          run_next_layer_eval
+            s
+            (Fc.with_finally
+               (fun () ->
+                 with_conn storage ~f:(fun db ->
+                     let { Tjc.Job.context = { Tjc.Context.scope; _ }; _ } = job in
+                     let open Abb.Future.Infix_monad in
+                     let store = s |> Builder.State.orig_store |> Tasks_base.forward_std_keys s in
+                     Builder.State.make
+                       ~log_id:request_id
+                       ~config
+                       ~store
+                       ~db
+                       ~exec
+                       ~tasks:
+                         (match scope with
+                         | Tjc.Context.Scope.Pull_request _ ->
+                             Tasks_pr.tasks @@ Builder.State.tasks s
+                         | Tjc.Context.Scope.Branch _ -> Tasks_branch.tasks @@ Builder.State.tasks s)
+                       ()
+                     >>= fun s ->
+                     Pgsql_io.tx db ~f:(fun () ->
+                         log_err ~request_id
+                         @@ tx_safe ~request_id
+                         @@ Builder.eval s Keys.maybe_complete_job_from_work_manifest_event))
+                 >>= function
+                 | Ok (`Ok ()) ->
+                     Fc.with_finally
+                       (fun () ->
+                         with_conn storage ~f:(fun db ->
                              let { Tjc.Job.context = { Tjc.Context.scope; _ }; _ } = job in
                              let store =
                                s
@@ -952,6 +974,7 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                                |> Keys.Key.add Keys.job job
                                |> Tasks_base.forward_std_keys s
                                |> add_work_manifest_keys work_manifest
+                               |> Builder.State.forward_store_value Keys.work_manifests_for_job s
                              in
                              let open Abb.Future.Infix_monad in
                              Builder.State.make
@@ -967,117 +990,45 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                                  | Tjc.Context.Scope.Branch _ ->
                                      Tasks_branch.tasks @@ Builder.State.tasks s)
                                ()
-                             >>= fun s -> tx_safe ~request_id @@ Builder.eval s Keys.run_next_layer)))
-                   ~finally:(fun () ->
-                     Fc.ignore
-                     @@ Abb.Future.fork
-                     @@ run_next_pending_compute ~request_id ~config ~storage ~exec ()))
-              >>= fun _ -> Abbs_fc.return_ok (`Ok ())
-          | Ok (s, work_manifest, job, `Suspend_eval _) ->
-              let open Abb.Future.Infix_monad in
-              run_next_layer_eval
-                s
-                (Fc.with_finally
-                   (fun () ->
-                     with_conn storage ~f:(fun db ->
-                         let { Tjc.Job.context = { Tjc.Context.scope; _ }; _ } = job in
-                         let open Abb.Future.Infix_monad in
-                         let store =
-                           s |> Builder.State.orig_store |> Tasks_base.forward_std_keys s
-                         in
-                         Builder.State.make
-                           ~log_id:request_id
-                           ~config
-                           ~store
-                           ~db
-                           ~exec
-                           ~tasks:
-                             (match scope with
-                             | Tjc.Context.Scope.Pull_request _ ->
-                                 Tasks_pr.tasks @@ Builder.State.tasks s
-                             | Tjc.Context.Scope.Branch _ ->
-                                 Tasks_branch.tasks @@ Builder.State.tasks s)
-                           ()
-                         >>= fun s ->
-                         Pgsql_io.tx db ~f:(fun () ->
-                             log_err ~request_id
-                             @@ tx_safe ~request_id
-                             @@ Builder.eval s Keys.maybe_complete_job_from_work_manifest_event))
-                     >>= function
-                     | Ok (`Ok ()) ->
-                         Fc.with_finally
-                           (fun () ->
-                             with_conn storage ~f:(fun db ->
-                                 let { Tjc.Job.context = { Tjc.Context.scope; _ }; _ } = job in
-                                 let store =
-                                   s
-                                   |> Builder.State.orig_store
-                                   |> Keys.Key.add Keys.job job
-                                   |> Tasks_base.forward_std_keys s
-                                   |> add_work_manifest_keys work_manifest
-                                   |> Builder.State.forward_store_value
-                                        Keys.work_manifests_for_job
-                                        s
-                                 in
-                                 let open Abb.Future.Infix_monad in
-                                 Builder.State.make
-                                   ~log_id:request_id
-                                   ~config
-                                   ~store
-                                   ~db
-                                   ~exec
-                                   ~tasks:
-                                     (match scope with
-                                     | Tjc.Context.Scope.Pull_request _ ->
-                                         Tasks_pr.tasks @@ Builder.State.tasks s
-                                     | Tjc.Context.Scope.Branch _ ->
-                                         Tasks_branch.tasks @@ Builder.State.tasks s)
-                                   ()
-                                 >>= fun s ->
-                                 Pgsql_io.tx db ~f:(fun () ->
-                                     log_err ~request_id
-                                     @@ tx_safe ~request_id
-                                     @@ Builder.eval s Keys.run_next_layer)))
-                           ~finally:(fun () ->
-                             Fc.ignore
-                             @@ Abb.Future.fork
-                             @@ run_next_pending_compute ~request_id ~config ~storage ~exec ())
-                     | (Ok (`Suspend_eval _ | `Noop | `Rerun _) | Error _) as r ->
-                         Abb.Future.return r)
-                   ~finally:(fun () ->
-                     Fc.ignore
-                     @@ Abb.Future.fork
-                     @@ run_next_pending_compute ~request_id ~config ~storage ~exec ()))
-              >>= fun _ -> Abbs_fc.return_ok (`Ok ())
-          | Ok (_, _, _, `Noop) -> Abbs_fc.return_ok `Noop
-          | Error #err as err ->
-              let open Abb.Future.Infix_monad in
-              with_conn storage ~f:(fun db ->
-                  let open Irm in
-                  query_work_manifest db
-                  >>= fun work_manifest ->
-                  S.Work_manifest.update_state
-                    ~request_id
-                    db
-                    work_manifest_id
-                    Terrat_work_manifest3.State.Aborted
-                  >>= fun () ->
-                  let open Abb.Future.Infix_monad in
-                  (* Best effort so the unified comment reflects the abort. *)
-                  S.Comment.mark_unified_comment_dirty ~request_id db work_manifest_id
-                  >>= fun _ ->
-                  run_work_manifest_event
-                    ~request_id
-                    ~config
-                    ~db
-                    ~exec
-                    (Keys.Work_manifest_event.Fail { work_manifest; error = `Result_handling_err }))
-              >>= fun _ -> Abb.Future.return err)
-      | `Legacy ->
-          let open Abb.Future.Infix_monad in
-          let ctx = Legacy.Ctx.make ~config ~storage ~request_id () in
-          Legacy.run_work_manifest_result ~ctx work_manifest_id result
+                             >>= fun s ->
+                             Pgsql_io.tx db ~f:(fun () ->
+                                 log_err ~request_id
+                                 @@ tx_safe ~request_id
+                                 @@ Builder.eval s Keys.run_next_layer)))
+                       ~finally:(fun () ->
+                         Fc.ignore
+                         @@ Abb.Future.fork
+                         @@ run_next_pending_compute ~request_id ~config ~storage ~exec ())
+                 | (Ok (`Suspend_eval _ | `Noop | `Rerun _) | Error _) as r -> Abb.Future.return r)
+               ~finally:(fun () ->
+                 Fc.ignore
+                 @@ Abb.Future.fork
+                 @@ run_next_pending_compute ~request_id ~config ~storage ~exec ()))
           >>= fun _ -> Abbs_fc.return_ok (`Ok ())
+      | Ok (_, _, _, `Noop) -> Abbs_fc.return_ok `Noop
+      | Error #err as err ->
+          let open Abb.Future.Infix_monad in
+          with_conn storage ~f:(fun db ->
+              let open Irm in
+              query_work_manifest db
+              >>= fun work_manifest ->
+              S.Work_manifest.update_state
+                ~request_id
+                db
+                work_manifest_id
+                Terrat_work_manifest3.State.Aborted
+              >>= fun () ->
+              let open Abb.Future.Infix_monad in
+              (* Best effort so the unified comment reflects the abort. *)
+              S.Comment.mark_unified_comment_dirty ~request_id db work_manifest_id
+              >>= fun _ ->
+              run_work_manifest_event
+                ~request_id
+                ~config
+                ~db
+                ~exec
+                (Keys.Work_manifest_event.Fail { work_manifest; error = `Result_handling_err }))
+          >>= fun _ -> Abb.Future.return err
     in
     let open Abb.Future.Infix_monad in
     Fc.with_finally
@@ -1096,20 +1047,6 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                 storage
                 work_manifest_id))
         >>= fun () ->
-        (* The legacy evaluator resolves its result future while its
-           transaction is still open, so the dirty mark may not be visible to
-           the drain above yet.  A delayed second drain picks it up. *)
-        Fc.ignore
-          (Abb.Future.fork
-             (Abb.Sys.sleep 10.0
-             >>= fun () ->
-             S.Comment.drain_unified_comment
-               ~request_id
-               ~fetch_brand:(S.Repo_config.fetch_brand ~request_id)
-               config
-               storage
-               work_manifest_id))
-        >>= fun () ->
         Fc.ignore
         @@ Abb.Future.fork
         @@ run_missing_drift_schedules ~request_id ~config ~storage ~exec ())
@@ -1117,65 +1054,52 @@ module Make (S : Terrat_vcs_provider2.S) = struct
   let push ~request_id ~config ~storage ~exec ~account ~repo ~branch ~user () =
     let run =
       let open Irm in
-      match Sys.getenv_opt "TERRAT_EVENT_EVALUATOR_MODE" with
-      | None | Some ("" | "new-age") ->
-          with_conn storage ~f:(fun db ->
-              Pgsql_io.tx db ~f:(fun () ->
-                  S.Db.store_account_repository ~request_id db account repo)
-              >>= fun () ->
-              Pgsql_io.tx db ~f:(fun () ->
-                  S.Job_context.create_or_get_for_branch ~request_id db account repo branch
-                  >>= fun context ->
-                  S.Job_context.Job.create ~request_id db Tjc.Job.Type_.Push context (Some user))
-              >>= fun job ->
-              let store =
-                Hmap.empty
-                |> Keys.Key.add Keys.account account
-                |> Keys.Key.add Keys.repo repo
-                |> Keys.Key.add Keys.user (Some user)
-                |> Keys.Key.add Keys.job job
-              in
-              let open Abb.Future.Infix_monad in
-              Builder.State.make
-                ~log_id:request_id
-                ~config
-                ~store
-                ~db
-                ~exec
-                ~tasks:(Tasks_branch.tasks tasks)
-                ()
-              >>= fun s ->
-              let open Irm in
-              (* For updating the branch hashes we set the branch name.  We make [s'] for this
-                 because [eval_push_event] doesn't need it and we don't want to put keys there that
-                 it might have its own plans for. *)
-              let s' =
-                s
-                |> Builder.State.orig_store
-                |> Keys.Key.add Keys.branch_name branch
-                |> Keys.Key.add Keys.dest_branch_name branch
-                |> CCFun.flip Builder.State.set_orig_store s
-              in
-              log_err ~request_id @@ Builder.eval s' Keys.update_context_branch_hashes
-              >>= fun () ->
-              let target = Keys.eval_push_event in
-              Logs.info (fun m -> m "%s : target=%s" (Builder.log_id s) (Hmap.Key.info target));
-              Pgsql_io.tx db ~f:(fun () -> tx_safe ~request_id @@ Builder.eval s target))
-          >>= fun _ ->
-          Fc.to_result
-          @@ Fc.ignore
-          @@ Abb.Future.fork
-          @@ run_missing_drift_schedules ~config ~storage ~exec ()
-      | Some _ ->
-          with_conn storage ~f:(fun db -> S.Api.create_client ~request_id config account db)
-          >>= fun client ->
-          S.Api.fetch_remote_repo ~request_id client repo
-          >>= fun remote_repo ->
-          let default_branch = S.Api.Remote_repo.default_branch remote_repo in
-          if branch = default_branch then
-            let ctx = Legacy.Ctx.make ~config ~storage ~request_id () in
-            Legacy.run_push ~ctx ~account ~user ~repo ~branch ()
-          else Abbs_fc.return_ok ()
+      with_conn storage ~f:(fun db ->
+          Pgsql_io.tx db ~f:(fun () -> S.Db.store_account_repository ~request_id db account repo)
+          >>= fun () ->
+          Pgsql_io.tx db ~f:(fun () ->
+              S.Job_context.create_or_get_for_branch ~request_id db account repo branch
+              >>= fun context ->
+              S.Job_context.Job.create ~request_id db Tjc.Job.Type_.Push context (Some user))
+          >>= fun job ->
+          let store =
+            Hmap.empty
+            |> Keys.Key.add Keys.account account
+            |> Keys.Key.add Keys.repo repo
+            |> Keys.Key.add Keys.user (Some user)
+            |> Keys.Key.add Keys.job job
+          in
+          let open Abb.Future.Infix_monad in
+          Builder.State.make
+            ~log_id:request_id
+            ~config
+            ~store
+            ~db
+            ~exec
+            ~tasks:(Tasks_branch.tasks tasks)
+            ()
+          >>= fun s ->
+          let open Irm in
+          (* For updating the branch hashes we set the branch name.  We make [s'] for this
+             because [eval_push_event] doesn't need it and we don't want to put keys there that
+             it might have its own plans for. *)
+          let s' =
+            s
+            |> Builder.State.orig_store
+            |> Keys.Key.add Keys.branch_name branch
+            |> Keys.Key.add Keys.dest_branch_name branch
+            |> CCFun.flip Builder.State.set_orig_store s
+          in
+          log_err ~request_id @@ Builder.eval s' Keys.update_context_branch_hashes
+          >>= fun () ->
+          let target = Keys.eval_push_event in
+          Logs.info (fun m -> m "%s : target=%s" (Builder.log_id s) (Hmap.Key.info target));
+          Pgsql_io.tx db ~f:(fun () -> tx_safe ~request_id @@ Builder.eval s target))
+      >>= fun _ ->
+      Fc.to_result
+      @@ Fc.ignore
+      @@ Abb.Future.fork
+      @@ run_missing_drift_schedules ~config ~storage ~exec ()
     in
     Fc.with_finally
       (fun () ->
