@@ -5,7 +5,6 @@
   abb_bounded_suspendable_executor
   abbs
   buildsys
-  cstruct
   logs
   ouuid
   prmths
@@ -20,7 +19,6 @@
   terrat_output_diff
   terrat_precheck
   terrat_storage
-  terrat_vcs_event_evaluator
   terrat_vcs_event_evaluator2_targets
   terrat_vcs_provider2)
  (preprocess
