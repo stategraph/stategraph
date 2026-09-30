@@ -3,7 +3,6 @@ let src = Logs.Src.create "vcs_service_gitlab_ep_work_manifest"
 module Logs = (val Logs.src_log src : Logs.LOG)
 
 module Make (P : Terrat_vcs_provider2_gitlab.S) = struct
-  (* module Evaluator = Terrat_vcs_event_evaluator.Make (P) *)
   module Evaluator2 = Terrat_vcs_event_evaluator2.Make (P)
 
   module Sql = struct

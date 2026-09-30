@@ -3,11 +3,13 @@ let src = Logs.Src.create "service_orchestration_github_claim_common"
 module Logs_lib = Logs
 module Logs = (val Logs.src_log src : Logs.LOG)
 
-let availability config =
-  match (Sgs_config.orchestration_enabled config, Sgs_config.github_oauth config) with
-  | false, _ -> `Orchestration_disabled
-  | true, None -> `Oauth_not_configured
-  | true, Some github_oauth -> `Available github_oauth
+(* The session key and the App's OAuth client, in one connection. Both claim
+   endpoints need both, and resolving the client is what keeps a console-created
+   App working, so neither endpoint is left to remember it. *)
+let keys_and_oauth config db =
+  let open Abbs_fc.Infix_result_monad in
+  Sgs_user_session.Session.fetch_key db
+  >>= fun keys -> Sgs_service_orchestration_github_app.oauth config db >>| fun oauth -> (keys, oauth)
 
 let log_unavailable ?(src = src) ctx = function
   | `Orchestration_disabled ->
@@ -93,20 +95,18 @@ let redirect_target ~config ctx = function
 (* [rd] was validated by start, either just now or before it was signed into
    the state. It still goes through [redirect_target] here, because this is
    where the Location header is written. *)
-let return_location ~config ~rd ~result ctx =
+let return_location ~config ~param ~rd ~value ctx =
   let path = redirect_target ~config ctx rd in
-  Printf.sprintf
-    "%s%sgithub_claim=%s"
-    path
-    (if CCString.contains path '?' then "&" else "?")
-    (redirect_result_to_string result)
+  Printf.sprintf "%s%s%s=%s" path (if CCString.contains path '?' then "&" else "?") param value
 
 (* Start and the callback are both reached by a full-page navigation, not a
    console fetch, so the honest thing on a failure is to put the user back on
    the console with a machine-readable reason rather than render an API error in
    a browser tab. *)
 let redirect_with ?proof ~config ~rd ~result ctx =
-  let location = return_location ~config ~rd ~result ctx in
+  let location =
+    return_location ~config ~param:"github_claim" ~rd ~value:(redirect_result_to_string result) ctx
+  in
   let headers = Cohttp.Header.init () in
   let headers =
     CCOption.map_or ~default:headers (fun proof -> set_proof_cookie ~config ~proof headers) proof

@@ -27,6 +27,7 @@
   unix
   uri
   uuidm
+  x509
   yojson)
  (preprocessor_deps
   (glob_files_rec sql/*))

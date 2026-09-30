@@ -261,9 +261,9 @@ let output_of_plan ?(default_visible_on = Visible_on.Always) output =
   P.of_yojson (O.Payload.to_yojson output.O.payload)
   >>= fun { P.cmd; text; has_changes = _; plan; visible_on } ->
   let visible_on = visible_on_of_payload ~default:default_visible_on visible_on in
-  (* An engine with no diff of its own -- stategraph and pulumi both return [None] -- still sends
-     the [plan] key, empty. An empty diff fence says nothing, so the command's own output is what
-     is left worth showing, and it is not a diff. *)
+  (* An engine with no diff of its own -- pulumi, and stategraph in older runners, return [None] --
+     still sends the [plan] key, empty. An empty diff fence says nothing, so the command's own
+     output is what is left worth showing, and it is not a diff. *)
   let text, text_decorator =
     match plan with
     | Some plan when not (CCString.is_empty plan) -> (plan, Some "diff")

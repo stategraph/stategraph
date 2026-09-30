@@ -30,7 +30,14 @@ type t [@@deriving show]
 type err = [ `Key_error of string ] [@@deriving show]
 
 val cors_default_origin : t -> string
-val create : unit -> (t, [> err ]) result
+
+(** [create ?github_app_managed ()] reads the configuration from the environment.
+    [github_app_managed] says that this deployment supplies the orchestration GitHub App itself for
+    every tenant; the console then does not offer to create one. It is an argument rather than an
+    environment variable because the deployments that set it are the ones that also choose it, and
+    only they know. *)
+val create : ?github_app_managed:bool -> unit -> (t, [> err ]) result
+
 val db : t -> string
 val default_tenant_name : t -> string option
 val db_connect_timeout : t -> float
@@ -60,10 +67,17 @@ val cost_enabled : t -> bool
 val dedicated_enabled : t -> bool
 
 (** STATEGRAPH_ORCHESTRATION_ENABLED: master on/off switch for the orchestration engine integration.
-    When on, the boot-time FDW reconcile creates the postgres_fdw bridge to the terrateam database,
-    and [create] requires STATEGRAPH_FDW_PASSWORD. The image CMD and nginx read the same variable to
-    gate the terrat service and its routes. *)
+    [true] turns it on and makes [create] require STATEGRAPH_FDW_PASSWORD; [false] turns it off;
+    unset means on exactly when STATEGRAPH_FDW_PASSWORD is set. When on, the boot-time FDW reconcile
+    creates the postgres_fdw bridge to the terrateam database. The image CMD and nginx apply the
+    same rule to gate the terrat service and its routes. *)
 val orchestration_enabled : t -> bool
+
+(** Whether STATEGRAPH_ORCHESTRATION_ENABLED decided {!orchestration_enabled}, rather than the
+    presence of STATEGRAPH_FDW_PASSWORD implying it. A deployment that asked for orchestration is
+    told loudly when its bridge cannot be built; one that got it by default keeps serving everything
+    else. *)
+val orchestration_explicit : t -> bool
 
 (** TERRAT_SESSION_COOKIE_NAME (default "session", as in the orchestration engine): the name of the
     engine's browser session cookie. The engine shares the console's origin, so logout must expire
@@ -102,6 +116,10 @@ val fdw_provisioner_password : t -> string option
     installation their orchestration side never sees. Unset (or empty) means the console shows
     manual install steps instead of a link. *)
 val github_app_url : t -> string option
+
+(** TERRAT_API_BASE: the public base of the orchestration engine's API, STATEGRAPH_UI_BASE plus
+    [/api] unless set. The same derivation the unified image's terrat service applies. *)
+val terrat_api_base : t -> string
 
 (** STATEGRAPH_PRICING_SERVICE_URL: endpoint of the pricing service, used when cost estimation is
     enabled. Defaults to the in-image service. *)
@@ -196,6 +214,23 @@ val github_oauth_api_base : github_oauth -> string
     authorization. *)
 val github_oauth_web_base : github_oauth -> string
 
+(** [make_github_oauth t ~client_id ~client_secret] is the OAuth client of a GitHub App stored in
+    the orchestration database, on the GitHub hosts of {!github_api_base} and {!github_web_base}. *)
+val make_github_oauth : t -> client_id:string -> client_secret:string -> github_oauth
+
+(** GITHUB_APP_ID: set when the engine's GitHub App comes from the environment, in which case the
+    stored App row is ignored on both sides. *)
+val github_app_id : t -> string option
+
+(** Whether this deployment supplies the orchestration GitHub App itself for every tenant. *)
+val github_app_managed : t -> bool
+
+(** GITHUB_API_BASE_URL, defaulting to https://api.github.com. *)
+val github_api_base : t -> string
+
+(** GITHUB_WEB_BASE_URL, defaulting to https://github.com. *)
+val github_web_base : t -> string
+
 (** STATEGRAPH_LICENSE_KEY: opaque self-hosted license key. [None] when unset; validity is checked
     at use-site. *)
 val license_key : t -> string option
@@ -204,4 +239,10 @@ val statement_timeout : t -> string
 val ui_base : t -> string
 val oauth_redirect_base : t -> string
 val oauth_redirect_base_explicit : t -> bool
+
+(** The base of a callback URL registered with a forge: {!oauth_redirect_base} when it was set, else
+    {!ui_base}. The former defaults to localhost, which no forge can reach, and a GitHub App carries
+    its callback URLs permanently. *)
+val public_callback_base : t -> string
+
 val secure_cookies : t -> bool

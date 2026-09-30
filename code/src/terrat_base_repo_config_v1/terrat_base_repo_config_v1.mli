@@ -173,7 +173,9 @@ module Workflow_step : sig
 
     type t = {
       env : string Sln_map.String.t option;
-      extra_args : string list; [@default []]
+      extra_args : string list option; [@default None]
+          (** [None] when the step does not set [extra_args]. The runner then applies the engine's
+              own default arguments, which an explicit list, even an empty one, replaces. *)
       mode : Mode.t; [@default Mode.Strict]
       visible_on : Visible_on.t; [@default Visible_on.Always]
     }

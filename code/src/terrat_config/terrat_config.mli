@@ -99,6 +99,20 @@ val admin_token : t -> string option
 val api_base : t -> string
 val create : unit -> (t, [> err ]) result
 
+(** The GitHub App a row of the orchestration database describes. The GitHub hosts, the call timeout
+    and the workflow overrides come from the environment, as for the App of the environment. *)
+val github_of_stored :
+  app_id:string ->
+  pem:string ->
+  client_id:string ->
+  client_secret:string ->
+  webhook_secret:string ->
+  app_url:string ->
+  (Github.t, [> err ]) result
+
+(** [with_github t github] is [t] with [github] as its GitHub App. *)
+val with_github : t -> Github.t -> t
+
 (** Build a configuration from explicit values, with no read of the environment. A test uses it to
     get a configuration that differs from the process environment, for example a test that runs
     several databases at the same time and must not change the environment that the others read. An

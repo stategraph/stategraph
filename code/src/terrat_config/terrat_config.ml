@@ -220,6 +220,65 @@ let infracost () =
   | Some _ as proxy -> Ok proxy
   | None -> infracost_price_book ()
 
+let github_of_parts
+    ~app_id
+    ~app_pem_content
+    ~app_client_id
+    ~app_client_secret
+    ~webhook_secret
+    ~app_url =
+  let open CCResult.Infix in
+  (match X509.Private_key.decode_pem app_pem_content with
+    | Ok (`RSA v) -> Ok v
+    | Ok _ -> Error (`Bad_pem "Expected RSA")
+    | Error (`Msg s) -> Error (`Bad_pem s))
+  >>= fun app_pem ->
+  let api_base_url =
+    CCOption.map_or
+      ~default:Github.default_github_api_base_url
+      Uri.of_string
+      (Sys.getenv_opt "GITHUB_API_BASE_URL")
+  in
+  let web_base_url =
+    CCOption.map_or
+      ~default:Github.default_github_web_base_url
+      Uri.of_string
+      (Sys.getenv_opt "GITHUB_WEB_BASE_URL")
+  in
+  vcs_call_timeout ()
+  >>= fun call_timeout ->
+  let workflow_path_override = Sys.getenv_opt "GITHUB_WORKFLOW_PATH_OVERRIDE" in
+  let action_dynamic_title =
+    CCOption.map_or
+      ~default:[]
+      (fun s ->
+        s
+        |> CCString.split_on_char ','
+        |> Sln_list.String.sort_uniq
+        |> CCList.filter_map (function
+          | "pr_title" -> Some `Pr_title
+          | "pr_number" -> Some `Pr_number
+          | "run_kind" -> Some `Run_kind
+          | "run_type" -> Some `Run_type
+          | "" -> None
+          | _ -> None))
+      (Sys.getenv_opt "GITHUB_ACTION_DYNAMIC_TITLE")
+  in
+  Ok
+    {
+      Github.action_dynamic_title;
+      api_base_url;
+      app_client_id;
+      app_client_secret;
+      app_id;
+      app_pem;
+      app_url;
+      call_timeout;
+      web_base_url;
+      webhook_secret;
+      workflow_path_override;
+    }
+
 let load_github () =
   let open CCResult.Infix in
   match Sys.getenv_opt "GITHUB_APP_ID" with
@@ -228,67 +287,35 @@ let load_github () =
       let webhook_secret = Sys.getenv_opt "GITHUB_WEBHOOK_SECRET" in
       env_str "GITHUB_APP_PEM"
       >>= fun app_pem_content ->
-      (match X509.Private_key.decode_pem app_pem_content with
-        | Ok (`RSA v) -> Ok v
-        | Ok _ -> Error (`Bad_pem "Expected RSA")
-        | Error (`Msg s) -> Error (`Bad_pem s))
-      >>= fun app_pem ->
       env_str "GITHUB_APP_CLIENT_SECRET"
       >>= fun app_client_secret ->
       env_str "GITHUB_APP_CLIENT_ID"
       >>= fun app_client_id ->
-      let api_base_url =
-        CCOption.map_or
-          ~default:Github.default_github_api_base_url
-          Uri.of_string
-          (Sys.getenv_opt "GITHUB_API_BASE_URL")
-      in
-      let web_base_url =
-        CCOption.map_or
-          ~default:Github.default_github_web_base_url
-          Uri.of_string
-          (Sys.getenv_opt "GITHUB_WEB_BASE_URL")
-      in
       let app_url =
         CCOption.map_or
           ~default:Github.default_github_app_url
           Uri.of_string
           (Sys.getenv_opt "GITHUB_APP_URL")
       in
-      vcs_call_timeout ()
-      >>= fun call_timeout ->
-      let workflow_path_override = Sys.getenv_opt "GITHUB_WORKFLOW_PATH_OVERRIDE" in
-      let action_dynamic_title =
-        CCOption.map_or
-          ~default:[]
-          (fun s ->
-            s
-            |> CCString.split_on_char ','
-            |> Sln_list.String.sort_uniq
-            |> CCList.filter_map (function
-              | "pr_title" -> Some `Pr_title
-              | "pr_number" -> Some `Pr_number
-              | "run_kind" -> Some `Run_kind
-              | "run_type" -> Some `Run_type
-              | "" -> None
-              | _ -> None))
-          (Sys.getenv_opt "GITHUB_ACTION_DYNAMIC_TITLE")
-      in
-      Ok
-        (Some
-           {
-             Github.action_dynamic_title;
-             api_base_url;
-             app_client_id;
-             app_client_secret;
-             app_id;
-             app_pem;
-             app_url;
-             call_timeout;
-             web_base_url;
-             webhook_secret;
-             workflow_path_override;
-           })
+      github_of_parts
+        ~app_id
+        ~app_pem_content
+        ~app_client_id
+        ~app_client_secret
+        ~webhook_secret
+        ~app_url
+      >|= CCOption.return
+
+let github_of_stored ~app_id ~pem ~client_id ~client_secret ~webhook_secret ~app_url =
+  github_of_parts
+    ~app_id
+    ~app_pem_content:pem
+    ~app_client_id:client_id
+    ~app_client_secret:client_secret
+    ~webhook_secret:(Some webhook_secret)
+    ~app_url:(Uri.of_string app_url)
+
+let with_github t github = { t with github = Some github }
 
 let load_gitlab () =
   let open CCResult.Infix in

@@ -1,3 +1,3 @@
-(dirs code api_schemas docker scripts)
+(dirs code api_schemas docker orchestration scripts)
 
-(data_only_dirs docker)
+(data_only_dirs docker orchestration)

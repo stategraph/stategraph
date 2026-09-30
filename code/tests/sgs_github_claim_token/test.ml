@@ -178,6 +178,62 @@ let test_empty_proof_covers_nothing =
       in
       Oth.Assert.not_true (covered proof "i-1"))
 
+let manifest_token
+    ?(signer = signer)
+    ?(user_id = "u-1")
+    ?(replace = false)
+    ?(rd = None)
+    ?(now = now)
+    () =
+  Token.Manifest.mint ~signer ~now ~user_id ~replace ~rd ()
+
+let test_manifest_round_trip =
+  Oth.test ~name:"manifest state round trips" (fun _ ->
+      let { Token.Manifest.user_id; replace; rd; exp } =
+        Oth.Assert.ok_pp
+          ~pp:Token.pp_verify_err
+          (Token.Manifest.verify
+             ~verifiers
+             ~now
+             (manifest_token ~replace:true ~rd:(Some "/settings/?tab=integrations") ()))
+      in
+      Oth.Assert.Eq.string ~expected:"u-1" ~actual:user_id;
+      (* The permission to overwrite an App travels in the signature, so the
+         callback cannot be told to replace by a browser. *)
+      Oth.Assert.Eq.bool ~expected:true ~actual:replace;
+      Oth.Assert.Eq.string_option ~expected:(Some "/settings/?tab=integrations") ~actual:rd;
+      (* A state that did not ask to replace cannot be edited into one. *)
+      Oth.Assert.Eq.bool
+        ~expected:false
+        ~actual:
+          (Oth.Assert.ok_pp
+             ~pp:Token.pp_verify_err
+             (Token.Manifest.verify ~verifiers ~now (manifest_token ())))
+            .Token.Manifest.replace;
+      Oth.Assert.true_ (CCFloat.equal exp (now +. Token.manifest_ttl));
+      expect_err
+        ~name:"manifest just after expiry"
+        `Expired_err
+        (Token.Manifest.verify
+           ~verifiers
+           ~now:(now +. Token.manifest_ttl +. 1.)
+           (manifest_token ()));
+      expect_err
+        ~name:"manifest with a foreign signature"
+        `Bad_signature_err
+        (Token.Manifest.verify ~verifiers ~now (manifest_token ~signer:(signer_of other_key) ())))
+
+let test_manifest_not_interchangeable =
+  Oth.test ~name:"a manifest state is not a claim state, nor the reverse" (fun _ ->
+      expect_err
+        ~name:"manifest as claim state"
+        `Bad_payload_err
+        (Token.State.verify ~verifiers ~now (manifest_token ()));
+      expect_err
+        ~name:"claim state as manifest"
+        `Bad_payload_err
+        (Token.Manifest.verify ~verifiers ~now (state_token ())))
+
 let test =
   Oth.parallel
     [
@@ -191,6 +247,8 @@ let test =
       test_tokens_are_not_interchangeable;
       test_session_jwt_is_not_a_claim_token;
       test_empty_proof_covers_nothing;
+      test_manifest_round_trip;
+      test_manifest_not_interchangeable;
     ]
 
 let () = Oth.run ~file:__FILE__ ~setup:(fun () -> Ok ()) ~teardown:(fun _ -> ()) (fun _ -> test)
