@@ -1,0 +1,11 @@
+(test
+ (name test)
+ (libraries containers mql_to_pgsql oth sgs_api sgs_mql sln yojson)
+ (preprocessor_deps select_mql_page_terrateam_ctes.sql)
+ (preprocess
+  (pps ppx_blob)))
+
+(rule
+ (copy
+  ../../src/sgs_mql/sql/select_mql_page_terrateam_ctes.sql
+  select_mql_page_terrateam_ctes.sql))

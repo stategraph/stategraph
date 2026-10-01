@@ -1,0 +1,17 @@
+(test
+ (name test)
+ (libraries containers mql_to_pgsql oth sgs_terrateam_catalog sln yojson)
+ (preprocessor_deps terrateam_tables.json fdw_tables.sql fdw_grants.sql)
+ (preprocess
+  (pps ppx_blob)))
+
+(rule
+ (copy
+  ../../../api_schemas/stategraph/terrateam_tables.json
+  terrateam_tables.json))
+
+(rule
+ (copy ../../src/sgs_terrateam_catalog/fdw_tables.sql fdw_tables.sql))
+
+(rule
+ (copy ../../src/sgs_terrateam_catalog/fdw_grants.sql fdw_grants.sql))

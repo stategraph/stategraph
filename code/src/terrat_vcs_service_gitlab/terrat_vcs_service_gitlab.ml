@@ -17,7 +17,6 @@ module Make
         with type Api.Config.t = Terrat_vcs_service_gitlab_provider.Api.Config.t)
     (Routes : ROUTES with type config = Provider.Api.Config.t) =
 struct
-  module Evaluator = Terrat_vcs_event_evaluator.Make (Provider)
   module Evaluator2 = Terrat_vcs_event_evaluator2.Make (Provider)
   module Ep_events = Terrat_vcs_service_gitlab_ep_events.Make (Provider)
 
@@ -271,29 +270,25 @@ struct
     let rec flow_state_cleanup config storage =
       let open Abb.Future.Infix_monad in
       Abbs_fc.ignore
-        (Evaluator.run_flow_state_cleanup
-           (Evaluator.Ctx.make ~config ~storage ~request_id:(Ouuid.to_string (Ouuid.v4 ())) ()))
+        (Evaluator2.run_flow_state_cleanup ~request_id:(Ouuid.to_string (Ouuid.v4 ())) ~storage ())
       >>= fun () -> Abb.Sys.sleep one_hour >>= fun () -> flow_state_cleanup config storage
 
     let rec plan_cleanup config storage =
       let open Abb.Future.Infix_monad in
       Abbs_fc.ignore
-        (Evaluator.run_plan_cleanup
-           (Evaluator.Ctx.make ~config ~storage ~request_id:(Ouuid.to_string (Ouuid.v4 ())) ()))
+        (Evaluator2.run_plan_cleanup ~request_id:(Ouuid.to_string (Ouuid.v4 ())) ~storage ())
       >>= fun () -> Abb.Sys.sleep one_hour >>= fun () -> plan_cleanup config storage
 
     let rec repo_config_cleanup config storage =
       let open Abb.Future.Infix_monad in
       Abbs_fc.ignore
-        (Evaluator.run_repo_config_cleanup
-           (Evaluator.Ctx.make ~config ~storage ~request_id:(Ouuid.to_string (Ouuid.v4 ())) ()))
+        (Evaluator2.run_repo_config_cleanup ~request_id:(Ouuid.to_string (Ouuid.v4 ())) ~storage ())
       >>= fun () -> Abb.Sys.sleep one_hour >>= fun () -> repo_config_cleanup config storage
 
     let rec repo_tree_cleanup config storage =
       let open Abb.Future.Infix_monad in
       Abbs_fc.ignore
-        (Evaluator.run_repo_tree_cleanup
-           (Evaluator.Ctx.make ~config ~storage ~request_id:(Ouuid.to_string (Ouuid.v4 ())) ()))
+        (Evaluator2.run_repo_tree_cleanup ~request_id:(Ouuid.to_string (Ouuid.v4 ())) ~storage ())
       >>= fun () -> Abb.Sys.sleep one_hour >>= fun () -> repo_tree_cleanup config storage
 
     let name _ = "gitlab"

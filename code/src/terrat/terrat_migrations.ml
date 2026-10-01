@@ -314,6 +314,7 @@ let migrations =
         [%blob "migrations/2026-09-24-add-github-pull-request-dirspace-summaries-work-manifest.sql"]
     );
     ("add-pruned-dirspaces", run_sql [%blob "migrations/2026-09-22-add-pruned-dirspaces.sql"]);
+    ("add-github-app", run_sql [%blob "migrations/2026-09-28-add-github-app.sql"]);
   ]
 
 let run config storage = Mig.run { Migrate.config; storage; tx = () } migrations

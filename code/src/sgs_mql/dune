@@ -1,0 +1,27 @@
+(library
+ (name sgs_mql)
+ (wrapped false)
+ (libraries
+  abb
+  abbs
+  brtl
+  brtl_ep
+  cohttp
+  containers
+  logs
+  mql
+  mql_to_pgsql
+  pgsql_io
+  pgsql_pool
+  sgs_api
+  sgs_config
+  sgs_eplib
+  sgs_storage
+  sgs_terrateam_catalog
+  sgs_user
+  uri
+  yojson)
+ (preprocessor_deps
+  (glob_files_rec sql/*))
+ (preprocess
+  (pps ppx_blob ppx_deriving.show)))

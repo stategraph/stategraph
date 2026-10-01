@@ -25,6 +25,9 @@ val state_ttl : float
 (** Seconds a proof token stays valid: long enough to pick an installation on the return screen. *)
 val proof_ttl : float
 
+(** Seconds a manifest state stays valid: the hour GitHub keeps the code of a created App. *)
+val manifest_ttl : float
+
 (** The OAuth [state] parameter. Binds the handshake to the user and tenant that started it, so the
     callback takes neither from the query string. *)
 module State : sig
@@ -72,4 +75,26 @@ module Proof : sig
       token proves control of a set, not of whatever a request asks for, so check this before
       writing. *)
   val covers : t -> installation_core_id:string -> [ `Covered | `Not_covered ]
+end
+
+(** The [state] of the GitHub App manifest flow. Binds the code GitHub returns to the instance admin
+    who asked for the manifest. *)
+module Manifest : sig
+  type t = {
+    user_id : string;
+    replace : bool;  (** the operator asked to replace an App this server already has *)
+    rd : string option;  (** the console page to return to *)
+    exp : float;
+  }
+
+  val mint :
+    signer:Jwt.Signer.t ->
+    now:float ->
+    user_id:string ->
+    replace:bool ->
+    rd:string option ->
+    unit ->
+    string
+
+  val verify : verifiers:Jwt.Verifier.t list -> now:float -> string -> (t, [> verify_err ]) result
 end

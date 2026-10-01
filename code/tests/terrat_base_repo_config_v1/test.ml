@@ -460,6 +460,44 @@ let test_workflow_visible_on_to_version_1_round_trip =
       | Some _ | None -> Oth.Assert.false_ "expected an apply step");
       ())
 
+(* The runner applies an engine default when the plan step config it receives has no [extra_args]
+   key, so an unset [extra_args] must stay unset through to_version_1, and an explicit list, even
+   an empty one, must stay set. *)
+let test_workflow_plan_extra_args_to_version_1_round_trip =
+  Oth.test ~name:"workflows: plan extra_args set or unset round-trips through Version_1" (fun _ ->
+      let module Items = Terrat_repo_config_workflow_op_list.Items in
+      let module P = Terrat_repo_config_workflow_op_plan in
+      let plan_step_json plan_step =
+        let json = workflows_json [ workflow_entry ~plan:[ plan_step ] "" ] in
+        let cfg = Oth.Assert.ok_pp ~pp:V1.pp_of_version_1_json_err (V1.of_version_1_json json) in
+        let v1 = V1.to_version_1 cfg in
+        let entry =
+          Oth.Assert.List.length_one (CCOption.get_or ~default:[] v1.Repo.Version_1.workflows)
+        in
+        match entry.Repo.Workflow_entry.plan with
+        | Some [ Items.Workflow_op_plan plan ] -> P.to_yojson plan
+        | Some _ | None -> Oth.Assert.false_ "expected a plan step"
+      in
+      let extra_args_json plan_step =
+        Yojson.Safe.Util.member "extra_args" (plan_step_json plan_step)
+      in
+      let with_extra_args args =
+        `Assoc
+          [ ("type", `String "plan"); ("extra_args", `List (CCList.map (fun a -> `String a) args)) ]
+      in
+      Oth.Assert.eq ~eq:Yojson.Safe.equal ~pp:Yojson.Safe.pp `Null (extra_args_json (step "plan"));
+      Oth.Assert.eq
+        ~eq:Yojson.Safe.equal
+        ~pp:Yojson.Safe.pp
+        (`List [])
+        (extra_args_json (with_extra_args []));
+      Oth.Assert.eq
+        ~eq:Yojson.Safe.equal
+        ~pp:Yojson.Safe.pp
+        (`List [ `String "--foo" ])
+        (extra_args_json (with_extra_args [ "--foo" ]));
+      ())
+
 let test_workflow_extra_steps_allowed =
   Oth.test ~name:"workflows: extra steps around plan and apply are allowed" (fun _ ->
       let json =
@@ -1285,6 +1323,7 @@ let test =
       test_workflow_visible_on_defaults;
       test_workflow_visible_on_is_read;
       test_workflow_visible_on_to_version_1_round_trip;
+      test_workflow_plan_extra_args_to_version_1_round_trip;
       test_workflow_extra_steps_allowed;
       test_workflow_missing_step_reports_index;
       test_parse_rejects_bad_glob_dir_key;

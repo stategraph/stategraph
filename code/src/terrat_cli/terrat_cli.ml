@@ -167,6 +167,50 @@ struct
             exit 1)
     | None -> Abb.Future.return None
 
+  (* The environment wins over the stored App, and a process running the
+     environment's App ignores the row entirely, so it does not watch it. Every
+     other case watches: the process exits when the stored App is no longer the
+     one it runs, and runit starts it again on the new one. *)
+  let resolve_github config storage =
+    let open Abb.Future.Infix_monad in
+    let watch ~loaded config =
+      Abb.Future.fork (Terrat_github_app.exit_when_changed ~loaded storage)
+      >>= fun _ -> Abb.Future.return config
+    in
+    match Terrat_config.github config with
+    | Some _ -> Abb.Future.return config
+    | None -> (
+        (* The watcher jitters its sleep so replicas do not all restart in the
+           same second, which needs a seed of its own: the default state is
+           identical in every process. *)
+        Random.self_init ();
+        Terrat_github_app.load storage
+        >>= function
+        | Ok (Terrat_github_app.App (github, token)) ->
+            Logs.info (fun m ->
+                m "GITHUB_APP : LOADED : app_id=%s" (Terrat_config.Github.app_id github));
+            Terrat_github_app.mark_loaded ~token storage
+            >>= fun marked ->
+            (match marked with
+            | Ok () -> ()
+            | Error err ->
+                Logs.err (fun m -> m "GITHUB_APP : MARK_LOADED : %a" Terrat_github_app.pp_err err));
+            watch ~loaded:(Some token) (Terrat_config.with_github config github)
+        | Ok Terrat_github_app.No_app ->
+            Logs.info (fun m -> m "GITHUB_APP : WAITING");
+            watch ~loaded:None config
+        (* A row the process cannot run, such as a key that does not decode. It
+           serves no GitHub and watches that row, so a correction heals the
+           deployment without an operator and nothing restarts until one comes. *)
+        | Ok (Terrat_github_app.Unusable (token, err)) ->
+            Logs.err (fun m -> m "GITHUB_APP : UNUSABLE : %a" Terrat_github_app.pp_err err);
+            watch ~loaded:(Some token) config
+        (* A database error says nothing about the row, so the process refuses
+           to run rather than guess. *)
+        | Error err ->
+            Logs.err (fun m -> m "GITHUB_APP : ERROR : %a" Terrat_github_app.pp_err err);
+            exit 1)
+
   let server () =
     let run () =
       match Terrat_config.create () with
@@ -179,6 +223,8 @@ struct
           @@ (Terrat_config.gc config).Terrat_config.Gc.dynamic_gc;
           Terrat_storage.create config
           >>= fun storage ->
+          resolve_github config storage
+          >>= fun config ->
           (match Terrat_config.infracost config with
             | Some (Terrat_config.Infracost.Proxy proxy) ->
                 Abb.Future.return (Some (Terrat_ep_infracost.Proxy proxy))

@@ -438,7 +438,7 @@ module Workflow_step = struct
 
     type t = {
       env : string Sln_map.String.t option;
-      extra_args : string list; [@default []]
+      extra_args : string list option; [@default None]
       mode : Mode.t; [@default Mode.Strict]
       visible_on : Visible_on.t; [@default Visible_on.Always]
     }
@@ -1940,7 +1940,7 @@ let of_version_1_workflow_op_list ops =
           let mode = of_version_1_workflow_op_plan_mode mode in
           let visible_on = CCOption.map of_version_1_visible_on visible_on in
           map_opt (fun { Op.Env.additional; _ } -> Ok additional) env
-          >>= fun env -> Ok (O.Plan (Workflow_step.Plan.make ?env ?extra_args ~mode ?visible_on ()))
+          >>= fun env -> Ok (O.Plan (Workflow_step.Plan.make ?env ~extra_args ~mode ?visible_on ()))
       | Op.Workflow_op_apply op ->
           let module R = Terrat_repo_config_retry in
           let module Op = Terrat_repo_config_workflow_op_apply in
@@ -3927,7 +3927,7 @@ let to_version_1_workflows_op =
         Op.Items.Workflow_op_plan
           {
             P.env = CCOption.map (fun env -> P.Env.make ~additional:env Json_schema.Empty_obj.t) env;
-            extra_args = Some extra_args;
+            extra_args;
             mode = to_version_1_plan_mode mode;
             type_ = `Plan;
             visible_on = Some (to_version_1_visible_on visible_on);

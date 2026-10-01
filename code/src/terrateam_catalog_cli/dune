@@ -1,0 +1,3 @@
+(executable
+ (name terrateam_catalog_cli)
+ (libraries cmdliner containers sln yojson))

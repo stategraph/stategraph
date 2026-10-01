@@ -42,7 +42,6 @@ module Metrics = struct
 end
 
 module Make (P : Terrat_vcs_provider2_github.S) = struct
-  (* module Evaluator = Terrat_vcs_event_evaluator.Make (P) *)
   module Evaluator2 = Terrat_vcs_event_evaluator2.Make (P)
   module Gw = Terrat_github_webhooks
 

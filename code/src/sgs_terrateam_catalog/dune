@@ -1,0 +1,72 @@
+; The sgs_terrateam_catalog artifacts are generated from
+; api_schemas/stategraph/terrateam_tables.json by terrateam_catalog_cli. This
+; mirrors the sgs_tx_log_data codegen: generate into a `gen` directory target,
+; format the OCaml with ocamlformat, and promote the files into this directory
+; (where the library below picks up the .ml as an ordinary source; the two
+; .sql artifacts are blobbed by their consumers). dune does not pre-create
+; directory targets and the generator open_out's without mkdir, so the action
+; creates `gen` first.
+
+(rule
+ (alias generate-api-types)
+ (mode
+  (promote
+   (into .)))
+ (deps
+  ../../.ocamlformat
+  ../../../api_schemas/stategraph/terrateam_tables.json)
+ (targets
+  (dir gen))
+ (action
+  (progn
+   (run mkdir -p gen)
+   (run
+    %{exe:../terrateam_catalog_cli/terrateam_catalog_cli.exe}
+    convert
+    --input
+    ../../../api_schemas/stategraph/terrateam_tables.json
+    --name
+    sgs_terrateam_catalog
+    --output-dir
+    gen)
+   (run bash -c "ocamlformat -i gen/*.ml"))))
+
+; Normalise the input schema in place with `jq -S`; see sgs_api/dune.
+
+(rule
+ (alias generate-api-types)
+ (mode
+  (promote
+   (into ../../../api_schemas/stategraph)))
+ (deps
+  (file ../../../api_schemas/stategraph/terrateam_tables.json))
+ (target terrateam_tables.json)
+ (action
+  (with-stdout-to
+   terrateam_tables.json
+   (run jq -S . ../../../api_schemas/stategraph/terrateam_tables.json))))
+
+; (input schema, destination dir) pair for the codegen manifest; see sgs_api/dune.
+
+(rule
+ (target sgs_terrateam_catalog.generate-api-types-pairs)
+ (action
+  (with-stdout-to
+   sgs_terrateam_catalog.generate-api-types-pairs
+   (echo
+    "api_schemas/stategraph/terrateam_tables.json code/src/sgs_terrateam_catalog\n"))))
+
+(library
+ (name sgs_terrateam_catalog)
+ (wrapped false)
+ (libraries mql_to_pgsql))
+
+; Make `dune build code/src/sgs_terrateam_catalog` regenerate from the schema:
+; the package's @all alias depends on the generate-api-types alias, so the
+; input schema is a build input of the package, not only of
+; @.../generate-api-types.
+
+(alias
+ (name all)
+ (deps
+  (alias generate-api-types)))
