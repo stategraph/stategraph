@@ -1,4 +1,4 @@
-let src = Logs.Src.create "setup_ep_admin_create"
+let src = Logs.Src.create "ep_admin_create"
 
 module Logs = (val Logs.src_log src : Logs.LOG)
 module Fc = Abbs_fc
