@@ -95,6 +95,10 @@ module type ASSERT = sig
     (** [str_mem ?fail_msg searched l] asserts that [l] contains [searched], otherwise it fails the
         test *)
     val str_mem : ?fail_msg:string -> searched:string -> string list -> unit
+
+    (** [str_not_mem ?fail_msg searched l] asserts that [l] does not contain [searched], otherwise
+        it fails the test *)
+    val str_not_mem : ?fail_msg:string -> searched:string -> string list -> unit
   end
 
   module Eq : sig

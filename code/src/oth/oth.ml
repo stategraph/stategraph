@@ -146,6 +146,15 @@ module Assert = struct
              (CCOption.map_or ~default:"" (fun m -> m ^ ": ") fail_msg)
              searched
              (CCString.concat "; " l))
+
+    let str_not_mem ?fail_msg ~searched l =
+      if CCList.mem ~eq:CCString.equal searched l then
+        false_
+          (Format.asprintf
+             "%sExpected the list not to contain %S, got [%s]"
+             (CCOption.map_or ~default:"" (fun m -> m ^ ": ") fail_msg)
+             searched
+             (CCString.concat "; " l))
   end
 
   module Eq = struct
