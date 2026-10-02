@@ -1,0 +1,18 @@
+(library
+ (name sgs_caps_rules_gen)
+ (modules sgs_caps_rules_gen)
+ (libraries qcheck-core sgs_caps_rules))
+
+(test
+ (name test)
+ (modules test)
+ (libraries
+  containers
+  oth
+  qcheck-core
+  sg_caps
+  sg_caps_trie
+  sgs_caps_rules
+  sgs_caps_rules_gen
+  sgs_session_caps
+  uuidm))

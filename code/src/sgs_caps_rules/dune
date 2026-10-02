@@ -1,0 +1,17 @@
+(library
+ (name sgs_caps_rules)
+ (libraries
+  abb
+  abbs
+  containers
+  pgsql_io
+  sg_caps
+  sg_caps_json
+  sg_caps_match
+  sgs_user
+  uuidm
+  yojson)
+ (preprocessor_deps
+  (glob_files_rec sql/*))
+ (preprocess
+  (pps ppx_blob ppx_deriving.show ppx_deriving_yojson)))
