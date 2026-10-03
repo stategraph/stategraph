@@ -1,5 +1,5 @@
 (library
- (name sgs_caps)
+ (name sgs_service_caps)
  (wrapped false)
  (libraries
   abb
@@ -18,6 +18,7 @@
   sgs_caps_rules
   sgs_config
   sgs_eplib
+  sgs_service
   sgs_storage
   sgs_tenant
   sgs_user

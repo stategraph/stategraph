@@ -1,7 +1,7 @@
 let src = Logs.Src.create "ep_group_rule_create"
 
 module Logs = (val Logs.src_log src : Logs.LOG)
-module Common = Sgs_caps_group_rule_common
+module Common = Sgs_service_caps_group_rule_common
 
 module Sql = struct
   (* Of the given state ids, the ones this tenant owns -- one query for the whole grant.  An id the

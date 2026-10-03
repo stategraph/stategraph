@@ -1,7 +1,7 @@
 let src = Logs.Src.create "ep_group_rules_list"
 
 module Logs = (val Logs.src_log src : Logs.LOG)
-module Common = Sgs_caps_group_rule_common
+module Common = Sgs_service_caps_group_rule_common
 
 let run _config storage tenant =
   let tenant_id = Sgs_tenant.id tenant in
