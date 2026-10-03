@@ -35,6 +35,7 @@ end
 type t = {
   file_reads : File_reads.t option; [@default None]
   for_each : Sgs_tx_log_hints_stored_for_each_hint.t option; [@default None]
+  for_each_file_calls : Sgs_tx_log_hints_for_each_file_calls.t option; [@default None]
   module_ancestors : Module_ancestors.t option; [@default None]
   module_index_reads : Module_index_reads.t option; [@default None]
   path_attrs : Path_attrs.t option; [@default None]

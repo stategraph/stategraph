@@ -35,6 +35,31 @@
       ],
       "type": "object"
     },
+    "for_each_file_calls": {
+      "additionalProperties": false,
+      "description": "Which file-function calls of a block with a top-level for_each belong to its collection, and which to its body (RFD 2172, the ingestion contract, item 7). Each entry is a call key: the key that each file_refs entry of the block carries (Sg_tf_eval_files.compute_call_key). The walk decides the scope of a reads_file edge by an equality between the two, thus it takes no text apart. A key in both lists is a call that the collection and the body make with the same text. Derived by the server at ingest and never sent by a client. PRESENT only on a block with a top-level for_each. ABSENT on every other block, and on a row that the server wrote before it derived this member: the walk then gives each file read of the block the scope body, which admits every instance. That is wider than necessary and never narrower.",
+      "properties": {
+        "body": {
+          "description": "The call keys of the block with its top-level for_each attribute removed: every other attribute and every nested block, with the path attributes of a resource.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "collection": {
+          "description": "The call keys of the top-level for_each expression.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "body",
+        "collection"
+      ],
+      "type": "object"
+    },
     "for_each_hint": {
       "additionalProperties": false,
       "description": "One block's client-computed recipe for evaluating its for_each collection (RFD 1562, Phase 1). Conceptually the same as realized_object_hint: the canon removes all levels of indirection and bottoms out at the irreducible inputs. It is at most ONE per node rather than a list, because a block has one for_each. Absent when the block has no for_each, when the client could not evaluate it, and when its canon is unreifiable; all three mean the same thing downstream, keys of null, which is the RFD's fail-safe mode 1 -- the for_each is reified verbatim and nothing is pruned.",
@@ -287,6 +312,9 @@
         },
         "for_each": {
           "$ref": "#/definitions/stored_for_each_hint"
+        },
+        "for_each_file_calls": {
+          "$ref": "#/definitions/for_each_file_calls"
         },
         "module_ancestors": {
           "description": "Every module call this node lies inside, from the outermost inwards, as fq addresses -- [module.a, module.a.module.b] for a node whose module address is [module.a.module.b]. Derived by the server at ingest and never sent by a client.\n\nWHY IT IS STORED RATHER THAN COMPUTED. The subgraph walk asks, of an ITERATED module call that moved, which nodes lie in its body. The address already says so, but only to something that takes an HCL address apart, and the walk asks it in SQL: the [contains] relation used to answer it with starts_with(child.module_address, call || '.'), which the RFD's constraint refuses -- an HCL identifier is parsed in OCaml, with the HCL libraries, and not by the database. Recording the chain here turns that prefix test into an equality against an array, which is also what it costs: MEASURED on the field-shape state the prefix join was 32 calls against 9 810 nodes and 0.59 s of a 1.41 s relation build.\n\nEMPTY for a node at the ROOT module, which lies inside no call. Absent means the row predates this hint.",
