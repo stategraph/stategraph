@@ -51,9 +51,16 @@ type t = {
     The run that remains is put into layers again rather than keeping the boundaries it started
     with, so a dirspace waits for the dirspaces it depends on and for nothing else.
 
-    [outputs] gives the baseline and current outputs of an applied dirspace. A dirspace that is in
-    the run only because a [depends_on] with an [outputs:] term matched an applied dependency whose
-    outputs did not change is pruned, and so is every dirspace that depends only on pruned ones.
+    [outputs] says what one dependency of the run has to offer an [outputs:] term, and it has three
+    answers. [`Diff diff] is the baseline and the current outputs of an applied dirspace: the term
+    is true when the path it names changed between them. [`Unchanged] is an applied dirspace that
+    recorded no outputs because its plan had no changes, and no [outputs:] term matches it.
+    [`No_comparison] is no answer at all, and there the term keeps its [dir:] meaning: a dirspace
+    that has not been applied, and a run with nothing to compare.
+
+    A dirspace that is in the run only because a [depends_on] with an [outputs:] term matched an
+    applied dependency whose outputs did not change is pruned, and so is every dirspace that depends
+    only on pruned ones.
 
     [file_changed] is the dirspaces whose own files changed. They are never pruned this way.
     [all_matches] alone cannot tell such a dirspace from one that is in the run only through
@@ -65,7 +72,7 @@ type t = {
     pruned by the same rule as every other dependent, thus the user can bring back a pruned branch
     one dirspace at a time. A dirspace of [revived] that is not in [all_matches] has no effect. *)
 val make :
-  outputs:(Terrat_dirspace.t -> Terrat_output_diff.t option) ->
+  outputs:(Terrat_dirspace.t -> [ `No_comparison | `Unchanged | `Diff of Terrat_output_diff.t ]) ->
   file_changed:Terrat_data.Dirspace_set.t ->
   revived:Terrat_data.Dirspace_set.t ->
   config:Terrat_change_match3.Config.t ->

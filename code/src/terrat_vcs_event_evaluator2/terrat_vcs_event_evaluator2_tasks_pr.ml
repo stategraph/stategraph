@@ -501,7 +501,12 @@ struct
           fetch Keys.pull_request
           >>| fun pull_request ~dirspaces ->
           Builder.run_db s ~f:(fun db -> query_dirspace_outputs s db pull_request dirspaces)
-          >>| fun outputs dirspace -> CCList.assoc_opt ~eq:Terrat_dirspace.equal dirspace outputs)
+          >>| fun outputs dirspace ->
+          (* Every dirspace asked for is applied, so no row means the plan of that dirspace had
+             no changes: it recorded no outputs, and none of them changed. *)
+          match CCList.assoc_opt ~eq:Terrat_dirspace.equal dirspace outputs with
+          | Some diff -> `Diff diff
+          | None -> `Unchanged)
 
     let intra_pr_selection =
       run ~name:"intra_pr_selection" (fun s { Bs.Fetcher.fetch } ->

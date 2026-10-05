@@ -168,7 +168,7 @@ struct
     (* A branch run has no pull request, thus no baseline and no current apply to compare. *)
     let dirspace_outputs =
       run ~name:"dirspace_outputs" (fun _s { Bs.Fetcher.fetch = _ } ->
-          Abbs_fc.return_ok (fun ~dirspaces:_ -> Abbs_fc.return_ok (CCFun.const None)))
+          Abbs_fc.return_ok (fun ~dirspaces:_ -> Abbs_fc.return_ok (CCFun.const `No_comparison)))
 
     let is_draft_pr =
       run ~name:"is_draft_pr" (fun _s { Bs.Fetcher.fetch = _ } -> Abbs_fc.return_ok false)

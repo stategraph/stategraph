@@ -250,13 +250,16 @@ module Make (S : Terrat_vcs_provider2.S) = struct
       Key.t =
     Hmap.Key.create "intra_pr_selection"
 
-  (* The baseline and the current outputs of the applied dirspaces of a run, which the [outputs:]
-     terms of [depends_on] compare.  A function, as [intra_pr_selection] is, because the dirspaces
-     are known only inside the computation of the matches.  The answer is [None] for a dirspace with
-     no current apply. *)
+  (* What the applied dirspaces of a run have to offer the [outputs:] terms of [depends_on], as a
+     function, as [intra_pr_selection] is, because the dirspaces are known only inside the
+     computation of the matches.  The answer is [`Unchanged] for a dirspace with no current apply:
+     its plan had no changes, thus it recorded no outputs and none of them changed. *)
   let dirspace_outputs :
       (dirspaces:Terrat_dirspace.t list ->
-      (Terrat_dirspace.t -> Terrat_output_diff.t option, err) result Abb.Future.t)
+      ( Terrat_dirspace.t -> [ `No_comparison | `Unchanged | `Diff of Terrat_output_diff.t ],
+        err )
+      result
+      Abb.Future.t)
       Key.t =
     Hmap.Key.create "dirspace_outputs"
 
