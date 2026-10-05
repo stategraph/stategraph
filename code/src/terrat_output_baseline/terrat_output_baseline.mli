@@ -42,7 +42,8 @@ val current :
 
 (** The baseline and the current outputs of [dirspace] in [pull_request], ready to compare, or
     [None] if [pull_request] has not applied [dirspace]. A dirspace can count as applied without an
-    apply, when its plan had no changes; it gets [None] as well, thus its dependents run.
+    apply, when its plan had no changes; it gets [None] as well. The caller reads [None] for an
+    applied dirspace as no output changed, so its dependents are pruned.
 
     The step name sets the shape: [tf/apply] is [Tf_wrapped] and every other step is [Raw]. A
     baseline with a shape different from the current one counts as no baseline. *)

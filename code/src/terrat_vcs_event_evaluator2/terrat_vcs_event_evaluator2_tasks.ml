@@ -215,7 +215,7 @@ struct
      term compares none, thus it does not query them. *)
   let fetch_applied_outputs dirspace_outputs ~applied all_matches =
     match Work_set.uses_outputs all_matches with
-    | false -> Abbs_fc.return_ok (CCFun.const None)
+    | false -> Abbs_fc.return_ok (CCFun.const `No_comparison)
     | true ->
         dirspace_outputs
           ~dirspaces:

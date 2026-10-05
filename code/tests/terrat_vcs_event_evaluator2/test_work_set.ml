@@ -86,7 +86,7 @@ let work_set
     ~all_matches
     ~op
     ?(tq = Terrat_tag_query.any)
-    ?(outputs = CCFun.const None)
+    ?(outputs = CCFun.const `No_comparison)
     ?(file_changed = [])
     ?(revived = [])
     applied =
@@ -335,7 +335,7 @@ let test_a_deleted_directory_does_not_block =
       let all_matches = Tcm.match_diff_list config networking_diff in
       let { Ws.working_set_matches; all_unapplied_matches = _; working_layer = _; pruned = _ } =
         Ws.make
-          ~outputs:(CCFun.const None)
+          ~outputs:(CCFun.const `No_comparison)
           ~file_changed:Terrat_data.Dirspace_set.empty
           ~revived:Terrat_data.Dirspace_set.empty
           ~config
@@ -360,19 +360,24 @@ let test_a_deleted_directory_does_not_block =
 let rfd_2110 = [ "rfd_2110" ]
 
 (* [outputs] is (dir, baseline, current) for each applied dirspace.  [None] is
-   an apply that recorded no outputs. *)
+   an apply that recorded no outputs.  An applied dirspace with no entry is one
+   whose plan had no changes: it recorded no outputs, and none of them changed. *)
 let outputs_of outputs ds =
-  CCList.find_map
-    (fun (dir, baseline, current) ->
-      if Terrat_dirspace.equal (dirspace dir) ds then
-        Some
-          {
-            Terrat_output_diff.shape = Terrat_output_diff.Raw;
-            baseline = CCOption.map Yojson.Safe.from_string baseline;
-            current = CCOption.map Yojson.Safe.from_string current;
-          }
-      else None)
-    outputs
+  match
+    CCList.find_map
+      (fun (dir, baseline, current) ->
+        if Terrat_dirspace.equal (dirspace dir) ds then
+          Some
+            {
+              Terrat_output_diff.shape = Terrat_output_diff.Raw;
+              baseline = CCOption.map Yojson.Safe.from_string baseline;
+              current = CCOption.map Yojson.Safe.from_string current;
+            }
+        else None)
+      outputs
+  with
+  | Some diff -> `Diff diff
+  | None -> `Unchanged
 
 let synthesize_dirs ds =
   synthesize ~file_list:(CCList.map (fun (d, _) -> d ^ "/main.tf") ds) ~dirs:ds ()
@@ -717,6 +722,22 @@ let test_rfd_2110_pr_15 =
         "PR-15";
       ())
 
+(* RFD 2110, revdate 2026-10-03: a plan that is a no-op counts as applied and
+   records no outputs, so no [outputs:] term matches it.  [ds1] is applied and
+   has no entry in [outputs], which is what the database gives for it. *)
+let test_rfd_2110_pr_16 =
+  Oth.test ~tags:rfd_2110 ~name:"PR-16: a no-op dependency prunes the dependent" (fun _ ->
+      assert_run
+        ~config:(chain_of_two ())
+        ~diff:[ "ds1/main.tf" ]
+        ~applied:[ "ds1" ]
+        ~outputs:[]
+        ~pruned:[ "ds2" ]
+        ~working:[]
+        ~remaining:[]
+        "PR-16";
+      ())
+
 let test =
   Oth.parallel
     [
@@ -740,6 +761,7 @@ let test =
       test_rfd_2110_pr_13;
       test_rfd_2110_pr_14;
       test_rfd_2110_pr_15;
+      test_rfd_2110_pr_16;
     ]
 
 let () =

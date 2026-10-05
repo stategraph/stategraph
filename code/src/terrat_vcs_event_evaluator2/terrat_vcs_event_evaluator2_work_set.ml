@@ -101,6 +101,18 @@ let dirspace_uses_outputs
 
 let uses_outputs all_matches = CCList.exists dirspace_uses_outputs (CCList.flatten all_matches)
 
+(* [reachable] takes the outputs of one dependency or nothing at all, so [`Unchanged] is written
+   as a comparison of two absent sides: no path in it differs, which is what makes an [outputs:]
+   term false.  Nothing at all keeps the [dir:] meaning of the term. *)
+let outputs_for_walk ~outputs ~applied dirspace =
+  if Dirspace_set.mem dirspace applied then
+    match outputs dirspace with
+    | `Diff diff -> Some diff
+    | `Unchanged ->
+        Some { Terrat_output_diff.shape = Terrat_output_diff.Raw; baseline = None; current = None }
+    | `No_comparison -> None
+  else None
+
 (* Walk the run again from its roots, this time with the outputs of the applied dirspaces, and keep
    only what the walk reaches.  The roots are the dirspaces whose own files changed and the revived
    dirspaces of the run.  A revived dirspace outside the run is not a root, or it could bring its
@@ -110,7 +122,6 @@ let prune_unchanged_outputs ~outputs ~file_changed ~revived ~config ~applied all
   match uses_outputs all_matches with
   | false -> (all_matches, Dirspace_set.empty)
   | true ->
-      let outputs dirspace = if Dirspace_set.mem dirspace applied then outputs dirspace else None in
       let in_run = Dirspace_set.of_list (dirspaces_of (CCList.flatten all_matches)) in
       let roots =
         CCList.filter_map
@@ -118,7 +129,9 @@ let prune_unchanged_outputs ~outputs ~file_changed ~revived ~config ~applied all
           (Dirspace_set.to_list
              (Dirspace_set.union file_changed (Dirspace_set.inter revived in_run)))
       in
-      let reached = Terrat_change_match3.reachable ~outputs config ~roots in
+      let reached =
+        Terrat_change_match3.reachable ~outputs:(outputs_for_walk ~outputs ~applied) config ~roots
+      in
       all_matches
       |> CCList.map
            (CCList.filter
