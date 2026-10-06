@@ -2,10 +2,11 @@ let src = Logs.Src.create "ep_invitation_revoke"
 
 module Logs = (val Logs.src_log src : Logs.LOG)
 module Common = Sgs_service_tenants_invitation_common
-module Members = Sgs_service_tenants_members_common
 
 let run _config storage tenant id_str =
-  Sgs_user_session.with_user ~caps:(Members.manage_members_caps tenant) ~f:(fun user ->
+  Sgs_user_session.with_user
+    ~caps:(Sgs_user_session.Caps.manages_tenant_members (Uuidm.to_string (Sgs_tenant.id tenant)))
+    ~f:(fun user ->
       Brtl_ep.run_json ~f:(fun ctx ->
           let open Abb.Future.Infix_monad in
           match Uuidm.of_string id_str with

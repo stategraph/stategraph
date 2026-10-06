@@ -191,6 +191,10 @@ module Caps : sig
       infrastructure. An unscoped grant satisfies it too. *)
   val users_manage_tenant : string -> t
 
+  (** [manages_tenant_members tenant_id] is the gate for changing members to the tenant. It is
+      granted by administering the tenant, or holding [users-manage] scoped to it. *)
+  val manages_tenant_members : string -> t
+
   (** Always [Allowed]: a [~caps] predicate that imposes no requirement. *)
   val allow_all : t
 

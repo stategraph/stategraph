@@ -10,7 +10,7 @@ type oauth2_provider =
       auth0_rp_logout : bool;
           (** STATEGRAPH_OAUTH_OIDC_USE_AUTH0_LOGOUT=true: force Auth0 RP-initiated logout
               regardless of issuer URL hostname. Needed when an Auth0 tenant uses a custom domain so
-              the `.auth0.com` URL detection in [Sgs_ep_login] would miss. *)
+              the `.auth0.com` URL detection in [Sgs_service_auth_ep_login] would miss. *)
     }
 
 (** OAuth2 Configuration - present if OAuth is configured *)
