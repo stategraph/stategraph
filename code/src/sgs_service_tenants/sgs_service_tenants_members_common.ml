@@ -3,13 +3,6 @@ let src = Logs.Src.create "members_common"
 module Logs = (val Logs.src_log src : Logs.LOG)
 module Scope = Sg_caps_ops.Tenant_scope
 
-(* Administering a tenant implies managing its membership; holding only [users-manage] for the tenant
-   is the narrower grant that permits membership changes and nothing else.  Renaming deliberately
-   does NOT accept this pair -- see Sgs_service_tenants_ep_update. *)
-let manage_members_caps tenant =
-  let tenant_id = Uuidm.to_string (Sgs_tenant.id tenant) in
-  Sgs_user_session.Caps.(or_ (admin_tenant tenant_id) (users_manage_tenant tenant_id))
-
 (* A caller may confer only rights they hold themselves, so the capability required of them is the
    very one being granted. *)
 let grant_to_caps tenant grant =

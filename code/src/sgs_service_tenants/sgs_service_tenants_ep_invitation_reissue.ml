@@ -110,7 +110,9 @@ module Make (Cloud : Sgs_cloud.S) = struct
         Abb.Future.return (Sgs_eplib.respond_tenant_access_err ctx err)
 
   let run config storage tenant id_str =
-    Sgs_user_session.with_session ~caps:(Members.manage_members_caps tenant) ~f:(fun session ->
+    Sgs_user_session.with_session
+      ~caps:(Sgs_user_session.Caps.manages_tenant_members (Uuidm.to_string (Sgs_tenant.id tenant)))
+      ~f:(fun session ->
         let user = Sgs_user_session.Session.user session in
         (* Whether this caller may confer admin does not depend on which invitation is being reissued,
          so it is settled once, here; only the role it applies to comes from the row.  Keeping the

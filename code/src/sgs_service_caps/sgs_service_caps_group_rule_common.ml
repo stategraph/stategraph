@@ -1,6 +1,6 @@
 (* An admin of [tenant] may manage its group rules; an installation-wide admin qualifies for any
    tenant, and a wider multi-tenant admin covering [tenant] qualifies too. Mirrors
-   [Sgs_service_tenants_members_common.manage_members_caps]. *)
+   [Sgs_user_session.Caps.manages_tenant_members]. *)
 let manage_caps tenant = Sgs_user_session.Caps.admin_tenant (Uuidm.to_string (Sgs_tenant.id tenant))
 let respond_json ~status body ctx = Brtl_ctx.set_response (Brtl_rspnc.create ~status body) ctx
 

@@ -1,5 +1,4 @@
 module Common = Sgs_service_tenants_invitation_common
-module Members = Sgs_service_tenants_members_common
 module Invitation = Sgs_service_tenants_invitation
 
 (* Bounded so a caller cannot ask for the whole table in one page. *)
@@ -12,7 +11,9 @@ let encode_cursor invitation =
     ~id:(Invitation.id invitation)
 
 let run _config storage tenant cursor limit =
-  Sgs_user_session.with_user ~caps:(Members.manage_members_caps tenant) ~f:(fun user ->
+  Sgs_user_session.with_user
+    ~caps:(Sgs_user_session.Caps.manages_tenant_members (Uuidm.to_string (Sgs_tenant.id tenant)))
+    ~f:(fun user ->
       Brtl_ep.run_json ~f:(fun ctx ->
           let open Abb.Future.Infix_monad in
           let limit = CCInt.max 1 (CCInt.min max_page_size limit) in

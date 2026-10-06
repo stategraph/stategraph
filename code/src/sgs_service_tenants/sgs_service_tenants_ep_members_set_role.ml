@@ -114,7 +114,8 @@ let run _config storage tenant user_id body =
   let caps =
     match admin_operation with
     | `Grant -> Common.grant_to_caps tenant `Admin
-    | `Noop | `Revoke -> Common.manage_members_caps tenant
+    | `Noop | `Revoke ->
+        Sgs_user_session.Caps.manages_tenant_members (Uuidm.to_string (Sgs_tenant.id tenant))
   in
   Sgs_user_session.with_session ~caps ~f:(fun session ->
       let user = Sgs_user_session.Session.user session in

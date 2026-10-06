@@ -21,18 +21,12 @@ type err =
   | `Caps_limit
   ]
 
-(** The gate for changing a tenant's membership: administering the tenant, or holding [users-manage]
-    scoped to it. A caller without it is refused with [403] by {!Sgs_user_session.with_user}, before
-    the endpoint body runs. Renaming does not accept the latter — see
-    {!Sgs_service_tenants_ep_update}. *)
-val manage_members_caps : 'a Sgs_tenant.t -> Sgs_user_session.Caps.t
-
 (** [grant_to_caps tenant grant] is what a caller must hold to confer [grant] over [tenant]: the
     grant itself. No one may hand out a right they lack, so an endpoint whose request body chooses
-    the grant must require this rather than {!manage_members_caps}, which [users-manage] alone
-    satisfies — otherwise a member-manager can mint tenant-administrator rights for anyone,
-    themselves included. Use it in [~caps] by selecting on the requested grant, so a refusal is
-    still the standard [403] capability denial. *)
+    the grant must require this rather than {!Sgs_user_session.Caps.manages_tenant_members}, which
+    [users-manage] alone satisfies — otherwise a member-manager can mint tenant-administrator rights
+    for anyone, themselves included. Use it in [~caps] by selecting on the requested grant, so a
+    refusal is still the standard [403] capability denial. *)
 val grant_to_caps : 'a Sgs_tenant.t -> Sg_caps_ops.tenant_grant -> Sgs_user_session.Caps.t
 
 (** Project a member onto the API type. Carries no status of its own — see {!respond_member}. The

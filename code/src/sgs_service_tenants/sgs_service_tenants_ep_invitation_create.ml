@@ -156,7 +156,8 @@ module Make (Cloud : Sgs_cloud.S) = struct
     let caps =
       match role with
       | Invitation.Role.Admin -> Members.grant_to_caps tenant `Admin
-      | Invitation.Role.Member -> Members.manage_members_caps tenant
+      | Invitation.Role.Member ->
+          Sgs_user_session.Caps.manages_tenant_members (Uuidm.to_string (Sgs_tenant.id tenant))
     in
     Sgs_user_session.with_user ~caps ~f:(fun user ->
         Brtl_ep.run_json ~f:(fun ctx ->
