@@ -53,20 +53,39 @@ val unless_self :
   (unit -> (unit, 'err) result Abb.Future.t) ->
   (unit, 'err) result Abb.Future.t
 
-(** Whether [actor] reaches every tenant the user belongs to — the membership half of
-    {!authority_over} and nothing else, for reading a user rather than acting on one. Reading who
-    someone is does not ask for the authority editing them does. *)
-val reaches_user :
+(** What the caller may see of [target]'s memberships. [Complete] carries every membership: the
+    self-read, a caller reaching every tenant, and a target in no tenant. [Partial] carries only the
+    in-scope memberships; [visible] is non-empty by construction. The empty-intersection case is not
+    a value here: it is [Error `Forbidden_no_tenant_visible_err]. *)
+type tenant_visibility =
+  | Complete of Sgs_tenant.stored Sgs_tenant.t list
+  | Partial of {
+      visible : Sgs_tenant.stored Sgs_tenant.t list;
+      withheld_count : int;
+    }
+
+(** [visible_tenants ~actor ~user db target] is the memberships of [target] the caller may see.
+
+    When [target] is [user], all tenants of [user] are returned. If [target] is different from
+    [user], then only the tenants [actor] manages (through its [admin] or [users-manage] grant) may
+    be returned.
+
+    This function answers [`Forbidden_no_tenant_visible_err] when there is no intersection between
+    [target]'s tenants and [actor]'s grant (except if [target] is in no tenant, this case is a
+    success, no matter [actor]'s grant). *)
+val visible_tenants :
   actor:Sg_caps.t ->
+  user:'a Sgs_user.t ->
   Pgsql_io.t ->
   Uuidm.t ->
-  (unit, [> `Forbidden_tenant_scope_err | Pgsql_io.err ]) result Abb.Future.t
+  (tenant_visibility, [> `Forbidden_no_tenant_visible_err | Pgsql_io.err ]) result Abb.Future.t
 
 (** Answer [403] for a refusal {!authority_over} returned, in the shape a [~caps] denial takes. *)
 val respond_no_authority :
   err:
     [ `Forbidden_peer_or_greater_err
     | `Forbidden_tenant_scope_err
+    | `Forbidden_no_tenant_visible_err
     | `Forbidden_no_tenant_in_scope_err
     ] ->
   ('a, 'b) Brtl_ctx.t ->

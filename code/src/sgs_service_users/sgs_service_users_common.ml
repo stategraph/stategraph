@@ -56,15 +56,36 @@ let unless_self ~user target_user_id check =
   | true -> Abbs_fc.return_ok ()
   | false -> check ()
 
-let reaches_user ~actor db target_user_id =
+type tenant_visibility =
+  | Complete of Sgs_tenant.stored Sgs_tenant.t list
+  | Partial of {
+      visible : Sgs_tenant.stored Sgs_tenant.t list;
+      withheld_count : int;
+    }
+
+let visible_tenants ~actor ~user db target_user_id =
   let open Abbs_fc.Infix_result_monad in
-  tenant_ids_of db target_user_id
-  >>= fun target_tenants ->
-  Abb.Future.return
-  @@
-  match Sg_caps_ops.unreached_tenant ~actor ~target_tenants with
-  | None -> Ok ()
-  | Some _ -> Error `Forbidden_tenant_scope_err
+  Sgs_tenant.list_by_user (Sgs_user.make ~id:target_user_id ()) db
+  >>= fun tenants ->
+  match Uuidm.equal (Sgs_user.id user) target_user_id with
+  | true -> Abbs_fc.return_ok (Complete tenants)
+  | false -> (
+      let visible =
+        CCList.filter
+          (fun t ->
+            Sg_caps_ops.reaches_user_tenant ~actor ~tenant:(Uuidm.to_string (Sgs_tenant.id t)))
+          tenants
+      in
+      (* A caller reaching none of the subject's tenants is refused; a subject in no tenant
+         has no membership to hide, so the empty list answers whatever the caller reaches. *)
+      let length_tenants = CCList.length tenants in
+      let length_visible = CCList.length visible in
+      match (tenants, visible) with
+      | [], _ -> Abbs_fc.return_ok (Complete visible)
+      | _, [] -> Abbs_fc.return_err `Forbidden_no_tenant_visible_err
+      | _ :: _, _ :: _ when length_visible = length_tenants -> Abbs_fc.return_ok (Complete tenants)
+      | _ :: _, _ :: _ ->
+          Abbs_fc.return_ok (Partial { visible; withheld_count = length_tenants - length_visible }))
 
 let respond_no_authority ~err ctx =
   let detail =
@@ -74,6 +95,8 @@ let respond_no_authority ~err ctx =
          be acted on"
     | `Forbidden_tenant_scope_err ->
         "requires a grant covering every tenant the target user belongs to"
+    | `Forbidden_no_tenant_visible_err ->
+        "requires a grant reaching at least one tenant the target user belongs to"
     | `Forbidden_no_tenant_in_scope_err ->
         "requires membership of a tenant the grant reaches, so that the new user has one to join"
   in

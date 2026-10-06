@@ -46,9 +46,13 @@ let run _config storage target_user_id =
           let open Abb.Future.Infix_monad in
           Pgsql_pool.with_conn storage ~f:(fun db ->
               let open Fc.Infix_result_monad in
-              Common.unless_self ~user target_user_id (fun () ->
-                  Common.reaches_user ~actor:actor_caps db target_user_id)
-              >>= fun () ->
+              Common.visible_tenants ~actor:actor_caps ~user db target_user_id
+              >>= fun visibility ->
+              let tenants, tenants_complete =
+                match visibility with
+                | Common.Complete tenants -> (tenants, true)
+                | Common.Partial { visible; withheld_count = _ } -> (visible, false)
+              in
               Pgsql_io.Prepared_stmt.fetch
                 db
                 (Sql.select_user_detail ())
@@ -67,18 +71,18 @@ let run _config storage target_user_id =
                       avatar_url;
                       auth_origin;
                       admin_rights = Common.admin_rights capabilities;
+                      tenants = CCList.map Sgs_tenant.to_api tenants;
+                      tenants_complete;
                       created_at;
                     }
                   in
-                  let body =
-                    Yojson.Safe.to_string
-                    @@ Sgs_api_components_user_detail_response.to_yojson response
-                  in
-                  Ok body)
+                  Ok
+                    (Yojson.Safe.to_string
+                    @@ Sgs_api_components_user_detail_response.to_yojson response))
           >>= function
           | Ok body ->
               Abb.Future.return (Brtl_ctx.set_response (Brtl_rspnc.create ~status:`OK body) ctx)
-          | Error (`Forbidden_tenant_scope_err as err) ->
+          | Error (`Forbidden_no_tenant_visible_err as err) ->
               Logs.warn (fun m ->
                   m
                     "%s : USER_AUTHORITY_DENIED : Refused the details of user %s"
