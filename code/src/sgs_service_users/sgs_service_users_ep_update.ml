@@ -45,6 +45,18 @@ let run' db ~actor_caps ~user target_user_id name email avatar_url is_instance_a
       Common.authority_over ~actor:actor_caps db target_user_id)
   >>= fun () ->
   let update () =
+    (* [authority_over] above already requires reaching every tenant, so this normally answers the
+       whole list with the flag up; a concurrent membership change in between can still leave a
+       tenant outside the caller's reach, which is then answered truthfully as a partial list
+       rather than asserted complete. The list is read rather than written so the two cannot
+       disagree. *)
+    Common.visible_tenants ~actor:actor_caps ~user db target_user_id
+    >>= fun visibility ->
+    let tenants, tenants_complete =
+      match visibility with
+      | Common.Complete tenants -> (tenants, true)
+      | Common.Partial { visible; withheld_count = _ } -> (visible, false)
+    in
     Pgsql_io.Prepared_stmt.fetch
       db
       (Sql.update_user ())
@@ -66,6 +78,8 @@ let run' db ~actor_caps ~user target_user_id name email avatar_url is_instance_a
             avatar_url;
             auth_origin;
             admin_rights = Common.admin_rights capabilities;
+            tenants = CCList.map Sgs_tenant.to_api tenants;
+            tenants_complete;
             created_at;
           }
         in
@@ -144,7 +158,10 @@ let run _config storage target_user_id =
                             (Uuidm.to_string target_user_id));
                       Abb.Future.return
                         (Common.respond_last_admin_protected ~action:Common.Demote ctx)
-                  | Error ((`Forbidden_peer_or_greater_err | `Forbidden_tenant_scope_err) as err) ->
+                  | Error
+                      (( `Forbidden_peer_or_greater_err
+                       | `Forbidden_tenant_scope_err
+                       | `Forbidden_no_tenant_visible_err ) as err) ->
                       Logs.warn (fun m ->
                           m
                             "%s : USER_AUTHORITY_DENIED : Refused to update user %s"

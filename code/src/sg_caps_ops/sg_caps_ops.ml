@@ -59,6 +59,9 @@ type authority =
    so does managing them. *)
 let users_reach caps = Scope.union caps.Sg_caps.admin caps.Sg_caps.users_manage
 
+(* The one-tenant half of [users_reach] *)
+let reaches_user_tenant ~actor ~tenant = Scope.mem (users_reach actor) tenant
+
 (* A target in no tenant leaves no tenant unreached, so an empty [target_tenants] answers [None] for
    any actor, even one reaching no tenant at all. *)
 let unreached_tenant ~actor ~target_tenants =

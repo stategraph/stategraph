@@ -53,6 +53,10 @@ type authority =
     at the same scope, so a tenant's administrator outranks a users-manage holder confined to it. *)
 val authority_over : actor:Sg_caps.t -> target:Sg_caps.t -> target_tenants:string list -> authority
 
+(** [reaches_user_tenant ~actor ~tenant] is true when [actor] reaches that tenant's users, with
+    either grant that answers user questions: [admin] or [users-manage]. *)
+val reaches_user_tenant : actor:Sg_caps.t -> tenant:string -> bool
+
 (** [unreached_tenant ~actor ~target_tenants] is a tenant of [target_tenants] that [actor] reaches
     with neither [admin] nor [users-manage], if there is one. A target in no tenant leaves no tenant
     unreached. *)

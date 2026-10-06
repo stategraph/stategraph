@@ -5895,6 +5895,17 @@
           "name": {
             "type": "string"
           },
+          "tenants": {
+            "description": "The tenants the user is a member of, as id and name pairs. Empty when the user belongs to no tenant.",
+            "items": {
+              "$ref": "#/components/schemas/tenant"
+            },
+            "type": "array"
+          },
+          "tenants_complete": {
+            "description": "Whether the tenants list holds every membership of the user. False when memberships outside the caller's scope were withheld; the list then holds only the memberships inside that scope. True for the user's own record and whenever the caller reaches every tenant.",
+            "type": "boolean"
+          },
           "type": {
             "type": "string"
           }
@@ -5904,6 +5915,8 @@
           "created_at",
           "id",
           "name",
+          "tenants",
+          "tenants_complete",
           "type"
         ],
         "type": "object"
@@ -5996,6 +6009,17 @@
           "name": {
             "type": "string"
           },
+          "tenants": {
+            "description": "The tenants the user is a member of, as id and name pairs. Empty when the user belongs to no tenant.",
+            "items": {
+              "$ref": "#/components/schemas/tenant"
+            },
+            "type": "array"
+          },
+          "tenants_complete": {
+            "description": "Whether the tenants list holds every membership of the user. False when memberships outside the caller's scope were withheld; the list then holds only the memberships inside that scope. True for the user's own record and whenever the caller reaches every tenant.",
+            "type": "boolean"
+          },
           "type": {
             "type": "string"
           }
@@ -6005,6 +6029,8 @@
           "created_at",
           "id",
           "name",
+          "tenants",
+          "tenants_complete",
           "type"
         ],
         "type": "object"
