@@ -11,7 +11,9 @@ let encode_cursor tenant_member =
     ~id:tenant_member.Sgs_tenant.Member.id
 
 let run _config storage tenant cursor limit =
-  Sgs_user_session.with_user ~caps:(Common.manage_members_caps tenant) ~f:(fun user ->
+  Sgs_user_session.with_user
+    ~caps:(Sgs_user_session.Caps.manages_tenant_members (Uuidm.to_string (Sgs_tenant.id tenant)))
+    ~f:(fun user ->
       Brtl_ep.run_json ~f:(fun ctx ->
           let open Abb.Future.Infix_monad in
           let limit = CCInt.max 1 (CCInt.min max_page_size limit) in

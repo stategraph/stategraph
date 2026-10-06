@@ -47,7 +47,9 @@ let run' storage tenant user target_id =
                     >>= fun _ -> Sgs_tenant.remove_user tenant target db >>| fun () -> ())))
 
 let run _config storage tenant user_id =
-  Sgs_user_session.with_user ~caps:(Common.manage_members_caps tenant) ~f:(fun user ->
+  Sgs_user_session.with_user
+    ~caps:(Sgs_user_session.Caps.manages_tenant_members (Uuidm.to_string (Sgs_tenant.id tenant)))
+    ~f:(fun user ->
       Brtl_ep.run_json ~f:(fun ctx ->
           let open Abb.Future.Infix_monad in
           match Uuidm.of_string user_id with

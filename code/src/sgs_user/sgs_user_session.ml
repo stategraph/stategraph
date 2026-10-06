@@ -550,6 +550,9 @@ module Caps = struct
   let users_manage_tenant tenant_id =
     satisfies { Sg_caps.empty with Sg_caps.users_manage = tenant_scope tenant_id }
 
+  let manages_tenant_members tenant_id =
+    or_ (admin_tenant tenant_id) (users_manage_tenant tenant_id)
+
   (* The capability-denied response body.  Exposed because a check whose input is only available
      after a database lookup cannot live in a [~caps] predicate, and such an endpoint must still
      deny in exactly the shape [with_session] does. *)
