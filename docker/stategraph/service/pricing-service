@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# Pricing-service launcher (runit).
+#
+# Cost estimation is opt-in. In the production image runit starts this service
+# only when cost is enabled: the image CMD (docker/stategraph/Dockerfile) marks
+# the service `down` unless STATEGRAPH_COST_ENABLED is true, so we are never
+# started when cost is off -- no idle process, nothing to clear by hand. Set
+# STATEGRAPH_COST_ENABLED=true in your deployment environment to enable cost.
+#
+# (The dev container runs this script directly, with PRICING_SERVICE_BIN
+# pointing at the dune-built binary.)
+#
+# Connection defaults match docker-compose's `db` service; override with
+# PRICING_DB_* when the pricing database lives elsewhere.
+
+DATABASE_URL="host=${PRICING_DB_HOST:-db} port=${PRICING_DB_PORT:-5432} user=${PRICING_DB_USER:-stategraph} dbname=${PRICING_DB_NAME:-cloud_pricing} sslmode=${PRICING_DB_SSLMODE:-disable} password=${PRICING_DB_PASSWORD:-stategraph}"
+export DATABASE_URL
+
+exec "${PRICING_SERVICE_BIN:-/usr/local/bin/pricing-service}"
