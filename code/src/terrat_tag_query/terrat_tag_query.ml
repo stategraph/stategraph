@@ -176,6 +176,13 @@ let rec selects_dirspaces_only' = function
 
 let selects_dirspaces_only t = selects_dirspaces_only' t.q
 
+(* [Q.Any] is what an input of no tokens parses to, and no other input produces it, thus it is the
+   test for the empty query. *)
+let is_empty t =
+  match t.q with
+  | Q.Any -> true
+  | Q.Tag _ | Q.Dir_glob _ | Q.Not _ | Q.Outputs _ | Q.And _ | Q.Or _ -> false
+
 let rec uses_outputs' = function
   | Q.Outputs _ -> true
   | Q.And (l, r) | Q.Or (l, r) -> uses_outputs' l || uses_outputs' r

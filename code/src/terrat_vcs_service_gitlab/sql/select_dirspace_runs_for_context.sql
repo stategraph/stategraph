@@ -2,6 +2,8 @@
 -- for an apply, with the sha of the run and the time of its work manifest.  Also whether the most
 -- recent plan and the most recent apply failed: a push makes a new head with no checks, and the
 -- check of a failed run is written again on the new head (RFD 2356).
+-- A failed apply is not the state of the dirspace when a successful plan is newer than it: the
+-- newest plan set the check of the dirspace, not the stale apply (Whatnot 5321).
 --
 -- Unlike select_dirspace_applies_for_context.sql, this does not test the sha of the work manifest
 -- against the sha of the branch.  Whether a run still counts is a question about the hashes of
@@ -109,7 +111,12 @@ select
   last_apply.start_dest_sha,
   last_apply.result_dest_sha,
   newest_plan.success is false,
+  -- A failed apply is not the state of the dirspace when a successful plan is newer than it:
+  -- then the newest plan set the check of the dirspace (Whatnot 5321).
   newest_apply.success is false
+    and not coalesce(
+      newest_plan.success and newest_plan.created_at > newest_apply.created_at,
+      false)
 from dirspaces as ds
 left join runs as last_plan
   on last_plan.path = ds.path
