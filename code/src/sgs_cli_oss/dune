@@ -1,0 +1,13 @@
+(executable
+ (name sgs_cli_oss)
+ (libraries
+  sgs_cli_lib
+  sgs_cloud_oss
+  sgs_mql
+  sgs_service_auth
+  sgs_service_caps
+  sgs_service_license
+  sgs_service_license_oss
+  sgs_service_orchestration
+  sgs_service_tenants
+  sgs_service_users))

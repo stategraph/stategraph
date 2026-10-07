@@ -1,0 +1,7 @@
+(library
+ (name sg_version)
+ (libraries containers)
+ (preprocessor_deps
+  (glob_files_rec data/*))
+ (preprocess
+  (pps ppx_blob)))
