@@ -1,0 +1,29 @@
+(library
+ (name sgs_server)
+ (wrapped false)
+ (libraries
+  abb
+  brtl
+  brtl_ep
+  brtl_mw_log
+  cohttp
+  containers
+  duration
+  logs
+  mql_to_pgsql
+  pgsql_io
+  pgsql_pool
+  sg_state_schema_version
+  sg_version
+  sgs_api
+  sgs_api_schema
+  sgs_cloud
+  sgs_config
+  sgs_eplib
+  sgs_mql
+  sgs_service
+  sgs_service_orchestration
+  sgs_setup
+  sgs_storage
+  sgs_user
+  yojson))

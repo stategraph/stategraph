@@ -1,0 +1,6 @@
+(library
+ (name sgs_api_schema)
+ (preprocessor_deps
+  (file ../../../api_schemas/stategraph/api.json))
+ (preprocess
+  (pps ppx_blob)))

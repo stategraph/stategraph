@@ -1,0 +1,28 @@
+(library
+ (name sgs_cli_lib)
+ (libraries
+  ISO8601
+  abbs
+  cmdliner
+  containers
+  logs
+  logs.cli
+  logs.threaded
+  mirage-crypto-rng.unix
+  sg_caps
+  sg_caps_json
+  sg_caps_trie
+  sg_version
+  sgs_caps_rules
+  sgs_cloud
+  sgs_config
+  sgs_migrations
+  sgs_server
+  sgs_service
+  sgs_tenant
+  sgs_user)
+ (preprocessor_deps
+  ../sgs_terrateam_catalog/fdw_tables.sql
+  (glob_files_rec sql/*))
+ (preprocess
+  (pps ppx_blob ppx_deriving.show)))

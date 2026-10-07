@@ -107,7 +107,7 @@ RUN eval $(opam env) && \
 # [[[cog emit("opam-install") ]]]
 RUN eval $(opam env) && cd mono/code && \
     opam install -j$(nproc --all) -y --no-depexts dune.3.24.2 menhir && \
-    cat opam.pins stategraph.pins | xargs opam install -j$(nproc --all) -y --no-depexts
+    cat opam.pins | xargs opam install -j$(nproc --all) -y --no-depexts
 # [[[end]]]
 # [[[cog emit("ocamlformat") ]]]
 RUN eval $(opam env) && opam pin add -y ocamlformat 0.29.0

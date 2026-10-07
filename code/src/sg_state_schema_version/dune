@@ -1,0 +1,2 @@
+(library
+ (name sg_state_schema_version))
