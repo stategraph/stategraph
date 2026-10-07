@@ -615,6 +615,29 @@ struct
             in
             intra_pr_selection ~dirspaces ~force
             >>= fun { Terrat_intra_pr_hash.Selection.to_run; out_of_order = _; applied } ->
+            (* RFD 2108: a plain [terrateam plan] which found nothing to run resets the pull
+               request.  [to_run] is empty on an empty [force] only when every dirspace of the run
+               counts as applied or has a plan that still stands, which is the condition of the
+               reset.  The selection then runs as if no dirspace had ever run: it is every
+               dirspace of the run and nothing counts as applied, and [Work_set.make] below puts
+               the run back together from its first layer.  The comment names no dirspace, thus
+               [force] is empty and this is not the force path. *)
+            let reset =
+              match job.Tjc.Job.type_ with
+              | Tjc.Job.Type_.Plan { tag_query; kind = None }
+                when Terrat_tag_query.is_empty tag_query && CCList.is_empty to_run -> true
+              | Tjc.Job.Type_.Plan _
+              | Tjc.Job.Type_.Apply _
+              | Tjc.Job.Type_.Autoapply
+              | Tjc.Job.Type_.Autoplan
+              | Tjc.Job.Type_.Gate_approval _
+              | Tjc.Job.Type_.Help
+              | Tjc.Job.Type_.Index
+              | Tjc.Job.Type_.Repo_config
+              | Tjc.Job.Type_.Unlock _
+              | Tjc.Job.Type_.Push -> false
+            in
+            let to_run, applied = if reset then (dirspaces, []) else (to_run, applied) in
             (* The files of a dirspace decide whether it is still applied, and no longer the sha of
                the work manifest.  Thus a push which does not touch a dirspace keeps it applied and
                the evaluation stays at the layer it reached. *)
