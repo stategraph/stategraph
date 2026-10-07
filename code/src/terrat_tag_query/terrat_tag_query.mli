@@ -52,6 +52,11 @@ val match_ : ctx:Ctx.t -> tag_set:Terrat_tag_set.t -> t -> bool
     matches everything, answers false. *)
 val selects_dirspaces_only : t -> bool
 
+(** Whether the query is the empty query, the match-all a comment carries when it named no tag
+    query. A plain [terrateam plan] parses to it, and it is the query for which the reset rule of a
+    plain plan fires. *)
+val is_empty : t -> bool
+
 (** Whether the query holds an [outputs:] or a [relative_outputs:] term. Only such a query can prune
     a dependent when the outputs of its dependency did not change. *)
 val uses_outputs : t -> bool
