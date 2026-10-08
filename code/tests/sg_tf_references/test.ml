@@ -1326,6 +1326,45 @@ let split_remote_state_test =
    [module.<name>.output.<attr>], which the subgraph traversal matches
    directly against the child output node. *)
 
+(* [names_a_node] is what the apply uses to drop an edge whose address points at nothing, and it
+   replaced [ref not like '%.*'] in [update_state_apply_tx.sql] -- RFD 1008 forbids SQL matching an
+   identifier as text.
+
+   The two cases must not be confused, and the second is why [is_wildcard] could not be used.  A
+   splat at the end of what the address consumes gives an address no node has; a splat anywhere
+   else leaves an address that names a node perfectly well, and dropping that edge would reify too
+   little.  The pairs below are exactly the rule, stated against the address each one produces. *)
+let names_a_node_rule =
+  Oth.test ~name:"names_a_node_rule" (fun _ ->
+      let case ~ref_ ~expect_address ~expect_names =
+        Oth.Assert.Eq.string
+          ~expected:expect_address
+          ~actual:(CCOption.get_or ~default:"<none>" (Sg_tf_references.address_of_reference ref_));
+        Oth.Assert.eq
+          ~eq:Bool.equal
+          ~pp:Format.pp_print_bool
+          expect_names
+          (Sg_tf_references.names_a_node ref_)
+      in
+      (* The splat ends the consumed address: no node is called [module.X.output.*]. *)
+      case
+        ~ref_:[ "module"; "child"; "*" ]
+        ~expect_address:"module.child.output.*"
+        ~expect_names:false;
+      (* The splat is beyond the address, which stops at the resource.  This edge is kept today and
+         must stay kept: [is_wildcard] would have dropped it. *)
+      case
+        ~ref_:[ "aws_instance"; "web"; "*"; "id" ]
+        ~expect_address:"aws_instance.web"
+        ~expect_names:true;
+      (* Ordinary reads, for contrast. *)
+      case ~ref_:[ "local"; "cfg" ] ~expect_address:"local.cfg" ~expect_names:true;
+      case
+        ~ref_:[ "module"; "child"; "out" ]
+        ~expect_address:"module.child.output.out"
+        ~expect_names:true;
+      ())
+
 let addresses_module_output =
   Oth.test ~name:"addresses_module_output" (fun _ ->
       let refs = rs_of_list [ [ "module"; "child"; "output_abc123" ] ] in
@@ -1360,7 +1399,13 @@ let addresses_module_bare =
       ())
 
 let addresses_module_truncation_test =
-  Oth.serial [ addresses_module_output; addresses_module_output_multiple; addresses_module_bare ]
+  Oth.serial
+    [
+      names_a_node_rule;
+      addresses_module_output;
+      addresses_module_output_multiple;
+      addresses_module_bare;
+    ]
 
 let selectors_of_string s =
   let values = Oth.Assert.ok_pp ~pp:Hcl_ast.pp_err (Hcl_ast.of_string s) in

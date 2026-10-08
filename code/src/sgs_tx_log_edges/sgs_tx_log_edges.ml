@@ -38,7 +38,7 @@ let edges_of_references ~module_address ~from_depends_on ~selectors refs =
     | Some (Sg_tf_references.Selector.Key k) -> (`String "string", `String k)
     | Some (Sg_tf_references.Selector.Index n) -> (`String "int", `Int n)
   in
-  let edge ?selector ~to_addr ~attr_path ~resolvable () =
+  let edge ?selector ?(names_a_node = true) ~to_addr ~attr_path ~resolvable () =
     let index_kind, index_val = index_of_selector selector in
     {
       Edge.to_addr;
@@ -46,6 +46,14 @@ let edges_of_references ~module_address ~from_depends_on ~selectors refs =
       index_kind;
       index_val;
       is_bare = CCList.is_empty attr_path;
+      (* Whether [to_addr] names a node.  Derived beside the address it describes, by
+         {!Sg_tf_references.names_a_node}, so that the apply can drop an edge which points at
+         nothing without matching the address as text -- RFD 1008 forbids that of SQL.
+
+         It defaults to true here and reads as true when absent downstream, because absent is what a
+         transaction an older client staged has, and the rule this replaces kept every edge whose
+         address it could not fault. *)
+      names_a_node = Some names_a_node;
       resolvable;
       from_depends_on;
     }
@@ -85,7 +93,13 @@ let edges_of_references ~module_address ~from_depends_on ~selectors refs =
           let attr_path = Sg_tf_references.attr_path_of_reference ref_ in
           let selector = selector_of ref_ in
           let base_edge =
-            edge ?selector ~to_addr:(qualify base_addr) ~attr_path ~resolvable:true ()
+            edge
+              ?selector
+              ~names_a_node:(Sg_tf_references.names_a_node ref_)
+              ~to_addr:(qualify base_addr)
+              ~attr_path
+              ~resolvable:true
+              ()
           in
           let extra =
             CCOption.map_or

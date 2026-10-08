@@ -19,6 +19,9 @@
         "is_bare": {
           "type": "boolean"
         },
+        "names_a_node": {
+          "type": "boolean"
+        },
         "resolvable": {
           "type": "boolean"
         },

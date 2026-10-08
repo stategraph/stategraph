@@ -240,7 +240,7 @@ hcl as not materialized (
     h.created_at as created_at,
     h.data as data,
     h.file_refs as file_refs,
-    h.hints as hints,
+    hh.expanded as hints,
     h.id as id,
     h.module_address as module_address,
     h.module_source as module_source,
@@ -251,6 +251,9 @@ hcl as not materialized (
   from hcl as h
   inner join states as s
     on s.id = h.state_id
+  left join hcl_hints as hh
+    on hh.state_id = h.state_id
+   and hh.id = h.id
 ),
 hcl_refs as not materialized (
   select

@@ -16,6 +16,7 @@ type t = {
   index_kind : Index_kind.t;
   index_val : Index_val.t;
   is_bare : bool;
+  names_a_node : bool option; [@default None]
   resolvable : bool;
   to_addr : string;
 }
