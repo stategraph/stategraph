@@ -527,6 +527,9 @@ let migrations =
        transaction.  [hcl.hints] cannot hold them without breaking the property that no runtime code
        writes an [hcl] row outside [tx_rows]. *)
     ("add-hcl-hints-tables", run_sql [%blob "./migrations/2026-09-18-add-hcl-hints-tables.sql"]);
+    (* RFD 1008 Phase 1: [tf_modules], [tf_module_hcl] and [tf_module_hcl_refs].  The place where a
+       module body lives once, whatever calls it.  Nothing writes them until Phase 2. *)
+    ("add-tf-module-tables", run_sql [%blob "./migrations/2026-09-23-add-tf-module-tables.sql"]);
   ]
 
 let run config storage = Mig.run { Migrate.config; storage; tx = () } migrations

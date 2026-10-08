@@ -222,6 +222,46 @@ let stategraph_tables =
             make ~name:"from_depends_on" ~type_:Type_.Bool ();
           ];
       Table.make
+        ~name:"tf_modules"
+        Column.
+          [
+            make ~name:"state_id" ~type_:Type_.Uuid ();
+            make ~name:"source" ~type_:Type_.Text ();
+            make ~name:"version" ~type_:Type_.Text ();
+            make ~name:"created_at" ~type_:Type_.Timestamptz ();
+          ];
+      Table.make
+        ~name:"tf_module_hcl"
+        Column.
+          [
+            make ~name:"state_id" ~type_:Type_.Uuid ();
+            make ~name:"source" ~type_:Type_.Text ();
+            make ~name:"version" ~type_:Type_.Text ();
+            make ~name:"id" ~type_:Type_.Text ();
+            make ~name:"fq_address" ~type_:Type_.Text ();
+            make ~name:"data" ~type_:Type_.Jsonb ();
+            make ~name:"refs" ~type_:(Type_.Complex "text[]") ();
+            make ~name:"path_attrs" ~type_:Type_.Jsonb ();
+            make ~name:"created_at" ~type_:Type_.Timestamptz ();
+            make ~name:"updated_at" ~type_:Type_.Timestamptz ();
+          ];
+      Table.make
+        ~name:"tf_module_hcl_refs"
+        Column.
+          [
+            make ~name:"state_id" ~type_:Type_.Uuid ();
+            make ~name:"source" ~type_:Type_.Text ();
+            make ~name:"version" ~type_:Type_.Text ();
+            make ~name:"id" ~type_:Type_.Text ();
+            make ~name:"ref" ~type_:Type_.Text ();
+            make ~name:"attr_path" ~type_:(Type_.Complex "text[]") ();
+            make ~name:"index_kind" ~type_:Type_.Text ();
+            make ~name:"index_val" ~type_:Type_.Jsonb ();
+            make ~name:"is_bare" ~type_:Type_.Bool ();
+            make ~name:"resolvable" ~type_:Type_.Bool ();
+            make ~name:"from_depends_on" ~type_:Type_.Bool ();
+          ];
+      Table.make
         ~name:"files"
         Column.
           [
