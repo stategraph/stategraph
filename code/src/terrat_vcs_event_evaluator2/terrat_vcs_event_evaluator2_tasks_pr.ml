@@ -1644,8 +1644,14 @@ struct
                      only reached by a job that had dirspaces to run, so without
                      this a pull request whose automerge failed once can never be
                      merged by any later command.  The no-match cases are left
-                     alone: a mistyped tag query must not merge a pull request. *)
-                  (if all_changes_applied then fetch Keys.maybe_automerge else Abbs_fc.return_ok ())
+                     alone: a mistyped tag query must not merge a pull request.
+                     The query is not enough on its own either: it says nothing
+                     about the dirspaces it did not select, so the whole pull
+                     request has to be applied -- the same guard the completion
+                     path uses. *)
+                  (if all_changes_applied && CCList.flatten all_unapplied_matches = [] then
+                     fetch Keys.maybe_automerge
+                   else Abbs_fc.return_ok ())
                   >>? fun () -> Error `Noop
               | _ :: _ ->
                   fetch Keys.repo
@@ -1726,8 +1732,15 @@ struct
                   >>= fun ((), ()) ->
                   (* Same reason as [check_dirspaces_to_plan]: an explicit apply
                      over dirspaces that are all applied is how a user retries a
-                     failed automerge, so it has to reach the automerge logic. *)
-                  (if all_changes_applied then fetch Keys.maybe_automerge else Abbs_fc.return_ok ())
+                     failed automerge, so it has to reach the automerge logic.
+                     The query alone is not that test: it selects nothing about
+                     the dirspaces it did not name, so a second apply of an
+                     applied workspace merged a pull request whose other
+                     workspaces were never applied.  The whole pull request has
+                     to be applied, the same guard as the completion path. *)
+                  (if all_changes_applied && CCList.flatten all_unapplied_matches = [] then
+                     fetch Keys.maybe_automerge
+                   else Abbs_fc.return_ok ())
                   >>? fun () -> Error `Noop
               | _ :: _ -> Abbs_fc.return_ok ())
           | _ -> Abbs_fc.return_ok ())
