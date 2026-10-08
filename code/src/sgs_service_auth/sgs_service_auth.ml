@@ -59,7 +59,9 @@ module Make (Cloud : Sgs_cloud.S) = struct
 
   (* The oauth2-proxy process, when OAuth is configured and the process started. *)
   type t = Sgs_service_auth_oauth2_proxy.t option
+  type 'a Sgs_service.ty += Ty : t Sgs_service.ty
 
+  let ty = Ty
   let name = "auth"
 
   (* A failure to spawn oauth2-proxy does not stop the server: it serves without OAuth, as logged. *)

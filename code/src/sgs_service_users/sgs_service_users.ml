@@ -44,7 +44,9 @@ module Rt = struct
 end
 
 type t = unit
+type 'a Sgs_service.ty += Ty : t Sgs_service.ty
 
+let ty = Ty
 let name = "users"
 let start _ _ = Abbs_fc.return_ok ()
 

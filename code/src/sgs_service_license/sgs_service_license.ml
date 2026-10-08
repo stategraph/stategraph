@@ -38,6 +38,16 @@ end
 
 module Make (L : LICENSE) = struct
   type t = unit
+  type 'a Sgs_service.ty += Ty : t Sgs_service.ty
+
+  let ty = Ty
+
+  (* The [Ty] match proves that the packed state has type [t]. *)
+  let of_started (Sgs_service.Started (m, v)) : t option =
+    let module M = (val m) in
+    match M.ty with
+    | Ty -> Some v
+    | _ -> None
 
   let name = "license"
 

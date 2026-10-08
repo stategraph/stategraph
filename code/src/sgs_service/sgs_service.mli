@@ -9,12 +9,19 @@ type route = Brtl_rtng.Method.t * Brtl_rtng.Handler.t Brtl_rtng.Route.Route.t
 (** Why a service refuses to start, told to the operator: the server logs it and exits. *)
 type start_err = [ `Start_err of string ]
 
+(** A service's witness at the type level: each service adds its own constructor, indexed at its own
+    [t]. A match on the witness of a started service tells which service it is. *)
+type 'a ty = ..
+
 module type S = sig
   (** The running service. *)
   type t
 
   (** The service's name. *)
   val name : string
+
+  (** The witness of the service: its constructor is indexed at [t]. *)
+  val ty : t ty
 
   (** Start the service before the listener, or refuse to. *)
   val start : Sgs_config.t -> Sgs_storage.t -> (t, start_err) result Abb.Future.t

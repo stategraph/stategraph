@@ -1,0 +1,275 @@
+#!/bin/sh
+
+sleep 5
+
+if [ "$DISABLE_IPV6" = "1" ]; then
+  export IPV6_LISTEN=""
+else
+  export IPV6_LISTEN="listen [::]:8080;"
+fi
+
+if [ -z "$STATEGRAPH_ACCESS_LOG" ]; then
+    export STATEGRAPH_ACCESS_LOG="off"
+fi
+
+if [ -z "$STATEGRAPH_CLIENT_MAX_BODY_SIZE" ]; then
+    export STATEGRAPH_CLIENT_MAX_BODY_SIZE="512m"
+fi
+
+# The console creates a GitHub App by posting a form to GitHub's own domain, so
+# form-action must name it. GITHUB_WEB_BASE_URL is the same variable the server
+# and the engine read, so GitHub Enterprise is covered by setting it once.
+export STATEGRAPH_GITHUB_WEB_BASE="${GITHUB_WEB_BASE_URL:-https://github.com}"
+
+# The rule lives in orchestration-enabled, which the image CMD asks too.
+if orchestration-enabled; then
+    STATEGRAPH_ORCHESTRATION_ON=1
+else
+    STATEGRAPH_ORCHESTRATION_ON=0
+fi
+
+# Google Tag Manager (GTM-ND4RB8T8). Only inject in COMMUNISM mode
+# (the hosted multi-tenant substrate); self-hosted deployments get nothing.
+# The head snippet uses only single quotes (wrapped in double quotes) and the
+# noscript only double quotes (wrapped in single quotes) so neither needs
+# escaping in the nginx config. sub_filter_once keeps a single injection.
+if [ "$STATEGRAPH_MODE" = "COMMUNISM" ]; then
+    export STATEGRAPH_GTM_SUB_FILTER="sub_filter '<head>' \"<head><!-- Google Tag Manager --><script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-ND4RB8T8');</script><!-- End Google Tag Manager -->\";
+            sub_filter '</body>' '<!-- Google Tag Manager (noscript) --><noscript><iframe src=\"https://www.googletagmanager.com/ns.html?id=GTM-ND4RB8T8\" height=\"0\" width=\"0\" style=\"display:none;visibility:hidden\"></iframe></noscript><!-- End Google Tag Manager (noscript) --></body>';
+            sub_filter_once on;"
+else
+    export STATEGRAPH_GTM_SUB_FILTER=""
+fi
+
+# Orchestration engine routes: terrat is reachable at its NATIVE paths -- the
+# same /api/github/v1/events etc. as the standalone terrat image, so webhook
+# URLs do not change when migrating to the unified image. Only the
+# machine-facing surface is routed: VCS webhooks/callbacks, the runner API
+# (work-manifests, plans, tenv, infracost), the KV store, and the
+# access-token lifecycle (bearer-authenticated). Everything else under /api
+# stays with stategraph -- the console uses stategraph endpoints.
+# The GitLab twins of the kv/access-token entries need no lines of their own:
+# they mount under /api/v1/gitlab, which is routed wholesale.
+# This list is guarded by code/tests/nginx_terrat_routes; update both
+# together.
+# Rendered only when orchestration is enabled; empty otherwise, so the config
+# matches a pre-orchestration image.
+# Escaped \$vars are nginx runtime variables; unescaped ones expand here.
+#
+# One terrat-proxied location. $1 is the location argument: a path prefix, or
+# a named location such as @terrat. Every terrat location uses this body.
+terrat_location() {
+    cat <<EOF
+
+        location $1 {
+            limit_conn stategraph_app 3000;
+            limit_req zone=client_limit burst=5000;
+
+            proxy_pass http://127.0.0.1:8181;
+            proxy_set_header X-Forwarded-For \$remote_addr;
+            proxy_set_header X-Forwarded-Base "${TERRAT_UI_BASE:-}";
+
+            proxy_buffer_size 128k;
+            proxy_buffers 4 256k;
+            proxy_busy_buffers_size 256k;
+
+            client_max_body_size ${STATEGRAPH_CLIENT_MAX_BODY_SIZE};
+
+            proxy_read_timeout 120;
+
+            add_header Cache-Control "no-store" always;
+
+            # Proof that the front door reached terrat and not stategraph.
+            # Cache-Control used to carry that signal, but stategraph's own /api
+            # sets no-store now (#2162), so the marker needs a header only these
+            # blocks emit. Asserted by e2e_tests_orchestration.
+            add_header X-Stategraph-Route "orchestration" always;
+
+            # This block declares add_header of its own, so nginx drops every
+            # directive inherited from the server block; repeat them here. See
+            # docker/stategraph/nginx.conf.template.
+            add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+            add_header X-Frame-Options "DENY" always;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+            add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        }
+EOF
+}
+
+case "$STATEGRAPH_ORCHESTRATION_ON" in
+    1)
+        STATEGRAPH_TERRAT_ROUTES=""
+        for prefix in \
+            /api/github \
+            /api/gitlab \
+            /api/v1/gitlab \
+            /api/v1/github/kv \
+            /api/v1/github/access-token \
+            /api/v1/access-token; do
+            STATEGRAPH_TERRAT_ROUTES="$STATEGRAPH_TERRAT_ROUTES$(terrat_location "$prefix")"
+        done
+        # Extra server directives. @terrat is for requests that a js_content
+        # handler passes on.
+        if [ -n "$TERRAT_NGINX_SERVER_CONFIG" ]; then
+            STATEGRAPH_TERRAT_ROUTES="$STATEGRAPH_TERRAT_ROUTES$(terrat_location @terrat)
+
+$TERRAT_NGINX_SERVER_CONFIG"
+        fi
+        export STATEGRAPH_TERRAT_ROUTES
+        ;;
+    *)
+        export STATEGRAPH_TERRAT_ROUTES=""
+        ;;
+esac
+
+# The iris server block: the Terrateam console on the host of TERRAT_UI_BASE.
+# It serves the same SPA, from the same asset root, as the standalone terrat
+# image. iris reads its API from a relative path, so this block sends all of
+# /api to terrat; the console host above keeps its prefix list, because there
+# stategraph owns everything the list does not name.
+# Its location / mirrors the server block of docker/terrat/nginx.conf.template:
+# the same %TERRATEAM_*% substitutions and the same Content-Security-Policy.
+# code/tests/nginx_terrat_routes fails when the two differ.
+# Rendered only when orchestration is enabled and TERRAT_UI_BASE names a host
+# of its own; empty otherwise, so the config matches a pre-iris image.
+# Escaped \$vars are nginx runtime variables; unescaped ones expand here.
+STATEGRAPH_IRIS_SERVER=""
+case "$STATEGRAPH_ORCHESTRATION_ON" in
+    1)
+        # The host of the URL in lowercase, without scheme, path or port. nginx
+        # removes the port from the Host header and compares the rest with
+        # server_name without case. An IPv6 literal keeps its brackets.
+        host_of() {
+            _host_of_h="${1#*://}"
+            _host_of_h="${_host_of_h%%/*}"
+            case "$_host_of_h" in
+                \[*) _host_of_h="${_host_of_h%%]*}]" ;;
+                *) _host_of_h="${_host_of_h%%:*}" ;;
+            esac
+            printf '%s' "$_host_of_h" | tr '[:upper:]' '[:lower:]'
+        }
+        # The host iris is served on: the host of $1 (TERRAT_UI_BASE), or
+        # nothing when $1 is unset or names the console host. One host serves
+        # one console. The console block answers the host of $2
+        # (STATEGRAPH_UI_BASE) only as the default server, so an iris block
+        # that names that host would take its requests, and one that names
+        # localhost would repeat the console block's server_name, which nginx
+        # ignores. Either way that host keeps hermes.
+        # code/tests/nginx_terrat_routes runs these two functions under sh;
+        # keep them self-contained.
+        iris_host_of() {
+            _iris_host_of_iris=$(host_of "$1")
+            _iris_host_of_console=$(host_of "$2")
+            if [ -z "$_iris_host_of_iris" ]; then
+                :
+            elif [ "$_iris_host_of_iris" = "$_iris_host_of_console" ] || [ "$_iris_host_of_iris" = "localhost" ]; then
+                echo "TERRAT_UI_BASE names the console host ($_iris_host_of_iris); serving hermes there, not iris" >&2
+            else
+                printf '%s' "$_iris_host_of_iris"
+            fi
+        }
+        iris_host=$(iris_host_of "${TERRAT_UI_BASE:-}" "${STATEGRAPH_UI_BASE:-}")
+        if [ -n "$iris_host" ]; then
+            STATEGRAPH_IRIS_SERVER=$(cat <<EOF
+    server {
+        listen       8080;
+        ${IPV6_LISTEN}
+
+        server_name  ${iris_host};
+        access_log   ${STATEGRAPH_ACCESS_LOG};
+        server_tokens off;
+
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+        location / {
+            set \$cspNonce '\$request_id';
+            sub_filter_once off;
+            sub_filter_types *;
+            sub_filter 'NGINX_CSP_NONCE' '\$cspNonce';
+
+            sub_filter '%TERRATEAM_UI_ANALYTICS%' '${TERRATEAM_UI_ANALYTICS:-}';
+            sub_filter '%TERRATEAM_UI_SUBSCRIPTION%' '${TERRATEAM_UI_SUBSCRIPTION:-}';
+            sub_filter '%TERRATEAM_MAINTENANCE%' '${TERRATEAM_MAINTENANCE:-}';
+            sub_filter '%TERRATEAM_MAINTENANCE_MESSAGE%' '${TERRATEAM_MAINTENANCE_MESSAGE:-}';
+            sub_filter '%TERRATEAM_UPGRADE_NUDGES%' '${TERRATEAM_UPGRADE_NUDGES:-}';
+            sub_filter '%TERRATEAM_UI_STRIPE_PUBLISHABLE_KEY%' '${TERRATEAM_UI_STRIPE_PUBLISHABLE_KEY:-}';
+            sub_filter '%TERRATEAM_UI_STRIPE_PRICING_TABLE_ID%' '${TERRATEAM_UI_STRIPE_PRICING_TABLE_ID:-}';
+
+            root /usr/local/share/terrat/ui/assets/;
+            index index.html index.htm;
+            try_files \$uri \$uri/ /index.html =404;
+
+            add_header Content-Security-Policy "default-src 'self'; img-src 'self' https://avatars.githubusercontent.com https://secure.gravatar.com https://www.redditstatic.com https://alb.reddit.com; script-src 'self' 'nonce-\$cspNonce' https://*.posthog.com https://www.redditstatic.com https://js.stripe.com; style-src 'self' 'nonce-\$cspNonce'; object-src 'none'; connect-src 'self' https://*.posthog.com https://o4509570379677696.ingest.de.sentry.io https://api.web3forms.com https://alb.reddit.com https://pixel-config.reddit.com https://conversions-config.reddit.com https://www.redditstatic.com; font-src 'self'; worker-src 'self' blob:; frame-src https://js.stripe.com; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; manifest-src 'self'; media-src 'none'; upgrade-insecure-requests;";
+            add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+            add_header X-Frame-Options "DENY" always;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+            add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+            add_header Cache-Control \$stategraph_document_cache_control always;
+        }
+
+        # The console host's terrat locations, so a request to one of those
+        # prefixes is handled the same on both hosts. Their prefixes are longer
+        # than /api, so they win over it.
+        ${STATEGRAPH_TERRAT_ROUTES}
+
+        location /api {
+            limit_conn stategraph_app 3000;
+            limit_req zone=client_limit burst=5000;
+
+            proxy_pass http://127.0.0.1:8181;
+            proxy_set_header X-Forwarded-For \$remote_addr;
+            proxy_set_header X-Forwarded-Base "${TERRAT_UI_BASE:-}";
+
+            proxy_buffer_size 128k;
+            proxy_buffers 4 256k;
+            proxy_busy_buffers_size 256k;
+
+            client_max_body_size ${STATEGRAPH_CLIENT_MAX_BODY_SIZE};
+
+            proxy_read_timeout 120;
+
+            add_header Cache-Control "no-store" always;
+
+            # Proof that the front door reached terrat and not stategraph, the
+            # same marker the console host puts on its terrat routes.
+            add_header X-Stategraph-Route "orchestration" always;
+
+            add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+            add_header X-Frame-Options "DENY" always;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+            add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        }
+
+        # The probes of the console host, so a probe gets the same answer on
+        # either host.
+        location = /health/live {
+            access_log off;
+            return 200 'ok';
+        }
+
+        location = /health/ready {
+            proxy_pass http://127.0.0.1:8180/api/v1/health;
+            proxy_set_header X-Forwarded-For \$remote_addr;
+        }
+    }
+EOF
+)
+        fi
+        ;;
+esac
+export STATEGRAPH_IRIS_SERVER
+
+# Graceful-shutdown bound for the nginx workers. Must stay below
+# runit-init's NGINX_SHUTDOWN_WAIT; see nginx.conf.template.
+export NGINX_WORKER_SHUTDOWN_TIMEOUT="${NGINX_WORKER_SHUTDOWN_TIMEOUT:-35}"
+
+mkdir -p /run/nginx
+envsubst '$NGINX_WORKER_SHUTDOWN_TIMEOUT $STATEGRAPH_UI_BASE $IPV6_LISTEN $STATEGRAPH_ACCESS_LOG $STATEGRAPH_CLIENT_MAX_BODY_SIZE $STATEGRAPH_GTM_SUB_FILTER $STATEGRAPH_GITHUB_WEB_BASE $STATEGRAPH_TERRAT_ROUTES $STATEGRAPH_IRIS_SERVER' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
+exec /usr/sbin/nginx -c /etc/nginx/nginx.conf

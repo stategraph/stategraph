@@ -1,10 +1,12 @@
 type route = Brtl_rtng.Method.t * Brtl_rtng.Handler.t Brtl_rtng.Route.Route.t
 type start_err = [ `Start_err of string ]
+type 'a ty = ..
 
 module type S = sig
   type t
 
   val name : string
+  val ty : t ty
   val start : Sgs_config.t -> Sgs_storage.t -> (t, start_err) result Abb.Future.t
   val routes : t -> Sgs_config.t -> Sgs_storage.t -> route list
   val stop : t -> unit Abb.Future.t

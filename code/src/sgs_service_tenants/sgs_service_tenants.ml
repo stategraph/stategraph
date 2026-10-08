@@ -81,7 +81,9 @@ module Make (Cloud : Sgs_cloud.S) = struct
   module Ep_invitation_reissue = Sgs_service_tenants_ep_invitation_reissue.Make (Cloud)
 
   type t = unit
+  type 'a Sgs_service.ty += Ty : t Sgs_service.ty
 
+  let ty = Ty
   let name = "tenants"
   let start _ _ = Abbs_fc.return_ok ()
 
