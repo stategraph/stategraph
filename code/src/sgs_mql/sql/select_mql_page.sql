@@ -270,6 +270,52 @@ hcl_refs as not materialized (
   inner join states as s
     on s.id = hr.state_id
 ),
+-- RFD 1008 Phase 1.  The module tables join the [states] anchor directly, the
+-- same as [hcl] and [hcl_refs], and not through the [tf_modules] CTE: a leaf
+-- joins only a materialised anchor.
+tf_modules as not materialized (
+  select
+    tm.state_id as state_id,
+    tm.source as source,
+    tm.version as version,
+    tm.created_at as created_at
+  from tf_modules as tm
+  inner join states as s
+    on s.id = tm.state_id
+),
+tf_module_hcl as not materialized (
+  select
+    tmh.state_id as state_id,
+    tmh.source as source,
+    tmh.version as version,
+    tmh.id as id,
+    tmh.fq_address as fq_address,
+    tmh.data as data,
+    tmh.refs as refs,
+    tmh.path_attrs as path_attrs,
+    tmh.created_at as created_at,
+    tmh.updated_at as updated_at
+  from tf_module_hcl as tmh
+  inner join states as s
+    on s.id = tmh.state_id
+),
+tf_module_hcl_refs as not materialized (
+  select
+    tmr.state_id as state_id,
+    tmr.source as source,
+    tmr.version as version,
+    tmr.id as id,
+    tmr.ref as ref,
+    coalesce(tmr.attr_path, '{}'::text[]) as attr_path,
+    tmr.index_kind as index_kind,
+    coalesce(tmr.index_val, 'null'::jsonb) as index_val,
+    tmr.is_bare as is_bare,
+    tmr.resolvable as resolvable,
+    tmr.from_depends_on as from_depends_on
+  from tf_module_hcl_refs as tmr
+  inner join states as s
+    on s.id = tmr.state_id
+),
 files as not materialized (
   select
     f.state_id as state_id,
