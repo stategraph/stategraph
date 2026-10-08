@@ -1,0 +1,410 @@
+#!/usr/bin/env python3
+#
+# Orchestration-engine launcher (runit), for the unified stategraph-server
+# image. Derived from docker/terrat/service/terrat, which stays with the
+# standalone terrat images until those are decommissioned (#1442 Phase 6).
+#
+# Orchestration is opt-in. The image CMD (docker/stategraph/Dockerfile) marks
+# this service `down` unless STATEGRAPH_ORCHESTRATION_ENABLED is true, so we
+# are never started when orchestration is off -- same pattern as
+# pricing-service.
+#
+# Both servers read DB_* for different logical databases, so this script
+# bridges TERRAT_DB_* over its own process env before exec; the database name
+# defaults to "terrateam". TERRAT_PORT defaults to 8181 (8180 is stategraph's
+# port in this image).
+
+import os
+import subprocess
+import sys
+import time
+
+import requests
+
+TERRAT_API_BASE = 'TERRAT_API_BASE'
+
+# On migrate/bootstrap failure, sleep before exiting so runit restarts us at a
+# sane cadence instead of hot-looping against a broken database.
+FAILURE_BACKOFF_SECONDS = 30
+
+# Least-privilege FDW role (the stategraph side's user mapping authenticates
+# as it) and the catalog-generated column-level grants baked into the image.
+FDW_ROLE = 'stategraph_mql'
+FDW_GRANTS_PATH = '/usr/local/share/stategraph/fdw_grants.sql'
+
+# Narrow write role for console-driven provisioning: the stategraph admin FDW
+# channel authenticates as it. Its privileges are hand-specified (not generated
+# from the catalog) and scoped to exactly the provisioning tables. Kept minimal
+# on purpose -- this is the only write path from the console into terrateam.
+PROV_ROLE = 'stategraph_provisioner'
+
+
+def bridge_db_env():
+    # TERRAT_DB_NAME intentionally does NOT fall back to DB_NAME: that is the
+    # stategraph database, and running terrat migrations against it would be
+    # worse than failing to boot.
+    os.environ['DB_NAME'] = os.environ.get('TERRAT_DB_NAME', 'terrateam')
+    for terrat_key, key in [
+        ('TERRAT_DB_HOST', 'DB_HOST'),
+        ('TERRAT_DB_PORT', 'DB_PORT'),
+        ('TERRAT_DB_USER', 'DB_USER'),
+        ('TERRAT_DB_PASS', 'DB_PASS'),
+    ]:
+        if terrat_key in os.environ:
+            os.environ[key] = os.environ[terrat_key]
+
+
+def setup_environment():
+    if 'GITHUB_APP_PEM' in os.environ:
+        os.environ['GITHUB_APP_PEM'] = os.environ['GITHUB_APP_PEM'].replace('\\n', '\n')
+    os.environ['TERRAT_PYTHON_EXEC'] = '/usr/bin/python3'
+    os.environ['OCAMLRUNPARAM'] = 'b'
+    os.environ['NGINX_STATUS_URI'] = 'http://localhost:8080/nginx_status'
+    os.environ.setdefault('TERRAT_PORT', '8181')
+    os.environ.setdefault('GITHUB_API_BASE_URL', 'https://api.github.com')
+    os.environ.setdefault('INFRACOST_PRICING_API_ENDPOINT', '')
+    os.environ.setdefault('SELF_HOSTED_INFRACOST_API_KEY', '')
+
+
+REQUIRED_DB_ENV_KEYS = ['DB_HOST', 'DB_USER', 'DB_PASS', 'DB_NAME']
+
+
+def assert_required_db_env():
+    missing = [k for k in REQUIRED_DB_ENV_KEYS if not os.environ.get(k)]
+    if missing:
+        fail_with_backoff(
+            'Missing database environment variables: {} '
+            '(set TERRAT_DB_* or DB_*)'.format(' '.join(missing)))
+
+
+def assert_github_webhook_secret():
+    # terrat skips webhook HMAC verification entirely when the secret is
+    # unset, and /api/github/v1/events is publicly routed through the front
+    # door -- fail-open is not an acceptable default for this image. Empty is
+    # rejected too: an empty secret HMACs with an empty key and silently
+    # rejects every webhook instead. The predicate mirrors
+    # terrat_config.load_github: an empty GITHUB_APP_ID means no GitHub
+    # service, so compose variable interpolation cannot trip this. An App the
+    # console creates always carries a secret, so this guards the environment
+    # path only. Standalone terrat images stay fail-open for now (deliberate:
+    # enforcing the secret in terrat_config.github_of_parts -- where the
+    # durable fix belongs, since it is the one chokepoint both paths share --
+    # would break existing OSS deployments that run without one).
+    # .github/workflows/unified-image.yml boots the image without the secret,
+    # greps the "GITHUB_WEBHOOK_SECRET must be set" sentence, and expects it on
+    # every runit restart: rewording the sentence or not exiting fails that CI.
+    if os.environ.get('GITHUB_APP_ID') and not os.environ.get('GITHUB_WEBHOOK_SECRET'):
+        detail = ('it is set but empty, and an empty HMAC key rejects every webhook'
+                  if 'GITHUB_WEBHOOK_SECRET' in os.environ
+                  else 'without it terrat accepts unsigned webhook events')
+        fail_with_backoff(
+            f'GITHUB_WEBHOOK_SECRET must be set when GITHUB_APP_ID is set: {detail}. '
+            "Set it to the same value configured under the GitHub App's Webhook -> Secret")
+
+
+def psql(dbname, command, variables=None):
+    # The maintenance connection uses the bridged DB_* values, so it reaches
+    # the same Postgres the migrations will. PGCONNECT_TIMEOUT bounds the TCP
+    # connect (libpq's default is unbounded, so a black-holed host would hang
+    # each probe for minutes); the subprocess timeout is the backstop.
+    # Values in [variables] are passed via psql's --set and referenced as
+    # :'var' (literal) or :"var" (identifier), so quoting is psql's problem.
+    # The SQL goes in on stdin, NOT via --command: psql only interpolates
+    # variables in stdin/-f input. ON_ERROR_STOP makes SQL errors exit
+    # non-zero on the stdin path.
+    argv = [
+        '/usr/bin/psql',
+        '--no-psqlrc',
+        '--no-password',
+        '--tuples-only',
+        '--no-align',
+        '--set', 'ON_ERROR_STOP=1',
+        '--host', os.environ['DB_HOST'],
+        '--port', os.environ.get('DB_PORT', '5432'),
+        '--username', os.environ['DB_USER'],
+        '--dbname', dbname,
+    ]
+    for key, value in (variables or {}).items():
+        argv += ['--set', f'{key}={value}']
+    try:
+        return subprocess.run(
+            argv,
+            input=command,
+            env={**os.environ,
+                 'PGPASSWORD': os.environ.get('DB_PASS', ''),
+                 'PGCONNECT_TIMEOUT': '5'},
+            capture_output=True,
+            text=True,
+            timeout=30)
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(
+            argv, returncode=124, stdout='', stderr='psql timed out after 30s')
+
+
+def fail_with_backoff(message):
+    print(message, flush=True)
+    print(f'Backing off {FAILURE_BACKOFF_SECONDS}s before runit restarts us...', flush=True)
+    time.sleep(FAILURE_BACKOFF_SECONDS)
+    sys.exit(1)
+
+
+def wait_for_postgres():
+    # Bounded wait against the maintenance database ("postgres"), because the
+    # terrateam database may not exist yet on first boot. Returns which
+    # database answered: hardened setups may revoke CONNECT on the
+    # maintenance database, and if the terrateam database itself answers,
+    # that is good enough -- the caller then skips the existence check.
+    r = None
+    for _ in range(30):
+        r = psql('postgres', 'select 1')
+        if r.returncode == 0:
+            return 'postgres'
+        time.sleep(2)
+    if psql(os.environ['DB_NAME'], 'select 1').returncode == 0:
+        print('Maintenance database "postgres" is not connectable; '
+              f"proceeding against {os.environ['DB_NAME']} directly", flush=True)
+        return 'dbname'
+    fail_with_backoff(
+        f"Postgres at {os.environ['DB_HOST']}:{os.environ.get('DB_PORT', '5432')} "
+        f"is not reachable as {os.environ['DB_USER']}: {r.stderr.strip()}")
+
+
+def ensure_database():
+    # First boot: nothing else creates the terrateam logical database. Create
+    # it if it is missing; when the role lacks CREATEDB (managed Postgres),
+    # fail with the exact statement an operator must run.
+    dbname = os.environ['DB_NAME']
+    owner = os.environ['DB_USER']
+
+    def exists():
+        r = psql(
+            'postgres',
+            "select 1 from pg_database where datname = :'name'",
+            variables={'name': dbname})
+        if r.returncode != 0:
+            fail_with_backoff(f'Could not check for database {dbname}: {r.stderr.strip()}')
+        return r.stdout.strip() == '1'
+
+    if exists():
+        return
+    print(f'Database {dbname} does not exist; attempting to create it...', flush=True)
+    # OWNER matters: without it a superuser pasting the remediation statement
+    # would own the database, and on PG15+ the migrations would then fail on
+    # the public schema. Owning role = the role terrat connects as.
+    r = psql(
+        'postgres',
+        'create database :"name" owner :"owner"',
+        variables={'name': dbname, 'owner': owner})
+    if r.returncode == 0:
+        print(f'Created database {dbname}', flush=True)
+        return
+    if exists():
+        # Another replica won the create race; that is success, not a
+        # privilege failure.
+        print(f'Database {dbname} was created concurrently; continuing', flush=True)
+        return
+    fail_with_backoff(f"""FAILED to create database {dbname}: {r.stderr.strip()}
+The role {owner} likely lacks the CREATEDB privilege (common on managed Postgres). Create the database manually:
+    CREATE DATABASE "{dbname}" OWNER "{owner}";
+then restart this container (or wait for the next runit restart).""")
+
+
+def reconcile_fdw_role():
+    # Converge the terrateam database on exactly the catalog's column-level
+    # grants for the FDW role: create the role NOLOGIN if missing, revoke
+    # everything, re-grant from the generated file. Revoke-then-grant makes
+    # catalog shrinkage take effect too, and grants are a function of the
+    # catalog rather than frozen in migrations. LOGIN + password stay
+    # deployment-owned (compose initdb in dev, ALTER ROLE in prod) -- this
+    # never touches credentials.
+    dbname = os.environ['DB_NAME']
+
+    def role_exists():
+        r = psql(
+            dbname,
+            "select 1 from pg_roles where rolname = :'role'",
+            variables={'role': FDW_ROLE})
+        if r.returncode != 0:
+            fail_with_backoff(f'Could not check for role {FDW_ROLE}: {r.stderr.strip()}')
+        return r.stdout.strip() == '1'
+
+    if not role_exists():
+        print(f'Role {FDW_ROLE} does not exist; attempting to create it...', flush=True)
+        r = psql(dbname, f'create role {FDW_ROLE} nologin')
+        if r.returncode == 0:
+            print(f'Created role {FDW_ROLE}', flush=True)
+        elif role_exists():
+            # Another replica won the create race. Re-checking existence (as
+            # ensure_database does) is more robust than catching one SQLSTATE:
+            # a lost race can surface as duplicate_object OR a unique_violation
+            # on pg_authid, and either way the role is now present -- success,
+            # not a CREATEROLE-privilege failure.
+            print(f'Role {FDW_ROLE} was created concurrently; continuing', flush=True)
+        else:
+            fail_with_backoff(f"""FAILED to create the {FDW_ROLE} role: {r.stderr.strip()}
+The role {os.environ.get('DB_USER')} likely lacks CREATEROLE (common on managed Postgres). Create the role manually:
+    CREATE ROLE {FDW_ROLE} NOLOGIN;
+then restart this container (or wait for the next runit restart).""")
+
+    # Converge grants: revoke everything, re-grant schema usage, then apply
+    # the generated column-level SELECTs. Split from the create so a
+    # revoke/grant error is not misreported as a role-creation failure.
+    #
+    # The grants file is read and validated BEFORE touching the database, and
+    # the revoke + re-grant run in ONE transaction: concurrent FDW readers
+    # keep the previous grants until commit (no zero-grant window on every
+    # terrat boot), and any failure -- unreadable file, bad statement -- leaves
+    # the previous grants in place instead of a stripped role (ON_ERROR_STOP
+    # aborts the script and the connection drop discards the transaction).
+    try:
+        with open(FDW_GRANTS_PATH) as f:
+            grants = f.read()
+    except OSError as exn:
+        fail_with_backoff(f'FDW grants file {FDW_GRANTS_PATH} is unreadable: {exn}')
+    if not grants.strip():
+        # An empty file applies cleanly (psql exits 0) yet leaves the role with
+        # no SELECT -- MQL reads fail closed while the log claims success. Treat
+        # a truncated/mis-generated grants file as a hard failure.
+        fail_with_backoff(f'FDW grants file {FDW_GRANTS_PATH} is empty; refusing to apply')
+    # #2469: the MQL tenant scope reads work_manifests (id, repo), which is not
+    # in the catalog (see code/src/sgs_cli_lib/sql/fdw_scope_tables.sql). This grant is
+    # necessary only because the foreign data wrapper abstraction is leaky.
+    r = psql(dbname, f"""begin;
+revoke all privileges on all tables in schema public from {FDW_ROLE};
+grant usage on schema public to {FDW_ROLE};
+{grants}
+grant select (id, repo) on work_manifests to {FDW_ROLE};
+commit;
+""")
+    if r.returncode != 0:
+        fail_with_backoff(f'FAILED to converge {FDW_ROLE} grants: {r.stderr.strip()}')
+    print(f'FDW role {FDW_ROLE} reconciled with catalog grants', flush=True)
+
+
+def reconcile_provisioner_role():
+    # Converge the narrow write role used by the stategraph provisioning
+    # endpoints: create NOLOGIN if missing, revoke everything, then grant only
+    # what a GitLab-group provision needs -- INSERT/SELECT/UPDATE on
+    # gitlab_installations (INSERT writes the row, SELECT reads back the
+    # generated webhook_secret/state, UPDATE lets a later token rotation reuse
+    # the channel) and INSERT/SELECT on gitlab_installations_map (the AFTER-INSERT
+    # trigger insert_gitlab_installations_map() is SECURITY INVOKER, so its map
+    # insert runs as this role; SELECT reads the trigger-generated core_id back).
+    # github_app: INSERT writes the App the console created and DELETE removes
+    # it, which together are how a replace swaps the row; the column UPDATE is
+    # the credential rotation, which also clears loaded_at; the column SELECT gives sgs
+    # the OAuth client and the load state, never the PEM or the webhook secret.
+    # The console reaches all three through foreign tables that declare only the
+    # columns each statement touches; these grants are what actually enforce it.
+    # Revoke-then-grant is convergent; LOGIN + password stay deployment-owned.
+    # Same shape as reconcile_fdw_role above, for the same reasons.
+    dbname = os.environ['DB_NAME']
+
+    def role_exists():
+        r = psql(
+            dbname,
+            "select 1 from pg_roles where rolname = :'role'",
+            variables={'role': PROV_ROLE})
+        if r.returncode != 0:
+            fail_with_backoff(f'Could not check for role {PROV_ROLE}: {r.stderr.strip()}')
+        return r.stdout.strip() == '1'
+
+    if not role_exists():
+        print(f'Role {PROV_ROLE} does not exist; attempting to create it...', flush=True)
+        r = psql(dbname, f'create role {PROV_ROLE} nologin')
+        if r.returncode == 0:
+            print(f'Created role {PROV_ROLE}', flush=True)
+        elif role_exists():
+            # Another replica won the create race; re-checking existence
+            # covers both the duplicate_object and the pg_authid
+            # unique_violation form of the lost race.
+            print(f'Role {PROV_ROLE} was created concurrently; continuing', flush=True)
+        else:
+            fail_with_backoff(f"""FAILED to create the {PROV_ROLE} role: {r.stderr.strip()}
+The role {os.environ.get('DB_USER')} likely lacks CREATEROLE (common on managed Postgres). Create the role manually:
+    CREATE ROLE {PROV_ROLE} NOLOGIN;
+then restart this container (or wait for the next runit restart).""")
+
+    # Revoke + re-grant in ONE transaction, so an in-flight provisioning
+    # request never sees a zero-grant window on a terrat boot, and a failing
+    # statement leaves the previous grants in place (ON_ERROR_STOP aborts the
+    # script and the connection drop discards the transaction).
+    r = psql(dbname, f"""begin;
+revoke all privileges on all tables in schema public from {PROV_ROLE};
+grant usage on schema public to {PROV_ROLE};
+grant insert, select, update on gitlab_installations to {PROV_ROLE};
+grant insert, select on gitlab_installations_map to {PROV_ROLE};
+grant insert, delete on github_app to {PROV_ROLE};
+grant update (pem, client_secret, webhook_secret, loaded_at) on github_app to {PROV_ROLE};
+grant select (id, slug, client_id, client_secret, html_url, created_at, loaded_at) on github_app to {PROV_ROLE};
+commit;
+""")
+    if r.returncode != 0:
+        fail_with_backoff(f'FAILED to converge {PROV_ROLE} grants: {r.stderr.strip()}')
+    print(f'Provisioner role {PROV_ROLE} reconciled', flush=True)
+
+
+def get_tunnel_hostname(terratunnel_endpoint):
+    try:
+        response = requests.get(f"{terratunnel_endpoint}/status", timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        if data.get('connected') and data.get('tunnel_hostname'):
+            return data['tunnel_hostname']
+    except Exception as e:
+        print(f"Failed to fetch tunnel hostname: {e}", flush=True)
+    return None
+
+
+def main():
+    print('Starting terrat (orchestration engine)...', flush=True)
+
+    # Sleep in case we're in a bad runit loop
+    time.sleep(3)
+
+    assert_github_webhook_secret()
+
+    # Try to set TERRAT_API_BASE from terratunnel if not already set
+    if not os.environ.get(TERRAT_API_BASE) and os.environ.get('TERRATUNNEL_API_ENDPOINT'):
+        print('TERRAT_API_BASE not set, attempting to fetch from terratunnel...', flush=True)
+        tunnel_hostname = get_tunnel_hostname(os.environ['TERRATUNNEL_API_ENDPOINT'])
+        if tunnel_hostname:
+            os.environ[TERRAT_API_BASE] = f"https://{tunnel_hostname}/api"
+            print(f"Set TERRAT_API_BASE to: {os.environ[TERRAT_API_BASE]}", flush=True)
+        else:
+            print("Failed to get tunnel hostname from terratunnel", flush=True)
+
+    # The console host serves terrat's machine-facing routes under /api, so the
+    # public console URL is the API base and the console host unless set.
+    ui_base = os.environ.get('STATEGRAPH_UI_BASE', '').rstrip('/')
+    if not os.environ.get(TERRAT_API_BASE) and ui_base:
+        os.environ[TERRAT_API_BASE] = f'{ui_base}/api'
+        print(f"Set TERRAT_API_BASE to: {os.environ[TERRAT_API_BASE]}", flush=True)
+    if not os.environ.get('TERRAT_UI_BASE') and ui_base:
+        os.environ['TERRAT_UI_BASE'] = ui_base
+
+    if not os.environ.get(TERRAT_API_BASE):
+        print('TERRAT_API_BASE or STATEGRAPH_UI_BASE must be set when orchestration is on', flush=True)
+        sys.exit(1)
+
+    bridge_db_env()
+    setup_environment()
+
+    assert_required_db_env()
+    if wait_for_postgres() == 'postgres':
+        ensure_database()
+
+    # Run db migration, then the server. The migration stream is independent
+    # of stategraph's (separate logical databases, shared engine); there is no
+    # cross-service ordering requirement.
+    try:
+        subprocess.check_call(['/usr/local/bin/terrat', 'migrate', '--verbosity=debug'])
+    except subprocess.CalledProcessError as exn:
+        fail_with_backoff(f'terrat migrate failed with exit code {exn.returncode}')
+    reconcile_fdw_role()
+    reconcile_provisioner_role()
+    os.execv('/usr/local/bin/terrat', ['/usr/local/bin/terrat', 'server', '--verbosity=debug'])
+
+
+if __name__ == '__main__':
+    main()

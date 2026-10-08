@@ -3,4 +3,4 @@
     start to its stop, and serves the session storage oauth2-proxy calls back into. Every edition
     runs it. [Make] takes the Cloud abstraction, which a first sign-in reports to. *)
 
-module Make (_ : Sgs_cloud.S) : Sgs_service.S
+module Make (_ : Sgs_cloud.S) : Sgs_service.S with type opt = Sgs_svc_mngr.t

@@ -10,4 +10,5 @@
   pgsql_pool
   sgs_config
   sgs_service
+  sgs_svc_mngr
   sgs_user))

@@ -6,5 +6,5 @@
 module Make (_ : Sgs_cloud.S) : sig
   (** Parse [Sys.argv], run the selected subcommand, and exit the process. [services] start in list
       order and stop in the reverse order. *)
-  val main : services:(module Sgs_service.S) list -> unit
+  val main : services:(module Sgs_service.S with type opt = Sgs_svc_mngr.t) list -> unit
 end

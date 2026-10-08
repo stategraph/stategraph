@@ -1,0 +1,20 @@
+#!/bin/sh
+set -e
+
+# Wait for nginx to start
+sleep 3
+
+# Set environment defaults
+export OCAMLRUNPARAM='b'
+export STATEGRAPH_PORT="${STATEGRAPH_PORT:-8180}"
+
+# Cost estimation is opt-in.  enable-pricing writes this env file with
+# STATEGRAPH_PRICING_SERVICE_URL set and then `sv restart`s us so the new
+# env takes effect.
+[ -f /tmp/stategraph-pricing.env ] && . /tmp/stategraph-pricing.env
+
+# Run db migration
+/usr/local/bin/stategraph-server migrate --verbosity=debug
+
+# Run server
+exec /usr/local/bin/stategraph-server server --verbosity=debug

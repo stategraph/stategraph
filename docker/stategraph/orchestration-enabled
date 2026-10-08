@@ -1,0 +1,14 @@
+#!/bin/sh
+# The one shell copy of the rule Sgs_config.orchestration_enabled applies:
+# STATEGRAPH_ORCHESTRATION_ENABLED decides when it is set, and when it is not,
+# orchestration is on exactly when STATEGRAPH_FDW_PASSWORD is, because without
+# that password no bridge to the engine's database can be built.
+#
+# Exits 0 when orchestration is on. The image CMD uses it before runit starts,
+# and service/nginx uses it when it renders; both run before any binary reads
+# the configuration, which is why the rule is spelled here as well as in OCaml.
+case "$STATEGRAPH_ORCHESTRATION_ENABLED" in
+    true|1) exit 0 ;;
+    false|0) exit 1 ;;
+    *) [ -n "$STATEGRAPH_FDW_PASSWORD" ] ;;
+esac

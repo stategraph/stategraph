@@ -285,7 +285,7 @@ let migrations =
        denormalized at write time so the Phase 2 tenant rollups and tag
        groupings need no backfill. *)
     ("add-cost-snapshots", run_sql [%blob "./migrations/2026-05-19-add-cost-snapshots.sql"]);
-    (* Distributed scheduler: schedules table read by Sgs_scheduler / Dist_scheduler. *)
+    (* Distributed scheduler: schedules table read by Sgs_service_scheduler / Dist_scheduler. *)
     ("add-schedules", run_sql [%blob "./migrations/2026-05-29-add-schedules.sql"]);
     (* Actual cloud spend in FOCUS format (FinOps Open Cost & Usage Spec),
        landed by the out-of-band DuckDB ETL in [code/src/focus_etl]; the OCaml
@@ -518,6 +518,10 @@ let migrations =
     );
     ( "capability-trie-not-null",
       run_sql [%blob "./migrations/2026-09-17-capability-trie-not-null.sql"] );
+    (* [misses] on [schedules]: how many times a task has triggered with nobody registered to run
+       it. The dispatcher records a miss on every trigger, re-runs the task on its next schedule,
+       and deletes the row at three. *)
+    ("schedule-misses", run_sql [%blob "./migrations/2026-10-04-schedule-misses.sql"]);
   ]
 
 let run config storage = Mig.run { Migrate.config; storage; tx = () } migrations

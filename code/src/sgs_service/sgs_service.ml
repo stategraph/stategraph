@@ -1,11 +1,22 @@
 type route = Brtl_rtng.Method.t * Brtl_rtng.Handler.t Brtl_rtng.Route.Route.t
-type start_err = [ `Start_err of string ]
+
+type start_err =
+  [ `Start_err of string
+  | `Start_missing_deps_err of string list
+  ]
+[@@deriving show]
+
+type 'a ty = ..
+type (_, _) eq = Refl : ('a, 'a) eq
 
 module type S = sig
   type t
+  type opt
 
   val name : string
-  val start : Sgs_config.t -> Sgs_storage.t -> (t, start_err) result Abb.Future.t
+  val ty : t ty
+  val matches : 'a ty -> (t, 'a) eq option
+  val start : opt -> (t, [> start_err ]) result Abb.Future.t
   val routes : t -> Sgs_config.t -> Sgs_storage.t -> route list
   val stop : t -> unit Abb.Future.t
 end
@@ -16,10 +27,11 @@ let src = Logs.Src.create "service"
 
 module Logs = (val Logs.src_log src : Logs.LOG)
 
-let start (module M : S) config storage =
+let start (type opt) (m : (module S with type opt = opt)) (o : opt) =
+  let module M = (val m) in
   let open Abb.Future.Infix_monad in
   Logs.info (fun m -> m "Starting service %s" M.name);
-  M.start config storage >>| CCResult.map (fun t -> Started ((module M), t))
+  M.start o >>| CCResult.map (fun t -> Started ((module M), t))
 
 let routes (Started ((module M), t)) config storage = M.routes t config storage
 

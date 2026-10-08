@@ -1,3 +1,5 @@
 (library
  (name sgs_service)
- (libraries abb brtl containers logs sgs_config sgs_storage))
+ (libraries abb brtl containers logs sgs_config sgs_storage)
+ (preprocess
+  (pps ppx_deriving.show)))
