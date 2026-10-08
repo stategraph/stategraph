@@ -26,9 +26,22 @@ val respond_last_admin_protected :
 val instance_admin_check :
   Sgs_user_session.Session.stored Sgs_user_session.Session.t -> Sgs_user_session.Caps.result
 
-(** One session's authority over another user, as {!Sg_caps_ops.authority_over} defines it, against
-    the target read from the database: the capabilities it holds and the tenants it belongs to. It
-    takes those two reads, so it cannot live in a [~caps] predicate.
+(** [authority ~actor ~target ~target_tenants] is whether [actor] may act on a user holding [target]
+    and belonging to [target_tenants]. An installation admin may act on anyone, another installation
+    admin included. That's so that an admin can help another admin, and we don't mind the edit-peer
+    risk for admins, since, if there is a rogue admin, the installation is doomed anyway.
+
+    Non-installation admins need {!Sg_caps_ops.authority_over} to answer [Dominates]. The two
+    refusals are kept apart so the denial can say which it was. *)
+val authority :
+  actor:Sg_caps.t ->
+  target:Sg_caps.t ->
+  target_tenants:'a Sgs_tenant.t list ->
+  (unit, [> `Forbidden_peer_or_greater_err | `Forbidden_tenant_scope_err ]) result
+
+(** One session's authority over another user, as {!authority} decides it, against the target read
+    from the database: the capabilities it holds and the tenants it belongs to. It takes those two
+    reads, so it cannot live in a [~caps] predicate.
 
     Answers [`Not_found_user_err] when no active user has that id, and otherwise one of two
     refusals, kept apart so the denial can say which it was. *)

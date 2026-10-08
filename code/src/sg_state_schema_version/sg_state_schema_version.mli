@@ -144,5 +144,43 @@
 
     A state that is behind is not incorrect. Without the hint the walk gives each file read of the
     block the scope body, which admits every instance. Such a state over-reifies -- the safe
-    direction -- and gets none of the narrowing until it is re-encoded. *)
+    direction -- and gets none of the narrowing until it is re-encoded.
+
+    Version 13: the hints move off the [hcl] row into [hcl_hints] and [transaction_hints], and the
+    server expands them (RFD 1008 Phase 0, Changes 4, 5 and 6). Every statement that reads a canon
+    now reads the expanded form out of those tables, and nothing writes them for a state that was
+    committed before this version.
+
+    It covers the whole of Phase 0 and not only that move, because every later change of the phase
+    alters the same stored shape and none of them shipped separately:
+
+    - a canon names its targets instead of copying them, in both the object form and the path form,
+      and writes a body-relative address where it can (Changes 1 and 2);
+    - [__sg_with_files] has left the canon; what it said is in the [inputs] list beside it, with a
+      [certain] flag (Change 8);
+    - a [..] path segment is the reserved call [__sg_up()] and no longer a reserved string buried in
+      a literal;
+    - [hcl.hints] is gone. The column was dropped once every reader had moved (plan item E1), and a
+      hint now lives only in [hcl_hints].
+
+    Each of those makes a row written by an older client unreadable in the same way the move does,
+    and for the same reason: the stored form means something different. One counter covers them
+    because they land together.
+
+    The client and the server must deploy in lockstep. {!Sgc_tf} refuses on any disagreement, in
+    both directions -- a newer client against an older server fails exactly as the reverse does --
+    so this is not a counter a rolling deploy can straddle.
+
+    This bump is the back-fill, and there is deliberately no data migration beside it. Copying
+    [hcl.hints] across would look like one and would be wrong: a row written before the
+    body-relative form existed holds a canon that is rooted and carries the call site, so it is not
+    a local form at all and storing it as one would be a lie the expansion then reads back. A
+    re-encode derives the right thing instead, and it is what this counter exists to force --
+    {!Sgc_tf.ensure_state_schema} re-imports every state a client owns, and
+    {!Sgs_dwf_preview.state_schema_step} refuses a run for a state it does not.
+
+    A state that is behind cannot be reached by the walk, which is why the two guards above matter
+    more here than they did for versions 11 and 12. Without its rows a node has no canon, the value
+    test answers with nothing, and the walk would reify too little -- the one direction this product
+    refuses. The version gate is what makes that unreachable rather than unlikely. *)
 val version : int

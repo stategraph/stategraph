@@ -78,6 +78,7 @@ let run' db ~actor_caps ~user target_user_id name email avatar_url is_instance_a
             avatar_url;
             auth_origin;
             admin_rights = Common.admin_rights capabilities;
+            capabilities = Sg_caps_json.to_wire capabilities;
             tenants = CCList.map Sgs_tenant.to_api tenants;
             tenants_complete;
             created_at;

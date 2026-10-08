@@ -244,6 +244,7 @@ let parse_template_string = Menhir.parse_template_string
 let unescape_literal = Hcl_ast_template.unescape_literal
 let map_expr = Hcl_ast_walker.map_in_body
 let map_in_expr = Hcl_ast_walker.map_in_expr
+let fold_expr ~f ~init expr = Hcl_ast_walker.map_accum_in_expr f init expr
 let map f ast = CCList.map f ast
 
 let find_attr name body =

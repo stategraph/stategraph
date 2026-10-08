@@ -26,30 +26,30 @@ let instance_admin_check session =
     (Sgs_user_session.Session.capabilities session)
     (Sgs_user_session.Session.user session)
 
-let tenant_ids_of db user_id =
-  let open Abbs_fc.Infix_result_monad in
-  Sgs_tenant.list_by_user (Sgs_user.make ~id:user_id ()) db
-  >>| CCList.map (fun t -> Uuidm.to_string (Sgs_tenant.id t))
+let authority ~actor ~target ~target_tenants =
+  match Sg_caps_ops.is_instance_admin actor with
+  (* The exemption changes exactly one answer: [Sg_caps_ops.authority_over] already says
+     [Dominates] for an installation admin against every target but another installation admin. *)
+  | true -> Ok ()
+  | false -> (
+      let target_tenants = CCList.map (fun t -> Uuidm.to_string (Sgs_tenant.id t)) target_tenants in
+      match Sg_caps_ops.authority_over ~actor ~target ~target_tenants with
+      | Sg_caps_ops.Dominates -> Ok ()
+      | Sg_caps_ops.Peer_or_greater -> Error `Forbidden_peer_or_greater_err
+      | Sg_caps_ops.Tenant_out_of_scope _ -> Error `Forbidden_tenant_scope_err)
 
 let authority_over ~actor db target_user_id =
   let open Abbs_fc.Infix_result_monad in
   match Sg_caps_ops.is_instance_admin actor with
-  (* The exemption changes exactly one answer: [Sg_caps_ops.authority_over] already says
-     [Dominates] for an installation admin against every target but another installation admin. *)
+  (* [authority] lets an installation admin act on any target: the two reads would decide nothing. *)
   | true -> Abbs_fc.return_ok ()
   | false -> (
       Sgs_user.capabilities_of db target_user_id
       >>= function
       | None -> Abbs_fc.return_err `Not_found_user_err
-      | Some target -> (
-          tenant_ids_of db target_user_id
-          >>= fun target_tenants ->
-          Abb.Future.return
-          @@
-          match Sg_caps_ops.authority_over ~actor ~target ~target_tenants with
-          | Sg_caps_ops.Dominates -> Ok ()
-          | Sg_caps_ops.Peer_or_greater -> Error `Forbidden_peer_or_greater_err
-          | Sg_caps_ops.Tenant_out_of_scope _ -> Error `Forbidden_tenant_scope_err))
+      | Some target ->
+          Sgs_tenant.list_by_user (Sgs_user.make ~id:target_user_id ()) db
+          >>? fun target_tenants -> authority ~actor ~target ~target_tenants)
 
 let unless_self ~user target_user_id check =
   match Uuidm.equal (Sgs_user.id user) target_user_id with

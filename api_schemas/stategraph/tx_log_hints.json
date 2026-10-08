@@ -60,20 +60,6 @@
       ],
       "type": "object"
     },
-    "for_each_hint": {
-      "additionalProperties": false,
-      "description": "One block's client-computed recipe for evaluating its for_each collection (RFD 1562, Phase 1). Conceptually the same as realized_object_hint: the canon removes all levels of indirection and bottoms out at the irreducible inputs. It is at most ONE per node rather than a list, because a block has one for_each. Absent when the block has no for_each, when the client could not evaluate it, and when its canon is unreifiable; all three mean the same thing downstream, keys of null, which is the RFD's fail-safe mode 1 -- the for_each is reified verbatim and nothing is pruned.",
-      "properties": {
-        "canon": {
-          "description": "The canonical expression rendered as HCL, using the same synthetic calls as realized_object_hint: __sg_fq_address(\"<fq address>\"), __sg_tfvar(\"var.<name>\"), __sg_file_ref(\"<file node id>\"), __sg_file_ref_path(\"<file node id>\"). It obeys the same discipline realized_object_hint does -- it evaluates alone, with no module context, no variable chain and no dependence on any other canon having been evaluated first -- because the server evaluates it twice, against the transaction and against the committed data, and the two evaluations are what produce [keys] and [destroyed_keys]. Unlike realized_object_hint there is no self-referential form: a for_each names a COLLECTION rather than the block's own value, and a block's row holds no realized value to point at, so a dependency-free expression is its own canon.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "canon"
-      ],
-      "type": "object"
-    },
     "for_each_ref_hint": {
       "additionalProperties": false,
       "description": "One read this node makes of a for_each'd block, as the client's canonical expression (RFD 1562, Phase 1). This channel answers which INSTANCE of a for_each'd block a consumer demands, so that a block whose keys the blast walk pruned still enters the slice with the keys its consumers need. Which ATTRIBUTE of that instance changed is object_attr_refs' question, and the attribute path is deliberately not carried here.",
@@ -90,18 +76,8 @@
     },
     "hints": {
       "additionalProperties": false,
-      "description": "Extensible container for client-computed hints on a tx-log HCL entry, AS SENT ON THE WIRE: data the client can cheaply derive from the whole system but the server would have to reconstruct the whole system to derive. Each hint kind is its own optional property; adding a kind is never a breaking change. What the server STORES is [stored_hints], which is this shape with the realized_object and for_each hints enriched and the object_attr_refs / for_each_refs / for_each_body_refs lists resolved -- see there for why the two are not the same type.",
+      "description": "Extensible container for client-computed hints on a tx-log HCL entry, as sent on the wire. It holds only the three naming channels (object_attr_refs, for_each_refs, for_each_body_refs), which state what the node's own block reads and are node-local by construction. The five canon channels (realized_object, for_each, module_index_reads, path_attrs, file_reads) are not sent: the server derives them from the stored blocks when it expands the hints (RFD 1008 Phase 0, Change 3). A hint may be added here only when the server cannot derive it and it is node-local: a change to one node must not be able to change the hint of any other node. Each hint kind is its own optional property. What the server stores is [stored_hints] -- see there for why the two are not the same type.",
       "properties": {
-        "file_reads": {
-          "description": "Canonical representations of file*() reads whose path expression the reifier's per-read view cannot classify (the anchor is reached through local/var indirection, possibly from another module's scope). Present only for reads the reifier would otherwise mis-anchor.",
-          "items": {
-            "$ref": "#/definitions/file_read_hint"
-          },
-          "type": "array"
-        },
-        "for_each": {
-          "$ref": "#/definitions/for_each_hint"
-        },
         "for_each_body_refs": {
           "description": "The reads the iterating block's body makes that are NOT reached through each.* -- the shared half of RFD 1562's per-key analysis. One entry per distinct read, in source order and without deduplication; the merge happens at ingest. PRESENCE of this property is the signal that the analysis ran: present, possibly as [], means the body shares no reads and per-key pruning stands, while ABSENT means the body was not analyzed and the block's keys are promoted to null, since a body whose shared reads are unknown cannot be shown to leave any key alone. That is inverted from object_attr_refs, where an absent list is a whole-VALUE read of something the node was going to be reified for anyway.",
           "items": {
@@ -116,29 +92,12 @@
           },
           "type": "array"
         },
-        "module_index_reads": {
-          "description": "Which module outputs this node reads through an index the client could not reduce -- the question the server answers from committed state (RFD cause C4). ABSENT means the client raised no such read, or made no analysis; either way nothing is narrowed and the enumeration the fallback emitted stands, which over-reifies and is always safe. Never present-and-empty for a node that raised one: an entry is written only where an index actually failed to reduce.",
-          "items": {
-            "$ref": "#/definitions/module_index_read_hint"
-          },
-          "type": "array"
-        },
         "object_attr_refs": {
           "description": "Which paths of which realized objects this node READS -- the consumer half of per-attribute subgraph generation (RFD 1162), where realized_object is the producer half. One entry per distinct path read. Absent when the node reads no object attribute it could narrow: a node that reads an object WHOLE is deliberately absent rather than present-and-empty, because both mean the same thing (use the whole-value path) and one spelling is enough.",
           "items": {
             "$ref": "#/definitions/object_attr_ref_hint"
           },
           "type": "array"
-        },
-        "path_attrs": {
-          "description": "Canonical representations of path-bearing attributes the server's per-block view cannot classify (the anchor is reached through local/var indirection). Present only for attributes the server would otherwise miss.",
-          "items": {
-            "$ref": "#/definitions/path_attr_hint"
-          },
-          "type": "array"
-        },
-        "realized_object": {
-          "$ref": "#/definitions/realized_object_hint"
         }
       },
       "type": "object"
@@ -191,20 +150,6 @@
       },
       "required": [
         "attr",
-        "canon"
-      ],
-      "type": "object"
-    },
-    "realized_object_hint": {
-      "additionalProperties": false,
-      "description": "One node's client-computed recipe for REALIZING its object or list value, the foundation of per-attribute subgraph generation (RFD 1162). Today a change anywhere inside an object value reifies every consumer of that value, because the subgraph is built from which NODES changed rather than which PART of a value changed. Realizing the value on both sides of a transaction is what lets the two be compared per attribute instead. [canon] is that recipe: the node's defining expression with all indirection removed, so it evaluates with no module context, no variable chain, and no dependence on any other node having been realized first. Note this is the OPPOSITE requirement from path_attr_hint / file_read_hint, whose canons are deliberately location-INDEPENDENT because they are rewritten into concrete paths at several emission sites; this one is a lookup key, so concrete identity is exactly what it wants. Produced by Sg_tf_eval_obj_canon, which is a separate module from Sg_tf_eval_canon for that reason. Unlike the other hint kinds this is at most ONE per node rather than a list, because a node has one value. Absent when the value is not an object or list, when the client could not resolve it, or when its canon is unreifiable -- in each of which cases the whole-value path is used and the node is treated as entirely changed.",
-      "properties": {
-        "canon": {
-          "description": "The canonical expression rendered as HCL, using synthetic calls that name database rows in place of anything irreducible: __sg_fq_address(\"<fq address>\") for a dependency-free HCL node (looked up in [hcl] by fq_address), __sg_tfvar(\"var.<name>\") for a tfvar (in [tfvars] by var_address), __sg_file_ref(\"<file node id>\") for a file's CONTENT and __sg_file_ref_path(\"<file node id>\") for a PATH to that content (both in [files] by its (state_id, id) primary key). A reference whose target still has dependencies of its own is INLINED; one whose target has none is NAMED rather than copied, so a shared value is stored once. A node with no dependencies therefore has a self-referential canon -- the lookup for its own address -- rather than a duplicate of a value already stored. The __sg_module / __sg_root anchors belong to path canons and never appear here.",
-          "type": "string"
-        }
-      },
-      "required": [
         "canon"
       ],
       "type": "object"
@@ -265,6 +210,10 @@
           "description": "The client's canon, stored verbatim -- see for_each_hint for what it contains.",
           "type": "string"
         },
+        "certain": {
+          "description": "Whether the canon can realize at all. It is false when the canon states an unknown of its own -- a corner the client could not reduce, marked in place rather than refusing the whole canon -- and true otherwise. The value guard of the subgraph walk reads it: a guard can answer 'this did not move' only about a canon that has no unknown in it, and an unknown guard is followed. It is stored rather than searched for in the canon text, because RFD 1008 takes the text matching out of the walk: the server already walks the canon once, at write time, and knows the answer then. Optional only for rows written before this field existed; such a row reads as 'cannot say', which follows the edge and over-reifies, and that is the safe direction.",
+          "type": "boolean"
+        },
         "inputs": {
           "description": "Every database row the canon reads, derived by the server at ingest. realized_object_input is reused verbatim -- the four kinds a for_each expression can bottom out in are the four a value expression can -- so nothing new is introduced on the fetch path.",
           "items": {
@@ -301,10 +250,10 @@
     },
     "stored_hints": {
       "additionalProperties": false,
-      "description": "The hints container AS STORED, which is deliberately not the same shape as the one that arrives on the wire: the server rewrites a tx-log entry's hints on ingest (Sgs_tx_log.add) so the database never holds the wire form. Four kinds differ -- realized_object and for_each each gain the input list the server derived from their canon, and object_attr_refs / for_each_refs / for_each_body_refs become stored_object_attr_refs / stored_for_each_refs / stored_for_each_body_refs, parsed out of HCL into the fields the walk joins on -- while file_reads / path_attrs are the same definitions the wire uses, because nothing about them needs deriving. Read this one wherever a stored row's hints are decoded; read [hints] wherever a client's payload is.",
+      "description": "The hints container as stored, which is deliberately not the same shape as the one that arrives on the wire. The server writes it in two places: on ingest (Sgs_tx_log.add), where object_attr_refs / for_each_refs / for_each_body_refs become stored_object_attr_refs / stored_for_each_refs / stored_for_each_body_refs, parsed out of HCL into the fields the walk joins on; and in the hint expansion, which derives the five canon channels -- realized_object and for_each with the input list read off their canon, module_index_reads, path_attrs and file_reads -- from the stored blocks (RFD 1008 Phase 0, Change 3). Read this one wherever a stored row's hints are decoded; read [hints] wherever a client's payload is.",
       "properties": {
         "file_reads": {
-          "description": "As on the wire; stored verbatim.",
+          "description": "Derived by the server from the stored block when it expands the hints (RFD 1008 Phase 0); the client does not send it.",
           "items": {
             "$ref": "#/definitions/file_read_hint"
           },
@@ -331,7 +280,7 @@
           "type": "array"
         },
         "path_attrs": {
-          "description": "As on the wire; stored verbatim. The hinted attribute names are additionally unioned into the row's own path_attrs column.",
+          "description": "Derived by the server from the stored block when it expands the hints (RFD 1008 Phase 0); the client does not send it. The attribute names are additionally unioned into the row's own path_attrs column.",
           "items": {
             "$ref": "#/definitions/path_attr_hint"
           },
@@ -399,11 +348,15 @@
       "description": "A realized_object hint as stored: the client's canon plus the database rows the server determined that canon reads. The canon is unchanged -- realization still parses and evaluates it -- so [inputs] is a fetch plan, not a second source of truth; a key missing from it means the row is not prefetched, the evaluator finds an input it cannot resolve, and the node fails safe to the whole-value path exactly as the RFD requires. Moving the parse to ingest also moves the fail-safe earlier: a canon the server cannot parse, or one naming a synthetic call it does not implement, is rejected once at write time and the hint is dropped, rather than being re-parsed and re-rejected on every subgraph build.",
       "properties": {
         "canon": {
-          "description": "The client's canon, stored verbatim -- see realized_object_hint for what it contains.",
+          "description": "The client's canon with the __sg_with_files wrappers peeled off -- see realized_object_hint for what the rest of it contains. RFD 1008 Phase 0 Change 8 took that token out: it named the block whose file rows the expression evaluates against, which is a mark the client's inlining left behind and not a fact the data needs, and the same fact is in [inputs] as a file_list entry. A wrapper could not survive the phase anyway -- once the canon names a target instead of inlining it, the walk never learns which block owns the read.",
           "type": "string"
         },
+        "certain": {
+          "description": "Whether the canon can realize at all. It is false when the canon states an unknown of its own -- a corner the client could not reduce, marked in place rather than refusing the whole canon -- and true otherwise. The value guard of the subgraph walk reads it: a guard can answer 'this did not move' only about a canon that has no unknown in it, and an unknown guard is followed. It is stored rather than searched for in the canon text, because RFD 1008 takes the text matching out of the walk: the server already walks the canon once, at write time, and knows the answer then. Optional only for rows written before this field existed; such a row reads as 'cannot say', which follows the edge and over-reifies, and that is the safe direction.",
+          "type": "boolean"
+        },
         "inputs": {
-          "description": "Every database row the canon reads, derived by the server. Optional only for rows written before this field existed: such a row still decodes and simply fails safe, which is why no backfill is needed.",
+          "description": "Every database row the canon reads, derived by the server. Optional only for rows written before this field existed: such a row still decodes and simply fails safe, which is why no backfill is needed. RFD 1008 Phase 0 Change 8: a file_list entry is now the only record of which block's file rows a canon evaluates against. The canon used to carry that as a __sg_with_files wrapper and no longer does, so a reader that wants the bag takes the key from here.",
           "items": {
             "$ref": "#/definitions/realized_object_input"
           },
