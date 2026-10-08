@@ -18,6 +18,7 @@
   sgs_eplib
   sgs_service
   sgs_service_tenants
+  sgs_svc_mngr
   sgs_storage
   sgs_tenant
   sgs_user

@@ -298,6 +298,10 @@ module Make (Fut : Abb_intf.Future.S) = struct
   let when_ b f = if b then f () else unit
   let when_m mb f = mb >>= fun b -> when_ b f
 
+  let when_err f = function
+    | Ok _ -> unit
+    | Error e -> f e
+
   module Infix_result_monad = struct
     type ('a, 'b) t = ('a, 'b) result Fut.t
 

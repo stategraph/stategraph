@@ -59,19 +59,34 @@ module Make (Cloud : Sgs_cloud.S) = struct
 
   (* The oauth2-proxy process, when OAuth is configured and the process started. *)
   type t = Sgs_service_auth_oauth2_proxy.t option
+  type 'a Sgs_service.ty += Ty : t Sgs_service.ty
+
+  let ty = Ty
+
+  let matches (type a) (q : a Sgs_service.ty) : (t, a) Sgs_service.eq option =
+    match q with
+    | Ty -> Some Sgs_service.Refl
+    | _ -> None
 
   let name = "auth"
 
+  type opt = Sgs_svc_mngr.t
+
   (* A failure to spawn oauth2-proxy does not stop the server: it serves without OAuth, as logged. *)
-  let start config _storage =
+  let start mgr =
     let open Abb.Future.Infix_monad in
-    Sgs_service_auth_oauth2_proxy.spawn config
+    Sgs_svc_mngr.config mgr
     >>= function
-    | Ok oauth2_proxy -> Abbs_fc.return_ok (Some oauth2_proxy)
-    | Error `No_oauth_config -> Abbs_fc.return_ok None
-    | Error (`Spawn_failed _ | #Abb_intf.Errors.spawn) ->
-        Logs.warn (fun m -> m "OAuth authentication will not be available");
-        Abbs_fc.return_ok None
+    | Error `Config_err ->
+        Abbs_fc.return_err (`Start_err "SERVICE_MANAGER : could not get the config")
+    | Ok config -> (
+        Sgs_service_auth_oauth2_proxy.spawn config
+        >>= function
+        | Ok oauth2_proxy -> Abbs_fc.return_ok (Some oauth2_proxy)
+        | Error `No_oauth_config -> Abbs_fc.return_ok None
+        | Error (`Spawn_failed _ | #Abb_intf.Errors.spawn) ->
+            Logs.warn (fun m -> m "OAuth authentication will not be available");
+            Abbs_fc.return_ok None)
 
   (* Build OAuth2 proxy routes if oauth2_proxy is available *)
   let oauth2_routes config storage oauth2_proxy =

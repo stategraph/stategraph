@@ -38,21 +38,38 @@ end
 
 module Make (L : LICENSE) = struct
   type t = unit
+  type 'a Sgs_service.ty += Ty : t Sgs_service.ty
+
+  let ty = Ty
+
+  let matches (type a) (q : a Sgs_service.ty) : (t, a) Sgs_service.eq option =
+    match q with
+    | Ty -> Some Sgs_service.Refl
+    | _ -> None
 
   let name = "license"
 
-  let start config storage =
+  type opt = Sgs_svc_mngr.t
+
+  let start mgr =
     let open Abb.Future.Infix_monad in
-    Pgsql_pool.with_conn storage ~f:(may_start ~requirement:L.requirement config)
-    >>| function
-    | Ok true -> Ok ()
-    | Ok false ->
-        Error
-          (`Start_err
-             "LICENSE_REQUIRED : This installation has users but no valid license. Set \
-              STATEGRAPH_LICENSE_KEY to a valid license key and restart.")
-    | Error (#Pgsql_pool.err as err) -> Error (`Start_err (Pgsql_pool.show_err err))
-    | Error (#Pgsql_io.err as err) -> Error (`Start_err (Pgsql_io.show_err err))
+    Abbs_fc.Result.all2 (Sgs_svc_mngr.config mgr) (Sgs_svc_mngr.storage mgr)
+    >>= function
+    | Error `Config_err ->
+        Abbs_fc.return_err (`Start_err "SERVICE_MANAGER : could not get the config")
+    | Error `Storage_err ->
+        Abbs_fc.return_err (`Start_err "SERVICE_MANAGER : could not get the storage")
+    | Ok (config, storage) -> (
+        Pgsql_pool.with_conn storage ~f:(may_start ~requirement:L.requirement config)
+        >>| function
+        | Ok true -> Ok ()
+        | Ok false ->
+            Error
+              (`Start_err
+                 "LICENSE_REQUIRED : This installation has users but no valid license. Set \
+                  STATEGRAPH_LICENSE_KEY to a valid license key and restart.")
+        | Error (#Pgsql_pool.err as err) -> Error (`Start_err (Pgsql_pool.show_err err))
+        | Error (#Pgsql_io.err as err) -> Error (`Start_err (Pgsql_io.show_err err)))
 
   let routes () config storage =
     Brtl_rtng.Route.

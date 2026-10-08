@@ -1,0 +1,247 @@
+daemon off;
+
+worker_processes 2;
+
+# Bound the graceful shutdown. runit-init sends the master a SIGQUIT, which
+# closes the listen socket and lets the workers finish what they are serving.
+# Unset, that drain is unbounded, and /api sets proxy_read_timeout 120 -- one
+# slow request could hold the container past the platform's stop grace period
+# and get everything force-killed, which is the failure this is meant to remove.
+#
+# The 35s default is sized to a 60s grace period (Fly kill_timeout, Compose
+# stop_grace_period, ECS stopTimeout); runit-init splits that into 40s for nginx,
+# 10s for the backends and 5s for runsvdir. This must stay below runit-init's
+# NGINX_SHUTDOWN_WAIT so nginx ends its own drain rather than being SIGKILLed by
+# sv with connections still up, so the two move together: NGINX_WORKER_SHUTDOWN_
+# TIMEOUT and NGINX_SHUTDOWN_WAIT.
+worker_shutdown_timeout ${NGINX_WORKER_SHUTDOWN_TIMEOUT}s;
+
+error_log /dev/stderr warn;
+
+load_module /usr/lib/nginx/modules/ngx_http_js_module.so;
+
+events {
+    worker_connections  1024;
+}
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+
+    sendfile        on;
+    keepalive_timeout  65;
+
+    gzip  on;
+    gzip_vary on;
+
+    # Prevent nginx from constructing absolute URLs with wrong protocol/port
+    # when behind reverse proxies (important for redirects like /login -> /login/)
+    absolute_redirect off;
+    port_in_redirect off;
+
+    real_ip_header X-Forwarded-For;
+    set_real_ip_from 0.0.0.0/0;
+
+    proxy_headers_hash_max_size 512;
+    proxy_headers_hash_bucket_size 128;
+
+    limit_conn_zone $server_name zone=stategraph_app:10m;
+
+    # The console document is the shell of a signed-in app and must not be stored; the assets
+    # `location /` serves beside it -- public/fonts, public/logos, the favicons -- must be. Only
+    # the bundles under /_next/static carry a content hash, so the split is made on content type
+    # rather than on path. nginx skips an add_header whose value is empty, so everything else is
+    # untouched. Mirrors docker/terrat/nginx.conf.template.
+    map $sent_http_content_type $stategraph_document_cache_control {
+        default      "";
+        ~*^text/html "no-store";
+    }
+    limit_req_zone $binary_remote_addr zone=client_limit:10m rate=1000r/s;
+
+    client_body_buffer_size 64k;
+
+    js_import /etc/nginx/events.js;
+
+    # The console host. It is declared first, so nginx also serves it to a
+    # request whose Host matches no server_name -- the iris block below names
+    # one host and one host only.
+    server {
+        listen       8080;
+        ${IPV6_LISTEN}
+
+        server_name  localhost;
+        access_log   ${STATEGRAPH_ACCESS_LOG};
+        server_tokens off;
+        client_max_body_size ${STATEGRAPH_CLIENT_MAX_BODY_SIZE};
+
+        # nginx replaces, rather than merges, inherited add_header directives as
+        # soon as a location declares its own, so these are repeated in each
+        # location that sets any header of its own.
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+        # Content-hashed filenames, so a long immutable TTL is safe and keeps the
+        # console fast under the no-store the document below carries. Declared
+        # before `location /` for readability only; nginx matches the longest
+        # prefix regardless of order.
+        location /_next/static/ {
+            root /usr/local/share/stategraph/ui/;
+
+            # No `always`: nginx's default status set for add_header is exactly the success
+            # and redirect codes, which is what may carry an immutable TTL. With `always` a 404
+            # for a chunk a replica has not got yet would be cached for a year.
+            add_header Cache-Control "public, max-age=31536000, immutable";
+            add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+            add_header X-Frame-Options "DENY" always;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+            add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        }
+
+        # iris-compat (#1619): terrat bakes /i/{installation}/runs/... links
+        # into every PR comment (terrat_vcs_github_comment_ui.ml), and the
+        # unified image ships no iris — map those onto the console's routes so
+        # existing comment links keep working. The installation id rides along
+        # as a lookup hint only; MQL tenant scoping is the security boundary.
+        # Regex locations win over the prefix locations below, and the terrat
+        # route prefixes (/api/...) never overlap /i/.
+        location ~ ^/i/([0-9]+)/runs/pr/([0-9]+)$ {
+            return 302 /pull-requests/detail/?installation=$1&pr=$2;
+        }
+        location ~ ^/i/([0-9]+)/runs/([0-9a-fA-F-]+)$ {
+            return 302 /runs/wm/?installation=$1&id=$2;
+        }
+        location ~ ^/i/ {
+            return 302 /;
+        }
+
+        location / {
+            root /usr/local/share/stategraph/ui/;
+            index index.html index.htm;
+            try_files $uri $uri/ /index.html =404;
+
+            # Defense in depth: never answer a Range request for this location, so no client or
+            # intermediary can end up holding a partial console document, which renders blank.
+            # Nothing here needs ranges (no media or large downloads). Not an add_header, so
+            # the headers below are unaffected.
+            max_ranges 0;
+
+            # Google Tag Manager: injected into the served HTML only when the
+            # server runs in COMMUNISM mode (app.stategraph.cloud); empty
+            # otherwise, so self-hosted deployments load no analytics. The
+            # value is built by the nginx service entrypoint from STATEGRAPH_MODE.
+            ${STATEGRAPH_GTM_SUB_FILTER}
+
+            # The document is the shell of a signed-in console, so it is not cacheable; the
+            # hashed bundles it pulls are, above. The map keeps this off the fonts, logos and
+            # favicons this same location serves.
+            add_header Cache-Control $stategraph_document_cache_control always;
+
+            # Report-only for now. The built UI carries four inline scripts -- our theme
+            # flash-guard and boot watchdog, and two Next.js Flight payloads -- and Next puts no
+            # nonce on the latter, so an enforcing policy needs either a nonce injected into the
+            # markup or a hermes change. script-src therefore does NOT list 'unsafe-inline':
+            # report-only enforces nothing, so leaving it out is what makes those four scripts show up as
+            # violations instead of being silently allowed. There is no report-uri yet, so the
+            # violations are read from the browser devtools console during manual QA; adding a
+            # reporting endpoint is the next step before enforcing. Note browsers ignore
+            # upgrade-insecure-requests in a report-only policy; it is carried here so the
+            # string is the one that will later be enforced. See #2162.
+            add_header Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com; frame-src https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; form-action 'self' ${STATEGRAPH_GITHUB_WEB_BASE}; frame-ancestors 'none'; manifest-src 'self'; upgrade-insecure-requests;" always;
+            add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+            add_header X-Frame-Options "DENY" always;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+            add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        }
+
+        location /api {
+            limit_conn stategraph_app 3000;
+            limit_req zone=client_limit burst=5000;
+
+            proxy_pass http://127.0.0.1:8180;
+            proxy_set_header X-Forwarded-For $remote_addr;
+            proxy_set_header X-Forwarded-Base "$STATEGRAPH_UI_BASE";
+
+            proxy_buffer_size 128k;
+            proxy_buffers 4 256k;
+            proxy_busy_buffers_size 256k;
+
+            client_max_body_size ${STATEGRAPH_CLIENT_MAX_BODY_SIZE};
+
+            proxy_read_timeout 120;
+
+            # API responses carry tenant-scoped data and must not be stored by
+            # browsers or intermediary caches.
+            add_header Cache-Control "no-store" always;
+            add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+            add_header X-Frame-Options "DENY" always;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+            add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        }
+
+        location /oauth2 {
+            proxy_pass http://127.0.0.1:8180;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+
+            # Don't buffer - important for redirects
+            proxy_buffering off;
+
+            # Authentication redirects carry session state; never store them.
+            add_header Cache-Control "no-store" always;
+            add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+            add_header X-Frame-Options "DENY" always;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+            add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        }
+
+        # Orchestration engine (terrat) routes at their native paths, present
+        # only when STATEGRAPH_ORCHESTRATION_ENABLED is true; empty otherwise,
+        # so the rendered config is unchanged for deployments without
+        # orchestration. Position relative to the /api location is irrelevant:
+        # nginx prefix locations match longest-prefix regardless of order, so
+        # these longer prefixes win for terrat-owned namespaces and /api keeps
+        # everything else. The block is built by the nginx service entrypoint.
+        ${STATEGRAPH_TERRAT_ROUTES}
+
+        # Liveness probe - returns 200 as long as nginx is running.
+        location = /health/live {
+            access_log off;
+            return 200 'ok';
+        }
+
+        # Readiness probe - proxied to backend /api/v1/health.
+        location = /health/ready {
+            proxy_pass http://127.0.0.1:8180/api/v1/health;
+            proxy_set_header X-Forwarded-For $remote_addr;
+        }
+
+
+        location /nginx_status {
+            stub_status on;
+            access_log off;
+            allow ::1;
+            allow 127.0.0.1;
+            allow 172.17.0.0/24;
+            deny all;
+        }
+    }
+
+    # The iris host: the server block for the host in TERRAT_UI_BASE, which
+    # serves the Terrateam console. Present only when orchestration is enabled
+    # and TERRAT_UI_BASE names a host; empty otherwise, so the rendered config
+    # holds one server block. iris reads its API from a relative path, so this
+    # block sends all of /api to terrat, which is the difference from the
+    # console host above. The block is built by the nginx service entrypoint,
+    # which supplies its own indentation.
+${STATEGRAPH_IRIS_SERVER}
+}

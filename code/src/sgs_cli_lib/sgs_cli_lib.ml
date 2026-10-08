@@ -107,42 +107,40 @@ module Cmdline = struct
   let default_cmd = C.Term.(ret (const (`Help (`Pager, None))))
 end
 
-(* Start [services] in list order, run [f] on them, and stop them in the reverse order. Each service
-   is stopped in a [finally] around everything after its own start, so it is stopped however that
-   ends: a later start refusing or raising, [f] returning or raising, or a later stop raising. When
-   one refuses to start, the rest are not started. *)
-let rec with_services services config storage f =
-  let open Abb.Future.Infix_monad in
-  match services with
-  | [] -> f []
-  | service :: services -> (
-      Sgs_service.start service config storage
-      >>= function
-      | Ok started ->
-          Abbs_fc.with_finally
-            (fun () -> with_services services config storage (fun rest -> f (started :: rest)))
-            ~finally:(fun () -> Sgs_service.stop started)
-      | Error err -> Abb.Future.return (Error err))
-
 module Make (Cloud : Sgs_cloud.S) = struct
   module Server = Sgs_server.Make (Cloud)
+
+  (* Runs the server with the build's services. Stopping the manager at the end stops those
+     services too. *)
+  let run_server ~services config storage mgr =
+    let open Abb.Future.Infix_monad in
+    (* The manager starts the build's services, so the routes come from what it started. *)
+    Sgs_svc_mngr.start_services mgr services
+    >>= function
+    | Ok started ->
+        let routes = CCList.flat_map (fun s -> Sgs_service.routes s config storage) started in
+        Abbs_fc.with_finally
+          (fun () -> Server.run ~routes config storage)
+          ~finally:(fun () -> Sgs_svc_mngr.stop mgr)
+        >>| fun () -> Ok ()
+    | Error err -> Abb.Future.return (Error err)
 
   let server' ~services config =
     let run () =
       let open Abb.Future.Infix_monad in
       Sgs_storage.create config
       >>= fun storage ->
-      (* Start the build's services; stop them when the server exits. *)
-      with_services services config storage (fun started ->
-          let routes = CCList.flat_map (fun s -> Sgs_service.routes s config storage) started in
-          Server.run ~routes config storage >>| fun () -> Ok ())
+      Sgs_svc_mngr.start config storage
+      >>= function
+      | Error `Start_err -> Abbs_fc.return_err (`Start_err "Could not start the service manager")
+      | Ok mgr -> run_server ~services config storage mgr
     in
     print_endline (Sgs_config.show config);
     let result = Abb.Scheduler.run_with_state run in
     match result with
     | `Det (Ok ()) -> ()
-    | `Det (Error (`Start_err msg)) ->
-        Logs.err (fun m -> m "%s" msg);
+    | `Det (Error (#Sgs_service.start_err as err)) ->
+        Logs.err (fun m -> m "%a" Sgs_service.pp_start_err err);
         exit 1
     | `Aborted -> assert false
     | `Exn (exn, bt_opt) ->

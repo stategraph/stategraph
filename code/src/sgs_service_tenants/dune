@@ -21,6 +21,7 @@
   sgs_eplib
   sgs_service
   sgs_storage
+  sgs_svc_mngr
   sgs_tenant
   sgs_user
   uri

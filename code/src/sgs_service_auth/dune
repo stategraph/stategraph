@@ -21,6 +21,7 @@
   sgs_eplib
   sgs_redirect
   sgs_service
+  sgs_svc_mngr
   sgs_storage
   sgs_tenant
   sgs_user

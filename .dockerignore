@@ -1,0 +1,25 @@
+# Ignore things that often change while tweaking/testing the corresponding image. This increases caching hit rates.
+.devcontainer
+.git
+.github
+CLAUDE.md
+_build/
+_opam/
+code/src/hermes/node_modules/
+code/src/hermes/.next/
+website/
+webhooks/
+CODEOWNERS
+CONTRIBUTING.md
+# docker/stategraph/service/ and nginx.conf.template must STAY in the build
+# context: code/tests/nginx_terrat_routes deps on service/nginx, so excluding
+# it breaks `make test-unit` inside the image with a "no rule found" error.
+docker/stategraph/build-target.sh
+docker/stategraph/build-clean-image.sh
+docker/stategraph/find-closest-image.sh
+docker/stategraph/Dockerfile
+docker/stategraph/docker-compose*
+docker/stategraph/README.md
+interviews/
+README.md
+rfds/

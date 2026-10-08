@@ -19,6 +19,7 @@
   sgs_migrations
   sgs_server
   sgs_service
+  sgs_svc_mngr
   sgs_tenant
   sgs_user)
  (preprocessor_deps

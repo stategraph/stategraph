@@ -180,6 +180,11 @@ module Make (Fut : Abb_intf.Future.S) : sig
        [whenM]}. *)
   val when_m : bool Fut.t -> (unit -> unit Fut.t) -> unit Fut.t
 
+  (** [when_err f] is a [>>=] continuation over a result: an [Ok] becomes a future determined to
+      [()], and an [Error e] runs [f e]. Use it when only the error needs handling, so the call
+      reads as one sequential line. *)
+  val when_err : ('e -> unit Fut.t) -> ('a, 'e) result -> unit Fut.t
+
   module List : sig
     (** Map a list in serial *)
     val map : f:('a -> 'b Fut.t) -> 'a list -> 'b list Fut.t

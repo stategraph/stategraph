@@ -47,4 +47,9 @@ module type LICENSE = sig
 end
 
 (** The service refuses to start when {!may_start} answers [false]. *)
-module Make (_ : LICENSE) : Sgs_service.S
+module Make (_ : LICENSE) : sig
+  include Sgs_service.S with type opt = Sgs_svc_mngr.t
+
+  (** Names this service in a match on {!Sgs_service.ty}. *)
+  type 'a Sgs_service.ty += Ty : t Sgs_service.ty
+end

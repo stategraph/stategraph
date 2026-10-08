@@ -44,9 +44,20 @@ module Rt = struct
 end
 
 type t = unit
+type 'a Sgs_service.ty += Ty : t Sgs_service.ty
+
+let ty = Ty
+
+let matches (type a) (q : a Sgs_service.ty) : (t, a) Sgs_service.eq option =
+  match q with
+  | Ty -> Some Sgs_service.Refl
+  | _ -> None
 
 let name = "users"
-let start _ _ = Abbs_fc.return_ok ()
+
+type opt = Sgs_svc_mngr.t
+
+let start _ = Abbs_fc.return_ok ()
 
 let routes () config storage =
   Brtl_rtng.Route.
