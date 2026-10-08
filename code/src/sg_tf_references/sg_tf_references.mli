@@ -108,6 +108,23 @@ val check_block_references : Hcl_parser_value.t -> Reference_set.t
     — never re-derive it from this string. *)
 val address_of_reference : string list -> string option
 
+(** [address_tokens_of_reference ref_] is the same answer as tokens, before the join.
+
+    One match derives both, so a caller that needs to inspect what the address consumed does not
+    take the joined string apart again. *)
+val address_tokens_of_reference : string list -> string list option
+
+(** [names_a_node ref_] is whether the address {!address_of_reference} gives names a node.
+
+    It does not when the last token the address consumed is the splat [*]: [module.X.*] resolves to
+    [module.X.output.*], and no node has that address. The reference is real — it reads every output
+    of the module — but the address is not a name, and an edge carrying it points at nothing. The
+    apply drops such an edge; this is what lets it do so without matching the address as text.
+
+    Not the same question as "does this reference contain a splat". For [aws_instance.web.*.id] the
+    address is [aws_instance.web], which names a node and which the apply keeps. *)
+val names_a_node : string list -> bool
+
 (** [attr_path_of_reference ref_] is the reference tail beyond the tokens {!address_of_reference}
     consumed: the attribute path read within the node the address names.
     [["local"; "config"; "x"; "z"]] gives [["x"; "z"]] (address ["local.config"]).

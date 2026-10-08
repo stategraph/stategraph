@@ -5873,6 +5873,7 @@
       },
       "user-detail-response": {
         "additionalProperties": false,
+        "description": "One user's record. capabilities is present when the caller is the user, or the caller holds authority over the user (i.e. if it can edit this user's data). It is absent otherwise.",
         "properties": {
           "admin_rights": {
             "$ref": "#/components/schemas/admin-rights"
@@ -5882,6 +5883,9 @@
           },
           "avatar_url": {
             "type": "string"
+          },
+          "capabilities": {
+            "$ref": "capability-wire.json#/definitions/capabilities"
           },
           "created_at": {
             "type": "string"
@@ -5997,6 +6001,9 @@
           "avatar_url": {
             "type": "string"
           },
+          "capabilities": {
+            "$ref": "capability-wire.json#/definitions/capabilities"
+          },
           "created_at": {
             "type": "string"
           },
@@ -6026,6 +6033,7 @@
         },
         "required": [
           "admin_rights",
+          "capabilities",
           "created_at",
           "id",
           "name",

@@ -5,6 +5,7 @@ end
 
 type t = {
   canon : string;
+  certain : bool option; [@default None]
   inputs : Inputs.t option; [@default None]
 }
 [@@deriving yojson { strict = false; meta = true }, make, show, eq]

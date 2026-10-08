@@ -36,6 +36,21 @@ module Sql = struct
       /% Var.uuid "user_id")
 end
 
+(* [target], the subject's capabilities, when the caller is the subject or may act on it as
+   {!Common.authority} decides: the rule the writes apply, not the containment the read does. *)
+let shown_capabilities ~actor ~user ~target target_user_id visibility =
+  match (Uuidm.equal (Sgs_user.id user) target_user_id, visibility) with
+  | true, _ -> Some target
+  | false, Common.Partial _ ->
+      (* [actor] leaves a tenant of the subject's unreached, which [Common.authority] refuses (an
+         installation admin reaches every tenant, so is never answered [Partial]). [Partial] does
+         not carry the withheld tenants it would need to say so itself. *)
+      None
+  | false, Common.Complete tenants -> (
+      match Common.authority ~actor ~target ~target_tenants:tenants with
+      | Ok () -> Some target
+      | Error (`Forbidden_peer_or_greater_err | `Forbidden_tenant_scope_err) -> None)
+
 let run _config storage target_user_id =
   Sgs_user_session.with_session
     ~caps:Sgs_user_session.Caps.(or_ users_manage_some (is_user target_user_id))
@@ -71,6 +86,15 @@ let run _config storage target_user_id =
                       avatar_url;
                       auth_origin;
                       admin_rights = Common.admin_rights capabilities;
+                      capabilities =
+                        CCOption.map
+                          Sg_caps_json.to_wire
+                          (shown_capabilities
+                             ~actor:actor_caps
+                             ~user
+                             ~target:capabilities
+                             target_user_id
+                             visibility);
                       tenants = CCList.map Sgs_tenant.to_api tenants;
                       tenants_complete;
                       created_at;

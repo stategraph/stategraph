@@ -522,6 +522,11 @@ let migrations =
        it. The dispatcher records a miss on every trigger, re-runs the task on its next schedule,
        and deletes the row at three. *)
     ("schedule-misses", run_sql [%blob "./migrations/2026-10-04-schedule-misses.sql"]);
+    (* RFD 1008 Phase 0: [hcl_hints] and [transaction_hints].  A hint becomes node-local and
+       body-relative and the server expands it, and that expansion writes rows for nodes outside the
+       transaction.  [hcl.hints] cannot hold them without breaking the property that no runtime code
+       writes an [hcl] row outside [tx_rows]. *)
+    ("add-hcl-hints-tables", run_sql [%blob "./migrations/2026-09-18-add-hcl-hints-tables.sql"]);
   ]
 
 let run config storage = Mig.run { Migrate.config; storage; tx = () } migrations

@@ -94,6 +94,14 @@ val map_in_expr :
   Hcl_parser_value.Expr.t ->
   Hcl_parser_value.Expr.t
 
+(** [fold_expr ~f ~init expr] is {!map_in_expr} with an accumulator that the walk passes down and
+    back, starting from [init]. *)
+val fold_expr :
+  f:('a -> Hcl_parser_value.Expr.t -> ('a * Hcl_parser_value.Expr.t) option) ->
+  init:'a ->
+  Hcl_parser_value.Expr.t ->
+  'a * Hcl_parser_value.Expr.t
+
 (** [find_attr name body] returns the expression of the first attribute named [name] in [body], or
     [None] if no such attribute exists. *)
 val find_attr : string -> Hcl_parser_value.t list -> Hcl_parser_value.Expr.t option

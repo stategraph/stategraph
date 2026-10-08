@@ -8,6 +8,17 @@ val map_in_expr :
   Hcl_parser_value.Expr.t ->
   Hcl_parser_value.Expr.t
 
+(** [map_accum_in_expr f acc expr] is {!map_in_expr} with an accumulator that flows through the walk
+    in evaluation order, left to right. [f] sees the accumulator of the walk so far. When it returns
+    [Some (acc, replacement)], the walk uses both and does not recurse into the replacement. When it
+    returns [None], the walk recurses into the children of [expr]. A caller uses it to carry a
+    state, for example a budget, down a rewrite and back, without a mutable value. *)
+val map_accum_in_expr :
+  ('a -> Hcl_parser_value.Expr.t -> ('a * Hcl_parser_value.Expr.t) option) ->
+  'a ->
+  Hcl_parser_value.Expr.t ->
+  'a * Hcl_parser_value.Expr.t
+
 (** [map_in_template_part f part] walks the expressions embedded in [part] (and recursively into
     nested template parts for [If_directive] / [For_directive] bodies), applying [f] via
     [map_in_expr]. Strip-marker and vars metadata is preserved as-is. *)

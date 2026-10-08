@@ -520,25 +520,48 @@ let remote_tf_state_all_outputs_sentinel_addr = "<*all-outputs*>"
    at" guard. *)
 let module_all_outputs_attr = "<*all-outputs*>"
 
-let address_of_reference ref_ =
+(* The address a reference resolves to, as tokens.  One match, so that a caller which needs to
+   inspect what the address consumed does not have to take the joined string apart again -- which is
+   the thing RFD 1008 forbids of SQL and which is no better done here.
+
+   [address_of_reference] is the join of this, and [attr_path_of_reference] beside it consumes the
+   same token counts; the file header already says those two must agree. *)
+let address_tokens_of_reference ref_ =
   match ref_ with
-  | [ s ] when s = remote_tf_state_all_outputs_sentinel_addr -> Some s
-  | "data" :: type_ :: name :: _ -> Some (String.concat "." [ "data"; type_; name ])
+  | [ s ] when s = remote_tf_state_all_outputs_sentinel_addr -> Some [ s ]
+  | "data" :: type_ :: name :: _ -> Some [ "data"; type_; name ]
   (* Ephemeral resources are 3-token (ephemeral.<type>.<name>), like data sources;
      keep the instance name so the edge matches the block node. *)
-  | "ephemeral" :: type_ :: name :: _ -> Some (String.concat "." [ "ephemeral"; type_; name ])
-  | "outputs" :: name :: _ -> Some (String.concat "." [ "output"; name ])
+  | "ephemeral" :: type_ :: name :: _ -> Some [ "ephemeral"; type_; name ]
+  | "outputs" :: name :: _ -> Some [ "output"; name ]
   (* [module.X.attr] reads a child module's output [attr].  The graph stores
      that output as a distinct node at [module.X.output.<attr>], so the
      reference must resolve to that full address — not to the module block
      [module.X].  Bare [module.X] (no attr, e.g. inside [keys(module.X)] or
      a whole-module object expression) resolves to the module block. *)
-  | "module" :: name :: attr :: _ -> Some (String.concat "." [ "module"; name; "output"; attr ])
-  | [ "module"; name ] -> Some (String.concat "." [ "module"; name ])
-  | ("var" | "local" | "output" | "terraform") :: name :: _ ->
-      Some (String.concat "." [ List.hd ref_; name ])
-  | _type :: name :: _ -> Some (String.concat "." [ List.hd ref_; name ])
+  | "module" :: name :: attr :: _ -> Some [ "module"; name; "output"; attr ]
+  | [ "module"; name ] -> Some [ "module"; name ]
+  | ("var" | "local" | "output" | "terraform") :: name :: _ -> Some [ List.hd ref_; name ]
+  | _type :: name :: _ -> Some [ List.hd ref_; name ]
   | _ -> None
+
+let address_of_reference ref_ = CCOption.map (String.concat ".") (address_tokens_of_reference ref_)
+
+(* Does the address this reference resolves to name a node?
+
+   It does not when the last token the address consumed is the splat [*]:
+   [module.X.*] gives the address [module.X.output.*], and no node has that address.  The reference
+   is real -- it reads every output of the module -- but the address is not a name, and an edge
+   carrying it points at nothing.
+
+   Not [is_wildcard], which asks whether [*] appears anywhere.  For
+   [aws_instance.web.*.id] the address is [aws_instance.web], which names a node perfectly well and
+   which the apply keeps today; testing for a [*] anywhere would drop that edge and reify too
+   little. *)
+let names_a_node ref_ =
+  match CCOption.map CCList.rev (address_tokens_of_reference ref_) with
+  | Some (last :: _) -> not (CCString.equal last "*")
+  | Some [] | None -> true
 
 (* The companion of {!address_of_reference}: the reference tail beyond the tokens
    that the address consumed — i.e. the attribute path a consumer read within the
