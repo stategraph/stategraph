@@ -1297,6 +1297,33 @@ let test_prechecks_not_inherited_by_a_dir =
           Oth.Assert.List.empty when_modified.V1.When_modified.prechecks)
         dir.V1.Dirs.Dir.workspaces)
 
+(* A pull request that changes nothing the repository manages still has to satisfy a branch
+   protection rule that keys on the apply check, so the completed check of a noop is on unless the
+   configuration turns it off. *)
+let test_apply_requirements_noop_check_default =
+  Oth.test
+    ~name:"apply_requirements: create_completed_apply_check_on_noop defaults to true"
+    (fun _ ->
+      let ar = V1.apply_requirements (config_of_json (`Assoc [])) in
+      if not ar.V1.Apply_requirements.create_completed_apply_check_on_noop then
+        failwith "create_completed_apply_check_on_noop defaults to false")
+
+(* The opt-out is what a repository that wants no such check uses, and it has to survive the
+   parse. *)
+let test_apply_requirements_noop_check_off =
+  Oth.test
+    ~name:"apply_requirements: create_completed_apply_check_on_noop can be turned off"
+    (fun _ ->
+      let json =
+        `Assoc
+          [
+            ("apply_requirements", `Assoc [ ("create_completed_apply_check_on_noop", `Bool false) ]);
+          ]
+      in
+      let ar = V1.apply_requirements (config_of_json json) in
+      if ar.V1.Apply_requirements.create_completed_apply_check_on_noop then
+        failwith "create_completed_apply_check_on_noop ignored the false value")
+
 let test =
   Oth.parallel
     [
@@ -1358,6 +1385,8 @@ let test =
       test_prechecks_round_trip;
       test_prechecks_rejected_in_a_dir;
       test_prechecks_not_inherited_by_a_dir;
+      test_apply_requirements_noop_check_default;
+      test_apply_requirements_noop_check_off;
     ]
 
 let () =

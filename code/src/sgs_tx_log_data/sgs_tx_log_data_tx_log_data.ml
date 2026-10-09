@@ -8,6 +8,8 @@ type t =
   | File_set of Sgs_tx_log_data_file_set.t
   | File_delete of Sgs_tx_log_data_file_delete.t
   | Refresh of Sgs_tx_log_data_refresh.t
+  | Module_set of Sgs_tx_log_data_module_set.t
+  | Module_delete of Sgs_tx_log_data_module_delete.t
 [@@deriving show, eq]
 
 let of_yojson =
@@ -23,6 +25,8 @@ let of_yojson =
        (fun v -> map (fun v -> File_set v) (Sgs_tx_log_data_file_set.of_yojson v));
        (fun v -> map (fun v -> File_delete v) (Sgs_tx_log_data_file_delete.of_yojson v));
        (fun v -> map (fun v -> Refresh v) (Sgs_tx_log_data_refresh.of_yojson v));
+       (fun v -> map (fun v -> Module_set v) (Sgs_tx_log_data_module_set.of_yojson v));
+       (fun v -> map (fun v -> Module_delete v) (Sgs_tx_log_data_module_delete.of_yojson v));
      ])
 
 let to_yojson = function
@@ -35,3 +39,5 @@ let to_yojson = function
   | File_set v -> Sgs_tx_log_data_file_set.to_yojson v
   | File_delete v -> Sgs_tx_log_data_file_delete.to_yojson v
   | Refresh v -> Sgs_tx_log_data_refresh.to_yojson v
+  | Module_set v -> Sgs_tx_log_data_module_set.to_yojson v
+  | Module_delete v -> Sgs_tx_log_data_module_delete.to_yojson v

@@ -1,5 +1,5 @@
 (library
  (name sgs_svc_mngr)
- (libraries abb abbs logs sgs_config sgs_service sgs_storage)
+ (libraries abb abbs logs sgs_service)
  (preprocess
   (pps ppx_deriving.show)))

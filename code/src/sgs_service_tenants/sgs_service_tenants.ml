@@ -80,7 +80,11 @@ module Make (Cloud : Sgs_cloud.S) = struct
   module Ep_invitation_create = Sgs_service_tenants_ep_invitation_create.Make (Cloud)
   module Ep_invitation_reissue = Sgs_service_tenants_ep_invitation_reissue.Make (Cloud)
 
-  type t = unit
+  type t = {
+    config : Sgs_config.t;
+    storage : Sgs_storage.t;
+  }
+
   type 'a Sgs_service.ty += Ty : t Sgs_service.ty
 
   let ty = Ty
@@ -94,10 +98,15 @@ module Make (Cloud : Sgs_cloud.S) = struct
 
   type opt = Sgs_svc_mngr.t
 
-  (* This service needs no config and no storage. *)
-  let start _ = Abbs_fc.return_ok ()
+  (* The routes need the config and the storage, so start loads them like any other dependency. *)
+  let start mgr =
+    let open Abbs_fc.Infix_result_monad in
+    Abbs_fc.Result.all2
+      (Sgs_svc_mngr.load ~name:Sgs_service_config.name Sgs_service_config.Ty mgr)
+      (Sgs_svc_mngr.load ~name:Sgs_service_storage.name Sgs_service_storage.Ty mgr)
+    >>| fun (config, storage) -> { config; storage }
 
-  let routes () config storage =
+  let routes { config; storage } =
     Brtl_rtng.Route.
       [
         (`GET, Rt.user_tenants () --> Sgs_service_tenants_ep_user_tenants.run config storage);
@@ -128,5 +137,5 @@ module Make (Cloud : Sgs_cloud.S) = struct
           Rt.invitation_accept () --> Sgs_service_tenants_ep_invitation_accept.run config storage );
       ]
 
-  let stop () = Abb.Future.return ()
+  let stop _ = Abb.Future.return ()
 end

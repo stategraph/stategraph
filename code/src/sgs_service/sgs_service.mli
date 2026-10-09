@@ -42,8 +42,9 @@ module type S = sig
       [`Start_missing_deps_err] on failure. *)
   val start : opt -> (t, [> start_err ]) result Abb.Future.t
 
-  (** The routes appended to the shared route table. *)
-  val routes : t -> Sgs_config.t -> Sgs_storage.t -> route list
+  (** The routes appended to the shared route table. A service that needs the config or the storage
+      service for its routes loads them in [start] and keeps them in [t]. *)
+  val routes : t -> route list
 
   (** Stop the service after the listener. *)
   val stop : t -> unit Abb.Future.t
@@ -56,7 +57,7 @@ type started = Started : (module S with type t = 'a) * 'a -> started
 val start : (module S with type opt = 'opt) -> 'opt -> (started, start_err) result Abb.Future.t
 
 (** The routes appended to the shared route table. *)
-val routes : started -> Sgs_config.t -> Sgs_storage.t -> route list
+val routes : started -> route list
 
 (** Stop the service. *)
 val stop : started -> unit Abb.Future.t

@@ -27,6 +27,10 @@
         },
         "to_addr": {
           "type": "string"
+        },
+        "to_call": {
+          "description": "The label of the child module call whose output this edge reads (RFD 1008 Phase 2), when to_addr is module.<label>.output.<name> in the coordinates of the block. The server derives it at ingest, because SQL does not take an address apart. Absent for each other edge.",
+          "type": "string"
         }
       },
       "required": [
@@ -56,6 +60,62 @@
       ],
       "type": "object"
     },
+    "file_read": {
+      "additionalProperties": false,
+      "description": "One read of a path by a block of a module body at one call path (RFD 1008 Phase 2, A read). The collector fields are those of Sg_tf_eval_files.File_ref.wire, except the path, which is the path of the file_set that holds the read.",
+      "properties": {
+        "call_key": {
+          "description": "The call key of the read (Sg_tf_eval_files.compute_call_key). With the block, it names the use site.",
+          "type": "string"
+        },
+        "call_path": {
+          "description": "The labels of the module calls from the root to the module of the block.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "file_function": {
+          "type": "string"
+        },
+        "fileset_rel": {
+          "description": "For a member of a fileset read: the path of the member relative to the folder of the fileset.",
+          "type": "string"
+        },
+        "inlined_file_expr": {
+          "type": "string"
+        },
+        "node_id": {
+          "description": "The id of the block relative to its module.",
+          "type": "string"
+        },
+        "refs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "template_vars": {
+          "items": {
+            "$ref": "#/definitions/template_var_ref"
+          },
+          "type": "array"
+        },
+        "tf_module": {
+          "$ref": "#/definitions/tf_module_key"
+        }
+      },
+      "required": [
+        "call_path",
+        "node_id",
+        "tf_module",
+        "call_key",
+        "file_function",
+        "refs",
+        "template_vars"
+      ],
+      "type": "object"
+    },
     "file_set": {
       "additionalProperties": false,
       "properties": {
@@ -78,6 +138,17 @@
         "node_id": {
           "type": "string"
         },
+        "present": {
+          "description": "Whether a file is at the path (RFD 1008 Phase 2, the presence node). A path that a read names has a row also when no file is at it: an absent file, or a folder. Such a row has no content, and present is false. Absent means true.",
+          "type": "boolean"
+        },
+        "reads": {
+          "description": "The reads of this path by the blocks of module bodies at the call path of the row (RFD 1008 Phase 2, Files). A block of the root sends its reads in hcl_set.file_refs. The apply writes each read into filepath_refs, and removes each committed read of a body block of this path that the list does not hold. A client sends the list on each file_set, also when it is empty. Absent means that the reads of the path do not change, as for the capture of a file that an apply wrote.",
+          "items": {
+            "$ref": "#/definitions/file_read"
+          },
+          "type": "array"
+        },
         "template_vars": {
           "items": {
             "type": "string"
@@ -99,8 +170,14 @@
     "hcl_delete": {
       "additionalProperties": false,
       "properties": {
+        "body_id": {
+          "type": "string"
+        },
         "node_id": {
           "type": "string"
+        },
+        "tf_module": {
+          "$ref": "#/definitions/tf_module_key"
         }
       },
       "required": [
@@ -112,6 +189,13 @@
       "additionalProperties": false,
       "properties": {
         "block_type": {},
+        "body_id": {
+          "description": "The id of the block relative to its module, for a block of a module body. node_id is then the revision key of the block (Sg_node.Id.of_tf_module_hcl).",
+          "type": "string"
+        },
+        "child_module": {
+          "$ref": "#/definitions/tf_module_key"
+        },
         "data": {},
         "depends_on_addresses": {
           "items": {
@@ -137,6 +221,18 @@
         },
         "module": {
           "type": "string"
+        },
+        "module_input_edges": {
+          "items": {
+            "$ref": "#/definitions/module_input_edge"
+          },
+          "type": "array"
+        },
+        "module_input_files": {
+          "items": {
+            "$ref": "#/definitions/module_input_file"
+          },
+          "type": "array"
         },
         "module_input_refs": {},
         "module_inputs": {},
@@ -172,6 +268,9 @@
         },
         "remote_state": {},
         "remote_tf_state_refs": {},
+        "tf_module": {
+          "$ref": "#/definitions/tf_module_key"
+        },
         "unconditional_seed": {
           "description": "Whether the walk must seed this block on EVERY plan, whatever the change. The server derives it at ingest and a client never sends it.\n\nA terraform_data with triggers_replace, and a null_resource with triggers, is replaced when the trigger's VALUE moves. Where that value is a function of the configuration the block reads what the trigger reads, the relation holds a reads edge for each of those reads, and the expansion carries a change along it -- the block needs no seed of its own and this is FALSE. Where it is not -- timestamp() is the case that matters -- no edge can carry it, because no line of the configuration moved, and this is TRUE.\n\nPRESENT, TRUE OR FALSE, on exactly the blocks of those two types that carry a trigger attribute; absent on every other block. ABSENT ON ONE OF THOSE TWO means the row predates this field, and the walk then seeds it by the block's shape, which is the rule this replaced -- wider than necessary, and never narrower.",
           "type": "boolean"
@@ -193,6 +292,142 @@
         "module_input_refs",
         "module_inputs",
         "file_refs"
+      ],
+      "type": "object"
+    },
+    "module_delete": {
+      "additionalProperties": false,
+      "properties": {
+        "node_id": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "node_id",
+        "source",
+        "version"
+      ],
+      "type": "object"
+    },
+    "module_input": {
+      "additionalProperties": false,
+      "description": "What ingest derives of one argument of a module call: the value of each member of the module_inputs of the call, keyed by the name of the argument.",
+      "properties": {
+        "hash": {
+          "description": "The SHA-256, in hexadecimal, of the argument expression and of the meta-argument expressions it reads.",
+          "type": "string"
+        },
+        "meta_args": {
+          "description": "The meta-arguments (for_each, count) that the argument reads through each or count, sorted.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "selectors": {
+          "description": "The members that the argument names with no evaluation. Absent when it names none.",
+          "items": {
+            "$ref": "#/definitions/module_input_selector"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "hash",
+        "meta_args"
+      ],
+      "type": "object"
+    },
+    "module_input_edge": {
+      "additionalProperties": false,
+      "description": "One read that the argument of a module call makes, for the child variable that the argument fills (RFD 1008 Phase 2). The subgraph walk joins the child variable to its producer on these fields, in the coordinates of the body that holds the call.",
+      "properties": {
+        "input": {
+          "description": "The name of the child variable.",
+          "type": "string"
+        },
+        "to_addr": {
+          "description": "The address the argument reads, in the coordinates of the body that holds the call.",
+          "type": "string"
+        },
+        "to_call": {
+          "description": "The label of the child call whose output to_addr names, as for an edge.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "input",
+        "to_addr"
+      ],
+      "type": "object"
+    },
+    "module_input_file": {
+      "additionalProperties": false,
+      "description": "One file read inside the argument of a module call (RFD 1008 Phase 2): the name of the child variable the argument fills, and the call key of the read, as the file_refs of the call key it. The subgraph walk joins a changed file to the argument that reads it on these fields.",
+      "properties": {
+        "call_key": {
+          "type": "string"
+        },
+        "input": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "input",
+        "call_key"
+      ],
+      "type": "object"
+    },
+    "module_input_selector": {
+      "additionalProperties": false,
+      "description": "The one member of a block that the argument of a module call reads, when the argument names it with no evaluation: p[\"K\"], p[0] or lookup(p, \"K\", d) (RFD 1008 Phase 2).",
+      "properties": {
+        "kind": {
+          "description": "The kind of the member: string for a key, int for an index.",
+          "type": "string"
+        },
+        "to": {
+          "description": "The address of the block that the argument reads one member of. It is in the coordinates of the body that holds the call, or, when to_call is set, in the coordinates of the body of that child call (output.<name>).",
+          "type": "string"
+        },
+        "to_call": {
+          "description": "The label of the child call of the body that holds the call, when the block is an output of that child call. Absent for every other block.",
+          "type": "string"
+        },
+        "val": {
+          "description": "The key (a JSON string) or the index (a JSON integer) of the member."
+        }
+      },
+      "required": [
+        "to",
+        "kind",
+        "val"
+      ],
+      "type": "object"
+    },
+    "module_set": {
+      "additionalProperties": false,
+      "properties": {
+        "node_id": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "node_id",
+        "source",
+        "version"
       ],
       "type": "object"
     },
@@ -412,6 +647,42 @@
       ],
       "type": "object"
     },
+    "template_var_ref": {
+      "additionalProperties": false,
+      "properties": {
+        "var_name": {
+          "type": "string"
+        },
+        "var_refs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "var_name",
+        "var_refs"
+      ],
+      "type": "object"
+    },
+    "tf_module_key": {
+      "additionalProperties": false,
+      "description": "The key of one module of tf_modules (RFD 1008 Phase 2). For a local module, source is its directory relative to the root module after normalization (svc, svc/m, ../shared) and version is the empty string.",
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "version"
+      ],
+      "type": "object"
+    },
     "tfvar_delete": {
       "additionalProperties": false,
       "properties": {
@@ -511,6 +782,12 @@
         },
         {
           "$ref": "#/definitions/refresh"
+        },
+        {
+          "$ref": "#/definitions/module_set"
+        },
+        {
+          "$ref": "#/definitions/module_delete"
         }
       ]
     }

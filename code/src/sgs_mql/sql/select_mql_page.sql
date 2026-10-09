@@ -247,7 +247,13 @@ hcl as not materialized (
     h.path_attrs as path_attrs,
     h.refs as refs,
     h.state_id as state_id,
-    h.updated_at as updated_at
+    h.updated_at as updated_at,
+    -- RFD 1008 Phase 2: the local module a [module] block reaches, and the reads
+    -- of each of its arguments, which a reader outside the walk needs to make the
+    -- edge from a child [variable] to what its call gives it.
+    h.child_source as child_source,
+    h.child_version as child_version,
+    h.module_input_edges as module_input_edges
   from hcl as h
   inner join states as s
     on s.id = h.state_id
@@ -265,7 +271,8 @@ hcl_refs as not materialized (
     coalesce(hr.index_val, 'null'::jsonb) as index_val,
     hr.is_bare as is_bare,
     hr.resolvable as resolvable,
-    hr.from_depends_on as from_depends_on
+    hr.from_depends_on as from_depends_on,
+    hr.to_call as to_call
   from hcl_refs as hr
   inner join states as s
     on s.id = hr.state_id
@@ -294,7 +301,10 @@ tf_module_hcl as not materialized (
     tmh.refs as refs,
     tmh.path_attrs as path_attrs,
     tmh.created_at as created_at,
-    tmh.updated_at as updated_at
+    tmh.updated_at as updated_at,
+    tmh.child_source as child_source,
+    tmh.child_version as child_version,
+    tmh.module_input_edges as module_input_edges
   from tf_module_hcl as tmh
   inner join states as s
     on s.id = tmh.state_id
@@ -311,10 +321,62 @@ tf_module_hcl_refs as not materialized (
     coalesce(tmr.index_val, 'null'::jsonb) as index_val,
     tmr.is_bare as is_bare,
     tmr.resolvable as resolvable,
-    tmr.from_depends_on as from_depends_on
+    tmr.from_depends_on as from_depends_on,
+    tmr.to_call as to_call
   from tf_module_hcl_refs as tmr
   inner join states as s
     on s.id = tmr.state_id
+),
+-- RFD 1008 Phase 2, "Module connections".  One row for each call path to a
+-- module: [[]] is the root, and [p || c] is a call path for each call path [p]
+-- and each [module] block [c] of the body at [p] that names a module.  The
+-- number of calls of a module is the number of its rows.  A call whose module
+-- is already on its own path is not followed: Terraform refuses a module that
+-- calls itself, and a state that holds one must still give a finite answer.
+-- [Sgs_reifier_subgraph2_calls.View] is the OCaml counterpart, and
+-- the integration test [tf_module_calls_witness] compares the two.
+--
+-- The recursion is local to this CTE, thus each name that it reads is a
+-- tenant-scoped CTE above.  The label is the first label of the parsed block,
+-- and [module_address] is built from the labels; no address is taken apart.
+tf_module_calls as not materialized (
+  with recursive call_paths (state_id, call_path, source, version, path_sources, path_versions) as (
+    select h.state_id,
+           array[coalesce(h.data->0->'labels'->>0, '')],
+           h.child_source,
+           coalesce(h.child_version, ''),
+           array['', h.child_source],
+           array['', coalesce(h.child_version, '')]
+    from hcl as h
+    where h.module_address = ''
+      and h.data->0->>'type' = 'module'
+      and h.child_source is not null
+      and (h.child_source, coalesce(h.child_version, '')) <> ('', '')
+    union all
+    select p.state_id,
+           p.call_path || coalesce(b.data->0->'labels'->>0, ''),
+           b.child_source,
+           coalesce(b.child_version, ''),
+           p.path_sources || b.child_source,
+           p.path_versions || coalesce(b.child_version, '')
+    from call_paths as p
+    inner join tf_module_hcl as b
+      on b.state_id = p.state_id
+     and b.source = p.source
+     and b.version = p.version
+    where b.data->0->>'type' = 'module'
+      and b.child_source is not null
+      and not exists (
+        select 1
+        from unnest(p.path_sources, p.path_versions) as on_path (source, version)
+        where (on_path.source, on_path.version) = (b.child_source, coalesce(b.child_version, '')))
+  )
+  select cp.state_id as state_id,
+         cp.call_path as call_path,
+         'module.' || array_to_string(cp.call_path, '.module.') as module_address,
+         cp.source as source,
+         cp.version as version
+  from call_paths as cp
 ),
 files as not materialized (
   select
@@ -324,10 +386,40 @@ files as not materialized (
     f.mode as mode,
     coalesce(f.template_vars, '{}'::text[]) as template_vars,
     f.module_address as module_address,
-    f.id as id
+    f.id as id,
+    -- RFD 1008 Phase 2: a path that a read names has a row also when no file is
+    -- at it, and then [present] is false.
+    f.present as present
   from files as f
   inner join states as s
     on s.id = f.state_id
+),
+-- RFD 1008 Phase 2.  The link from a block that reads a file to the file, at one
+-- call.  The reader is named by its call path and its id in its body: a block of
+-- a body has its module in [body_source] and [body_version], and a block of the
+-- root has neither and the empty call path.
+filepath_refs as not materialized (
+  select
+    fr.state_id as state_id,
+    fr.id as id,
+    fr.call_path as call_path,
+    fr.body_source as body_source,
+    fr.body_version as body_version,
+    fr.ref as ref,
+    fr.filepath as filepath,
+    fr.template_var as template_var,
+    fr.file_id as file_id,
+    -- The read itself: its call key, which names the use site with the block, and
+    -- the collector fields.
+    fr.call_key as call_key,
+    fr.file_function as file_function,
+    fr.refs as refs,
+    fr.template_vars as template_vars,
+    fr.fileset_rel as fileset_rel,
+    fr.inlined_file_expr as inlined_file_expr
+  from filepath_refs as fr
+  inner join states as s
+    on s.id = fr.state_id
 ),
 tfvars as not materialized (
   select

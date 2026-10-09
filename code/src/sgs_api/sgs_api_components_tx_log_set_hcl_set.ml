@@ -24,13 +24,13 @@ module Data = struct
   end
 
   type t = {
+    child_module : Sgs_tx_log_data_tf_module_key.t option; [@default None]
     data : Data.t;
     file : string;
     file_refs : File_refs.t option; [@default None]
     hints : Sgs_tx_log_hints_hints.t option; [@default None]
-    module_ : string; [@key "module"]
-    module_source : string option; [@default None]
     ref_hints : Ref_hints.t option; [@default None]
+    tf_module : Sgs_tx_log_data_tf_module_key.t option; [@default None]
   }
   [@@deriving yojson { strict = false; meta = true }, show, eq]
 end

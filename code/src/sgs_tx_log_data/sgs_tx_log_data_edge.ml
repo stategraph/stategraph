@@ -19,5 +19,6 @@ type t = {
   names_a_node : bool option; [@default None]
   resolvable : bool;
   to_addr : string;
+  to_call : string option; [@default None]
 }
 [@@deriving yojson { strict = false; meta = true }, make, show, eq]

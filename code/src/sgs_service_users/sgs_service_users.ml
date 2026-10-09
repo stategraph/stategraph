@@ -43,7 +43,11 @@ module Rt = struct
     Brtl_rtng.Route.(api_v1 () / "users" / "set-instance-admin" /? Query.uuid "user_id")
 end
 
-type t = unit
+type t = {
+  config : Sgs_config.t;
+  storage : Sgs_storage.t;
+}
+
 type 'a Sgs_service.ty += Ty : t Sgs_service.ty
 
 let ty = Ty
@@ -57,9 +61,15 @@ let name = "users"
 
 type opt = Sgs_svc_mngr.t
 
-let start _ = Abbs_fc.return_ok ()
+(* The routes need the config and the storage, so start loads them like any other dependency. *)
+let start mgr =
+  let open Abbs_fc.Infix_result_monad in
+  Abbs_fc.Result.all2
+    (Sgs_svc_mngr.load ~name:Sgs_service_config.name Sgs_service_config.Ty mgr)
+    (Sgs_svc_mngr.load ~name:Sgs_service_storage.name Sgs_service_storage.Ty mgr)
+  >>| fun (config, storage) -> { config; storage }
 
-let routes () config storage =
+let routes { config; storage } =
   Brtl_rtng.Route.
     [
       ( `GET,
@@ -85,4 +95,4 @@ let routes () config storage =
         --> Sgs_service_users_ep_set_instance_admin.run config storage );
     ]
 
-let stop () = Abb.Future.return ()
+let stop _ = Abb.Future.return ()

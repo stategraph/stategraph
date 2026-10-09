@@ -37,7 +37,11 @@ module Rt = struct
 end
 
 module Make (L : LICENSE) = struct
-  type t = unit
+  type t = {
+    config : Sgs_config.t;
+    storage : Sgs_storage.t;
+  }
+
   type 'a Sgs_service.ty += Ty : t Sgs_service.ty
 
   let ty = Ty
@@ -52,26 +56,24 @@ module Make (L : LICENSE) = struct
   type opt = Sgs_svc_mngr.t
 
   let start mgr =
-    let open Abb.Future.Infix_monad in
-    Abbs_fc.Result.all2 (Sgs_svc_mngr.config mgr) (Sgs_svc_mngr.storage mgr)
-    >>= function
-    | Error `Config_err ->
-        Abbs_fc.return_err (`Start_err "SERVICE_MANAGER : could not get the config")
-    | Error `Storage_err ->
-        Abbs_fc.return_err (`Start_err "SERVICE_MANAGER : could not get the storage")
-    | Ok (config, storage) -> (
-        Pgsql_pool.with_conn storage ~f:(may_start ~requirement:L.requirement config)
-        >>| function
-        | Ok true -> Ok ()
-        | Ok false ->
-            Error
-              (`Start_err
-                 "LICENSE_REQUIRED : This installation has users but no valid license. Set \
-                  STATEGRAPH_LICENSE_KEY to a valid license key and restart.")
-        | Error (#Pgsql_pool.err as err) -> Error (`Start_err (Pgsql_pool.show_err err))
-        | Error (#Pgsql_io.err as err) -> Error (`Start_err (Pgsql_io.show_err err)))
+    let open Abbs_fc.Infix_result_monad in
+    Abbs_fc.Result.all2
+      (Sgs_svc_mngr.load ~name:Sgs_service_config.name Sgs_service_config.Ty mgr)
+      (Sgs_svc_mngr.load ~name:Sgs_service_storage.name Sgs_service_storage.Ty mgr)
+    >>= fun (config, storage) ->
+    Pgsql_pool.with_conn storage ~f:(may_start ~requirement:L.requirement config)
+    |> Abbs_fc.Result.map_err ~f:(function
+      | #Pgsql_pool.err as err -> `Start_err (Pgsql_pool.show_err err)
+      | #Pgsql_io.err as err -> `Start_err (Pgsql_io.show_err err))
+    >>? function
+    | true -> Ok { config; storage }
+    | false ->
+        Error
+          (`Start_err
+             "LICENSE_REQUIRED : This installation has users but no valid license. Set \
+              STATEGRAPH_LICENSE_KEY to a valid license key and restart.")
 
-  let routes () config storage =
+  let routes { config; storage } =
     Brtl_rtng.Route.
       [
         (`POST, Rt.setup_complete () --> L.setup_complete config storage);
@@ -79,5 +81,5 @@ module Make (L : LICENSE) = struct
         (`GET, Rt.license_status () --> L.license_status config storage);
       ]
 
-  let stop () = Abb.Future.return ()
+  let stop _ = Abb.Future.return ()
 end

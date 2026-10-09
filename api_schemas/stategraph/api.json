@@ -4836,7 +4836,9 @@
               "tfvar_ephemeral",
               "file_set",
               "file_delete",
-              "refresh"
+              "refresh",
+              "module_set",
+              "module_delete"
             ],
             "type": "string"
           },
@@ -4859,7 +4861,9 @@
               "state_metadata",
               "tfvar",
               "file",
-              "refresh"
+              "refresh",
+              "tf_module_hcl",
+              "module"
             ],
             "type": "string"
           },
@@ -4908,6 +4912,12 @@
           },
           {
             "$ref": "#/components/schemas/tx_log_set_refresh"
+          },
+          {
+            "$ref": "#/components/schemas/tx_log_set_module_set"
+          },
+          {
+            "$ref": "#/components/schemas/tx_log_set_module_delete"
           }
         ]
       },
@@ -4991,6 +5001,9 @@
               "node_id": {
                 "description": "Stringified Sg_node.Id of the HCL block to delete.",
                 "type": "string"
+              },
+              "tf_module": {
+                "$ref": "tx_log_data.json#/definitions/tf_module_key"
               }
             },
             "required": [
@@ -5024,6 +5037,9 @@
           "data": {
             "additionalProperties": false,
             "properties": {
+              "child_module": {
+                "$ref": "tx_log_data.json#/definitions/tf_module_key"
+              },
               "data": {
                 "description": "AST-encoded HCL block, as produced by Hcl_parser_value_json.Safe.of_ast on a single element."
               },
@@ -5037,31 +5053,79 @@
               "hints": {
                 "$ref": "tx_log_hints.json#/definitions/hints"
               },
-              "module": {
-                "description": "Fully-qualified module address that owns this block. Empty string for the root module.",
-                "type": "string"
-              },
-              "module_source": {
-                "description": "Raw [source] argument of the enclosing module call. Null for the root module.",
-                "type": "string"
-              },
               "ref_hints": {
                 "description": "Module-output ref hints used to bridge dynamic module.X[*].out lookups. Presence (even as []) is authoritative on the server.",
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
+              },
+              "tf_module": {
+                "$ref": "tx_log_data.json#/definitions/tf_module_key"
               }
             },
             "required": [
               "file",
-              "module",
               "data"
             ],
             "type": "object"
           },
           "object_type": {
             "const": "hcl",
+            "type": "string"
+          },
+          "state_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "object_type",
+          "state_id",
+          "data"
+        ],
+        "type": "object"
+      },
+      "tx_log_set_module_delete": {
+        "additionalProperties": false,
+        "description": "RFD 1008 Phase 2. Removes one module, named by data, from tf_modules when the transaction applies. The stored body of the module goes with it.",
+        "properties": {
+          "action": {
+            "const": "module_delete",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "tx_log_data.json#/definitions/tf_module_key"
+          },
+          "object_type": {
+            "const": "module",
+            "type": "string"
+          },
+          "state_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "object_type",
+          "state_id",
+          "data"
+        ],
+        "type": "object"
+      },
+      "tx_log_set_module_set": {
+        "additionalProperties": false,
+        "description": "RFD 1008 Phase 2. Adds one module, named by data, to tf_modules when the transaction applies. The blocks of its body travel as hcl_set entries whose tf_module names the module. A module that is already present stays as it is.",
+        "properties": {
+          "action": {
+            "const": "module_set",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "tx_log_data.json#/definitions/tf_module_key"
+          },
+          "object_type": {
+            "const": "module",
             "type": "string"
           },
           "state_id": {

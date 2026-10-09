@@ -109,33 +109,48 @@ end
 
 module Make (Cloud : Sgs_cloud.S) = struct
   module Server = Sgs_server.Make (Cloud)
+  module Config_service = Sgs_service_config.Make (Cloud)
 
   (* Runs the server with the build's services. Stopping the manager at the end stops those
-     services too. *)
-  let run_server ~services config storage mgr =
+     services too. The config and the storage services are registered first, so every service
+     loads them like any other dependency; the boot loads the values itself for the listener. *)
+  let run_server ~services mgr =
     let open Abb.Future.Infix_monad in
-    (* The manager starts the build's services, so the routes come from what it started. *)
-    Sgs_svc_mngr.start_services mgr services
+    Sgs_svc_mngr.register' mgr ((module Config_service) :: (module Sgs_service_storage) :: services)
     >>= function
-    | Ok started ->
-        let routes = CCList.flat_map (fun s -> Sgs_service.routes s config storage) started in
-        Abbs_fc.with_finally
-          (fun () -> Server.run ~routes config storage)
-          ~finally:(fun () -> Sgs_svc_mngr.stop mgr)
-        >>| fun () -> Ok ()
-    | Error err -> Abb.Future.return (Error err)
+    | Error `Register_err ->
+        Abb.Future.return (Error (`Start_err "SERVICE_MANAGER : could not register the services"))
+    | Ok () -> (
+        (* A service whose start never succeeds keeps this undetermined, so the boot waits here
+           until every service is up. *)
+        Sgs_svc_mngr.started mgr
+        >>= fun () ->
+        Abbs_fc.Result.all2
+          (Sgs_svc_mngr.load ~name:Sgs_service_config.name Sgs_service_config.Ty mgr)
+          (Sgs_svc_mngr.load ~name:Sgs_service_storage.name Sgs_service_storage.Ty mgr)
+        >>= function
+        | Ok (config, storage) -> (
+            print_endline (Sgs_config.show config);
+            Sgs_svc_mngr.routes mgr Sgs_service.routes
+            >>= function
+            | Ok routes ->
+                Abbs_fc.with_finally
+                  (fun () -> Server.run ~routes config storage)
+                  ~finally:(fun () -> Sgs_svc_mngr.stop mgr)
+                >>| fun () -> Ok ()
+            | Error `Routes_err ->
+                Abb.Future.return
+                  (Error (`Start_err "SERVICE_MANAGER : could not collect the routes")))
+        | Error (#Sgs_service.start_err as err) -> Abb.Future.return (Error err))
 
-  let server' ~services config =
+  let server' ~services =
     let run () =
       let open Abb.Future.Infix_monad in
-      Sgs_storage.create config
-      >>= fun storage ->
-      Sgs_svc_mngr.start config storage
+      Sgs_svc_mngr.start ()
       >>= function
       | Error `Start_err -> Abbs_fc.return_err (`Start_err "Could not start the service manager")
-      | Ok mgr -> run_server ~services config storage mgr
+      | Ok mgr -> run_server ~services mgr
     in
-    print_endline (Sgs_config.show config);
     let result = Abb.Scheduler.run_with_state run in
     match result with
     | `Det (Ok ()) -> ()
@@ -150,17 +165,12 @@ module Make (Cloud : Sgs_cloud.S) = struct
           bt_opt;
         assert false
 
+  let server ~services () = server' ~services
+
   let config_github_app_managed () =
     match Cloud.github_app () with
     | `Deployment -> true
     | `Console -> false
-
-  let server ~services () =
-    match Sgs_config.create ~github_app_managed:(config_github_app_managed ()) () with
-    | Ok config -> server' ~services config
-    | Error (#Sgs_config.err as err) ->
-        Logs.err (fun m -> m "Config file failed to load %a" Sgs_config.pp_err err);
-        exit 1
 
   let migrate () =
     match Sgs_config.create ~github_app_managed:(config_github_app_managed ()) () with
