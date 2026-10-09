@@ -362,9 +362,9 @@ module Ast = struct
     and mk_order_by = function
       | [] -> assert false
       | x :: xs ->
-          CCListLabels.fold_right
+          CCListLabels.fold_left
             ~init:(D.order_by_expr @@ mk_order_by_expr x)
-            ~f:(fun x acc -> D.order_by_exprs acc @@ mk_order_by_expr x)
+            ~f:(fun acc x -> D.order_by_exprs acc @@ mk_order_by_expr x)
             xs
 
     and mk_group_by_exprs = function

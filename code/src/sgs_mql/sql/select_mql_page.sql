@@ -277,6 +277,20 @@ hcl_refs as not materialized (
   inner join states as s
     on s.id = hr.state_id
 ),
+-- RFD 1008 Phase 3, "Where the hint travels and where it is stored".  The stored
+-- hints of each block of the root and of each instance of a body block, by the
+-- id of the instance.  The client reads the [filesets] channel with MQL.  This
+-- CTE comes after [hcl], whose join names the table.
+hcl_hints as not materialized (
+  select
+    hh.state_id as state_id,
+    hh.id as id,
+    hh.expanded as expanded,
+    hh.filesets as filesets
+  from hcl_hints as hh
+  inner join states as s
+    on s.id = hh.state_id
+),
 -- RFD 1008 Phase 1.  The module tables join the [states] anchor directly, the
 -- same as [hcl] and [hcl_refs], and not through the [tf_modules] CTE: a leaf
 -- joins only a materialised anchor.
@@ -378,11 +392,38 @@ tf_module_calls as not materialized (
          cp.version as version
   from call_paths as cp
 ),
+-- RFD 1008 Phase 3.  The scope of each module in the revision of a state: its
+-- scope hash and kind, and the hash of each node of its body.
+tf_module_revision_hashes as not materialized (
+  select
+    tmrh.state_id as state_id,
+    tmrh.source as source,
+    tmrh.version as version,
+    tmrh.kind as kind,
+    tmrh.hash as hash
+  from tf_module_revision_hashes as tmrh
+  inner join states as s
+    on s.id = tmrh.state_id
+),
+tf_module_revision_node_hashes as not materialized (
+  select
+    tmrn.state_id as state_id,
+    tmrn.source as source,
+    tmrn.version as version,
+    tmrn.key as key,
+    tmrn.hash as hash
+  from tf_module_revision_node_hashes as tmrn
+  inner join states as s
+    on s.id = tmrn.state_id
+),
 files as not materialized (
   select
     f.state_id as state_id,
     f.filepath as filepath,
     f.content_hash as content_hash,
+    -- RFD 1008 Phase 3: the client reads an inside file of a remote package from
+    -- its row.  The bytes are base64 text, as the [content] of a [file_set].
+    encode(f.content, 'base64') as content,
     f.mode as mode,
     coalesce(f.template_vars, '{}'::text[]) as template_vars,
     f.module_address as module_address,
@@ -416,7 +457,10 @@ filepath_refs as not materialized (
     fr.refs as refs,
     fr.template_vars as template_vars,
     fr.fileset_rel as fileset_rel,
-    fr.inlined_file_expr as inlined_file_expr
+    fr.inlined_file_expr as inlined_file_expr,
+    -- RFD 1008 Phase 3: the entry of the folder read of a member.
+    fr.fileset_dir as fileset_dir,
+    fr.fileset_pattern as fileset_pattern
   from filepath_refs as fr
   inner join states as s
     on s.id = fr.state_id

@@ -15,6 +15,7 @@ type t = {
   call_key : string;
   call_path : Call_path.t;
   file_function : string;
+  fileset : Sgs_tx_log_data_fileset_entry.t option; [@default None]
   fileset_rel : string option; [@default None]
   inlined_file_expr : string option; [@default None]
   node_id : string;

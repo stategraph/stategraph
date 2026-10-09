@@ -136,6 +136,14 @@ let test =
           in
           assert_roundtrip sql;
           ());
+      (* The order of the terms is the order of the keyset of a page, thus the printer keeps it. *)
+      Oth.test ~name:"Roundtrip order by three terms" (fun _ ->
+          let sql =
+            build_str
+              [ "select source, version, id"; "from tf_module_hcl"; "order by source, version, id" ]
+          in
+          assert_roundtrip sql;
+          ());
       Oth.test ~name:"Roundtrip 12" (fun _ ->
           let sql = build_str [ "select count(*)"; "from foo" ] in
           assert_roundtrip sql;

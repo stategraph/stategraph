@@ -280,12 +280,33 @@ let stategraph_tables =
             make ~name:"version" ~type_:Type_.Text ();
           ];
       Table.make
+        ~name:"tf_module_revision_hashes"
+        Column.
+          [
+            make ~name:"state_id" ~type_:Type_.Uuid ();
+            make ~name:"source" ~type_:Type_.Text ();
+            make ~name:"version" ~type_:Type_.Text ();
+            make ~name:"kind" ~type_:Type_.Text ();
+            make ~name:"hash" ~type_:Type_.Text ();
+          ];
+      Table.make
+        ~name:"tf_module_revision_node_hashes"
+        Column.
+          [
+            make ~name:"state_id" ~type_:Type_.Uuid ();
+            make ~name:"source" ~type_:Type_.Text ();
+            make ~name:"version" ~type_:Type_.Text ();
+            make ~name:"key" ~type_:Type_.Text ();
+            make ~name:"hash" ~type_:Type_.Text ();
+          ];
+      Table.make
         ~name:"files"
         Column.
           [
             make ~name:"state_id" ~type_:Type_.Uuid ();
             make ~name:"filepath" ~type_:Type_.Text ();
             make ~name:"content_hash" ~type_:Type_.Text ();
+            make ~name:"content" ~type_:Type_.Text ();
             make ~name:"mode" ~type_:Type_.Integer ();
             make ~name:"template_vars" ~type_:(Type_.Complex "text[]") ();
             make ~name:"module_address" ~type_:Type_.Text ();
@@ -311,6 +332,17 @@ let stategraph_tables =
             make ~name:"template_vars" ~type_:Type_.Jsonb ();
             make ~name:"fileset_rel" ~type_:Type_.Text ();
             make ~name:"inlined_file_expr" ~type_:Type_.Text ();
+            make ~name:"fileset_dir" ~type_:Type_.Text ();
+            make ~name:"fileset_pattern" ~type_:Type_.Text ();
+          ];
+      Table.make
+        ~name:"hcl_hints"
+        Column.
+          [
+            make ~name:"state_id" ~type_:Type_.Uuid ();
+            make ~name:"id" ~type_:Type_.Text ();
+            make ~name:"expanded" ~type_:Type_.Jsonb ();
+            make ~name:"filesets" ~type_:Type_.Jsonb ();
           ];
       Table.make
         ~name:"tfvars"

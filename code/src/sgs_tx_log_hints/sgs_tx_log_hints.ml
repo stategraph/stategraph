@@ -1,4 +1,5 @@
 module File_read_hint = Sgs_tx_log_hints_file_read_hint
+module Fileset_hint_entry = Sgs_tx_log_hints_fileset_hint_entry
 module For_each_body_ref_hint = Sgs_tx_log_hints_for_each_body_ref_hint
 module For_each_file_calls = Sgs_tx_log_hints_for_each_file_calls
 module For_each_ref_hint = Sgs_tx_log_hints_for_each_ref_hint

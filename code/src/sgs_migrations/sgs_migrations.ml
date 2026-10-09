@@ -545,6 +545,13 @@ let migrations =
        body block, so that the apply knows whether it has to make them itself. *)
     ( "transaction-hints-instance",
       run_sql [%blob "./migrations/2026-09-25-transaction-hints-instance.sql"] );
+    (* RFD 1008 Phase 3: a module is a scope of the revision, with its scope hash and the hashes of
+       its nodes, beside the root scope of [revision_hashes]. *)
+    ( "add-tf-module-revision-tables",
+      run_sql [%blob "./migrations/2026-09-30-add-tf-module-revision-tables.sql"] );
+    (* RFD 1008 Phase 3: the fileset hint, on each read of a member of a folder and in the
+       [filesets] channel of the [hcl_hints] row of the instance. *)
+    ("add-fileset-hints", run_sql [%blob "./migrations/2026-09-30-add-fileset-hints.sql"]);
   ]
 
 let run config storage = Mig.run { Migrate.config; storage; tx = () } migrations

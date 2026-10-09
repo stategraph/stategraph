@@ -78,6 +78,9 @@
         "file_function": {
           "type": "string"
         },
+        "fileset": {
+          "$ref": "#/definitions/fileset_entry"
+        },
         "fileset_rel": {
           "description": "For a member of a fileset read: the path of the member relative to the folder of the fileset.",
           "type": "string"
@@ -164,6 +167,25 @@
         "content_hash",
         "mode",
         "template_vars"
+      ],
+      "type": "object"
+    },
+    "fileset_entry": {
+      "additionalProperties": false,
+      "description": "The entry of a folder read in the fileset hint of an instance (RFD 1008 Phase 3, The fileset hint): one fileset(dir, pattern) call with concrete values. The read of each member of the folder carries it.",
+      "properties": {
+        "dir": {
+          "description": "The folder, relative to path.root.",
+          "type": "string"
+        },
+        "pattern": {
+          "description": "The glob.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "dir",
+        "pattern"
       ],
       "type": "object"
     },

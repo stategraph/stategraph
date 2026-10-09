@@ -21,6 +21,30 @@
       ],
       "type": "object"
     },
+    "fileset_hint_entry": {
+      "additionalProperties": false,
+      "description": "One entry of the fileset hint of an instance (RFD 1008 Phase 3, The fileset hint): one fileset(dir, pattern) call with concrete values. The commit writes the entries of each instance into the filesets channel of its hcl_hints row, from the reads of its members; an entry stays while one or more of its members stay. On a later plan the client lists dir with pattern and compares the (path, hash) set with the members of the use site (fq_address, call_key).",
+      "properties": {
+        "call_key": {
+          "description": "The call key of the read (Sg_tf_eval_files.compute_call_key).",
+          "type": "string"
+        },
+        "dir": {
+          "description": "The folder, relative to path.root.",
+          "type": "string"
+        },
+        "pattern": {
+          "description": "The glob.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_key",
+        "dir",
+        "pattern"
+      ],
+      "type": "object"
+    },
     "for_each_body_ref_hint": {
       "additionalProperties": false,
       "description": "One read the iterating block's BODY makes that is not reached through each.*, as the client's canonical expression (RFD 1562, Phase 1). A key's element changing is not the same as an instance changing: an instance's rendered value is a function of what its body reads, and a body reads two kinds of thing -- values reached through each.*, which differ per key, and values reached any other way, which every instance of the block SHARES. A change to a shared read changes every instance, so no key of that block can be pruned. This channel carries the shared reads, and the ABSENCE of an entry is what licenses per-key pruning.",

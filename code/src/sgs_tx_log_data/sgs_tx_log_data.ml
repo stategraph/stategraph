@@ -2,6 +2,7 @@ module Edge = Sgs_tx_log_data_edge
 module File_delete = Sgs_tx_log_data_file_delete
 module File_read = Sgs_tx_log_data_file_read
 module File_set = Sgs_tx_log_data_file_set
+module Fileset_entry = Sgs_tx_log_data_fileset_entry
 module Hcl_delete = Sgs_tx_log_data_hcl_delete
 module Hcl_set = Sgs_tx_log_data_hcl_set
 module Module_delete = Sgs_tx_log_data_module_delete
