@@ -14,7 +14,6 @@
   sg_caps_trie
   sg_version
   sgs_caps_rules
-  sgs_cloud
   sgs_config
   sgs_migrations
   sgs_server

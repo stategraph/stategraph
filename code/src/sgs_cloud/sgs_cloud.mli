@@ -1,6 +1,6 @@
 (** What differs when Stategraph Cloud operates the deployment: how it runs, and the calls to its
-    control plane. The core takes an implementation as a functor argument, so that an edition
-    without Stategraph Cloud does not carry it. *)
+    control plane. The services that depend on it take an implementation as a functor argument, so
+    that an edition without Stategraph Cloud does not carry it. *)
 
 (** The Stategraph user a call to the control plane is attributed to. *)
 type identity = {
