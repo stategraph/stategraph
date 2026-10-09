@@ -1,0 +1,3 @@
+(library
+ (name sgs_service_config)
+ (libraries abbs sgs_cloud sgs_config sgs_service sgs_svc_mngr))

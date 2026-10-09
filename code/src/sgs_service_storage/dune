@@ -1,0 +1,3 @@
+(library
+ (name sgs_service_storage)
+ (libraries abbs sgs_service sgs_service_config sgs_storage sgs_svc_mngr))
