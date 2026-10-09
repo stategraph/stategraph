@@ -192,5 +192,15 @@
     make the body from those rows: the key of a module is its directory relative to the root, which
     only the client reads, and the walk reads no block of a body from [hcl]. Thus a state that is
     behind has no module body the walk can reach, and the re-import this counter forces is what
-    writes one. *)
+    writes one.
+
+    Version 15: a module is a scope of the revision (RFD 1008 Phase 3, Scopes). The node hashes of a
+    module are in [tf_module_revision_node_hashes], with its scope hash and its kind in
+    [tf_module_revision_hashes], and [revision_hashes] holds the root scope only. A state written
+    before this holds the nodes of each module in [revision_hashes] and no scope row, thus its root
+    hash counts the nodes of the modules and the client compares no module scope. No migration can
+    make the kind of a module: only the client knows which module is local. The re-import this
+    counter forces writes each scope. The other changes of Phase 3 to the stored shape (the fileset
+    hints, the identity of a remote call) take this version too, because the phase does not ship in
+    parts. *)
 val version : int

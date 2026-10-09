@@ -2477,6 +2477,7 @@
       },
       "revision-add-request": {
         "additionalProperties": false,
+        "description": "Node hashes of one scope of the revision of a transaction. A scope can hold more nodes than one request, thus a client sends a scope in one or more requests.",
         "properties": {
           "nodes": {
             "items": {
@@ -2484,25 +2485,34 @@
             },
             "type": "array"
           },
+          "scope": {
+            "$ref": "#/components/schemas/revision-scope"
+          },
           "tx_id": {
             "type": "string"
           }
         },
         "required": [
           "tx_id",
+          "scope",
           "nodes"
         ],
         "type": "object"
       },
       "revision-compare-request": {
         "additionalProperties": false,
+        "description": "Compare one scope of the revision of a transaction with the scope that the state holds. The server compares the scope hash first, and compares the node hashes that the transaction holds for the scope only when the scope hash differs.",
         "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/revision-scope"
+          },
           "tx_id": {
             "type": "string"
           }
         },
         "required": [
-          "tx_id"
+          "tx_id",
+          "scope"
         ],
         "type": "object"
       },
@@ -2533,6 +2543,37 @@
         ],
         "type": "object"
       },
+      "revision-module": {
+        "additionalProperties": false,
+        "description": "A module scope of a revision: the identity of a row of tf_modules, and its kind.",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/revision-module-kind"
+          },
+          "source": {
+            "description": "The source of the module: the folder of a local module relative to the root module, or the source text of a remote module.",
+            "type": "string"
+          },
+          "version": {
+            "description": "The version of the module, or the empty string for a local module.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "version",
+          "kind"
+        ],
+        "type": "object"
+      },
+      "revision-module-kind": {
+        "description": "The kind of a module: `local` for a module folder under the root module, `remote` for a downloaded package and for a local module inside it.",
+        "enum": [
+          "local",
+          "remote"
+        ],
+        "type": "string"
+      },
       "revision-node": {
         "additionalProperties": false,
         "properties": {
@@ -2546,6 +2587,70 @@
         "required": [
           "key",
           "hash"
+        ],
+        "type": "object"
+      },
+      "revision-scope": {
+        "additionalProperties": false,
+        "description": "A scope of a revision: the root module, or one module.",
+        "properties": {
+          "hash": {
+            "description": "The scope hash: the SHA-256, in hex, over the key and hash of each node of the scope, in the byte order of the key. The empty string is the scope of a module that is no longer in the configuration, which has no node.",
+            "type": "string"
+          },
+          "module": {
+            "$ref": "#/components/schemas/revision-module"
+          }
+        },
+        "required": [
+          "hash"
+        ],
+        "type": "object"
+      },
+      "revision-scopes-response": {
+        "additionalProperties": false,
+        "description": "The scopes of the revision of a state: the root scope hash, and each module of the state with its scope hash and its kind.",
+        "properties": {
+          "modules": {
+            "description": "Each row of tf_modules of the state.",
+            "items": {
+              "$ref": "#/components/schemas/revision-state-module"
+            },
+            "type": "array"
+          },
+          "root_hash": {
+            "description": "The scope hash of the root module. Absent when the state has no root node.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "modules"
+        ],
+        "type": "object"
+      },
+      "revision-state-module": {
+        "additionalProperties": false,
+        "description": "A row of tf_modules of a state, with its scope.",
+        "properties": {
+          "hash": {
+            "description": "The scope hash of the module. Absent when the module has no scope row.",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/revision-module-kind"
+          },
+          "source": {
+            "description": "The source of the module.",
+            "type": "string"
+          },
+          "version": {
+            "description": "The version of the module, or the empty string for a local module.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "version"
         ],
         "type": "object"
       },
@@ -8152,6 +8257,16 @@
               }
             }
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-response"
+                }
+              }
+            },
+            "description": "The transaction id does not parse."
+          },
           "401": {},
           "404": {
             "description": "The state does not exist, or the caller is not a member of its tenant. The two are deliberately indistinguishable."
@@ -8188,6 +8303,40 @@
           },
           "404": {
             "description": "No revision hashes exist for this state"
+          }
+        }
+      }
+    },
+    "/api/v1/states/{state_id}/revision/scopes": {
+      "get": {
+        "description": "Read the scopes of the revision of a state: the root scope hash, and the source, version, scope hash and kind of each module of the state.",
+        "operationId": "states/revision-scopes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "state_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/revision-scopes-response"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "The state does not exist, or the caller is not a member of its tenant. The two are deliberately indistinguishable."
           }
         }
       }
