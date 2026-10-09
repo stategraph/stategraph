@@ -107,7 +107,7 @@ Prechecks apply only to autoplan. Commenting `terrateam plan` runs the pull requ
 
 #### Prechecks and the apply check
 
-A pull request that a precheck stopped still has to be mergeable. If [`apply_requirements.create_completed_apply_check_on_noop`](/reference/configuration/apply-requirements) is `true`, the completed `terrateam apply` check is created even though no work was done.
+A pull request that a precheck stopped still has to be mergeable. The completed `terrateam apply` check is created by default, so the pull request can merge. No work was done in this case. Set [`apply_requirements.create_completed_apply_check_on_noop`](/reference/configuration/apply-requirements) to `false` to skip the check.
 
 ### Auto-Plan
 The `autoplan` key enables or disables automatic plan operations on new pull requests or updates to existing ones.

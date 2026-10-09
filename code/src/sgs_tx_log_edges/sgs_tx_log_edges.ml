@@ -56,6 +56,7 @@ let edges_of_references ~module_address ~from_depends_on ~selectors refs =
       names_a_node = Some names_a_node;
       resolvable;
       from_depends_on;
+      to_call = None;
     }
   in
   (* A read that names the module and no output depends on EVERY output that the module declares.

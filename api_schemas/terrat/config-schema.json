@@ -84,7 +84,7 @@
           "$ref": "#/definitions/apply-requirements-checks"
         },
         "create_completed_apply_check_on_noop": {
-          "default": false,
+          "default": true,
           "type": "boolean"
         },
         "create_pending_apply_check": {

@@ -11,7 +11,11 @@ module Action = struct
 end
 
 module Data = struct
-  type t = { node_id : string } [@@deriving yojson { strict = false; meta = true }, show, eq]
+  type t = {
+    node_id : string;
+    tf_module : Sgs_tx_log_data_tf_module_key.t option; [@default None]
+  }
+  [@@deriving yojson { strict = false; meta = true }, show, eq]
 end
 
 module Object_type = struct

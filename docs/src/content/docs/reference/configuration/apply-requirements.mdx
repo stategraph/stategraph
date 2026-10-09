@@ -56,7 +56,7 @@ By adjusting these settings, you can customize the apply requirements to match y
 | --- | --- | --- |
 | `checks` | list | List of check entries. The first entry whose `tag_query` matches a directory and workspace is used. `checks` may also be a single object with the `approved`, `merge_conflicts`, and `status_checks` keys, which applies to every directory and workspace. |
 | `create_pending_apply_check` | boolean | Create a pending `terrateam apply` commit status on the pull request until every directory and workspace with changes has been applied. Use it with branch protection to block merging until the apply completes. Default `true`. |
-| `create_completed_apply_check_on_noop` | boolean | Also create a completed `terrateam apply` commit status when the pull request changes nothing that Terrateam manages, so the pull request can be merged when branch protection requires the check. Default `false`. |
+| `create_completed_apply_check_on_noop` | boolean | Also create a completed `terrateam apply` commit status when the pull request changes nothing that Terrateam manages, so the pull request can be merged when branch protection requires the check. Default `true`. |
 
 ### Check Entry Keys
 

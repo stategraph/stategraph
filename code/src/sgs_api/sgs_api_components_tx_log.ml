@@ -4,6 +4,8 @@ module Action = struct
     | `String "file_set" -> Ok `File_set
     | `String "hcl_delete" -> Ok `Hcl_delete
     | `String "hcl_set" -> Ok `Hcl_set
+    | `String "module_delete" -> Ok `Module_delete
+    | `String "module_set" -> Ok `Module_set
     | `String "refresh" -> Ok `Refresh
     | `String "state_delete" -> Ok `State_delete
     | `String "state_set" -> Ok `State_set
@@ -17,6 +19,8 @@ module Action = struct
     | `File_set -> `String "file_set"
     | `Hcl_delete -> `String "hcl_delete"
     | `Hcl_set -> `String "hcl_set"
+    | `Module_delete -> `String "module_delete"
+    | `Module_set -> `String "module_set"
     | `Refresh -> `String "refresh"
     | `State_delete -> `String "state_delete"
     | `State_set -> `String "state_set"
@@ -29,6 +33,8 @@ module Action = struct
      | `File_set
      | `Hcl_delete
      | `Hcl_set
+     | `Module_delete
+     | `Module_set
      | `Refresh
      | `State_delete
      | `State_set
@@ -51,11 +57,13 @@ module Object_type = struct
     | `String "file" -> Ok `File
     | `String "hcl" -> Ok `Hcl
     | `String "instance" -> Ok `Instance
+    | `String "module" -> Ok `Module
     | `String "output" -> Ok `Output
     | `String "provider" -> Ok `Provider
     | `String "refresh" -> Ok `Refresh
     | `String "resource" -> Ok `Resource
     | `String "state_metadata" -> Ok `State_metadata
+    | `String "tf_module_hcl" -> Ok `Tf_module_hcl
     | `String "tfvar" -> Ok `Tfvar
     | json -> Error ("Unknown value: " ^ Yojson.Safe.pretty_to_string json)
 
@@ -65,11 +73,13 @@ module Object_type = struct
     | `File -> `String "file"
     | `Hcl -> `String "hcl"
     | `Instance -> `String "instance"
+    | `Module -> `String "module"
     | `Output -> `String "output"
     | `Provider -> `String "provider"
     | `Refresh -> `String "refresh"
     | `Resource -> `String "resource"
     | `State_metadata -> `String "state_metadata"
+    | `Tf_module_hcl -> `String "tf_module_hcl"
     | `Tfvar -> `String "tfvar"
 
   type t =
@@ -78,11 +88,13 @@ module Object_type = struct
      | `File
      | `Hcl
      | `Instance
+     | `Module
      | `Output
      | `Provider
      | `Refresh
      | `Resource
      | `State_metadata
+     | `Tf_module_hcl
      | `Tfvar
      ]
     [@of_yojson t_of_yojson] [@to_yojson t_to_yojson])
