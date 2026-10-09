@@ -2,9 +2,7 @@
     list of {!Sgs_service.S}; the core starts them, serves their routes next to its own, and stops
     them. *)
 
-(** The command line of an edition, given its Cloud abstraction. *)
-module Make (_ : Sgs_cloud.S) : sig
-  (** Parse [Sys.argv], run the selected subcommand, and exit the process. [services] start in list
-      order and stop in the reverse order. *)
-  val main : services:(module Sgs_service.S with type opt = Sgs_svc_mngr.t) list -> unit
-end
+(** Parse [Sys.argv], run the selected subcommand, and exit the process. [services] start in list
+    order and stop in the reverse order. They include a config service ({!Sgs_service_config.Make}):
+    the server reads its configuration from it. *)
+val main : services:(module Sgs_service.S with type opt = Sgs_svc_mngr.t) list -> unit

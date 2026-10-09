@@ -107,143 +107,133 @@ module Cmdline = struct
   let default_cmd = C.Term.(ret (const (`Help (`Pager, None))))
 end
 
-module Make (Cloud : Sgs_cloud.S) = struct
-  module Server = Sgs_server.Make (Cloud)
-  module Config_service = Sgs_service_config.Make (Cloud)
-
-  (* Runs the server with the build's services. Stopping the manager at the end stops those
-     services too. The config and the storage services are registered first, so every service
-     loads them like any other dependency; the boot loads the values itself for the listener. *)
-  let run_server ~services mgr =
-    let open Abb.Future.Infix_monad in
-    Sgs_svc_mngr.register' mgr ((module Config_service) :: (module Sgs_service_storage) :: services)
-    >>= function
-    | Error `Register_err ->
-        Abb.Future.return (Error (`Start_err "SERVICE_MANAGER : could not register the services"))
-    | Ok () -> (
-        (* A service whose start never succeeds keeps this undetermined, so the boot waits here
+(* Runs the server with the build's services. Stopping the manager at the end stops those
+     services too. The storage service is registered with the build's services, the config service
+     among them, so every service loads both like any other dependency; the boot loads the values
+     itself for the listener. *)
+let run_server ~services mgr =
+  let open Abb.Future.Infix_monad in
+  Sgs_svc_mngr.register' mgr ((module Sgs_service_storage) :: services)
+  >>= function
+  | Error `Register_err ->
+      Abb.Future.return (Error (`Start_err "SERVICE_MANAGER : could not register the services"))
+  | Ok () -> (
+      (* A service whose start never succeeds keeps this undetermined, so the boot waits here
            until every service is up. *)
-        Sgs_svc_mngr.started mgr
-        >>= fun () ->
-        Abbs_fc.Result.all2
-          (Sgs_svc_mngr.load ~name:Sgs_service_config.name Sgs_service_config.Ty mgr)
-          (Sgs_svc_mngr.load ~name:Sgs_service_storage.name Sgs_service_storage.Ty mgr)
-        >>= function
-        | Ok (config, storage) -> (
-            print_endline (Sgs_config.show config);
-            Sgs_svc_mngr.routes mgr Sgs_service.routes
-            >>= function
-            | Ok routes ->
-                Abbs_fc.with_finally
-                  (fun () -> Server.run ~routes config storage)
-                  ~finally:(fun () -> Sgs_svc_mngr.stop mgr)
-                >>| fun () -> Ok ()
-            | Error `Routes_err ->
-                Abb.Future.return
-                  (Error (`Start_err "SERVICE_MANAGER : could not collect the routes")))
-        | Error (#Sgs_service.start_err as err) -> Abb.Future.return (Error err))
-
-  let server' ~services =
-    let run () =
-      let open Abb.Future.Infix_monad in
-      Sgs_svc_mngr.start ()
+      Sgs_svc_mngr.started mgr
+      >>= fun () ->
+      Abbs_fc.Result.all2
+        (Sgs_svc_mngr.load ~name:Sgs_service_config.name Sgs_service_config.Ty mgr)
+        (Sgs_svc_mngr.load ~name:Sgs_service_storage.name Sgs_service_storage.Ty mgr)
       >>= function
-      | Error `Start_err -> Abbs_fc.return_err (`Start_err "Could not start the service manager")
-      | Ok mgr -> run_server ~services mgr
-    in
-    let result = Abb.Scheduler.run_with_state run in
-    match result with
-    | `Det (Ok ()) -> ()
-    | `Det (Error (#Sgs_service.start_err as err)) ->
-        Logs.err (fun m -> m "%a" Sgs_service.pp_start_err err);
-        exit 1
-    | `Aborted -> assert false
-    | `Exn (exn, bt_opt) ->
-        Logs.err (fun m -> m "%s" (Printexc.to_string exn));
-        CCOption.iter
-          (fun bt -> Logs.err (fun m -> m "%s" (Printexc.raw_backtrace_to_string bt)))
-          bt_opt;
-        assert false
-
-  let server ~services () = server' ~services
-
-  let config_github_app_managed () =
-    match Cloud.github_app () with
-    | `Deployment -> true
-    | `Console -> false
-
-  let migrate () =
-    match Sgs_config.create ~github_app_managed:(config_github_app_managed ()) () with
-    | Ok config -> (
-        let run () =
-          let open Abb.Future.Infix_monad in
-          Sgs_storage.create config
-          >>= fun storage ->
-          Sgs_migrations.run config storage
+      | Ok (config, storage) -> (
+          print_endline (Sgs_config.show config);
+          Sgs_svc_mngr.routes mgr Sgs_service.routes
           >>= function
-          | Ok () -> (
-              (* The FDW bridge is a function of env, not a migration; reconcile
+          | Ok routes ->
+              Abbs_fc.with_finally
+                (fun () -> Sgs_server.run ~routes config storage)
+                ~finally:(fun () -> Sgs_svc_mngr.stop mgr)
+              >>| fun () -> Ok ()
+          | Error `Routes_err ->
+              Abb.Future.return
+                (Error (`Start_err "SERVICE_MANAGER : could not collect the routes")))
+      | Error (#Sgs_service.start_err as err) -> Abb.Future.return (Error err))
+
+let server' ~services =
+  let run () =
+    let open Abb.Future.Infix_monad in
+    Sgs_svc_mngr.start ()
+    >>= function
+    | Error `Start_err -> Abbs_fc.return_err (`Start_err "Could not start the service manager")
+    | Ok mgr -> run_server ~services mgr
+  in
+  let result = Abb.Scheduler.run_with_state run in
+  match result with
+  | `Det (Ok ()) -> ()
+  | `Det (Error (#Sgs_service.start_err as err)) ->
+      Logs.err (fun m -> m "%a" Sgs_service.pp_start_err err);
+      exit 1
+  | `Aborted -> assert false
+  | `Exn (exn, bt_opt) ->
+      Logs.err (fun m -> m "%s" (Printexc.to_string exn));
+      CCOption.iter
+        (fun bt -> Logs.err (fun m -> m "%s" (Printexc.raw_backtrace_to_string bt)))
+        bt_opt;
+      assert false
+
+let server ~services () = server' ~services
+
+(* The migrations and the FDW reconcile do not read who supplies the GitHub App, so the
+     configuration takes the default. *)
+let migrate () =
+  match Sgs_config.create () with
+  | Ok config -> (
+      let run () =
+        let open Abb.Future.Infix_monad in
+        Sgs_storage.create config
+        >>= fun storage ->
+        Sgs_migrations.run config storage
+        >>= function
+        | Ok () -> (
+            (* The FDW bridge is a function of env, not a migration; reconcile
                it after the stream so orchestration deployments converge on
                the current config + catalog every boot. *)
-              Sgs_cli_lib_fdw_reconcile.run config storage
-              >>= function
-              | Ok () -> Abbs_fc.return_ok ()
-              | Error (#Sgs_cli_lib_fdw_reconcile.err as err)
-                when not (Sgs_config.orchestration_explicit config) ->
-                  Logs.err (fun m ->
-                      m
-                        "FDW reconcile failed; orchestration is unavailable. Set \
-                         STATEGRAPH_ORCHESTRATION_ENABLED=false to stop trying, or give the \
-                         database role the rights the bridge needs.");
-                  Logs.err (fun m -> m "%s" (Sgs_cli_lib_fdw_reconcile.show_err err));
-                  Abbs_fc.return_ok ()
-              | Error (#Sgs_cli_lib_fdw_reconcile.err as err) ->
-                  Abbs_fc.return_err (`Fdw_reconcile_err err))
-          | Error _ as err -> Abb.Future.return err
-        in
-        print_endline (Sgs_config.show config);
-        match Abb.Scheduler.run_with_state run with
-        | `Det (Ok ()) -> Logs.info (fun m -> m "Migration complete")
-        | `Det (Error (`Migration_err (#Pgsql_io.err as err))) ->
-            Logs.err (fun m -> m "Migration failed");
-            Logs.err (fun m -> m "%s" (Pgsql_io.show_err err));
-            exit 1
-        | `Det (Error (`Migration_err (#Pgsql_pool.err as err))) ->
-            Logs.err (fun m -> m "Migration failed");
-            Logs.err (fun m -> m "%s" (Pgsql_pool.show_err err));
-            exit 1
-        | `Det (Error (`Consistency_err consistency)) ->
-            Logs.err (fun m ->
-                m
-                  "Migration failed - inconsistent migrations: %s"
-                  (Data_mig.Error.Consistency.to_string consistency));
-            exit 1
-        | `Det (Error (`Fdw_reconcile_err err)) ->
-            Logs.err (fun m -> m "FDW reconcile failed, and orchestration was asked for");
-            Logs.err (fun m -> m "%s" (Sgs_cli_lib_fdw_reconcile.show_err err));
-            exit 1
-        | `Aborted -> assert false
-        | `Exn (exn, bt_opt) ->
-            Logs.err (fun m -> m "%s" (Printexc.to_string exn));
-            CCOption.iter
-              (fun bt -> Logs.err (fun m -> m "%s" (Printexc.raw_backtrace_to_string bt)))
-              bt_opt;
-            assert false)
-    | Error (#Sgs_config.err as err) ->
-        Logs.err (fun m -> m "Config file failed to load %a" Sgs_config.pp_err err);
-        exit 1
+            Sgs_cli_lib_fdw_reconcile.run config storage
+            >>= function
+            | Ok () -> Abbs_fc.return_ok ()
+            | Error (#Sgs_cli_lib_fdw_reconcile.err as err)
+              when not (Sgs_config.orchestration_explicit config) ->
+                Logs.err (fun m ->
+                    m
+                      {|FDW reconcile failed; orchestration is unavailable.
+Set STATEGRAPH_ORCHESTRATION_ENABLED=false to stop trying, or give the database role the rights the bridge needs.|});
+                Logs.err (fun m -> m "%s" (Sgs_cli_lib_fdw_reconcile.show_err err));
+                Abbs_fc.return_ok ()
+            | Error (#Sgs_cli_lib_fdw_reconcile.err as err) ->
+                Abbs_fc.return_err (`Fdw_reconcile_err err))
+        | Error _ as err -> Abb.Future.return err
+      in
+      print_endline (Sgs_config.show config);
+      match Abb.Scheduler.run_with_state run with
+      | `Det (Ok ()) -> Logs.info (fun m -> m "Migration complete")
+      | `Det (Error (`Migration_err (#Pgsql_io.err as err))) ->
+          Logs.err (fun m -> m "Migration failed");
+          Logs.err (fun m -> m "%s" (Pgsql_io.show_err err));
+          exit 1
+      | `Det (Error (`Migration_err (#Pgsql_pool.err as err))) ->
+          Logs.err (fun m -> m "Migration failed");
+          Logs.err (fun m -> m "%s" (Pgsql_pool.show_err err));
+          exit 1
+      | `Det (Error (`Consistency_err consistency)) ->
+          Logs.err (fun m ->
+              m
+                "Migration failed - inconsistent migrations: %s"
+                (Data_mig.Error.Consistency.to_string consistency));
+          exit 1
+      | `Det (Error (`Fdw_reconcile_err err)) ->
+          Logs.err (fun m -> m "FDW reconcile failed, and orchestration was asked for");
+          Logs.err (fun m -> m "%s" (Sgs_cli_lib_fdw_reconcile.show_err err));
+          exit 1
+      | `Aborted -> assert false
+      | `Exn (exn, bt_opt) ->
+          Logs.err (fun m -> m "%s" (Printexc.to_string exn));
+          CCOption.iter
+            (fun bt -> Logs.err (fun m -> m "%s" (Printexc.raw_backtrace_to_string bt)))
+            bt_opt;
+          assert false)
+  | Error (#Sgs_config.err as err) ->
+      Logs.err (fun m -> m "Config file failed to load %a" Sgs_config.pp_err err);
+      exit 1
 
-  let cmds ~services =
-    Cmdline.
-      [ server_cmd (server ~services); migrate_cmd migrate; version_cmd; Sgs_cli_lib_test.cmd logs ]
+let cmds ~services =
+  Cmdline.
+    [ server_cmd (server ~services); migrate_cmd migrate; version_cmd; Sgs_cli_lib_test.cmd logs ]
 
-  let main ~services =
-    Random.self_init ();
-    Mirage_crypto_rng_unix.use_default ();
-    let info =
-      Cmdliner.Cmd.info ~doc:"Operate the Stategraph server" (Filename.basename Sys.argv.(0))
-    in
-    exit
-    @@ Cmdliner.Cmd.eval
-    @@ Cmdliner.Cmd.group ~default:Cmdline.default_cmd info (cmds ~services)
-end
+let main ~services =
+  Random.self_init ();
+  Mirage_crypto_rng_unix.use_default ();
+  let info =
+    Cmdliner.Cmd.info ~doc:"Operate the Stategraph server" (Filename.basename Sys.argv.(0))
+  in
+  exit @@ Cmdliner.Cmd.eval @@ Cmdliner.Cmd.group ~default:Cmdline.default_cmd info (cmds ~services)

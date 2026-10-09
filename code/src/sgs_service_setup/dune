@@ -1,0 +1,12 @@
+(library
+ (name sgs_service_setup)
+ (wrapped false)
+ (libraries
+  abb
+  brtl
+  sgs_cloud
+  sgs_service
+  sgs_service_storage
+  sgs_setup
+  sgs_storage
+  sgs_svc_mngr))
