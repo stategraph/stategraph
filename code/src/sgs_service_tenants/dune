@@ -20,6 +20,8 @@
   sgs_config
   sgs_eplib
   sgs_service
+  sgs_service_config
+  sgs_service_storage
   sgs_storage
   sgs_svc_mngr
   sgs_tenant

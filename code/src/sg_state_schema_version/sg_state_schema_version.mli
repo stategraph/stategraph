@@ -182,5 +182,15 @@
     A state that is behind cannot be reached by the walk, which is why the two guards above matter
     more here than they did for versions 11 and 12. Without its rows a node has no canon, the value
     test answers with nothing, and the walk would reify too little -- the one direction this product
-    refuses. The version gate is what makes that unreachable rather than unlikely. *)
+    refuses. The version gate is what makes that unreachable rather than unlikely.
+
+    Version 14: module bodies (RFD 1008 Phase 2). The database holds a local module one time, in
+    [tf_modules] and [tf_module_hcl], whatever calls it, and [hcl] holds the root module only. A
+    block of a body has an id relative to its module, a [module] block names the module it reaches,
+    and the file reads of a block of a body are kept for each call. A state written before this
+    holds one copy of each body for each call, in [hcl], with the call in each id. No migration can
+    make the body from those rows: the key of a module is its directory relative to the root, which
+    only the client reads, and the walk reads no block of a body from [hcl]. Thus a state that is
+    behind has no module body the walk can reach, and the re-import this counter forces is what
+    writes one. *)
 val version : int

@@ -17,7 +17,7 @@ module type S = sig
   val ty : t ty
   val matches : 'a ty -> (t, 'a) eq option
   val start : opt -> (t, [> start_err ]) result Abb.Future.t
-  val routes : t -> Sgs_config.t -> Sgs_storage.t -> route list
+  val routes : t -> route list
   val stop : t -> unit Abb.Future.t
 end
 
@@ -33,7 +33,7 @@ let start (type opt) (m : (module S with type opt = opt)) (o : opt) =
   Logs.info (fun m -> m "Starting service %s" M.name);
   M.start o >>| CCResult.map (fun t -> Started ((module M), t))
 
-let routes (Started ((module M), t)) config storage = M.routes t config storage
+let routes (Started ((module M), t)) = M.routes t
 
 let stop (Started ((module M), t)) =
   Logs.info (fun m -> m "Stopping service %s" M.name);

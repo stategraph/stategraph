@@ -206,6 +206,9 @@ let stategraph_tables =
             make ~name:"refs" ~type_:(Type_.Complex "text[]") ();
             make ~name:"state_id" ~type_:Type_.Uuid ();
             make ~name:"updated_at" ~type_:Type_.Timestamptz ();
+            make ~name:"child_source" ~type_:Type_.Text ();
+            make ~name:"child_version" ~type_:Type_.Text ();
+            make ~name:"module_input_edges" ~type_:Type_.Jsonb ();
           ];
       Table.make
         ~name:"hcl_refs"
@@ -220,6 +223,7 @@ let stategraph_tables =
             make ~name:"is_bare" ~type_:Type_.Bool ();
             make ~name:"resolvable" ~type_:Type_.Bool ();
             make ~name:"from_depends_on" ~type_:Type_.Bool ();
+            make ~name:"to_call" ~type_:Type_.Text ();
           ];
       Table.make
         ~name:"tf_modules"
@@ -244,6 +248,9 @@ let stategraph_tables =
             make ~name:"path_attrs" ~type_:Type_.Jsonb ();
             make ~name:"created_at" ~type_:Type_.Timestamptz ();
             make ~name:"updated_at" ~type_:Type_.Timestamptz ();
+            make ~name:"child_source" ~type_:Type_.Text ();
+            make ~name:"child_version" ~type_:Type_.Text ();
+            make ~name:"module_input_edges" ~type_:Type_.Jsonb ();
           ];
       Table.make
         ~name:"tf_module_hcl_refs"
@@ -260,6 +267,17 @@ let stategraph_tables =
             make ~name:"is_bare" ~type_:Type_.Bool ();
             make ~name:"resolvable" ~type_:Type_.Bool ();
             make ~name:"from_depends_on" ~type_:Type_.Bool ();
+            make ~name:"to_call" ~type_:Type_.Text ();
+          ];
+      Table.make
+        ~name:"tf_module_calls"
+        Column.
+          [
+            make ~name:"state_id" ~type_:Type_.Uuid ();
+            make ~name:"call_path" ~type_:(Type_.Complex "text[]") ();
+            make ~name:"module_address" ~type_:Type_.Text ();
+            make ~name:"source" ~type_:Type_.Text ();
+            make ~name:"version" ~type_:Type_.Text ();
           ];
       Table.make
         ~name:"files"
@@ -272,6 +290,27 @@ let stategraph_tables =
             make ~name:"template_vars" ~type_:(Type_.Complex "text[]") ();
             make ~name:"module_address" ~type_:Type_.Text ();
             make ~name:"id" ~type_:Type_.Text ();
+            make ~name:"present" ~type_:Type_.Bool ();
+          ];
+      Table.make
+        ~name:"filepath_refs"
+        Column.
+          [
+            make ~name:"state_id" ~type_:Type_.Uuid ();
+            make ~name:"id" ~type_:Type_.Text ();
+            make ~name:"call_path" ~type_:(Type_.Complex "text[]") ();
+            make ~name:"body_source" ~type_:Type_.Text ();
+            make ~name:"body_version" ~type_:Type_.Text ();
+            make ~name:"ref" ~type_:Type_.Text ();
+            make ~name:"filepath" ~type_:Type_.Text ();
+            make ~name:"template_var" ~type_:Type_.Text ();
+            make ~name:"file_id" ~type_:Type_.Text ();
+            make ~name:"call_key" ~type_:Type_.Text ();
+            make ~name:"file_function" ~type_:Type_.Text ();
+            make ~name:"refs" ~type_:Type_.Jsonb ();
+            make ~name:"template_vars" ~type_:Type_.Jsonb ();
+            make ~name:"fileset_rel" ~type_:Type_.Text ();
+            make ~name:"inlined_file_expr" ~type_:Type_.Text ();
           ];
       Table.make
         ~name:"tfvars"

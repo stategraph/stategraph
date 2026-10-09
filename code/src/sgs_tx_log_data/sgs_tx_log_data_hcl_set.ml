@@ -18,6 +18,16 @@ module File_refs = struct
   type t = Yojson.Safe.t [@@deriving yojson { strict = false; meta = true }, show, eq]
 end
 
+module Module_input_edges = struct
+  type t = Sgs_tx_log_data_module_input_edge.t list
+  [@@deriving yojson { strict = false; meta = true }, show, eq]
+end
+
+module Module_input_files = struct
+  type t = Sgs_tx_log_data_module_input_file.t list
+  [@@deriving yojson { strict = false; meta = true }, show, eq]
+end
+
 module Module_input_refs = struct
   type t = Yojson.Safe.t [@@deriving yojson { strict = false; meta = true }, show, eq]
 end
@@ -48,6 +58,8 @@ end
 
 type t = {
   block_type : Block_type.t;
+  body_id : string option; [@default None]
+  child_module : Sgs_tx_log_data_tf_module_key.t option; [@default None]
   data : Data.t;
   depends_on_addresses : Depends_on_addresses.t;
   edges : Edges.t;
@@ -56,6 +68,8 @@ type t = {
   fq_address : string;
   hints : Sgs_tx_log_hints_stored_hints.t option; [@default None]
   module_ : string; [@key "module"]
+  module_input_edges : Module_input_edges.t option; [@default None]
+  module_input_files : Module_input_files.t option; [@default None]
   module_input_refs : Module_input_refs.t;
   module_inputs : Module_inputs.t;
   module_source : Module_source.t;
@@ -68,6 +82,7 @@ type t = {
   refs : Refs.t;
   remote_state : Remote_state.t;
   remote_tf_state_refs : Remote_tf_state_refs.t;
+  tf_module : Sgs_tx_log_data_tf_module_key.t option; [@default None]
   unconditional_seed : bool option; [@default None]
 }
 [@@deriving yojson { strict = false; meta = true }, make, show, eq]

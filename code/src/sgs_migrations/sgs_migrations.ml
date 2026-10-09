@@ -530,6 +530,21 @@ let migrations =
     (* RFD 1008 Phase 1: [tf_modules], [tf_module_hcl] and [tf_module_hcl_refs].  The place where a
        module body lives once, whatever calls it.  Nothing writes them until Phase 2. *)
     ("add-tf-module-tables", run_sql [%blob "./migrations/2026-09-23-add-tf-module-tables.sql"]);
+    (* RFD 1008 Phase 2: a module body is stored one time, and a call names the module it reaches.
+       The log gets the object types of a body block, a module and the file reads of a call; an edge
+       names the child call it enters; [filepath_refs] names a reader by its call path and its id. *)
+    ("add-module-bodies", run_sql [%blob "./migrations/2026-09-24-add-module-bodies.sql"]);
+    (* RFD 1008 Phase 2: a taint is per call site, thus [hcl_tainted] names a block by its call path
+       and its body id, with the foreign keys of [filepath_refs]. *)
+    ("hcl-tainted-call-path", run_sql [%blob "./migrations/2026-09-24-hcl-tainted-call-path.sql"]);
+    (* RFD 1008 Phase 2: the committed blocks of a body that name an address, which the instances
+       whose stored hints a delete can change are found from. *)
+    ( "tf-module-hcl-refs-ref-idx",
+      run_sql [%blob "./migrations/2026-09-25-tf-module-hcl-refs-ref-idx.sql"] );
+    (* RFD 1008 Phase 2: the rows of [transaction_hints] that a walk wrote for the instances of a
+       body block, so that the apply knows whether it has to make them itself. *)
+    ( "transaction-hints-instance",
+      run_sql [%blob "./migrations/2026-09-25-transaction-hints-instance.sql"] );
   ]
 
 let run config storage = Mig.run { Migrate.config; storage; tx = () } migrations
