@@ -1,27 +1,125 @@
 name: stategraph
 
 on:
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  CI_IMAGE: stategraph-server-oss-ci:${{ github.sha }}
+  RUNTIME_IMAGE: stategraph-server-oss:${{ github.sha }}
+
 jobs:
-  build-server-oss:
+  changes:
+    name: Detect non-doc changes
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     permissions:
       contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - name: Determine whether anything outside docs/ changed
+        id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # Manual runs always exercise the checks.
+          if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          files=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" --jq '.[].filename')
+          if printf '%s\n' "$files" | grep -qv '^docs/'; then
+            echo "Non-docs changes present; running the checks."
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Only docs/ changed; skipping the checks."
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  test:
+    name: Build and test public server
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: depot-ubuntu-24.04-16
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build the OSS server image
-        uses: docker/build-push-action@v6
+      - name: Set up Depot CLI
+        uses: depot/setup-action@v1
         with:
+          oidc: true
+
+      - name: Build the OSS server test image
+        id: build
+        timeout-minutes: 45
+        uses: depot/build-push-action@v1
+        with:
+          project: 0757vsb834
           context: .
           file: docker/stategraph/Dockerfile
-          target: stategraph-server-oss
+          target: stategraph-server-oss-build
+          push: false
+          load: false
+          save: true
+          save-tags: ${{ github.sha }}
           build-args: |
             UID=1000
             GID=1000
             USERNAME=stategraph
-            DEPLOYMENT_KIND=production
-          push: false
+            DEPLOYMENT_KIND=development
+
+      - name: Pull the test image from Depot Registry
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          BUILD_ID='${{ steps.build.outputs.build-id }}'
+          if [ -z "${BUILD_ID}" ]; then
+            BUILD_ID=$(printf '%s' '${{ steps.build.outputs.metadata }}' \
+              | jq -r '."depot.build".buildID // empty')
+          fi
+          if [ -z "${BUILD_ID}" ]; then
+            echo "could not determine Depot build id; cannot pull image" >&2
+            exit 1
+          fi
+          depot pull --project 0757vsb834 -t "$CI_IMAGE" "$BUILD_ID"
+          docker image inspect "$CI_IMAGE" >/dev/null
+
+      - name: Check formatting, generated API types, and public unit tests
+        timeout-minutes: 30
+        run: |
+          # The Docker build context excludes .git. Mount the checkout metadata so
+          # check-api-types can compare regenerated files with the committed tree.
+          docker run --rm \
+            -e GIT_OPTIONAL_LOCKS=0 \
+            -v "$PWD/.git:/tmp/mono/.git:ro" \
+            "$CI_IMAGE" -lc '
+              set -euo pipefail
+              git config --global --add safe.directory /tmp/mono
+
+              echo "== Check OCaml and dune formatting =="
+              dune build @fmt
+
+              echo "== Check generated API types =="
+              make -C code check-api-types
+
+              echo "== Run the public unit-test suite =="
+              make -C code test-terrat
+            '
