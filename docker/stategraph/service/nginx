@@ -180,6 +180,9 @@ case "$STATEGRAPH_ORCHESTRATION_ON" in
         access_log   ${STATEGRAPH_ACCESS_LOG};
         server_tokens off;
 
+        # Search engines must not index this host. location / and location /api
+        # set headers of their own, so they repeat this one.
+        add_header X-Robots-Tag "noindex, nofollow" always;
         add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
         add_header X-Frame-Options "DENY" always;
         add_header X-Content-Type-Options "nosniff" always;
@@ -205,6 +208,7 @@ case "$STATEGRAPH_ORCHESTRATION_ON" in
             try_files \$uri \$uri/ /index.html =404;
 
             add_header Content-Security-Policy "default-src 'self'; img-src 'self' https://avatars.githubusercontent.com https://secure.gravatar.com https://www.redditstatic.com https://alb.reddit.com; script-src 'self' 'nonce-\$cspNonce' https://*.posthog.com https://www.redditstatic.com https://js.stripe.com; style-src 'self' 'nonce-\$cspNonce'; object-src 'none'; connect-src 'self' https://*.posthog.com https://o4509570379677696.ingest.de.sentry.io https://api.web3forms.com https://alb.reddit.com https://pixel-config.reddit.com https://conversions-config.reddit.com https://www.redditstatic.com; font-src 'self'; worker-src 'self' blob:; frame-src https://js.stripe.com; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; manifest-src 'self'; media-src 'none'; upgrade-insecure-requests;";
+            add_header X-Robots-Tag "noindex, nofollow" always;
             add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
             add_header X-Frame-Options "DENY" always;
             add_header X-Content-Type-Options "nosniff" always;
@@ -240,6 +244,7 @@ case "$STATEGRAPH_ORCHESTRATION_ON" in
             # same marker the console host puts on its terrat routes.
             add_header X-Stategraph-Route "orchestration" always;
 
+            add_header X-Robots-Tag "noindex, nofollow" always;
             add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
             add_header X-Frame-Options "DENY" always;
             add_header X-Content-Type-Options "nosniff" always;
