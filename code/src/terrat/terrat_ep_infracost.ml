@@ -2,6 +2,7 @@ let src = Logs.Src.create "infracost"
 
 module Logs = (val Logs.src_log src : Logs.LOG)
 module Http = Cohttp_abb.Make (Abb)
+module Http_tls = Cohttp_abb_tls.Make (Abb)
 module Exec = Abb_keyed_concurrent_executor.Make (Abb) (CCString)
 
 type backend =
@@ -105,7 +106,7 @@ let proxy storage api_key infracost_uri path ctx =
               (if wait_time < api_call_timeout then
                  Abbs_fc.timeout
                    ~timeout:(Abb.Sys.sleep (api_call_timeout -. wait_time))
-                   (Http.Client.post ~headers ~body uri)
+                   (Http.Client.post ~connector:(Http_tls.connector ()) ~headers ~body uri)
                else Abb.Future.return `Timeout)
               >>= fun ret -> Abb.Future.Promise.set p ret)
           >>= fun _ ->

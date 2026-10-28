@@ -5,11 +5,14 @@ module Logs = (val Logs.src_log src : Logs.LOG)
 type connect_err =
   [ Abb_happy_eyeballs.connect_err
   | `E_connection_refused
+  | `E_tls_not_configured
   | `Unknown_scheme of string
   | `Unexpected_err of string
   | `Error
   ]
 [@@deriving show]
+
+type channel_err = [ `Error ] [@@deriving show]
 
 type request_err =
   [ connect_err
@@ -31,7 +34,6 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
   module Io = Cohttp_abb_io.Make (Abb)
   module Buffered = Abb_io_buffered.Make (Abb.Future)
   module Buffered_of = Abb_io_buffered.Of (Abb)
-  module Abb_tls = Abb_tls.Make (Abb)
   module Request = Cohttp.Request
   module Response = Cohttp.Response
   module Body = Cohttp.Body
@@ -136,6 +138,9 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
     module Connector = struct
       type t = Request.t -> (Transport.t, connect_err) result Abb.Future.t
 
+      type channel =
+        host:string -> Abb.Socket.tcp Abb.Socket.t -> (Io.ic * Io.oc, channel_err) result
+
       let connect_to_port host port =
         let open Abb.Future.Infix_monad in
         Logs.debug (fun m -> m "CONNECT : %s : %d" host port);
@@ -149,7 +154,11 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
                 m "CONNECT : error :  %s : %d : %a" host port Abb_happy_eyeballs.pp_connect_err err);
             Fut_comb.return_err err
 
-      let connect_with_sock tls_config uri =
+      let close_err sock err =
+        let open Abb.Future.Infix_monad in
+        Fut_comb.ignore (Abb.Socket.close sock) >>= fun () -> Fut_comb.return_err err
+
+      let connect_with_sock channel uri =
         let open Fut_comb.Infix_result_monad in
         match Uri.scheme uri with
         | Some "http" ->
@@ -159,31 +168,26 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
             >>| fun sock ->
             let reader, writer = Buffered_of.of_tcp_socket sock in
             (sock, reader, writer)
-        | Some "https" ->
+        | Some "https" -> (
             let host = CCOption.get_exn_or "get host" (Uri.host uri) in
             let port = CCOption.get_or ~default:443 (Uri.port uri) in
-            Fut_comb.protect_finally
-              ~setup:(fun () -> Abb.Future.return (tls_config host))
-              (fun tls_config ->
+            match channel with
+            | None -> Fut_comb.return_err `E_tls_not_configured
+            | Some channel -> (
                 connect_to_port host port
                 >>= fun sock ->
-                Abb.Future.return (Abb_tls.client_tcp sock tls_config host)
-                >>| fun (reader, writer) -> (sock, reader, writer))
-              ~finally:(fun tls_config ->
-                Otls.Tls_config.destroy tls_config;
-                Fut_comb.unit)
+                match channel ~host sock with
+                | Ok (reader, writer) -> Fut_comb.return_ok (sock, reader, writer)
+                | Error `Error -> close_err sock `Error))
         | Some scheme -> Fut_comb.return_err (`Unknown_scheme scheme)
-        | _ -> assert false
+        | None -> assert false
 
-      let connect tls_config request =
+      let connect channel request =
         let open Fut_comb.Infix_result_monad in
-        connect_with_sock tls_config (Request.uri request)
+        connect_with_sock channel (Request.uri request)
         >>| fun (_, reader, writer) -> Transport.default reader writer
 
-      let make ?(tls_config = fun _ -> Otls.Tls_config.create ()) ?(connect = connect) () =
-        connect tls_config
-
-      let of_env ?tls_config () =
+      let of_env ?channel () =
         let maybe_add_proxy_auth uri =
           match (Uri.user uri, Uri.password uri) with
           | Some user, Some password ->
@@ -201,7 +205,7 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
               Logs.debug (fun m -> m "proxy : %s : %s" (Uri.to_string uri) line);
               read_remaining_headers uri reader
         in
-        let finish_proxy_response tls_config uri sock scheme host reader writer =
+        let finish_proxy_response channel uri sock scheme host reader writer =
           let open Fut_comb.Infix_result_monad in
           Buffered.read_line reader
           >>= function
@@ -213,9 +217,14 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
               | "HTTP/1.1" :: status :: _ -> (
                   match CCInt.of_string status with
                   | Some status when Cohttp.Code.is_success status && CCString.equal scheme "https"
-                    ->
-                      Abb.Future.return (Abb_tls.client_tcp sock (tls_config host) host)
-                      >>| fun (reader, writer) -> Transport.default reader writer
+                    -> (
+                      match channel with
+                      | None -> Fut_comb.return_err `E_tls_not_configured
+                      | Some channel -> (
+                          match channel ~host sock with
+                          | Ok (reader, writer) ->
+                              Fut_comb.return_ok (Transport.default reader writer)
+                          | Error `Error -> Fut_comb.return_err `Error))
                   | Some status when Cohttp.Code.is_success status && CCString.equal scheme "http"
                     -> Fut_comb.return_ok (Transport.default reader writer)
                   | _ -> Fut_comb.return_err (`Unexpected_err ("PROXY:RESPONSE:" ^ status)))
@@ -244,40 +253,7 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
             CCFun.(CCString.split_on_char ',' %> CCList.map CCString.trim)
             (get_env "no_proxy")
         in
-        let no_verify_tls_cert =
-          CCOption.map_or
-            ~default:[]
-            CCFun.(CCString.split_on_char ',' %> CCList.map CCString.trim)
-            (get_env "no_verify_tls_cert")
-        in
-        let no_verify_tls_name =
-          CCOption.map_or
-            ~default:[]
-            CCFun.(CCString.split_on_char ',' %> CCList.map CCString.trim)
-            (get_env "no_verify_tls_name")
-        in
-        let local_certs_dir = Sys.getenv_opt "CERTS_DIR" in
-        let connect tls_config request =
-          let tls_config host =
-            let config = tls_config host in
-            ignore (Otls.Tls_config.set_alpn config "http/1.1");
-            CCOption.iter
-              (fun local_certs_dir ->
-                Logs.debug (fun m -> m "CERTS_DIR : %s" local_certs_dir);
-                ignore (Otls.Tls_config.set_ca_path config local_certs_dir))
-              local_certs_dir;
-            if CCList.mem ~eq:CCString.equal host no_verify_tls_cert || no_verify_tls_cert = [ "*" ]
-            then (
-              Logs.debug (fun m ->
-                  m "NO_VERIFY_CERT : %s : %s" host (CCString.concat " " no_verify_tls_cert));
-              Otls.Tls_config.insecure_noverifycert config);
-            if CCList.mem ~eq:CCString.equal host no_verify_tls_name || no_verify_tls_name = [ "*" ]
-            then (
-              Logs.debug (fun m ->
-                  m "NO_VERIFY_NAME : %s : %s" host (CCString.concat " " no_verify_tls_name));
-              Otls.Tls_config.insecure_noverifyname config);
-            config
-          in
+        let connect request =
           let request_host = Uri.host_with_default ~default:"" (Request.uri request) in
           match (Uri.scheme (Request.uri request), http_proxy, https_proxy) with
           | (Some ("http" as scheme), Some proxy, _ | Some ("https" as scheme), _, Some proxy)
@@ -288,42 +264,43 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
                   m "PROXY : %s : %s" (Uri.to_string (Request.uri request)) (Uri.to_string proxy));
               let run =
                 let open Fut_comb.Infix_result_monad in
-                connect_with_sock tls_config proxy
+                connect_with_sock channel proxy
                 >>= fun (sock, reader, writer) ->
-                let host =
-                  match Uri.host (Request.uri request) with
-                  | Some host -> host
-                  | None -> assert false
+                let tunnel =
+                  let host =
+                    match Uri.host (Request.uri request) with
+                    | Some host -> host
+                    | None -> assert false
+                  in
+                  let port = port (Request.uri request) in
+                  let b = Buffer.create 50 in
+                  Buffer.add_string
+                    b
+                    (Printf.sprintf "CONNECT %s:%d HTTP/1.1\r\nhost: %s:%d" host port host port);
+                  (match maybe_add_proxy_auth proxy with
+                  | Some header ->
+                      Buffer.add_string b "\r\n";
+                      Buffer.add_string b header
+                  | None -> ());
+                  Buffer.add_string b "\r\n\r\n";
+                  Logs.debug (fun m ->
+                      m "proxy : %s : %s" (Uri.to_string (Request.uri request)) (Buffer.contents b));
+                  let contents = Buffer.to_bytes b in
+                  Buffered.write
+                    writer
+                    ~bufs:
+                      Abb_intf.Write_buf.
+                        [ { buf = contents; pos = 0; len = Bytes.length contents } ]
+                  >>= fun _ ->
+                  Buffered.flushed writer
+                  >>= fun () ->
+                  finish_proxy_response channel (Request.uri request) sock scheme host reader writer
                 in
-                let port = port (Request.uri request) in
-                let b = Buffer.create 50 in
-                Buffer.add_string
-                  b
-                  (Printf.sprintf "CONNECT %s:%d HTTP/1.1\r\nhost: %s:%d" host port host port);
-                (match maybe_add_proxy_auth proxy with
-                | Some header ->
-                    Buffer.add_string b "\r\n";
-                    Buffer.add_string b header
-                | None -> ());
-                Buffer.add_string b "\r\n\r\n";
-                Logs.debug (fun m ->
-                    m "proxy : %s : %s" (Uri.to_string (Request.uri request)) (Buffer.contents b));
-                let contents = Buffer.to_bytes b in
-                Buffered.write
-                  writer
-                  ~bufs:
-                    Abb_intf.Write_buf.[ { buf = contents; pos = 0; len = Bytes.length contents } ]
-                >>= fun _ ->
-                Buffered.flushed writer
-                >>= fun () ->
-                finish_proxy_response
-                  tls_config
-                  (Request.uri request)
-                  sock
-                  scheme
-                  host
-                  reader
-                  writer
+                let open Abb.Future.Infix_monad in
+                tunnel
+                >>= function
+                | Ok _ as res -> Abb.Future.return res
+                | Error err -> close_err sock err
               in
               let open Abb.Future.Infix_monad in
               run
@@ -350,9 +327,13 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
                         (Uri.to_string (Request.uri request))
                         (Printexc.to_string exn));
                   raise exn)
-          | _, _, _ -> connect tls_config request
+          | _, _, _ -> connect channel request
         in
-        make ?tls_config ~connect ()
+        connect
+
+      module Tests = struct
+        let make ?channel () = connect channel
+      end
     end
 
     let connect connector request =
@@ -379,7 +360,7 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
       let b = Buffer.create 10 in
       read' transport b
 
-    let call ?flush ?headers ?chunked ?body ?(connector = Connector.of_env ()) meth uri =
+    let call ?flush ?headers ?chunked ?body ~connector meth uri =
       let open Fut_comb.Infix_result_monad in
       let request = Request.make_for_client ?headers ?chunked meth uri in
       Fut_comb.protect_finally
@@ -398,18 +379,16 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
           | Ok transport -> Transport.destroy transport
           | Error _ -> Fut_comb.unit)
 
-    let get ?headers ?connector uri = call ?headers ?connector `GET uri
-    let put ?headers ?body ?connector uri = call ?headers ?body ?connector `PUT uri
-    let post ?headers ?body ?connector uri = call ?headers ?body ?connector `POST uri
-    let delete ?headers ?connector uri = call ?headers ?connector `DELETE uri
+    let get ?headers ~connector uri = call ?headers ~connector `GET uri
+    let put ?headers ?body ~connector uri = call ?headers ?body ~connector `PUT uri
+    let post ?headers ?body ~connector uri = call ?headers ?body ~connector `POST uri
+    let delete ?headers ~connector uri = call ?headers ~connector `DELETE uri
   end
 
   module Server = struct
-    module Scheme = struct
-      type t =
-        | Http
-        | Https of Otls.Tls_config.t
-    end
+    type channel = Abb.Socket.tcp Abb.Socket.t -> (Io.ic * Io.oc, channel_err) result
+
+    let http_channel conn = Ok (Buffered_of.of_tcp_socket ~size:4096 conn)
 
     type handler =
       Abb.Socket.tcp Abb.Socket.t ->
@@ -428,7 +407,7 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
     module Config = struct
       module View = struct
         type t = {
-          scheme : Scheme.t;
+          channel : channel;
           on_handler_err : on_handler_err;
           on_protocol_err : on_protocol_err;
           port : int;
@@ -445,7 +424,7 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
         | { View.port; _ } when port <= 0 -> Error `Invalid_port
         | t -> Ok t
 
-      let scheme t = t.View.scheme
+      let channel t = t.View.channel
       let on_handler_err t = t.View.on_handler_err
       let on_protocol_err t = t.View.on_protocol_err
       let port t = t.View.port
@@ -524,19 +503,22 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
           | `Ok -> Fut_comb.ignore (Abb.Chan.send wc `Ok)
           | `Stop -> Fut_comb.ignore (Abb.Chan.send wc `Stop))
 
-    let rec tcp_accept_loop sock config bf wc =
+    let rec tcp_accept_loop sock config wc =
       let open Abb.Future.Infix_monad in
       Abb.Socket.accept sock
       >>= function
-      | Ok conn ->
-          bf conn
-          >>= fun (r, w) ->
-          Abb.Future.fork (run_handler config conn r w wc)
-          >>= fun _ -> tcp_accept_loop sock config bf wc
+      | Ok conn -> (
+          match Config.channel config conn with
+          | Ok (r, w) ->
+              Abb.Future.fork (run_handler config conn r w wc)
+              >>= fun _ -> tcp_accept_loop sock config wc
+          | Error `Error ->
+              Logs.debug (fun m -> m "channel : closing_connection");
+              Fut_comb.ignore (Abb.Socket.close conn) >>= fun () -> tcp_accept_loop sock config wc)
       | Error `E_connection_aborted ->
           (* In the case the client disconnected between accepting and getting
              here, just ignore the error. *)
-          tcp_accept_loop sock config bf wc
+          tcp_accept_loop sock config wc
       | Error `E_file_closed | Error `E_bad_file ->
           (* This should never happen. *)
           assert false
@@ -560,7 +542,7 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
       | Ok (`Exn exn) -> Fut_comb.return_err (`Exn exn)
       | Error `Chan_closed -> Fut_comb.return_ok ()
 
-    let run_tcp_server config bf =
+    let run_tcp_server config =
       let open Fut_comb.Infix_result_monad in
       let addr =
         Abb_intf.Socket.Sockaddr.(Inet { addr = Unix.inet_addr_any; port = Config.port config })
@@ -571,7 +553,7 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
       Abb.Future.return (Abb.Socket.listen tcp ~backlog:128)
       >>= fun () ->
       let rc = Abb.Chan.create ~capacity:1000 () in
-      let accept_loop = tcp_accept_loop tcp config bf rc in
+      let accept_loop = tcp_accept_loop tcp config rc in
       Fut_comb.with_finally
         (fun () ->
           let open Abb.Future.Infix_monad in
@@ -582,30 +564,7 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
 
     let run config =
       let open Abb.Future.Infix_monad in
-      let bf conn =
-        match Config.scheme config with
-        | Scheme.Http -> Abb.Future.return (Buffered_of.of_tcp_socket ~size:4096 conn)
-        | Scheme.Https tls_config -> (
-            let server = Otls.Tls.server () in
-            (* TODO: This can error *)
-            ignore (Otls.configure server tls_config);
-            match Abb_tls.server_tcp server conn with
-            | Ok rw -> Abb.Future.return rw
-            | Error `Error -> assert false)
-        (* | Ok rw -> Abb.Future.return rw *)
-        (* | Error `E_bad_file *)
-        (* | Error `E_invalid *)
-        (* | Error `E_io *)
-        (* | Error `E_is_dir *)
-        (* | Error `E_no_space *)
-        (* | Error `E_permission *)
-        (* | Error `E_pipe *)
-        (* | Error `Error *)
-        (* | Error (`Unexpected _) -> *)
-        (*   (\* Should be impossible *\) *)
-        (*   assert false *)
-      in
-      run_tcp_server config bf
+      run_tcp_server config
       >>| function
       | Ok () -> Ok ()
       | ( Error (`Exn _)

@@ -5,7 +5,6 @@
   abb_happy_eyeballs
   abb_intf
   abb_io
-  abb_tls
   cohttp
   containers
   duration

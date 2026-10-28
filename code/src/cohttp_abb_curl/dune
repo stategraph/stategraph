@@ -1,3 +1,3 @@
 (executable
  (name cohttp_abb_curl)
- (libraries uri otls abb_intf abb_scheduler_select abb_io cohttp_abb))
+ (libraries abb_scheduler_select cohttp_abb cohttp_abb_tls uri))

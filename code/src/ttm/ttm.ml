@@ -48,6 +48,7 @@ module Cmdline = struct
         "abb_curl_easy";
         "cohttp_abb";
         "cohttp_abb.io";
+        "cohttp_abb.tls";
         "dns_cache";
         "dns_client";
         "happy-eyeballs";
