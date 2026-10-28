@@ -33,7 +33,8 @@ create foreign table terrateam_admin.gitlab_installations_map (
 -- fires on insert; loaded_at is declared because the key rotation clears it,
 -- and it is nullable with no default, so sending NULL on an insert is what the
 -- row would have had anyway. What this role may actually read and write is
--- decided remotely, by the column grants in docker/stategraph/service/terrat.
+-- decided remotely, by the column grants in
+-- code/src/sgs_cli_lib/sgs_cli_lib_terrat_migrate.ml.
 drop foreign table if exists terrateam_admin.github_app_write;
 create foreign table terrateam_admin.github_app_write (
   id bigint,

@@ -4,6 +4,7 @@
  (libraries
   abb
   abbs
+  brtl
   containers
   logs
   pgsql_io
@@ -11,7 +12,9 @@
   sgs_service
   sgs_svc_mngr
   sgs_terrat_config
+  terrat
   terrat_config
   terrat_storage
   terrat_vcs_event_evaluator2
-  terrat_vcs_service))
+  terrat_vcs_service
+  uuidm))

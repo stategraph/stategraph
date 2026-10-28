@@ -16,8 +16,8 @@
       any other           the variable itself
     v}
 
-    An empty TERRAT_API_BASE or TERRAT_UI_BASE is unset. STATEGRAPH_UI_BASE loses its trailing
-    slashes. *)
+    An empty TERRAT_DB_NAME, TERRAT_API_BASE or TERRAT_UI_BASE is unset. STATEGRAPH_UI_BASE loses
+    its trailing slashes. *)
 
 (** The configuration from the process environment. *)
 val create : unit -> (Terrat_config.t, [> Terrat_config.err ]) result

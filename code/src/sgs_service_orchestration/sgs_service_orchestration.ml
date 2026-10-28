@@ -183,4 +183,5 @@ let routes { config; storage } =
         --> Sgs_service_orchestration_ep_github_app_credentials_put.run config storage );
     ]
 
+let wrap _ = CCFun.id
 let stop _ = Abb.Future.return ()

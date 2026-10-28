@@ -97,7 +97,8 @@ let get_auth_token config ctx =
   | _, Some cookie -> Some (Auth.Cookie cookie)
   | None, None -> None
 
-let pre_handler config ctx =
+(* Puts the session the request authenticates with, if any, into its context. *)
+let load_session config ctx =
   match get_auth_token config ctx with
   | Some (Auth.Bearer token) -> (
       match config.Config.bearer with
@@ -114,8 +115,8 @@ let pre_handler config ctx =
                   ctx
             | None -> ctx
           in
-          Abb.Future.return (Brtl_mw.Pre_handler.Cont ctx)
-      | None -> Abb.Future.return (Brtl_mw.Pre_handler.Cont ctx))
+          Abb.Future.return ctx
+      | None -> Abb.Future.return ctx)
   | Some (Auth.Cookie cookie_id) -> (
       match config.Config.cookie with
       | Some cookie ->
@@ -131,9 +132,12 @@ let pre_handler config ctx =
                   ctx
             | None -> ctx
           in
-          Abb.Future.return (Brtl_mw.Pre_handler.Cont ctx)
-      | None -> Abb.Future.return (Brtl_mw.Pre_handler.Cont ctx))
-  | None -> Abb.Future.return (Brtl_mw.Pre_handler.Cont ctx)
+          Abb.Future.return ctx
+      | None -> Abb.Future.return ctx)
+  | None -> Abb.Future.return ctx
+
+let pre_handler config ctx =
+  Abb.Future.map (fun ctx -> Brtl_mw.Pre_handler.Cont ctx) (load_session config ctx)
 
 let post_handler config ctx =
   match Brtl_ctx.md_find config.Config.key ctx with
@@ -145,6 +149,10 @@ let post_handler config ctx =
 
 let early_exit_handler = Brtl_mw.early_exit_handler_noop
 let create config = Brtl_mw.Mw.create (pre_handler config) (post_handler config) early_exit_handler
+
+let wrap config handler ctx =
+  let open Abb.Future.Infix_monad in
+  load_session config ctx >>= handler >>= post_handler config
 
 let set_session_value key v ctx =
   match Brtl_ctx.md_find key ctx with

@@ -17,4 +17,5 @@ let start mgr =
   >>= fun config -> Sgs_storage.create config |> Abb.Future.map (fun v -> Ok v)
 
 let routes _ = []
+let wrap _ = CCFun.id
 let stop _ = Abb.Future.return ()

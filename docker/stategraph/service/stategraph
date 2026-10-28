@@ -7,6 +7,28 @@ sleep 3
 # Set environment defaults
 export OCAMLRUNPARAM='b'
 export STATEGRAPH_PORT="${STATEGRAPH_PORT:-8180}"
+# Orchestration (terrat's services) reports nginx's connection metrics from here.
+export NGINX_STATUS_URI="${NGINX_STATUS_URI:-http://localhost:8080/nginx_status}"
+
+# Dev tunnel (docker-compose-dev.yml, profile tunnel): without TERRAT_API_BASE,
+# take terrat's API base from the tunnel's public host. Read before migrate, so
+# migrate and the server see the same value.
+if [ -z "$TERRAT_API_BASE" ] && [ -n "$TERRATUNNEL_API_ENDPOINT" ]; then
+    tunnel_host=$(python3 -I -c '
+import json, sys, urllib.request
+try:
+    with urllib.request.urlopen(sys.argv[1] + "/status", timeout=5) as r:
+        status = json.load(r)
+    if status.get("connected") and status.get("tunnel_hostname"):
+        print(status["tunnel_hostname"])
+except Exception as e:
+    print("Failed to fetch tunnel hostname: %s" % e, file=sys.stderr)
+' "$TERRATUNNEL_API_ENDPOINT") || true
+    if [ -n "$tunnel_host" ]; then
+        export TERRAT_API_BASE="https://$tunnel_host/api"
+        echo "Set TERRAT_API_BASE to: $TERRAT_API_BASE"
+    fi
+fi
 
 # Cost estimation is opt-in.  enable-pricing writes this env file with
 # STATEGRAPH_PRICING_SERVICE_URL set and then `sv restart`s us so the new

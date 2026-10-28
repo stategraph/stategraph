@@ -53,4 +53,5 @@ let routes { config; storage } =
         Rt.tenant_caps_group_rule () --> Sgs_service_caps_ep_group_rule_delete.run config storage );
     ]
 
+let wrap _ = CCFun.id
 let stop _ = Abb.Future.return ()

@@ -4,5 +4,10 @@
 
 (** Parse [Sys.argv], run the selected subcommand, and exit the process. [services] start in list
     order and stop in the reverse order. They include a config service ({!Sgs_service_config.Make}):
-    the server reads its configuration from it. *)
-val main : services:(module Sgs_service.S with type opt = Sgs_svc_mngr.t) list -> unit
+    the server reads its configuration from it. [orchestration_services] start only when
+    orchestration is enabled, once [services] are up, and their routes come after the routes of
+    [services]. *)
+val main :
+  services:(module Sgs_service.S with type opt = Sgs_svc_mngr.t) list ->
+  orchestration_services:(module Sgs_service.S with type opt = Sgs_svc_mngr.t) list ->
+  unit

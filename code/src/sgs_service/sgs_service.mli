@@ -49,6 +49,11 @@ module type S = sig
       service for its routes loads them in [start] and keeps them in [t]. *)
   val routes : t -> route list
 
+  (** The wrapper of each of the service's route handlers, for what only its routes need, such as a
+      session of their own; [CCFun.id] when they need nothing more than the listener's middleware.
+  *)
+  val wrap : t -> Brtl_rtng.Handler.t -> Brtl_rtng.Handler.t
+
   (** Stop the service after the listener. *)
   val stop : t -> unit Abb.Future.t
 end
@@ -58,9 +63,6 @@ type started = Started : (module S with type t = 'a) * 'a -> started
 
 (** Start the service and pair it with its module. [opt] is the options the service asked for. *)
 val start : (module S with type opt = 'opt) -> 'opt -> (started, start_err) result Abb.Future.t
-
-(** The routes appended to the shared route table. *)
-val routes : started -> route list
 
 (** Stop the service. *)
 val stop : started -> unit Abb.Future.t

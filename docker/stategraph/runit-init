@@ -12,11 +12,12 @@
 # This is runit's stage 3, merged into stage 2 so a container can use it.
 #
 # Order matters. nginx is the only ingress: it fronts on 8080 and proxies to
-# stategraph (8180) and, when orchestration is on, terrat (8181). Draining nginx
-# first therefore drains the backends' request work before we stop them.
+# stategraph (8180), which also serves terrat's routes when orchestration is on.
+# Draining nginx first therefore drains the backends' request work before we
+# stop them.
 #
-# The remaining services are stopped in one sv call. pricing-service and terrat
-# are opt-in and are commonly marked `down` by the image CMD; force-stop on an
+# The remaining services are stopped in one sv call. pricing-service is opt-in
+# and is commonly marked `down` by the image CMD; force-stop on an
 # already-down service is a no-op, so no special-casing is needed.
 #
 # nginx's own drain is bounded by worker_shutdown_timeout in nginx.conf.template

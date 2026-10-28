@@ -62,7 +62,7 @@ type t = {
   security_enabled : bool;
   dedicated_enabled : bool;
   (* STATEGRAPH_ORCHESTRATION_ENABLED: master on/off switch for the orchestration engine
-     integration (FDW bridge to the terrateam database; the terrat runit service and nginx routes
+     integration (FDW bridge to the terrateam database and terrat's services; the nginx routes
      read the same variable). *)
   orchestration_enabled : bool;
   (* Whether STATEGRAPH_ORCHESTRATION_ENABLED said so, rather than the FDW password implying it.
@@ -383,8 +383,7 @@ let create ?(github_app_managed = false) () =
   in
   let fdw_provisioner_password = env_str_opt "STATEGRAPH_FDW_PROVISIONER_PASSWORD" in
   (* Unset means on when the FDW password is set: without that password no bridge can be built,
-     so the engine has nothing to serve. The image CMD and the nginx render script apply the same
-     rule. *)
+     so the engine has nothing to serve. The nginx render script applies the same rule. *)
   let orchestration_explicit =
     match env_str_opt "STATEGRAPH_ORCHESTRATION_ENABLED" with
     | Some ("true" | "1" | "false" | "0") -> true

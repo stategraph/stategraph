@@ -21,7 +21,7 @@ fi
 # and the engine read, so GitHub Enterprise is covered by setting it once.
 export STATEGRAPH_GITHUB_WEB_BASE="${GITHUB_WEB_BASE_URL:-https://github.com}"
 
-# The rule lives in orchestration-enabled, which the image CMD asks too.
+# The rule lives in orchestration-enabled.
 if orchestration-enabled; then
     STATEGRAPH_ORCHESTRATION_ON=1
 else
@@ -41,23 +41,21 @@ else
     export STATEGRAPH_GTM_SUB_FILTER=""
 fi
 
-# Orchestration engine routes: terrat is reachable at its NATIVE paths -- the
-# same /api/github/v1/events etc. as the standalone terrat image, so webhook
-# URLs do not change when migrating to the unified image. Only the
-# machine-facing surface is routed: VCS webhooks/callbacks, the runner API
-# (work-manifests, plans, tenv, infracost), the KV store, and the
-# access-token lifecycle (bearer-authenticated). Everything else under /api
-# stays with stategraph -- the console uses stategraph endpoints.
-# The GitLab twins of the kv/access-token entries need no lines of their own:
-# they mount under /api/v1/gitlab, which is routed wholesale.
-# This list is guarded by code/tests/nginx_terrat_routes; update both
+# Orchestration engine routes: the stategraph server serves terrat's routes at
+# their NATIVE paths -- the same /api/github/v1/events etc. as the standalone
+# terrat image, so webhook URLs do not change when migrating to the unified
+# image -- and the console host's /api location reaches them. Two of them need
+# a location of their own: the VCS OAuth callbacks redirect to the base nginx
+# forwards, which must stay terrat's console (TERRAT_UI_BASE), as when terrat
+# ran as a process of its own.
+# These locations are guarded by code/tests/nginx_terrat_routes; update both
 # together.
 # Rendered only when orchestration is enabled; empty otherwise, so the config
 # matches a pre-orchestration image.
 # Escaped \$vars are nginx runtime variables; unescaped ones expand here.
 #
-# One terrat-proxied location. $1 is the location argument: a path prefix, or
-# a named location such as @terrat. Every terrat location uses this body.
+# One terrat location. $1 is the location argument: a path, or a named location
+# such as @terrat. Every terrat location uses this body.
 terrat_location() {
     cat <<EOF
 
@@ -65,7 +63,7 @@ terrat_location() {
             limit_conn stategraph_app 3000;
             limit_req zone=client_limit burst=5000;
 
-            proxy_pass http://127.0.0.1:8181;
+            proxy_pass http://127.0.0.1:8180;
             proxy_set_header X-Forwarded-For \$remote_addr;
             proxy_set_header X-Forwarded-Base "${TERRAT_UI_BASE:-}";
 
@@ -79,10 +77,8 @@ terrat_location() {
 
             add_header Cache-Control "no-store" always;
 
-            # Proof that the front door reached terrat and not stategraph.
-            # Cache-Control used to carry that signal, but stategraph's own /api
-            # sets no-store now (#2162), so the marker needs a header only these
-            # blocks emit. Asserted by e2e_tests_orchestration.
+            # Marks the responses of these locations, which only terrat's
+            # routes reach. Asserted by e2e_tests_orchestration.
             add_header X-Stategraph-Route "orchestration" always;
 
             # This block declares add_header of its own, so nginx drops every
@@ -100,14 +96,10 @@ EOF
 case "$STATEGRAPH_ORCHESTRATION_ON" in
     1)
         STATEGRAPH_TERRAT_ROUTES=""
-        for prefix in \
-            /api/github \
-            /api/gitlab \
-            /api/v1/gitlab \
-            /api/v1/github/kv \
-            /api/v1/github/access-token \
-            /api/v1/access-token; do
-            STATEGRAPH_TERRAT_ROUTES="$STATEGRAPH_TERRAT_ROUTES$(terrat_location "$prefix")"
+        for callback in \
+            /api/github/v1/callback \
+            /api/v1/gitlab/callback; do
+            STATEGRAPH_TERRAT_ROUTES="$STATEGRAPH_TERRAT_ROUTES$(terrat_location "= $callback")"
         done
         # Extra server directives. @terrat is for requests that a js_content
         # handler passes on.
@@ -126,8 +118,9 @@ esac
 # The iris server block: the Terrateam console on the host of TERRAT_UI_BASE.
 # It serves the same SPA, from the same asset root, as the standalone terrat
 # image. iris reads its API from a relative path, so this block sends all of
-# /api to terrat; the console host above keeps its prefix list, because there
-# stategraph owns everything the list does not name.
+# /api to the stategraph server, which serves terrat's routes. Two of iris's
+# routes have a path that stategraph serves too; the server answers terrat's at
+# /api/v1/terrateam/..., and this block rewrites to it.
 # Its location / mirrors the server block of docker/terrat/nginx.conf.template:
 # the same %TERRATEAM_*% substitutions and the same Content-Security-Policy.
 # code/tests/nginx_terrat_routes fails when the two differ.
@@ -218,15 +211,20 @@ case "$STATEGRAPH_ORCHESTRATION_ON" in
         }
 
         # The console host's terrat locations, so a request to one of those
-        # prefixes is handled the same on both hosts. Their prefixes are longer
-        # than /api, so they win over it.
+        # paths is handled the same on both hosts. They are exact matches, so
+        # they win over /api.
         ${STATEGRAPH_TERRAT_ROUTES}
 
         location /api {
             limit_conn stategraph_app 3000;
             limit_req zone=client_limit burst=5000;
 
-            proxy_pass http://127.0.0.1:8181;
+            # terrat's whoami and task, whose paths stategraph serves too
+            # (code/src/sgs_service_terrat/sgs_service_terrat_ui.mli).
+            rewrite ^/api/v1/whoami\$ /api/v1/terrateam/whoami break;
+            rewrite ^/api/v1/tasks/(.*)\$ /api/v1/terrateam/tasks/\$1 break;
+
+            proxy_pass http://127.0.0.1:8180;
             proxy_set_header X-Forwarded-For \$remote_addr;
             proxy_set_header X-Forwarded-Base "${TERRAT_UI_BASE:-}";
 
@@ -240,8 +238,8 @@ case "$STATEGRAPH_ORCHESTRATION_ON" in
 
             add_header Cache-Control "no-store" always;
 
-            # Proof that the front door reached terrat and not stategraph, the
-            # same marker the console host puts on its terrat routes.
+            # Marks the responses of this host's API, which serves terrat's
+            # routes, the same marker as the console host's terrat locations.
             add_header X-Stategraph-Route "orchestration" always;
 
             add_header X-Robots-Tag "noindex, nofollow" always;

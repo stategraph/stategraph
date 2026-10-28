@@ -15,8 +15,10 @@ let start mgr =
   let open Abbs_fc.Infix_result_monad in
   Sgs_svc_mngr.load ~name:Sgs_service_terrat_config.name Sgs_service_terrat_config.Ty mgr
   >>= fun config ->
+  let config = Sgs_service_terrat_config.config config in
   Terrat_vcs_event_evaluator2.create_exec ~slots:(Terrat_config.event_evaluator_slots config) ()
   |> Abb.Future.map (fun exec -> Ok exec)
 
 let routes _ = []
+let wrap _ = CCFun.id
 let stop _ = Abb.Future.return ()

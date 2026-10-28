@@ -247,7 +247,12 @@ module Route = struct
   module Route = struct
     (* Remember the name of Furi.t first *)
     type ('f, 'r) _t = ('f, 'r) t
-    type 'r t = Route : (('f, 'r) _t * 'f) -> 'r t
+
+    type 'r t =
+      | Route : (('f, 'r) _t * 'f) -> 'r t
+      | Map : 'a t * ('a -> 'r) -> 'r t
+
+    let map f t = Map (t, f)
   end
 
   let rel = Rel
@@ -338,14 +343,21 @@ module Route = struct
     let path = Uri.path uri in
     let query = Uri.query uri in
     let path_len = String.length path in
-    let rec go = function
-      | [] -> default ctx
-      | Route.Route (t, f) :: rs -> (
+    let rec matched : type r. r Route.t -> r option = function
+      | Route.Route (t, f) -> (
           match test_ctx body ~path ~query t with
           | Some (idx, wit) when path_len = idx ->
               (* Ensure the whole URI path has been consumed *)
-              apply_ctx wit f
-          | Some _ | None -> go rs)
+              Some (apply_ctx wit f)
+          | Some _ | None -> None)
+      | Route.Map (route, f) -> CCOption.map f (matched route)
+    in
+    let rec go = function
+      | [] -> default ctx
+      | route :: rs -> (
+          match matched route with
+          | Some r -> r
+          | None -> go rs)
     in
     go rs
 

@@ -11,4 +11,7 @@
   sgs_service_orchestration
   sgs_service_scheduler
   sgs_service_tenants
-  sgs_service_users))
+  sgs_service_terrat
+  sgs_service_users
+  terrat_vcs_service_github_oss
+  terrat_vcs_service_gitlab_oss))

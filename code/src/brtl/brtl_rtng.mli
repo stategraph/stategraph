@@ -112,6 +112,10 @@ module Route : sig
   (** Represents a route, which is a URL pattern and the function it should be applied to. *)
   module Route : sig
     type 'r t
+
+    (** [map f route] matches the requests that [route] matches, and gives [f] of what [route]
+        gives. For example, it wraps the handler of a route in a middleware of its own. *)
+    val map : ('a -> 'b) -> 'a t -> 'b t
   end
 
   (** The start of a path. *)

@@ -20,6 +20,9 @@ let test_db_name =
       Oth.Assert.Eq.string
         ~expected:"orchestration"
         ~actual:(Terrat_config.db (config (("TERRAT_DB_NAME", "orchestration") :: base_env)));
+      Oth.Assert.Eq.string
+        ~expected:"terrateam"
+        ~actual:(Terrat_config.db (config (("TERRAT_DB_NAME", "") :: base_env)));
       ())
 
 let test_db_connection =

@@ -188,7 +188,7 @@ struct
   let server () =
     let run () =
       match Terrat_config.create () with
-      | Ok config ->
+      | Ok config -> (
           let open Abb.Future.Infix_monad in
           print_endline (Terrat_config.show config);
           CCOption.iter (fun config ->
@@ -211,6 +211,11 @@ struct
           >>= fun gitlab_service ->
           let services = CCOption.to_list github_service @ CCOption.to_list gitlab_service in
           Terrat_server.run ~infracost config storage services
+          >>= function
+          | Ok () -> Abb.Future.return ()
+          | Error err ->
+              Logs.err (fun m -> m "SESSION : ERROR : %s" (Terrat_session.show_err err));
+              exit 1)
       | Error err ->
           Logs.err (fun m -> m "CONFIG : ERROR : %s" (Terrat_config.show_err err));
           exit 1

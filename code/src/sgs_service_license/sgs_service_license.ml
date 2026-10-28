@@ -84,5 +84,6 @@ module Make (L : LICENSE) (Cloud : Sgs_cloud.S) = struct
         (`GET, Rt.license_status () --> L.license_status config storage);
       ]
 
+  let wrap _ = CCFun.id
   let stop _ = Abb.Future.return ()
 end

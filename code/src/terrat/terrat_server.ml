@@ -125,7 +125,7 @@ let start_telemetry config =
       >>= fun () -> Abbs_fc.ignore (Abb.Future.fork (Terrat_telemetry.start_ping_loop config))
 
 let run ~infracost config storage services =
-  let open Abb.Future.Infix_monad in
+  let open Abbs_fc.Infix_result_monad in
   let one_min = Duration.of_min 1 in
   let five_min = Duration.of_min 5 in
   let cfg =
@@ -139,8 +139,9 @@ let run ~infracost config storage services =
       create (Config.make ~remote_ip_header:"X-Forwarded-For" ~metrics:Metrics.observe ()))
   in
   Logs.info (fun m -> m "Creating storage connection");
-  Terrat_session.create ~cookie_name:(Terrat_config.session_cookie_name config) storage
+  Terrat_session.try_create ~cookie_name:(Terrat_config.session_cookie_name config) storage
   >>= fun mw_session ->
+  let open Abb.Future.Infix_monad in
   let mw = Brtl_mw.create [ mw_log; mw_session ] in
   Logs.info (fun m -> m "Starting server");
   start_telemetry config
@@ -154,16 +155,16 @@ let run ~infracost config storage services =
   >>= fun _ ->
   Brtl.run cfg mw (rtng ~infracost config storage services)
   >>| function
-  | Ok () -> ()
+  | Ok () -> Ok ()
   | Error (`Exn exn) ->
       Logs.err (fun m -> m "%s" (Printexc.to_string exn));
-      ()
+      Ok ()
   | Error `E_address_not_available ->
       Logs.err (fun m -> m "Failed to run server because address not available");
-      ()
+      Ok ()
   | Error `E_address_family_not_supported ->
       Logs.err (fun m -> m "Failed to run server because address family not supported");
-      ()
+      Ok ()
   | Error `E_address_in_use ->
       Logs.err (fun m -> m "Failed to run server because address already in use");
-      ()
+      Ok ()

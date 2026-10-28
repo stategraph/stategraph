@@ -52,28 +52,45 @@ module Svc = struct
     fatal : string option;
   }
 
-  (* One attempt, then one second between tries, until the service starts or the manager is
-     gone. *)
+  (* A fatal refusal is not retried: the manager reports it to the waiters of [started]. *)
+  let fail svc starter msg =
+    let open Abb.Future.Infix_monad in
+    let msg = Printf.sprintf "Service %s cannot start : %s" starter.name msg in
+    Logs.err (fun m -> m "%s" msg);
+    Typed.call svc (Req.Failed msg) >>= fun _ -> Abb.Future.return ()
+
+  (* One attempt, then one second between tries, until the service starts, refuses for good, or
+     the manager is gone. A start that raises refuses for good: a retry would raise again, and an
+     exception that ended the task unseen would leave [started] waiting forever. *)
   let rec start_service svc id (starter : starter) =
     let open Abb.Future.Infix_monad in
-    starter.run ()
+    Abb.Future.await (Abb.Future.return () >>= starter.run)
     >>= function
-    | Ok started ->
+    | `Det (Ok started) ->
         Typed.call svc (Req.Registered (id, started))
         >>= Abbs_fc.when_err (fun `Chan_closed ->
             (* The manager is gone, so the service must not outlive it. *)
             Sgs_service.stop started)
-    | Error (`Start_fatal_err msg) ->
-        (* A fatal refusal is not retried: the manager reports it to the waiters of [started]. *)
-        let msg = Printf.sprintf "Service %s cannot start : %s" starter.name msg in
-        Logs.err (fun m -> m "%s" msg);
-        Typed.call svc (Req.Failed msg) >>= fun _ -> Abb.Future.return ()
-    | Error ((`Start_err _ | `Start_missing_deps_err _) as err) ->
+    | `Det (Error (`Start_fatal_err msg)) -> fail svc starter msg
+    | `Exn (exn, bt) ->
+        CCOption.iter
+          (fun bt ->
+            Logs.err (fun m ->
+                m "Service %s raised : %s" starter.name (Printexc.raw_backtrace_to_string bt)))
+          bt;
+        fail svc starter ("raised " ^ Printexc.to_string exn)
+    | `Aborted -> Abb.Future.return ()
+    | `Det (Error ((`Start_err _ | `Start_missing_deps_err _) as err)) -> (
         (* Any other refusal, missing dependencies included, is logged and retried: the next attempt
            runs one second later. *)
         Logs.err (fun m ->
             m "Service %s failed to start : %a" starter.name Sgs_service.pp_start_err err);
-        Abb.Sys.sleep 1.0 >>= fun () -> start_service svc id starter
+        Abb.Sys.sleep 1.0
+        >>= fun () ->
+        Typed.call svc Req.State
+        >>= function
+        | Ok (Waiting | All_started | Fatal _) -> start_service svc id starter
+        | Error `Chan_closed -> Abb.Future.return ())
 
   (* The registered service the query names, if any. [matches] proves the stored value has the
      query's type when the witnesses match. *)
