@@ -1,4 +1,5 @@
 module Http = Cohttp_abb.Make (Abb)
+module Http_tls = Cohttp_abb_tls.Make (Abb)
 
 module Metrics = struct
   let namespace = "terrat"
@@ -81,7 +82,7 @@ let rec start uri =
   let open Abb.Future.Infix_monad in
   Abb.Sys.sleep 10.0
   >>= fun () ->
-  Http.Client.call `GET uri
+  Http.Client.call ~connector:(Http_tls.connector ()) `GET uri
   >>= function
   | Ok (resp, body) when Http.Response.status resp = `OK ->
       parse_and_update_metrics body;

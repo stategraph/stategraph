@@ -104,7 +104,7 @@ let run cfg mw rtng =
     Http.Server.(
       Config.of_view
         {
-          Config.View.scheme = Scheme.Http;
+          Config.View.channel = Http.Server.http_channel;
           on_handler_err;
           on_protocol_err;
           port = Cfg.port cfg;

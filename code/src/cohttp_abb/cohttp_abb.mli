@@ -1,13 +1,19 @@
-(** Cohttp-based client and server. *)
+(** Cohttp-based client and server. TLS is not part of this library: the [cohttp_abb_tls] library
+    builds the channels for [https] and for serving TLS. *)
 
 type connect_err =
   [ Abb_happy_eyeballs.connect_err
   | `E_connection_refused
+  | `E_tls_not_configured
   | `Unknown_scheme of string
   | `Unexpected_err of string
   | `Error
   ]
 [@@deriving show]
+
+(** An error while building the buffered I/O over a connection, such as a failed TLS setup on the
+    socket. The value is generic because the TLS layer reports no cause. *)
+type channel_err = [ `Error ] [@@deriving show]
 
 type request_err =
   [ connect_err
@@ -42,10 +48,10 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) : sig
   (** Side-effectful API for working with responses. *)
   module Response_io : module type of Cohttp.Response.Make (Io) with type t = Response.t
 
-  (** An HTTP and HTTPs client. Provides a high-level API for doing complete requests in one call
-      down to the underlying APIs for managing a connection. This client does not follow redirects
-      or handle caching but simply provides the underlying HTTP request creation and response
-      parsing. *)
+  (** An HTTP client. It fetches [https] URIs when its {!Client.Connector.t} has a TLS channel.
+      Provides a high-level API for doing complete requests in one call down to the underlying APIs
+      for managing a connection. This client does not follow redirects or handle caching but simply
+      provides the underlying HTTP request creation and response parsing. *)
   module Client : sig
     module Transport : sig
       type t
@@ -64,20 +70,25 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) : sig
     end
 
     module Connector : sig
+      (** Builds the buffered reader and writer over an established TCP connection. [host] is the
+          name of the remote server. A TLS channel uses it as the server name. *)
+      type channel =
+        host:string -> Abb.Socket.tcp Abb.Socket.t -> (Io.ic * Io.oc, channel_err) result
+
       type t
 
-      (** Create a connector using proxy-related environment variables to construct it *)
-      val of_env : ?tls_config:(string -> Otls.Tls_config.t) -> unit -> t
+      (** Create a connector using proxy-related environment variables to construct it. [channel]
+          builds the I/O for [https] URIs. When it is absent, [https] requests fail with
+          [`E_tls_not_configured]. *)
+      val of_env : ?channel:channel -> unit -> t
 
-      (** Make a connector and optionally override the connect function. *)
-      val make :
-        ?tls_config:(string -> Otls.Tls_config.t) ->
-        ?connect:
-          ((string -> Otls.Tls_config.t) ->
-          Request.t ->
-          (Transport.t, connect_err) result Abb.Future.t) ->
-        unit ->
-        t
+      module Tests : sig
+        (** Make a connector that ignores the proxy-related environment variables. [channel] builds
+            the I/O for [https] URIs. {b Only call this module in tests!}
+
+            Production code should use {!of_env}. *)
+        val make : ?channel:channel -> unit -> t
+      end
     end
 
     (** Connect to a the destination of a request given a connector. Return a transport that can be
@@ -104,47 +115,47 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) : sig
       ?headers:Cohttp.Header.t ->
       ?chunked:bool ->
       ?body:string ->
-      ?connector:Connector.t ->
+      connector:Connector.t ->
       Cohttp.Code.meth ->
       Uri.t ->
       (Response.t * string, [> request_err ]) result Abb.Future.t
 
     val get :
       ?headers:Cohttp.Header.t ->
-      ?connector:Connector.t ->
+      connector:Connector.t ->
       Uri.t ->
       (Response.t * string, [> request_err ]) result Abb.Future.t
 
     val put :
       ?headers:Cohttp.Header.t ->
       ?body:string ->
-      ?connector:Connector.t ->
+      connector:Connector.t ->
       Uri.t ->
       (Response.t * string, [> request_err ]) result Abb.Future.t
 
     val post :
       ?headers:Cohttp.Header.t ->
       ?body:string ->
-      ?connector:Connector.t ->
+      connector:Connector.t ->
       Uri.t ->
       (Response.t * string, [> request_err ]) result Abb.Future.t
 
     val delete :
       ?headers:Cohttp.Header.t ->
-      ?connector:Connector.t ->
+      connector:Connector.t ->
       Uri.t ->
       (Response.t * string, [> request_err ]) result Abb.Future.t
   end
 
-  (** Simple HTTP and HTTPs server. The server runs a configuration and returns when the server has
+  (** Simple HTTP server. The {!Config.View.channel} builds the I/O for each accepted connection, so
+      a TLS channel serves HTTPS. The server runs a configuration and returns when the server has
       stopped. *)
   module Server : sig
-    (** The scheme type to serve. *)
-    module Scheme : sig
-      type t =
-        | Http
-        | Https of Otls.Tls_config.t
-    end
+    (** Builds the buffered I/O over an accepted TCP connection. *)
+    type channel = Abb.Socket.tcp Abb.Socket.t -> (Io.ic * Io.oc, channel_err) result
+
+    (** Serve plain HTTP. *)
+    val http_channel : channel
 
     (** The type of a request handler. A handler takes the parsed headers of a Request and the input
         and output buffers for the connection. A handler is called per request however there can be
@@ -174,10 +185,10 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) : sig
     module Config : sig
       module View : sig
         type t = {
-          scheme : Scheme.t;  (** HTTP or HTTPS server. *)
+          channel : channel;  (** Builds the buffered I/O for each accepted connection. *)
           on_handler_err : on_handler_err;  (** Function to execute on handler error. *)
           on_protocol_err : on_protocol_err;  (** Function to execute on protocol error. *)
-          port : int;  (** Port ot listen on. *)
+          port : int;  (** Port to listen on. *)
           handler : handler;  (** The handler to execute per requests. *)
           read_header_timeout : Duration.t option;  (** Time to wait to read all headers. *)
           handler_timeout : Duration.t option;  (** Time to allow a handler to run. *)

@@ -1,0 +1,3 @@
+(library
+ (name cohttp_abb_tls)
+ (libraries abb_intf abb_tls cohttp_abb containers logs otls sln unix))

@@ -1,12 +1,15 @@
 module Abb = Abb_scheduler_select
 module Fut_comb = Abb_fc.Make (Abb.Future)
 module Http = Cohttp_abb.Make (Abb)
+module Http_tls = Cohttp_abb_tls.Make (Abb)
 
 let run_client () =
   let open Abb.Future.Infix_monad in
   let url = Sys.argv.(1) in
   let uri = Uri.of_string url in
-  Fut_comb.timeout ~timeout:(Abb.Sys.sleep 10.0) (Http.Client.call `GET uri)
+  Fut_comb.timeout
+    ~timeout:(Abb.Sys.sleep 10.0)
+    (Http.Client.call ~connector:(Http_tls.connector ()) `GET uri)
   >>= function
   | `Ok (Ok (resp, body)) ->
       Printf.printf "Status: %s\n" (Cohttp.Code.string_of_status resp.Http.Response.status);

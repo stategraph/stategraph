@@ -50,6 +50,7 @@ module Cmdline = struct
         "brtl_mw_log.pre";
         "cohttp_abb";
         "cohttp_abb.io";
+        "cohttp_abb.tls";
         "dns_cache";
         "dns_client";
         "happy-eyeballs";

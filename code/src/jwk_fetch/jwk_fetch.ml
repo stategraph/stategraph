@@ -1,4 +1,5 @@
 module Http = Cohttp_abb.Make (Abb)
+module Http_tls = Cohttp_abb_tls.Make (Abb)
 
 type err =
   [ Cohttp_abb.request_err
@@ -20,7 +21,7 @@ let get_max_age cache_control =
 
 let fetch uri =
   let open Abbs_fc.Infix_result_monad in
-  Http.Client.get uri
+  Http.Client.get ~connector:(Http_tls.connector ()) uri
   >>? function
   | resp, body when resp.Http.Response.status = `OK -> (
       let headers = Http.Response.headers resp in
