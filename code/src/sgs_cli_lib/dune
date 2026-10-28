@@ -3,6 +3,7 @@
  (libraries
   ISO8601
   abbs
+  brtl
   cmdliner
   containers
   logs
@@ -11,6 +12,8 @@
   mirage-crypto-rng.unix
   mql
   mql_sql
+  pgsql_io
+  pgsql_pool
   sg_caps
   sg_caps_json
   sg_caps_trie
@@ -24,8 +27,13 @@
   sgs_service_storage
   sgs_svc_mngr
   sgs_tenant
-  sgs_user)
+  sgs_terrat_config
+  sgs_user
+  terrat
+  terrat_config
+  terrat_storage)
  (preprocessor_deps
+  ../sgs_terrateam_catalog/fdw_grants.sql
   ../sgs_terrateam_catalog/fdw_tables.sql
   (glob_files_rec sql/*))
  (preprocess

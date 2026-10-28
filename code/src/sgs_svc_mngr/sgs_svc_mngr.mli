@@ -28,7 +28,7 @@ val register' :
 
 (** Register a service with the manager. The service is started inside of the service manager. If
     the service fails to start, it is retried forever with a wait of 1 second between tries, unless
-    it refuses with [`Start_fatal_err].
+    it refuses with [`Start_fatal_err]. A start that raises counts as a [`Start_fatal_err] refusal.
 
     A service should use {!Sgs_svc_mngr.get} to load any other service dependencies on startup and
     fail with [`Start_missing_deps_err] if the required services cannot be found. The service

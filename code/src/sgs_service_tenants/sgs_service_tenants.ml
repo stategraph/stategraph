@@ -137,5 +137,6 @@ module Make (Cloud : Sgs_cloud.S) = struct
           Rt.invitation_accept () --> Sgs_service_tenants_ep_invitation_accept.run config storage );
       ]
 
+  let wrap _ = CCFun.id
   let stop _ = Abb.Future.return ()
 end

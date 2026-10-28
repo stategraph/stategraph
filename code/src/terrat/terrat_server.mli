@@ -11,9 +11,11 @@ val api_routes :
     ends. Nothing happens when telemetry is disabled. *)
 val start_telemetry : Terrat_config.t -> unit Abb.Future.t
 
+(** Serve terrat's API until the listener stops. It fails before listening when the session
+    middleware cannot be created. *)
 val run :
   infracost:Terrat_ep_infracost.backend option ->
   Terrat_config.t ->
   Terrat_storage.t ->
   Terrat_vcs_service.service list ->
-  unit Abb.Future.t
+  (unit, [> Terrat_session.err ]) result Abb.Future.t

@@ -90,8 +90,10 @@ module Cookie = struct
               (Terrat_user.id user)
               user_agent)
         >>= function
-        | Ok [] -> assert false
         | Ok (token :: _) -> Abb.Future.return (Uuidm.to_string token)
+        | Ok [] ->
+            Logs.err (fun m -> m "Failure storing session: the insert returned no token");
+            raise Session_store_failed
         | Error (#Pgsql_io.err as err) ->
             Logs.err (fun m -> m "Failure storing session %s" (Pgsql_io.show_err err));
             raise Session_store_failed
@@ -172,7 +174,13 @@ type err =
   | Pgsql_io.err
   ]
 
-let try_create ~cookie_name storage =
+let show_err = function
+  | `No_encryption_keys_err -> "the terrateam database has no encryption keys: run the migrations"
+  | #Pgsql_pool.err as err -> Pgsql_pool.show_err err
+  | #Pgsql_io.err as err -> Pgsql_io.show_err err
+
+(* The session's configuration needs the keys of the [encryption_keys] table. *)
+let try_config ~cookie_name storage =
   let open Abb.Future.Infix_monad in
   Pgsql_pool.with_conn storage ~f:(fun db ->
       Pgsql_io.Prepared_stmt.fetch db (Sql.select_encryption_keys ()) ~f:CCFun.id)
@@ -202,14 +210,13 @@ let try_create ~cookie_name storage =
               };
         }
       in
-      Ok (Brtl_mw_session.create config)
+      Ok config
 
-let create ~cookie_name storage =
-  let open Abb.Future.Infix_monad in
-  try_create ~cookie_name storage
-  >>= function
-  | Ok mw -> Abb.Future.return mw
-  | Error _ -> assert false
+let try_create ~cookie_name storage =
+  Abb.Future.map (CCResult.map Brtl_mw_session.create) (try_config ~cookie_name storage)
+
+let try_create_wrapper ~cookie_name storage =
+  Abb.Future.map (CCResult.map Brtl_mw_session.wrap) (try_config ~cookie_name storage)
 
 let get_session ctx = Brtl_mw_session.get_session_value key ctx
 

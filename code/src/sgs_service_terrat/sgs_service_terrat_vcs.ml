@@ -35,7 +35,12 @@ module Make
     (Vcs : Terrat_vcs_service.S)
     (Select : SELECT with type vcs_config = Vcs.Service.vcs_config) =
 struct
-  type t = Vcs.Service.t option
+  type started = {
+    service : Vcs.Service.t;
+    session : Sgs_service_terrat_session.t;
+  }
+
+  type t = started option
   type opt = Sgs_svc_mngr.t
   type 'a Sgs_service.ty += Ty : t Sgs_service.ty
 
@@ -50,35 +55,39 @@ struct
 
   let start mgr =
     let open Abbs_fc.Infix_result_monad in
-    Sgs_svc_mngr.load ~name:Sgs_service_terrat_config.name Sgs_service_terrat_config.Ty mgr
-    >>= fun config ->
+    Abbs_fc.Result.all3
+      (Sgs_svc_mngr.load ~name:Sgs_service_terrat_config.name Sgs_service_terrat_config.Ty mgr)
+      (Sgs_svc_mngr.load ~name:Sgs_service_terrat_exec.name Sgs_service_terrat_exec.Ty mgr)
+      (Sgs_svc_mngr.load ~name:Sgs_service_terrat_session.name Sgs_service_terrat_session.Ty mgr)
+    >>= fun (config, exec, session) ->
+    let storage = Sgs_service_terrat_config.storage config
+    and config = Sgs_service_terrat_config.config config in
     match Select.vcs_config config with
     | None ->
         Logs.info (fun m -> m "%s is not configured: it serves no routes" name);
         Abbs_fc.return_ok None
     | Some vcs_config ->
-        Abbs_fc.Result.all2
-          (Sgs_svc_mngr.load
-             ~name:Sgs_service_terrat_storage.name
-             Sgs_service_terrat_storage.Ty
-             mgr)
-          (Sgs_svc_mngr.load ~name:Sgs_service_terrat_exec.name Sgs_service_terrat_exec.Ty mgr)
-        >>= fun (storage, exec) ->
         Abbs_fc.Result.map_err
           ~f:(function
-            | `Error -> `Start_err (name ^ " : could not start"))
+            | `Error -> `Start_fatal_err (name ^ " : could not start"))
           (Vcs.Service.start config vcs_config storage exec)
-        >>| CCOption.return
+        >>| fun service -> Some { service; session }
 
   let routes = function
-    | Some service -> Vcs.Service.routes service
+    | Some { service; session = _ } -> Vcs.Service.routes service
     | None -> []
 
+  let wrap = function
+    | Some { service = _; session } -> session
+    | None -> CCFun.id
+
   let stop = function
-    | Some service -> Vcs.Service.stop service
+    | Some { service; session = _ } -> Vcs.Service.stop service
     | None -> Abb.Future.return ()
 
-  let service = CCOption.map (fun service -> Terrat_vcs_service.Service ((module Vcs), service))
+  let service =
+    CCOption.map (fun { service; session = _ } ->
+        Terrat_vcs_service.Service ((module Vcs), service))
 end
 
 module Make_github

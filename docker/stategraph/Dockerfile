@@ -494,8 +494,8 @@ COPY --from=focus-etl /usr/local/share/duckdb/extensions /usr/local/share/duckdb
 COPY --from=focus-etl --chown=${USERNAME}:${USERNAME} /usr/local/bin/load-focus-billing /usr/local/bin/load-focus-billing
 
 # The unified server's runtime, so that the server service of docker-compose-dev.yml runs the
-# topology stategraph-server-base sets up: nginx on 8080 in front of the stategraph server (8180)
-# and terrat (8181), under runit. Scripts and configuration are links into the source tree, and
+# topology stategraph-server-base sets up: nginx on 8080 in front of the stategraph server (8180),
+# which also serves terrat's routes, under runit. Scripts and configuration are links into the source tree, and
 # binaries and consoles links into _build, so an edit, or a `dune build @code/stategraph` and an
 # `sv restart`, takes effect without rebuilding the image. No pricing-service runit service:
 # docker-compose-dev.yml runs its own container.
@@ -512,7 +512,7 @@ RUN apk add --no-cache \
 COPY --from=oauth2-proxy-build /oauth2-proxy /usr/local/bin/oauth2-proxy
 RUN src=/tmp/mono/docker/stategraph && \
     build=/tmp/mono/_build/default/code/src && \
-    for service in stategraph nginx terrat; do \
+    for service in stategraph nginx; do \
       mkdir -p /etc/service/$service && \
       ln -s $src/service/$service /etc/service/$service/run; \
     done && \
@@ -523,9 +523,7 @@ RUN src=/tmp/mono/docker/stategraph && \
     ln -s $src/nginx.conf.template /etc/nginx/nginx.conf.template && \
     ln -s $src/events.js /etc/nginx/events.js && \
     ln -s $build/sgs_cli/sgs_cli.exe /usr/local/bin/stategraph-server && \
-    ln -s $build/terrat_ee/terrat_ee.exe /usr/local/bin/terrat && \
     mkdir -p /usr/local/share/stategraph /usr/local/share/terrat/ui && \
-    ln -s /tmp/mono/code/src/sgs_terrateam_catalog/fdw_grants.sql /usr/local/share/stategraph/fdw_grants.sql && \
     ln -s $build/hermes/ui-export /usr/local/share/stategraph/ui && \
     ln -s $build/iris/ui-export /usr/local/share/terrat/ui/assets && \
     chown -R ${USERNAME}:${USERNAME} /etc/service /etc/nginx /var/lib/nginx /var/log/nginx /run
@@ -535,10 +533,11 @@ USER ${USERNAME}
 # We're done with the development and devcontainer images at this point. Below are things only for the production image #
 #########################################################################################################################
 
-# Orchestration engine binaries, one per edition, and the iris UI for the
-# unified image. The image serves hermes on its default host and iris on the
-# TERRAT_UI_BASE host, one console per brand. Deliberately narrower than the
-# terrat-build stage further down: no ttm.
+# The iris UI for the unified image, which serves hermes on its default host and
+# iris on the TERRAT_UI_BASE host, one console per brand. The stategraph server
+# runs the orchestration engine itself, so no terrat binary is built here. The
+# stages below that need the source and the restored dune cache start from this
+# one.
 FROM ocaml-deps AS terrat-server-build
 
 ARG USERNAME
@@ -553,8 +552,6 @@ RUN --mount=type=cache,id=${DUNE_CACHE_ID},target=/dune-cache,uid=1000,gid=1000,
       mkdir -p /tmp/mono/_build && \
       cp -aT /dune-cache/_build /tmp/mono/_build; \
     fi && \
-    make -C code terrat_ee && \
-    make -C code terrat_oss && \
     make -C code iris && \
     rm -rf /dune-cache/_build && \
     cp -aT /tmp/mono/_build /dune-cache/_build
@@ -581,8 +578,8 @@ RUN --mount=type=cache,id=${DUNE_CACHE_ID},target=/dune-cache,uid=1000,gid=1000,
 # Final server image, in two editions assembled from one base. The base is
 # everything edition-blind: packages, the runit tree, nginx, oauth2-proxy and
 # the orchestration console (iris). Each edition layer below adds its server,
-# its terrat and the tools its features shell out to; the enterprise one also
-# adds the Stategraph console (hermes) and the client.
+# which runs the orchestration engine, and the tools its features shell out to;
+# the enterprise one also adds the Stategraph console (hermes) and the client.
 FROM base-tenv-tofu AS stategraph-server-base
 
 ARG USERNAME
@@ -615,7 +612,7 @@ RUN apk add --no-cache \
 COPY --from=oauth2-proxy-build /oauth2-proxy /usr/local/bin/oauth2-proxy
 # The ${USERNAME} user/group (and TENV_ROOT) were created in base-tenv-tofu;
 # reuse them as the service account rather than creating a separate user.
-RUN mkdir -p /usr/local/bin /etc/service/stategraph /etc/service/nginx /etc/service/nginx/control /etc/service/pricing-service /etc/service/terrat /usr/local/share/stategraph/ui /usr/local/share/terrat/ui/assets /var/cache/stategraph/terraform-plugins /var/cache/stategraph/tofu-workdir /var/cache/stategraph/tofu-generated /var/cache/stategraph/gap-analysis
+RUN mkdir -p /usr/local/bin /etc/service/stategraph /etc/service/nginx /etc/service/nginx/control /etc/service/pricing-service /usr/local/share/stategraph/ui /usr/local/share/terrat/ui/assets /var/cache/stategraph/terraform-plugins /var/cache/stategraph/tofu-workdir /var/cache/stategraph/tofu-generated /var/cache/stategraph/gap-analysis
 RUN chown -R ${USERNAME}:${USERNAME} /etc/service /usr/local/share/stategraph /usr/local/share/terrat /etc/nginx /var/lib/nginx /var/log/nginx /run /var/cache/stategraph
 COPY --chown=${USERNAME}:${USERNAME} docker/stategraph/service/stategraph /etc/service/stategraph/run
 COPY --chown=${USERNAME}:${USERNAME} docker/stategraph/service/nginx /etc/service/nginx/run
@@ -624,17 +621,10 @@ COPY --chown=${USERNAME}:${USERNAME} docker/stategraph/service/nginx /etc/servic
 # hook makes `sv down` send nginx a graceful SIGQUIT rather than a fast TERM.
 COPY --chown=${USERNAME}:${USERNAME} --chmod=755 docker/stategraph/runit-init /usr/local/bin/runit-init
 COPY --chown=${USERNAME}:${USERNAME} --chmod=755 docker/stategraph/service/nginx-control-t /etc/service/nginx/control/t
-# The orchestration switch, in one place: the CMD below and service/nginx both
-# run before any binary reads the configuration, so both ask this.
+# The orchestration switch, in one place: service/nginx runs before any binary
+# reads the configuration, so it asks this.
 COPY --chown=${USERNAME}:${USERNAME} --chmod=755 docker/stategraph/orchestration-enabled /usr/local/bin/orchestration-enabled
 COPY --chown=${USERNAME}:${USERNAME} docker/stategraph/service/pricing-service /etc/service/pricing-service/run
-# terrat (orchestration engine) is gated by the image CMD, same mechanism as
-# pricing-service. The CMD decides on each start, so a container restarted with
-# a different setting follows it.
-COPY --chown=${USERNAME}:${USERNAME} docker/stategraph/service/terrat /etc/service/terrat/run
-# Catalog-generated column-level grants for the least-privilege FDW role; the
-# terrat service applies them (convergently) after its migrations run.
-COPY --chown=${USERNAME}:${USERNAME} code/src/sgs_terrateam_catalog/fdw_grants.sql /usr/local/share/stategraph/fdw_grants.sql
 # pricing-service is opt-in. The image CMD (below) marks it `down` unless
 # STATEGRAPH_PRICING_SERVICE_URL is set in the container environment, so runit
 # never starts it when cost is off -- declarative, and it survives container
@@ -648,9 +638,9 @@ COPY --from=terrat-server-build /tmp/mono/_build/default/code/src/iris/ui-export
 
 # Set oauth2-proxy path
 ENV STATEGRAPH_OAUTH2_PROXY_PATH=/usr/local/bin/oauth2-proxy
-# terrat and sgs share one origin, and sgs names its console cookie "session".
-# terrat reads this name for its own session cookie; sgs reads it to expire
-# that cookie on logout. Set at image level so that both processes see it.
+# terrat's routes and sgs's share one origin, and sgs names its console cookie
+# "session". terrat reads this name for its own session cookie; sgs reads it to
+# expire that cookie on logout.
 ENV TERRAT_SESSION_COOKIE_NAME=terrat_session
 
 USER ${USERNAME}
@@ -659,11 +649,9 @@ EXPOSE 8080
 # pricing-service `down` so runit never starts it (no idle process). Set
 # STATEGRAPH_COST_ENABLED=true in your deployment environment to enable cost
 # durably; runit then starts the service, which loads + weekly-refreshes the
-# price book.
-# Orchestration uses the same mechanism, and asks orchestration-enabled for the
-# rule so the shell side of it is written once.
+# price book. Orchestration needs no runit service of its own: the stategraph
+# server starts it when it is enabled.
 CMD case "$STATEGRAPH_COST_ENABLED" in true|1) ;; *) touch /etc/service/pricing-service/down ;; esac; \
-    if orchestration-enabled; then rm -f /etc/service/terrat/down; else touch /etc/service/terrat/down; fi; \
     exec /usr/local/bin/runit-init
 
 # The OSS edition: orchestration through Stategraph. It ships no pricing
@@ -674,7 +662,6 @@ FROM stategraph-server-base AS stategraph-server-oss
 ARG USERNAME
 
 COPY --from=stategraph-server-oss-build /tmp/mono/_build/default/code/src/sgs_cli_oss/sgs_cli_oss.exe /usr/local/bin/stategraph-server
-COPY --from=terrat-server-build --chown=${USERNAME}:${USERNAME} /tmp/mono/_build/default/code/src/terrat_oss/terrat_oss.exe /usr/local/bin/terrat
 RUN touch /etc/service/pricing-service/down
 
 # The enterprise edition: the whole of Stategraph, with the tools its cost,
@@ -699,7 +686,6 @@ COPY --from=stategraph-dev /tmp/mono/_build/default/code/src/sgc/sgc.exe /usr/lo
 # left behind by a previous build, which does not exist on a clean checkout.
 COPY --from=stategraph-dev /tmp/mono/_build/default/code/src/hermes/ui-export/ /usr/local/share/stategraph/ui/
 COPY --from=stategraph-dev /tmp/mono/_build/default/code/src/sgs_cli/sgs_cli.exe /usr/local/bin/stategraph-server
-COPY --from=terrat-server-build --chown=${USERNAME}:${USERNAME} /tmp/mono/_build/default/code/src/terrat_ee/terrat_ee.exe /usr/local/bin/terrat
 COPY --from=stategraph-dev --chown=${USERNAME}:${USERNAME} --chmod=755 /tmp/mono/code/src/sg_gap_analysis/sg-gap-analysis /usr/local/bin/sg-gap-analysis
 COPY --from=stategraph-dev --chown=${USERNAME}:${USERNAME} --chmod=755 /tmp/mono/code/src/sg_tofu_import/sg-tofu-import /usr/local/bin/sg-tofu-import
 COPY --from=stategraph-dev --chown=${USERNAME}:${USERNAME} /tmp/mono/code/src/sg_tofu_import/mappings /usr/local/share/stategraph/mappings
@@ -747,8 +733,8 @@ ENTRYPOINT ["/usr/local/bin/stategraph"]
 # exes + @code/src/iris/all) in one dune call -- dune holds a global workspace
 # lock, so parallel make calls would only contend.
 # Chained on terrat-server-build (which already copied the source, restored the
-# dune cache, and compiled terrat_ee), so this only builds the remaining alias
-# targets incrementally. No cache restore here: the parent already did it, and
+# dune cache, and built iris), so this only builds the remaining alias targets
+# incrementally. No cache restore here: the parent already did it, and
 # re-restoring would overlay whatever the shared mount holds NOW -- possibly a
 # concurrent stategraph build's _build -- over a tree that is already correct.
 # The save stays, so the cache ends with the fullest _build.

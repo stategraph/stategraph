@@ -58,6 +58,16 @@ end
 
 val create : 'a Config.t -> Brtl_mw.Mw.t
 
+(** [wrap config handler] is [handler] with the session, for routes that need it when the rest of
+    the listener does not: it loads the session of the request into the context, as the middleware
+    does before the handler, then runs [handler], then stores the session if [handler] changed it,
+    as the middleware does after. *)
+val wrap :
+  'a Config.t ->
+  ((string, unit) Brtl_ctx.t -> (string, Brtl_rspnc.t) Brtl_ctx.t Abb.Future.t) ->
+  (string, unit) Brtl_ctx.t ->
+  (string, Brtl_rspnc.t) Brtl_ctx.t Abb.Future.t
+
 val set_session_value :
   'a Value.t Hmap.key -> 'a Auth.t -> ('b, 'c) Brtl_ctx.t -> ('b, 'c) Brtl_ctx.t
 

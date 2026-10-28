@@ -170,6 +170,8 @@ module Make (Cloud : Sgs_cloud.S) = struct
       ]
     @ oauth2_routes config storage oauth2_proxy
 
+  let wrap _ = CCFun.id
+
   let stop t =
     match t.oauth2_proxy with
     | Some oauth2_proxy -> Sgs_service_auth_oauth2_proxy.stop oauth2_proxy

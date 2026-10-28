@@ -197,9 +197,10 @@ create foreign table terrateam.%s (
 -- terrateam database. Column-level, not table-level: a table-level grant
 -- would let the role read the credential columns the catalog excludes,
 -- collapsing secret-exclusion to a single layer (the foreign-table
--- definitions). Intended consumer: the terrat service's boot-time
--- convergence (revoke-then-grant after every migrate, so catalog shrinkage
--- revokes too -- see docker/stategraph/service/terrat), kept in sync by a
+-- definitions). Intended consumer: the boot-time convergence of
+-- `stategraph-server migrate` (revoke-then-grant after every migrate, so
+-- catalog shrinkage revokes too -- see
+-- code/src/sgs_cli_lib/sgs_cli_lib_terrat_migrate.ml), kept in sync by a
 -- test.
 
 |}

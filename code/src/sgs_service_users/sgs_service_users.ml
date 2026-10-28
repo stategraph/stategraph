@@ -95,4 +95,5 @@ let routes { config; storage } =
         --> Sgs_service_users_ep_set_instance_admin.run config storage );
     ]
 
+let wrap _ = CCFun.id
 let stop _ = Abb.Future.return ()

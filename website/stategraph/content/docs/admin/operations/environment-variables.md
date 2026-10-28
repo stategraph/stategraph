@@ -107,7 +107,6 @@ A missing or invalid sign-in variable stops the server at start, with the reason
 | `TERRAT_DEFAULT_TIER` | `unlimited` | Default tier of a new installation |
 | `TERRAT_EVENT_EVALUATOR_SLOTS` | `20` | Concurrent event evaluations |
 | `TERRAT_STATEMENT_TIMEOUT` | `5s` | Statement timeout for the Orchestration database |
-| `TERRAT_GC_MIN_SPACE_OVERHEAD` / `TERRAT_GC_MAX_SPACE_OVERHEAD` / `TERRAT_GC_HEAP_SPACE_OVERHEAD_START_MB` / `TERRAT_GC_HEAP_SPACE_OVERHEAD_REALLY_MB` | unset | Garbage collector tuning. Set all four together |
 | `GITHUB_ACTION_DYNAMIC_TITLE` | unset | Comma-separated fields for the dynamic title of Orchestration GitHub Actions runs: `pr_title`, `pr_number`, `run_kind`, `run_type` |
 | `GITHUB_WORKFLOW_PATH_OVERRIDE` | unset | Path of the GitHub Actions workflow file that Orchestration dispatches, in place of the default |
 | `TERRATUNNEL_API_ENDPOINT` | unset | Development only: `TERRAT_API_BASE` comes from a tunnel |

@@ -190,7 +190,8 @@ module Session = struct
         |> CCOption.map Jwt.payload
         |> CCOption.to_result `Bad_signature_err
 
-  let of_token ~keys db token =
+  (* The session a verified payload carries. [token] is the token the payload came from. *)
+  let of_payload ~token db payload =
     let open Abb.Future.Infix_monad in
     Abb.Sys.time ()
     >>= fun now ->
@@ -219,26 +220,28 @@ module Session = struct
             db
       | None, None -> assert false
     in
+    let exp =
+      CCOption.map (fun exp -> CCFloat.of_int exp -. now)
+      @@ Jwt.Payload.find_claim_int Jwt.Claim.exp payload
+    in
+    match Jwt.Payload.find_claim claim payload with
+    | Some repr -> (
+        match Repr.of_yojson repr with
+        | Ok { Repr.access_token_id; user_id; metadata; capabilities } -> (
+            match (Uuidm.of_string user_id, CCOption.map Uuidm.of_string access_token_id) with
+            | Some id, ((None as access_token_id) | Some (Some _ as access_token_id)) ->
+                mk exp access_token_id id metadata capabilities
+            | None, _ -> Abbs_fc.return_err (`Data_decode_err ("user_id: " ^ user_id))
+            | _, Some None ->
+                Abbs_fc.return_err
+                  (`Data_decode_err
+                     ("access_token_id:" ^ CCOption.get_or ~default:"" access_token_id)))
+        | Error err -> Abbs_fc.return_err (`Data_decode_err err))
+    | None -> Abbs_fc.return_err `Decode_err
+
+  let of_token ~keys db token =
     match verify_token ~verifiers:(verifiers keys) token with
-    | Ok payload -> (
-        let exp =
-          CCOption.map (fun exp -> CCFloat.of_int exp -. now)
-          @@ Jwt.Payload.find_claim_int Jwt.Claim.exp payload
-        in
-        match Jwt.Payload.find_claim claim payload with
-        | Some repr -> (
-            match Repr.of_yojson repr with
-            | Ok { Repr.access_token_id; user_id; metadata; capabilities } -> (
-                match (Uuidm.of_string user_id, CCOption.map Uuidm.of_string access_token_id) with
-                | Some id, ((None as access_token_id) | Some (Some _ as access_token_id)) ->
-                    mk exp access_token_id id metadata capabilities
-                | None, _ -> Abbs_fc.return_err (`Data_decode_err ("user_id: " ^ user_id))
-                | _, Some None ->
-                    Abbs_fc.return_err
-                      (`Data_decode_err
-                         ("access_token_id:" ^ CCOption.get_or ~default:"" access_token_id)))
-            | Error err -> Abbs_fc.return_err (`Data_decode_err err))
-        | None -> Abbs_fc.return_err `Decode_err)
+    | Ok payload -> of_payload ~token db payload
     | Error (`Malformed_err | `Bad_signature_err) -> Abbs_fc.return_err `Decode_err
 
   let to_token ~key { metadata; expiration; user_id; _ } =
@@ -364,21 +367,30 @@ end
 
 let key : Session.stored Session.t Brtl_mw_session.Value.t Hmap.key = Brtl_mw_session.create_key ()
 
+(* The session of a cookie or a bearer token. A token that stategraph did not sign, such as one of
+   terrat's routes, carries no session: it is told apart before taking a connection, and without an
+   error. *)
+let load_session storage keys token =
+  let open Abb.Future.Infix_monad in
+  match Session.verify_token ~verifiers:(Session.verifiers keys) token with
+  | Error (`Malformed_err | `Bad_signature_err) ->
+      Logs.debug (fun m -> m "Not a stategraph token: no session");
+      Abb.Future.return None
+  | Ok payload -> (
+      Pgsql_pool.with_conn storage ~f:(fun db -> Session.of_payload ~token db payload)
+      >>= function
+      | Ok session -> Abb.Future.return (Some session)
+      | Error (`User_not_found_err _) -> Abb.Future.return None
+      | Error (#Session.of_token_err as err) ->
+          Logs.err (fun m -> m "%a" Session.pp_of_token_err err);
+          Abb.Future.return None
+      | Error (#Pgsql_pool.err as err) ->
+          Logs.err (fun m -> m "%a" Pgsql_pool.pp_err err);
+          Abb.Future.return None)
+
 module Cookie = struct
   let cookie_name = "session"
-
-  let load storage keys token =
-    let open Abb.Future.Infix_monad in
-    Pgsql_pool.with_conn storage ~f:(fun db -> Session.of_token ~keys db token)
-    >>= function
-    | Ok session -> Abb.Future.return (Some session)
-    | Error (`User_not_found_err _) -> Abb.Future.return None
-    | Error (#Session.of_token_err as err) ->
-        Logs.err (fun m -> m "%a" Session.pp_of_token_err err);
-        Abb.Future.return None
-    | Error (#Pgsql_pool.err as err) ->
-        Logs.err (fun m -> m "%a" Pgsql_pool.pp_err err);
-        Abb.Future.return None
+  let load = load_session
 
   let store _storage key id_opt session _ctx =
     match id_opt with
@@ -387,19 +399,7 @@ module Cookie = struct
 end
 
 module Bearer = struct
-  let load storage keys token =
-    let open Abb.Future.Infix_monad in
-    Pgsql_pool.with_conn storage ~f:(fun db -> Session.of_token ~keys db token)
-    >>= function
-    | Ok user -> Abb.Future.return (Some user)
-    | Error (`User_not_found_err _) -> Abb.Future.return None
-    | Error (#Session.of_token_err as err) ->
-        Logs.err (fun m -> m "%a" Session.pp_of_token_err err);
-        Abb.Future.return None
-    | Error (#Pgsql_pool.err as err) ->
-        Logs.err (fun m -> m "%a" Pgsql_pool.pp_err err);
-        Abb.Future.return None
-
+  let load = load_session
   let store _storage _keys _ = raise (Failure "nyi")
 end
 

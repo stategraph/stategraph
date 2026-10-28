@@ -209,13 +209,13 @@ http {
             add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
         }
 
-        # Orchestration engine (terrat) routes at their native paths, present
-        # only when STATEGRAPH_ORCHESTRATION_ENABLED is true; empty otherwise,
-        # so the rendered config is unchanged for deployments without
-        # orchestration. Position relative to the /api location is irrelevant:
-        # nginx prefix locations match longest-prefix regardless of order, so
-        # these longer prefixes win for terrat-owned namespaces and /api keeps
-        # everything else. The block is built by the nginx service entrypoint.
+        # Orchestration engine (terrat) locations, present only when
+        # orchestration is enabled; empty otherwise, so the rendered config is
+        # unchanged for deployments without orchestration. The stategraph
+        # server serves terrat's routes, so /api reaches them; these are the
+        # VCS OAuth callbacks, exact matches that win over /api, and the extra
+        # server directives of TERRAT_NGINX_SERVER_CONFIG. The block is built
+        # by the nginx service entrypoint.
         ${STATEGRAPH_TERRAT_ROUTES}
 
         # Liveness probe - returns 200 as long as nginx is running.
@@ -245,8 +245,9 @@ http {
     # serves the Terrateam console. Present only when orchestration is enabled
     # and TERRAT_UI_BASE names a host; empty otherwise, so the rendered config
     # holds one server block. iris reads its API from a relative path, so this
-    # block sends all of /api to terrat, which is the difference from the
-    # console host above. The block is built by the nginx service entrypoint,
-    # which supplies its own indentation.
+    # block sends all of /api to the stategraph server, as the console host
+    # does, and rewrites the two iris routes whose path stategraph serves too.
+    # The block is built by the nginx service entrypoint, which supplies its
+    # own indentation.
 ${STATEGRAPH_IRIS_SERVER}
 }

@@ -32,5 +32,6 @@ module Make (Cloud : Sgs_cloud.S) = struct
         Abbs_fc.return_err (`Start_fatal_err (Sgs_config.show_err err))
 
   let routes _ = []
+  let wrap _ = CCFun.id
   let stop _ = Abb.Future.return ()
 end

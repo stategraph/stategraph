@@ -72,8 +72,8 @@ val dedicated_enabled : t -> bool
 (** STATEGRAPH_ORCHESTRATION_ENABLED: master on/off switch for the orchestration engine integration.
     [true] turns it on and makes [create] require STATEGRAPH_FDW_PASSWORD; [false] turns it off;
     unset means on exactly when STATEGRAPH_FDW_PASSWORD is set. When on, the boot-time FDW reconcile
-    creates the postgres_fdw bridge to the terrateam database. The image CMD and nginx apply the
-    same rule to gate the terrat service and its routes. *)
+    creates the postgres_fdw bridge to the terrateam database, and the server starts terrat's
+    services. nginx applies the same rule to gate terrat's routes. *)
 val orchestration_enabled : t -> bool
 
 (** Whether STATEGRAPH_ORCHESTRATION_ENABLED decided {!orchestration_enabled}, rather than the

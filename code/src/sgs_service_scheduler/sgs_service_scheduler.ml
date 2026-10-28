@@ -441,6 +441,7 @@ let register_scheduled_kind t ~kind schedule run =
 
 (* The scheduler appends no routes of its own. *)
 let routes _ = []
+let wrap _ = CCFun.id
 
 let stop t =
   let open Abb.Future.Infix_monad in
