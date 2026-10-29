@@ -33,10 +33,7 @@ let run' ?default_tenant_name ~requirement config token db email password name =
     (* Check: No users exist *)
     Sgs_user.has_human_users db
     >>= function
-    | true ->
-        Logs.warn (fun m ->
-            m "%s : SETUP_ALREADY_COMPLETE Admin creation attempted but users exist" token);
-        Abbs_fc.return_err `Users_exist_err
+    | true -> Abbs_fc.return_err `Users_exist_err
     | false ->
         (* Hash password *)
         let password_hash = Sgs_user_password.hash password in
