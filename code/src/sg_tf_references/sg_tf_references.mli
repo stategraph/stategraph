@@ -100,6 +100,13 @@ val depends_on_references : Hcl_parser_value.t -> Reference_set.t
     edges so the cone walk still admits the target but the substitution decision skips it. *)
 val check_block_references : Hcl_parser_value.t -> Reference_set.t
 
+(** [meta_keyword_attrs ~block_type] is the attributes of a [block_type] block that hold keywords or
+    attribute names, not expressions: [lifecycle.ignore_changes], the [when] and [on_failure] of a
+    [provisioner] or [connection], the [events] of an [action_trigger], and the [type] of a
+    [variable]. {!references} takes no reference from them, and the evaluator does not evaluate
+    them. *)
+val meta_keyword_attrs : block_type:string -> string list
+
 (** [address_of_reference ref_] converts a single reference (string list) to its canonical Terraform
     HCL address. Namespace mappings are applied: ["outputs"] is translated to ["output"] to match
     the HCL block type. Returns [None] if the reference is too short.

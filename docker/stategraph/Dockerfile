@@ -202,6 +202,14 @@ RUN apk add --no-cache \
 # Give the user root access. Handy for debugging.
 RUN echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
+# Terraform, for the e2e tests of what OpenTofu does not support. It is installed in this stage
+# only, so that no production image ships it. This version number is also used in
+# .github/workflows/test-macos.yml. Update both simultaneously.
+ENV TERRAFORM_VERSION=1.16.5
+USER ${USERNAME}
+RUN tenv terraform install ${TERRAFORM_VERSION}
+USER root
+
 # Development and containerized development did not differ yet
 FROM base-development AS base-devcontainer
 # Production base (no additional packages needed)

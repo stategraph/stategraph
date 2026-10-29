@@ -679,6 +679,35 @@ let test_schema_ephemeral =
   secret_id = "my-secret"
 }|}
 
+let test_schema_action =
+  roundtrip_test
+    ~name:"schema_action"
+    {|action "local_command" "notify" {
+  count = 2
+  config {
+    command   = "echo"
+    arguments = [var.message]
+  }
+}|}
+
+let test_schema_resource_action_trigger =
+  roundtrip_test
+    ~name:"schema_resource_action_trigger"
+    {|resource "terraform_data" "r" {
+  input = "x"
+  lifecycle {
+    action_trigger {
+      events  = [after_create]
+      actions = [action.local_command.notify[0]]
+    }
+    action_trigger {
+      events    = [after_update]
+      condition = var.enabled
+      actions   = [action.local_command.notify[1]]
+    }
+  }
+}|}
+
 let test_schema_provider =
   roundtrip_test ~name:"schema_provider" {|provider "aws" {
   region = "us-east-1"
@@ -1108,6 +1137,8 @@ let test =
       test_schema_import;
       test_schema_removed;
       test_schema_ephemeral;
+      test_schema_action;
+      test_schema_resource_action_trigger;
       test_schema_provider;
       test_schema_check;
       test_schema_terraform_backend;

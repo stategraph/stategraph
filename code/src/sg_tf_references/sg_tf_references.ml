@@ -419,15 +419,21 @@ let comprehension_of_expr expr =
    to a resource named after an ignored attribute).  [replace_triggered_by] is a
    real reference list and is intentionally not included.
 
+   An [action_trigger]'s [events] lists keywords ([before_create], [after_update], ...), and
+   Terraform refuses any expression there.  Its [actions] list is a real reference list.
+
    A [variable] block's [type] is a type constraint (e.g. [string],
    [object({...})]) — a syntactic type expression, not an evaluatable value — so
    it carries no references either. *)
-let meta_keyword_attr ~block_type name =
-  match (block_type, name) with
-  | "lifecycle", "ignore_changes" -> true
-  | ("provisioner" | "connection"), ("when" | "on_failure") -> true
-  | "variable", "type" -> true
-  | _ -> false
+let meta_keyword_attrs ~block_type =
+  match block_type with
+  | "lifecycle" -> [ "ignore_changes" ]
+  | "provisioner" | "connection" -> [ "when"; "on_failure" ]
+  | "action_trigger" -> [ "events" ]
+  | "variable" -> [ "type" ]
+  | _ -> []
+
+let meta_keyword_attr ~block_type name = Sln_list.String.mem name (meta_keyword_attrs ~block_type)
 
 let rec from_value ?(block_type = "") acc item =
   match item with
@@ -533,6 +539,9 @@ let address_tokens_of_reference ref_ =
   (* Ephemeral resources are 3-token (ephemeral.<type>.<name>), like data sources;
      keep the instance name so the edge matches the block node. *)
   | "ephemeral" :: type_ :: name :: _ -> Some [ "ephemeral"; type_; name ]
+  (* An action is 3-token too (action.<type>.<name>).  Only an [action_trigger]'s [actions] list
+     can name one, and an index selects an instance of a counted or iterated action. *)
+  | "action" :: type_ :: name :: _ -> Some [ "action"; type_; name ]
   | "outputs" :: name :: _ -> Some [ "output"; name ]
   (* [module.X.attr] reads a child module's output [attr].  The graph stores
      that output as a distinct node at [module.X.output.<attr>], so the
@@ -600,7 +609,7 @@ let names_a_node ref_ =
 let attr_path_of_reference ref_ =
   match ref_ with
   | "outputs" :: _ | "module" :: _ -> []
-  | "data" :: _ :: _ :: tail | "ephemeral" :: _ :: _ :: tail -> tail
+  | "data" :: _ :: _ :: tail | "ephemeral" :: _ :: _ :: tail | "action" :: _ :: _ :: tail -> tail
   | _ :: _ :: tail -> tail
   | [ _ ] | [] -> []
 

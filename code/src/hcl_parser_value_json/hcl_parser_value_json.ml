@@ -41,6 +41,7 @@ module Schema = struct
         ([ "provider" ], 1);
         ([ "module" ], 1);
         ([ "check" ], 1);
+        ([ "action" ], 2);
         ([ "terraform" ], 0);
         ([ "locals" ], 0);
         ([ "moved" ], 0);
@@ -59,6 +60,7 @@ module Schema = struct
         (* Nested in resource > lifecycle *)
         ([ "resource"; "lifecycle"; "precondition" ], 0);
         ([ "resource"; "lifecycle"; "postcondition" ], 0);
+        ([ "resource"; "lifecycle"; "action_trigger" ], 0);
         (* Nested in data — from dataBlockSchema *)
         ([ "data"; "lifecycle" ], 0);
         ([ "data"; "lifecycle"; "precondition" ], 0);
@@ -67,6 +69,8 @@ module Schema = struct
         ([ "variable"; "validation" ], 0);
         (* Nested in output — from outputBlockSchema *)
         ([ "output"; "precondition" ], 0);
+        (* Nested in action — from actionBlockSchema in action.go *)
+        ([ "action"; "config" ], 0);
         (* Nested in check — from checkBlockSchema in checks.go *)
         ([ "check"; "data" ], 2);
         ([ "check"; "assert" ], 0);
