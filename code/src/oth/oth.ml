@@ -217,6 +217,7 @@ module Assert = struct
       if not (CCString.is_empty s) then
         false_ (Format.asprintf "Expected string to be empty, but got: %s" s)
 
+    (* TODO should move close to its friends as str_doesnt_contain_any (or the others should move here..) *)
     let doesnt_contain_any ~haystack ~needles =
       CCList.iter (fun needle -> str_doesnt_contain ~haystack ~needle) needles
   end

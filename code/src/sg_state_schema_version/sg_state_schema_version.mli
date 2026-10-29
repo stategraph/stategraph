@@ -226,5 +226,16 @@
     read it. The upgrade computes the reads again, thus it repairs such a file. An upgrade now fails
     on a strict evaluation error, thus a state whose stored configuration is not consistent fails
     this upgrade, and needs [stategraph import tf --hcl --overwrite] from the code of the deployed
-    infrastructure. *)
+    infrastructure.
+
+    Version 18: a reference to an [action] block, [action.<type>.<name>], which only the [actions]
+    list of an [action_trigger] can hold. {!Sg_tf_references.address_tokens_of_reference} gave it
+    the address [action.<type>], with the name left in the attribute path, thus its edge named no
+    node, the walk never kept the action, and Terraform refused the plan of a block that triggers
+    one ("references non-existent action"). The address now has three tokens, and the walk carries
+    the reference as a [requires] edge (see [stategraph/rfds/2172 - Expand Mark Sweep], the edge
+    rules). The server derives the reference at ingest from the block, as for version 12, and no
+    migration rewrites a stored row. A state that is behind keeps the edge that names no node and
+    keeps failing such a plan; the upgrade this counter forces derives the reference again from the
+    stored configuration (RFD 1423). *)
 val version : int

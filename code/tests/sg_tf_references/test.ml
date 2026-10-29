@@ -411,6 +411,32 @@ let lifecycle_ignore_changes_not_ref =
       assert_refs (rs_of_list []) actual;
       ())
 
+(* An [action_trigger]'s [events] are keywords ([after_create]), not references; its [condition]
+   and its [actions] list are real references and still flow. *)
+let action_trigger_events_not_ref =
+  Oth.test ~name:"action_trigger_events_not_ref" (fun _ ->
+      let actual =
+        refs_of_string'
+          {|resource "terraform_data" "r" {
+             lifecycle {
+               action_trigger {
+                 events    = [after_create, after_update]
+                 condition = var.enabled
+                 actions   = [action.local_command.a, action.local_command.c[0]]
+               }
+             }
+           }|}
+      in
+      assert_refs
+        (rs_of_list
+           [
+             [ "var"; "enabled" ];
+             [ "action"; "local_command"; "a" ];
+             [ "action"; "local_command"; "c" ];
+           ])
+        actual;
+      ())
+
 (* A provisioner's [when]/[on_failure] are keywords ([destroy]/[continue]), not
    references; real attributes in the same block (e.g. [command]) still flow. *)
 let provisioner_when_on_failure_not_ref =
@@ -923,6 +949,7 @@ let references_test =
       block_with_mixed;
       empty_block;
       lifecycle_ignore_changes_not_ref;
+      action_trigger_events_not_ref;
       provisioner_when_on_failure_not_ref;
       variable_type_not_ref;
       multiple_top_level;
@@ -1028,6 +1055,11 @@ let attr_path_ephemeral_consumes_three =
         (Sg_tf_references.attr_path_of_reference [ "ephemeral"; "t"; "n"; "value" ]);
       ())
 
+let attr_path_action_consumes_three =
+  Oth.test ~name:"attr_path_action_consumes_three" (fun _ ->
+      assert_path [] (Sg_tf_references.attr_path_of_reference [ "action"; "local_command"; "a" ]);
+      ())
+
 let attr_path_resource_consumes_two =
   Oth.test ~name:"attr_path_resource_consumes_two" (fun _ ->
       assert_path [ "id" ] (Sg_tf_references.attr_path_of_reference [ "aws_instance"; "foo"; "id" ]);
@@ -1075,6 +1107,7 @@ let attr_path_of_reference_test =
       attr_path_no_tail;
       attr_path_data_consumes_three;
       attr_path_ephemeral_consumes_three;
+      attr_path_action_consumes_three;
       attr_path_resource_consumes_two;
       attr_path_outputs_is_empty;
       attr_path_module_is_empty;
@@ -1119,6 +1152,15 @@ let addresses_ephemeral =
       in
       let actual = Sg_tf_references.addresses refs in
       assert_addrs (as_of_list [ "ephemeral.aws_secretsmanager_secret_version.e" ]) actual;
+      ())
+
+let addresses_action =
+  Oth.test ~name:"addresses_action" (fun _ ->
+      (* An action reference is 3-token (like data); the action name must be kept so the edge
+         matches the 3-part block node. *)
+      let refs = rs_of_list [ [ "action"; "aws_lambda_invoke"; "example" ] ] in
+      let actual = Sg_tf_references.addresses refs in
+      assert_addrs (as_of_list [ "action.aws_lambda_invoke.example" ]) actual;
       ())
 
 let addresses_var =
@@ -1190,6 +1232,7 @@ let addresses_test =
       addresses_resource;
       addresses_data_source;
       addresses_ephemeral;
+      addresses_action;
       addresses_var;
       addresses_local;
       addresses_module;
