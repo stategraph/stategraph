@@ -188,7 +188,7 @@ Starts the OAuth login flow for the provider, named as in `GET /api/v1/login/opt
 | `provider` | path | Yes | OAuth provider name |
 | `rd` | query | No | Redirect destination after login |
 
-Response: `302` redirect to the OAuth provider, or `503` when OAuth is not configured.
+Response: `302` redirect to the OAuth provider, `404` when OAuth is not configured or `provider` is not the configured one, or `503` when OAuth is configured but its sign-in provider is not running.
 
 ### Complete OAuth login
 

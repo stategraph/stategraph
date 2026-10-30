@@ -42,6 +42,7 @@ let oauth2_proxy_binary () =
 type t = {
   process : Abb.Process.t;
   port : int;
+  provider_name : string;
   (* Set only when we wrote the file ourselves from inline JSON, so [stop] never removes a path the
      operator gave us. *)
   owned_service_account_path : string option;
@@ -362,7 +363,12 @@ let spawn config =
                 | Ok () ->
                     Logs.info (fun m -> m "oauth2-proxy started with PID %d" pid);
                     Abbs_fc.return_ok
-                      { process; port = oauth2_proxy_port; owned_service_account_path }
+                      {
+                        process;
+                        port = oauth2_proxy_port;
+                        provider_name;
+                        owned_service_account_path;
+                      }
                 | Error (`Spawn_failed _ as err) ->
                     (* Nobody will call [stop] for a failed spawn, so clean up after ourselves. *)
                     CCOption.iter
@@ -419,6 +425,7 @@ let stop t =
 
 (* Get the port oauth2-proxy is listening on *)
 let port t = t.port
+let provider_name t = t.provider_name
 
 module Tests = struct
   let redact_arg = redact_arg

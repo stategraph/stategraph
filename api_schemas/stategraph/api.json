@@ -7136,8 +7136,11 @@
           "302": {
             "description": "Redirect to OAuth provider"
           },
+          "404": {
+            "description": "OAuth not configured, or not the configured provider"
+          },
           "503": {
-            "description": "OAuth not configured"
+            "description": "OAuth configured but its sign-in provider is not running"
           }
         }
       }
