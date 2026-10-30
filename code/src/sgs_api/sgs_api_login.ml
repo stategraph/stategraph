@@ -9,15 +9,22 @@ module Initiate = struct
 
   module Responses = struct
     module Found = struct end
+    module Not_found = struct end
     module Service_unavailable = struct end
 
     type t =
       [ `Found
+      | `Not_found
       | `Service_unavailable
       ]
     [@@deriving show, eq]
 
-    let t = [ ("302", fun _ -> Ok `Found); ("503", fun _ -> Ok `Service_unavailable) ]
+    let t =
+      [
+        ("302", fun _ -> Ok `Found);
+        ("404", fun _ -> Ok `Not_found);
+        ("503", fun _ -> Ok `Service_unavailable);
+      ]
   end
 
   let url = "/api/v1/login/{provider}"

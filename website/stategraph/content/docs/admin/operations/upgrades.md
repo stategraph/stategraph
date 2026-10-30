@@ -20,7 +20,7 @@ services:
 Then:
 
 - Docker Compose: `docker compose pull` and `docker compose up -d`
-- Kubernetes: set `stategraph.image.tag` and run `helm upgrade`
+- Kubernetes: run `helm upgrade` with the chart `--version` that ships the release, or set `stategraph.image.tag`
 - Amazon ECS: set `stategraph_image` and run `terraform apply`
 - Google Cloud Run: mirror the new tag into Artifact Registry, update `image:` in the service definition, and redeploy
 

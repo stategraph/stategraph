@@ -28,6 +28,10 @@ val stop : t -> unit Abb.Future.t
 (** Get the port oauth2-proxy is listening on *)
 val port : t -> int
 
+(** The name of the provider this oauth2-proxy was spawned for, ["google"] or ["oidc"]: the one
+    provider segment the server's OAuth2 routes answer. *)
+val provider_name : t -> string
+
 (** Test-only: steps of {!spawn} that the unit tests exercise directly. *)
 module Tests : sig
   (** Mask the value of a secret-bearing oauth2-proxy flag (["--client-secret=x"] becomes
