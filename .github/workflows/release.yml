@@ -324,6 +324,72 @@ jobs:
         run: |
           ./scripts/create_manifest terrat-ee terrat-oss ttm
 
+  # Runs after both builds and their checks, so an image that fails them
+  # carries no signature. The version tag and `latest` share a digest, so
+  # both verify.
+  sign-images:
+    needs: [set-version-tag, create-multi-arch-manifest, build-fips]
+    runs-on: ubuntu-22.04
+    environment: ${{ github.event.inputs.environment || 'production' }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [terrat-ee, terrat-ee-fips]
+
+    permissions:
+      contents: read
+      # cosign exchanges this token for a Fulcio signing certificate.
+      id-token: write
+
+    env:
+      VERSION_TAG: ${{ needs.set-version-tag.outputs.version_tag }}
+      IMAGE_REF: ghcr.io/terrateamio/${{ matrix.image }}
+
+    steps:
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: x-access-token
+          password: ${{ secrets.TERRATEAMIO_PACKAGES_TOKEN }}
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v4.1.2
+        with:
+          cosign-release: v3.1.3
+
+      - name: Install syft
+        id: syft
+        uses: anchore/sbom-action/download-syft@v0.24.3
+        with:
+          syft-version: v1.54.1
+
+      # A multi-arch index and every platform manifest under it get a
+      # signature, and each platform manifest gets its own SBOM attestation.
+      # A single-platform image is its own platform manifest.
+      - name: Sign ${{ matrix.image }} and attest its SBOMs
+        env:
+          SYFT: ${{ steps.syft.outputs.cmd }}
+          # Package-to-file relationships make up most of the SPDX document;
+          # without them the envelope stays well under Rekor v2's 4 MB request
+          # limit.
+          SYFT_RELATIONSHIPS_PACKAGE_FILE_OWNERSHIP: "false"
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "${IMAGE_REF}:${VERSION_TAG}" --format '{{json .Manifest}}' > "${RUNNER_TEMP}/manifest.json"
+          DIGEST=$(jq -r .digest "${RUNNER_TEMP}/manifest.json")
+          cosign sign --yes --recursive "${IMAGE_REF}@${DIGEST}"
+          PLATFORMS=$(jq -r '.manifests[]?.digest' "${RUNNER_TEMP}/manifest.json")
+          for REF in ${PLATFORMS:-${DIGEST}}; do
+            "${SYFT}" scan "registry:${IMAGE_REF}@${REF}" -o "spdx-json=${RUNNER_TEMP}/sbom.spdx.json"
+            cosign attest --yes --type spdxjson \
+              --predicate "${RUNNER_TEMP}/sbom.spdx.json" "${IMAGE_REF}@${REF}"
+          done
+
   release-notify:
     needs: [set-version-tag, create-multi-arch-manifest]
     runs-on: ubuntu-22.04
