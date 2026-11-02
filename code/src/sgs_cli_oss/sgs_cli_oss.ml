@@ -28,4 +28,5 @@ let () =
         (module Sgs_service_orchestration);
         (module Auth);
         (module Sgs_service_scheduler);
+        (module Sgs_service_oauth2);
       ]

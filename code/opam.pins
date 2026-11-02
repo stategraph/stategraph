@@ -31,6 +31,7 @@ luv.0.5.14
 magic-mime.1.3.1
 menhirLib.20260209
 mirage-crypto.2.4.1
+mirage-crypto-ec.2.4.1
 mirage-crypto-pk.2.4.1
 mirage-crypto-rng.2.4.1
 mtime.2.2.0

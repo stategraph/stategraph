@@ -13,10 +13,30 @@ module Verifier : sig
     val of_pub_key : Mirage_crypto_pk.Rsa.pub -> t
   end
 
+  (** An elliptic-curve or Edwards-curve public key. *)
+  module Ec_pub_key : sig
+    type t
+
+    (** [crv] is the JWK curve: [P-256], [P-384], [P-521] or [Ed25519]. [x] and [y] are encoded as
+        they would show up in a JWK; [Ed25519] has no [y]. *)
+    val create : crv:string -> x:string -> y:string option -> t option
+  end
+
+  (** An [ES*] verifier only verifies with a key on its curve: [P-256], [P-384] and [P-521] for
+      [ES256], [ES384] and [ES512]. [EdDSA] verifies with an [Ed25519] key. *)
   type t =
     | HS256 of string
     | HS512 of string
     | RS256 of Pub_key.t
+    | RS384 of Pub_key.t
+    | RS512 of Pub_key.t
+    | PS256 of Pub_key.t
+    | PS384 of Pub_key.t
+    | PS512 of Pub_key.t
+    | ES256 of Ec_pub_key.t
+    | ES384 of Ec_pub_key.t
+    | ES512 of Ec_pub_key.t
+    | EdDSA of Ec_pub_key.t
 
   val to_string : t -> string
 end

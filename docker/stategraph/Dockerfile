@@ -112,21 +112,6 @@ RUN mkdir -p "$DUCKDB_EXTENSION_DIR" && \
 # Sgs_focus_sync worker.
 COPY --chown=${USERNAME}:${USERNAME} --chmod=755 code/src/focus_etl/load-focus-billing /usr/local/bin/load-focus-billing
 
-# Build oauth2-proxy from stategraph fork (has HTTP session storage support)
-FROM golang:1.27-alpine@sha256:4c9fe60190a2a3350ddc51de80d0224b8a6698d12bdfc999fee45ea9d6c46dbc AS oauth2-proxy-build
-RUN apk add --no-cache git make
-WORKDIR /src
-# Pinned to a commit, not a branch: a branch tip makes the image content depend on
-# when it was built rather than on this file.
-ARG OAUTH2_PROXY_REF=f6dc14cce0a4d16791fec34a0638b9c77e034cd0
-RUN git init -q . && \
-    git remote add origin https://github.com/stategraph/oauth2-proxy.git && \
-    git fetch --depth 1 origin "${OAUTH2_PROXY_REF}" && \
-    git checkout -q FETCH_HEAD
-# GOTOOLCHAIN=auto lets Go fetch a newer toolchain when go.mod asks for one this
-# image does not carry.
-RUN GOTOOLCHAIN=auto CGO_ENABLED=0 go build -ldflags="-s -w" -o /oauth2-proxy .
-
 FROM base-tenv-tofu AS base
 
 # region:apk-base
@@ -517,7 +502,6 @@ RUN apk add --no-cache \
     py3-jwt \
     py3-requests \
     runit
-COPY --from=oauth2-proxy-build /oauth2-proxy /usr/local/bin/oauth2-proxy
 RUN src=/tmp/mono/docker/stategraph && \
     build=/tmp/mono/_build/default/code/src && \
     for service in stategraph nginx; do \
@@ -584,8 +568,8 @@ RUN --mount=type=cache,id=${DUNE_CACHE_ID},target=/dune-cache,uid=1000,gid=1000,
     cp -aT /tmp/mono/_build /dune-cache/_build
 
 # Final server image, in two editions assembled from one base. The base is
-# everything edition-blind: packages, the runit tree, nginx, oauth2-proxy and
-# the orchestration console (iris). Each edition layer below adds its server,
+# everything edition-blind: packages, the runit tree, nginx and the
+# orchestration console (iris). Each edition layer below adds its server,
 # which runs the orchestration engine, and the tools its features shell out to;
 # the enterprise one also adds the Stategraph console (hermes) and the client.
 FROM base-tenv-tofu AS stategraph-server-base
@@ -617,7 +601,6 @@ RUN apk add --no-cache \
     python3 \
     runit
 
-COPY --from=oauth2-proxy-build /oauth2-proxy /usr/local/bin/oauth2-proxy
 # The ${USERNAME} user/group (and TENV_ROOT) were created in base-tenv-tofu;
 # reuse them as the service account rather than creating a separate user.
 RUN mkdir -p /usr/local/bin /etc/service/stategraph /etc/service/nginx /etc/service/nginx/control /etc/service/pricing-service /usr/local/share/stategraph/ui /usr/local/share/terrat/ui/assets /var/cache/stategraph/terraform-plugins /var/cache/stategraph/tofu-workdir /var/cache/stategraph/tofu-generated /var/cache/stategraph/gap-analysis
@@ -644,8 +627,6 @@ COPY --chown=${USERNAME}:${USERNAME} docker/stategraph/events.js /etc/nginx/even
 # so the nginx template keeps one root for it.
 COPY --from=terrat-server-build /tmp/mono/_build/default/code/src/iris/ui-export/ /usr/local/share/terrat/ui/assets/
 
-# Set oauth2-proxy path
-ENV STATEGRAPH_OAUTH2_PROXY_PATH=/usr/local/bin/oauth2-proxy
 # terrat's routes and sgs's share one origin, and sgs names its console cookie
 # "session". terrat reads this name for its own session cookie; sgs reads it to
 # expire that cookie on logout.

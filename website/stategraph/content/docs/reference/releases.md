@@ -92,7 +92,7 @@ The [CLI reference](/docs/cli) shows how to use it, run it from the image, and e
 
 ### Verifying an image
 
-Release images have a [Sigstore](https://www.sigstore.dev/) keyless signature and a SLSA build provenance attestation. The signing certificate records the repository, the release workflow, and the source commit.
+Release images have a [Sigstore](https://www.sigstore.dev/) keyless signature and a SLSA build provenance attestation. Each per-architecture image also has an SPDX SBOM attestation. The signing certificate records the repository, the release workflow, and the source commit.
 
 Check the signature with [cosign](https://docs.sigstore.dev/cosign/installation/):
 
@@ -121,7 +121,19 @@ With the same identity flags, both commands also accept:
 - The `latest` tag, which has the same digest, and so the same signature, as its version.
 - The per-architecture tags `<version>-amd64` and `<version>-arm64`, which have their own signature and provenance.
 
-Tags published before image signing started have no signature, and `cosign verify` fails for them.
+Read the SBOM, an SPDX list of the packages in the image, from the tag for your architecture:
+
+```bash
+cosign verify-attestation --type spdxjson \
+  --certificate-identity-regexp '^https://github\.com/stategraph/mono/\.github/workflows/release\.yml@' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/stategraph/stategraph:<version>-amd64 \
+  | jq -r .payload | base64 -d | jq .predicate
+```
+
+Only the per-architecture tags carry an SBOM. The `<version>` and `latest` tags do not. The server image has its SBOMs on the same tags.
+
+Tags published before image signing started have no signature, and `cosign verify` fails for them. Tags published before SBOM attestations started have no SBOM, and `cosign verify-attestation --type spdxjson` fails for them.
 
 ## Binary Downloads
 

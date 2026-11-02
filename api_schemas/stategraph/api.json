@@ -7248,42 +7248,6 @@
         }
       }
     },
-    "/api/v1/oauth2/{provider}/complete": {
-      "get": {
-        "operationId": "oauth2/complete",
-        "parameters": [
-          {
-            "description": "OAuth provider name",
-            "in": "path",
-            "name": "provider",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Redirect destination after OAuth completion",
-            "in": "query",
-            "name": "rd",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "302": {
-            "description": "Redirect after setting session cookie"
-          },
-          "401": {
-            "description": "Authentication failed"
-          },
-          "500": {
-            "description": "Internal error"
-          }
-        }
-      }
-    },
     "/api/v1/openapi": {
       "get": {
         "operationId": "server/api_schema",

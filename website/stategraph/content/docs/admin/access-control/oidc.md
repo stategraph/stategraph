@@ -245,9 +245,12 @@ Response:
   "authorization_endpoint": "https://your-provider.com/authorize",
   "token_endpoint": "https://your-provider.com/oauth/token",
   "userinfo_endpoint": "https://your-provider.com/userinfo",
-  "jwks_uri": "https://your-provider.com/.well-known/jwks.json"
+  "jwks_uri": "https://your-provider.com/.well-known/jwks.json",
+  "id_token_signing_alg_values_supported": ["RS256"]
 }
 ```
+
+Stategraph verifies ID tokens signed with RS256, RS384, RS512, PS256, PS384, PS512, ES256, ES384, ES512, or EdDSA. When the provider lists none of these, the sign-in provider cannot be set up. The client authenticates at the token endpoint with HTTP Basic, and with its credentials in the request body when the provider refuses Basic.
 
 ### Check the Stategraph logs
 
@@ -255,7 +258,7 @@ Response:
 docker compose logs server | grep -i oauth
 ```
 
-Look for errors or successful authentication messages. If the sign-in provider does not start, Stategraph runs without OAuth sign-in, with the reason in `/tmp/oauth2-proxy.log`.
+Look for errors or successful authentication messages. If the sign-in provider cannot be set up, Stategraph logs the reason, tries again every second, and accepts no requests until the setup succeeds.
 
 ## Security best practices
 

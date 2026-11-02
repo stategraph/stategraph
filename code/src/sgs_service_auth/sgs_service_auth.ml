@@ -1,26 +1,12 @@
-let src = Logs.Src.create "service_auth"
-
-module Logs = (val Logs.src_log src : Logs.LOG)
-
 module Rt = struct
   let api_v1 () = Brtl_rtng.Route.(rel / "api" / "v1")
   let whoami () = Brtl_rtng.Route.(api_v1 () / "whoami")
 
-  (* OAuth2 proxy routes - catch all /oauth2/{provider}/* paths *)
+  (* OAuth2 flow - /oauth2/{provider}/* paths *)
   let oauth2_start () = Brtl_rtng.Route.(rel / "oauth2" /% Path.string / "start")
   let oauth2_callback () = Brtl_rtng.Route.(rel / "oauth2" /% Path.string / "callback")
-  let oauth2_sign_in () = Brtl_rtng.Route.(rel / "oauth2" /% Path.string / "sign_in")
-  let oauth2_sign_out () = Brtl_rtng.Route.(rel / "oauth2" /% Path.string / "sign_out")
-  let oauth2_auth () = Brtl_rtng.Route.(rel / "oauth2" /% Path.string / "auth")
-  let oauth2_userinfo () = Brtl_rtng.Route.(rel / "oauth2" /% Path.string / "userinfo")
 
-  (* OAuth2 complete - StateGraph callback after oauth2-proxy authentication. The provider is a
-     literal segment, not an extraction: the callback stores it as the auth_origin of the user it
-     signs in. *)
-  let oauth2_complete provider =
-    Brtl_rtng.Route.(api_v1 () / "oauth2" / provider / "complete" /? Query.(option (string "rd")))
-
-  (* Login endpoints. The provider is a literal segment, as in [oauth2_complete]. *)
+  (* Login endpoints. The provider is a literal segment. *)
   let login provider =
     Brtl_rtng.Route.(api_v1 () / "login" / provider /? Query.(option (string "rd")))
 
@@ -35,24 +21,6 @@ module Rt = struct
       / "set-cookie"
       /? Query.string "session-id"
       /? Query.(option (string "redirect")))
-
-  (* OAuth2 Session Storage - internal endpoints for oauth2-proxy *)
-  let oauth2_session_rt () =
-    Brtl_rtng.Route.(
-      rel
-      / "internal"
-      / "oauth2-sessions"
-      /% Path.string
-      / "sessions"
-      /% Path.string
-      /* Body.decode ~json:Sgs_service_auth_ep_oauth2_sessions.Put_request.of_yojson ())
-
-  let oauth2_session_get_rt () =
-    Brtl_rtng.Route.(
-      rel / "internal" / "oauth2-sessions" /% Path.string / "sessions" /% Path.string)
-
-  let oauth2_health_rt () =
-    Brtl_rtng.Route.(rel / "internal" / "oauth2-sessions" /% Path.string / "health")
 end
 
 module Make (Cloud : Sgs_cloud.S) = struct
@@ -61,8 +29,8 @@ module Make (Cloud : Sgs_cloud.S) = struct
   type t = {
     config : Sgs_config.t;
     storage : Sgs_storage.t;
-    (* The oauth2-proxy process, when OAuth is configured and the process started. *)
-    oauth2_proxy : Sgs_service_auth_oauth2_proxy.t option;
+    (* The OAuth2 provider, when OAuth is configured. *)
+    oauth2 : Sgs_service_oauth2.Provider.t option;
   }
 
   type 'a Sgs_service.ty += Ty : t Sgs_service.ty
@@ -78,14 +46,14 @@ module Make (Cloud : Sgs_cloud.S) = struct
 
   type opt = Sgs_svc_mngr.t
 
-  (* A failure to spawn oauth2-proxy does not stop the server: it serves without OAuth, as logged. *)
   let start mgr =
     let open Abbs_fc.Infix_result_monad in
-    Abbs_fc.Result.all3
+    Abbs_fc.Result.all4
       (Sgs_svc_mngr.load ~name:Sgs_service_config.name Sgs_service_config.Ty mgr)
       (Sgs_svc_mngr.load ~name:Sgs_service_storage.name Sgs_service_storage.Ty mgr)
       (Sgs_svc_mngr.load ~name:Sgs_service_scheduler.name Sgs_service_scheduler.Ty mgr)
-    >>= fun (config, storage, scheduler) ->
+      (Sgs_svc_mngr.load ~name:Sgs_service_oauth2.name Sgs_service_oauth2.Ty mgr)
+    >>= fun (config, storage, scheduler, oauth2) ->
     Sgs_service_scheduler.register_scheduled_kind
       scheduler
       ~kind:(Sgs_service_scheduler.Id.of_string Sgs_service_auth_login_session_gc.kind)
@@ -98,70 +66,29 @@ module Make (Cloud : Sgs_cloud.S) = struct
       ~kind:(Sgs_service_scheduler.Id.of_string Sgs_service_auth_oauth2_session_gc.kind)
       Sgs_service_scheduler.Schedule.Hourly
       Sgs_service_auth_oauth2_session_gc.run
-    |> Abb.Future.map (fun () -> Ok ())
-    >>= fun () ->
-    (* A failure to spawn oauth2-proxy does not stop the server: it serves without OAuth, as
-       logged. *)
-    Sgs_service_auth_oauth2_proxy.spawn config
-    |> Abb.Future.map (function
-      | Ok oauth2_proxy -> Ok { config; storage; oauth2_proxy = Some oauth2_proxy }
-      | Error `No_oauth_config -> Ok { config; storage; oauth2_proxy = None }
-      | Error (`Spawn_failed _ | #Abb_intf.Errors.spawn) ->
-          Logs.warn (fun m -> m "OAuth authentication will not be available");
-          Ok { config; storage; oauth2_proxy = None })
+    |> Abb.Future.map (fun () ->
+        Ok { config; storage; oauth2 = Sgs_service_oauth2.provider oauth2 })
 
-  (* Build OAuth2 proxy routes if oauth2_proxy is available *)
-  let oauth2_routes config storage oauth2_proxy =
-    match oauth2_proxy with
+  let oauth2_routes config storage oauth2 =
+    match oauth2 with
     | None -> []
-    | Some proxy ->
-        let provider = Sgs_service_auth_oauth2_proxy.provider_name proxy in
+    | Some oauth2 ->
         Brtl_rtng.Route.
           [
-            (* All methods for each OAuth2 endpoint - provider extracted from path, stripped when proxying *)
-            ( `GET,
-              Rt.oauth2_start ()
-              --> fun provider -> Sgs_service_auth_ep_oauth2_proxy.run ~provider proxy "start" );
-            ( `GET,
-              Rt.oauth2_callback ()
-              --> fun provider -> Sgs_service_auth_ep_oauth2_proxy.run ~provider proxy "callback" );
-            ( `GET,
-              Rt.oauth2_sign_in ()
-              --> fun provider -> Sgs_service_auth_ep_oauth2_proxy.run ~provider proxy "sign_in" );
-            ( `POST,
-              Rt.oauth2_sign_in ()
-              --> fun provider -> Sgs_service_auth_ep_oauth2_proxy.run ~provider proxy "sign_in" );
-            ( `GET,
-              Rt.oauth2_sign_out ()
-              --> fun provider -> Sgs_service_auth_ep_oauth2_proxy.run ~provider proxy "sign_out" );
-            ( `POST,
-              Rt.oauth2_sign_out ()
-              --> fun provider -> Sgs_service_auth_ep_oauth2_proxy.run ~provider proxy "sign_out" );
-            ( `GET,
-              Rt.oauth2_auth ()
-              --> fun provider -> Sgs_service_auth_ep_oauth2_proxy.run ~provider proxy "auth" );
-            ( `GET,
-              Rt.oauth2_userinfo ()
-              --> fun provider -> Sgs_service_auth_ep_oauth2_proxy.run ~provider proxy "userinfo" );
-            (* StateGraph callback - creates user and session after oauth2-proxy auth *)
-            ( `GET,
-              Rt.oauth2_complete provider --> Ep_oauth2_callback.run config storage proxy provider
-            );
+            (`GET, Rt.oauth2_start () --> Sgs_service_auth_ep_oauth2_start.run oauth2);
+            (`GET, Rt.oauth2_callback () --> Ep_oauth2_callback.run config storage oauth2);
           ]
 
-  (* The login route answers for the configured provider only, whether or not oauth2-proxy runs:
-     without it the endpoint says that OAuth login is not available. *)
-  let login_routes config oauth2_proxy =
+  (* The login route answers for the configured provider only. *)
+  let login_routes config oauth2 =
     match Sgs_config.oauth2 config with
     | None -> []
     | Some oauth_config ->
         let provider = oauth_config.Sgs_config.oauth2_provider_name in
         Brtl_rtng.Route.
-          [
-            (`GET, Rt.login provider --> Sgs_service_auth_ep_login.run config oauth2_proxy provider);
-          ]
+          [ (`GET, Rt.login provider --> Sgs_service_auth_ep_login.run config oauth2 provider) ]
 
-  let routes { config; storage; oauth2_proxy } =
+  let routes { config; storage; oauth2 } =
     Brtl_rtng.Route.
       [
         (`GET, Rt.whoami () --> Sgs_service_auth_ep_whoami.run config storage);
@@ -170,26 +97,10 @@ module Make (Cloud : Sgs_cloud.S) = struct
         (`GET, Rt.login_options () --> Sgs_service_auth_ep_login.options config);
         (`POST, Rt.login_password () --> Sgs_service_auth_ep_login_password.run config storage);
         (`GET, Rt.logout () --> Sgs_service_auth_ep_login.logout config);
-        (* OAuth2 Session Storage - internal endpoints for oauth2-proxy *)
-        ( `PUT,
-          Rt.oauth2_session_rt () --> Sgs_service_auth_ep_oauth2_sessions.Put.run config storage );
-        ( `GET,
-          Rt.oauth2_session_get_rt () --> Sgs_service_auth_ep_oauth2_sessions.Get.run config storage
-        );
-        ( `DELETE,
-          Rt.oauth2_session_get_rt ()
-          --> Sgs_service_auth_ep_oauth2_sessions.Delete.run config storage );
-        ( `GET,
-          Rt.oauth2_health_rt () --> Sgs_service_auth_ep_oauth2_sessions.Health.run config storage
-        );
       ]
-    @ login_routes config oauth2_proxy
-    @ oauth2_routes config storage oauth2_proxy
+    @ login_routes config oauth2
+    @ oauth2_routes config storage oauth2
 
   let wrap _ = CCFun.id
-
-  let stop t =
-    match t.oauth2_proxy with
-    | Some oauth2_proxy -> Sgs_service_auth_oauth2_proxy.stop oauth2_proxy
-    | None -> Abb.Future.return ()
+  let stop _ = Abb.Future.return ()
 end

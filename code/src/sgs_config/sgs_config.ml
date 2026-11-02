@@ -55,7 +55,6 @@ type t = {
   port : int;
   statement_timeout : string;
   cors_default_origin : string;
-  oauth2_api_key : (string[@opaque]);
   oauth2 : oauth2_config option;
   default_tenant_name : string option;
   cost_enabled : bool;
@@ -193,16 +192,12 @@ let parse_oauth2_config () =
                 config_hash,
                 "google" )
         | "oidc" ->
-            (* Pass STATEGRAPH_OAUTH_OIDC_ISSUER_URL through to oauth2-proxy
-             EXACTLY as the operator provided it — do not strip trailing
-             slashes. Modern oauth2-proxy strict-string-matches the
-             configured --oidc-issuer-url against the "issuer" field in
-             the provider's discovery doc, and some providers (notably
-             Auth0) publish their issuer WITH a trailing slash. Stripping
-             here was producing a guaranteed mismatch and crashing
-             oauth2-proxy on startup with:
-               oidc: issuer did not match the issuer returned by provider,
-               expected "https://x.auth0.com" got "https://x.auth0.com/"
+            (* Keep STATEGRAPH_OAUTH_OIDC_ISSUER_URL EXACTLY as the
+             operator provided it — do not strip trailing slashes. OIDC
+             discovery strict-string-matches the configured issuer against
+             the "issuer" field in the provider's discovery doc, and some
+             providers (notably Auth0) publish their issuer WITH a trailing
+             slash, so a stripped issuer fails discovery on startup.
              Operators set the env var to match whatever .well-known/
              openid-configuration returns. *)
             env_str "STATEGRAPH_OAUTH_OIDC_ISSUER_URL"
@@ -246,14 +241,14 @@ let parse_oauth2_config () =
             | "google" -> "Google"
             | _ -> "SSO")
       in
-      (* Cookie secret for oauth2-proxy. Prefer an operator-supplied value via
+      (* Cookie secret for the OAuth2 CSRF cookie. Prefer an operator-supplied value via
          STATEGRAPH_OAUTH_COOKIE_SECRET so every replica shares ONE secret.
          Generating per process (the fallback below) gives each replica a
          DIFFERENT secret, which breaks login behind a load balancer — the
-         replica handling /oauth2/callback can't validate the CSRF/session
-         cookie the /oauth2/start replica signed — and invalidates every
-         session on each restart. See stategraph/mono#1133. oauth2-proxy
-         requires the raw secret to be 16, 24, or 32 bytes (an AES key length). *)
+         replica handling /oauth2/callback can't validate the CSRF
+         cookie the /oauth2/start replica signed — and fails every sign-in
+         in flight across a restart. See stategraph/mono#1133. The raw
+         secret must be 16, 24, or 32 bytes (an AES key length). *)
       (match Sys.getenv_opt "STATEGRAPH_OAUTH_COOKIE_SECRET" with
         | Some s when CCString.length (CCString.trim s) > 0 ->
             let s = CCString.trim s in
@@ -325,18 +320,6 @@ let create ?(github_app_managed = false) () =
   let enable_cors = env_bool "STATEGRAPH_ENABLE_CORS" in
   let cors_default_origin =
     CCOption.get_or ~default:cors_default_origin @@ Sys.getenv_opt "STATEGRAPH_CORS_DEFAULT_ORIGIN"
-  in
-  (* OAuth2 API key for session storage - generate random hex string if not set *)
-  let oauth2_api_key =
-    let generate_random_key () =
-      Random.self_init ();
-      let hex_char () =
-        let n = Random.int 16 in
-        if n < 10 then Char.chr (n + 48) else Char.chr (n + 87)
-      in
-      CCString.init 32 (fun _ -> hex_char ())
-    in
-    CCOption.get_or ~default:(generate_random_key ()) (Sys.getenv_opt "STATEGRAPH_OAUTH2_API_KEY")
   in
   (* Parse OAuth2 configuration if present *)
   parse_oauth2_config ()
@@ -460,7 +443,6 @@ let create ?(github_app_managed = false) () =
       default_tenant_name;
       enable_cors;
       oauth2;
-      oauth2_api_key;
       oauth_redirect_base;
       oauth_redirect_base_explicit;
       port;
@@ -520,7 +502,6 @@ let db_port t = t.db_port
 let db_user t = t.db_user
 let enable_cors t = t.enable_cors
 let oauth2 t = t.oauth2
-let oauth2_api_key t = t.oauth2_api_key
 let port t = t.port
 let cost_enabled t = t.cost_enabled
 let security_enabled t = t.security_enabled

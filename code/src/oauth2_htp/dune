@@ -1,0 +1,28 @@
+(library
+ (name oauth2_htp)
+ (wrapped false)
+ (libraries
+  abb
+  abb_curl
+  abbs
+  base64
+  brtl
+  cohttp
+  containers
+  curl
+  digestif
+  duration
+  eqaf
+  form_urlencode
+  jwk
+  jwt
+  logs
+  mirage-crypto
+  mirage-crypto-rng
+  re
+  sln
+  uri
+  x509
+  yojson)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving_yojson)))

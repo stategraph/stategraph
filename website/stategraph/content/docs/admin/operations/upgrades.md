@@ -56,7 +56,7 @@ Read the release notes of the versions that you skip. These changes affect runni
 
 ## Verify an image
 
-Released images have a [Sigstore](https://www.sigstore.dev/) keyless signature and a SLSA build provenance attestation. The signing certificate records the repository, release workflow, and source commit. Check it with [cosign](https://docs.sigstore.dev/cosign/installation/) before you run a new tag:
+Released images have a [Sigstore](https://www.sigstore.dev/) keyless signature and a SLSA build provenance attestation. Each per-arch image also has an SPDX SBOM attestation. The signing certificate records the repository, release workflow, and source commit. Check it with [cosign](https://docs.sigstore.dev/cosign/installation/) before you run a new tag:
 
 ```bash
 cosign verify \
@@ -77,10 +77,22 @@ cosign verify-attestation --type slsaprovenance1 \
 
 The predicate names the builder, the source commit, and the workflow run that built the image.
 
+Read the SBOM, an SPDX list of the packages in the image, from the per-arch tag for your hosts:
+
+```bash
+cosign verify-attestation --type spdxjson \
+  --certificate-identity-regexp '^https://github\.com/stategraph/mono/\.github/workflows/release\.yml@' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/stategraph/stategraph-server:<version>-amd64 \
+  | jq -r .payload | base64 -d | jq .predicate
+```
+
 - `latest` resolves to the same digest as its version, so both tags check the same signature.
 - The per-arch tags `<version>-amd64` and `<version>-arm64` have their own signature and provenance, and both commands accept them with the same identity flags.
 - The CLI image, `ghcr.io/stategraph/stategraph`, verifies the same way.
+- Only the per-arch tags carry an SBOM. `<version>` and `latest` do not.
 - Tags before 2.5.2 have no signature, and `cosign verify` fails for them.
+- Tags released before SBOM attestations started have no SBOM, and `cosign verify-attestation --type spdxjson` fails for them.
 
 ## Next steps
 

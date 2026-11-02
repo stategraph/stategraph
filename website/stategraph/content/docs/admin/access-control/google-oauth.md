@@ -107,16 +107,16 @@ If sign-in fails, check the server logs:
 docker compose logs server
 ```
 
-Look for OAuth messages. A missing or invalid OAuth variable stops Stategraph at startup, with the reason in the log. If the sign-in provider does not start, Stategraph runs without OAuth sign-in, with the reason in `/tmp/oauth2-proxy.log` in the container. The service account key is not logged at startup.
+Look for OAuth messages. A missing or invalid OAuth variable stops Stategraph at startup, with the reason in the log. If the sign-in provider cannot be set up, Stategraph logs the reason, tries again every second, and accepts no requests until the setup succeeds. The service account key is not logged at startup.
 
 ## Advanced configuration
 
-### Google Groups restriction
+### Google Groups
 
-To limit access to the members of a Google Group, set three variables:
+With an admin email and a service account, Stategraph reads each user's Google Groups at sign-in, and [group rules](/docs/admin/access-control/group-rules) grant capabilities from them. To also limit access to the members of some groups, set `STATEGRAPH_OAUTH_GOOGLE_GROUP` to one group or a comma-separated list:
 
 ```bash
-# Google Group email
+# Google Groups whose members can sign in (optional)
 STATEGRAPH_OAUTH_GOOGLE_GROUP=stategraph-users@example.com
 
 # Admin email for the group lookup
@@ -134,6 +134,8 @@ STATEGRAPH_OAUTH_GOOGLE_SERVICE_ACCOUNT_JSON='{...}'
 4. Download the JSON key file.
 5. Set `STATEGRAPH_OAUTH_GOOGLE_SERVICE_ACCOUNT_JSON` to the JSON content, or to the path of the downloaded key file.
 
+Stategraph checks the key and the delegation at startup. If the check fails, Stategraph logs the reason and tries again every second, and accepts no requests until the check passes.
+
 #### Configure domain-wide delegation
 
 1. Go to the [Google Admin Console](https://admin.google.com).
@@ -143,12 +145,13 @@ STATEGRAPH_OAUTH_GOOGLE_SERVICE_ACCOUNT_JSON='{...}'
 
 ### Multiple domains
 
-Stategraph uses `STATEGRAPH_OAUTH_EMAIL_DOMAIN` as it is: your domain, or `*` for all domains. For users from several organizations, allow all domains, and limit access with a Google Group:
+Set `STATEGRAPH_OAUTH_EMAIL_DOMAIN` to a comma-separated list of domains:
 
 ```bash
-# Allow all domains
-STATEGRAPH_OAUTH_EMAIL_DOMAIN=*
+STATEGRAPH_OAUTH_EMAIL_DOMAIN=example.com,example.org
 ```
+
+For users from many organizations, allow all domains with `*`, and limit access with a Google Group.
 
 ## Troubleshooting
 

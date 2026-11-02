@@ -1,16 +1,12 @@
 (** OAuth2 Callback Handler
 
-    This endpoint is called after oauth2-proxy successfully authenticates a user. It creates/finds
-    the user in StateGraph and generates a session cookie. *)
+    GET /oauth2/\{provider\}/callback - The provider redirects here after the user signs in. It
+    creates/finds the user in StateGraph, generates a session cookie and redirects to the
+    destination the sign-in started with. *)
 
 module Make (_ : Sgs_cloud.S) : sig
-  (** Run the OAuth2 callback handler. [provider] is the OAuth provider name used as auth_origin.
-      [rd] is the redirect destination after login (defaults to "/"). *)
+  (** Run the OAuth2 callback handler. The provider in the path is ignored: users are signed in with
+      the configured provider's name as their auth_origin. *)
   val run :
-    Sgs_config.t ->
-    Sgs_storage.t ->
-    Sgs_service_auth_oauth2_proxy.t ->
-    string ->
-    string option ->
-    Brtl_rtng.Handler.t
+    Sgs_config.t -> Sgs_storage.t -> Sgs_service_oauth2.Provider.t -> string -> Brtl_rtng.Handler.t
 end

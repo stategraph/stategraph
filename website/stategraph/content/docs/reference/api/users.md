@@ -190,21 +190,6 @@ Starts the OAuth login flow for the provider, named as in `GET /api/v1/login/opt
 
 Response: `302` redirect to the OAuth provider, `404` when OAuth is not configured or `provider` is not the configured one, or `503` when OAuth is configured but its sign-in provider is not running.
 
-### Complete OAuth login
-
-```text
-GET /api/v1/oauth2/{provider}/complete
-```
-
-The provider returns the browser here after authorization. The endpoint sets the session cookie and redirects.
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `provider` | path | Yes | OAuth provider name |
-| `rd` | query | No | Redirect destination after OAuth completion |
-
-Response: `302` redirect after it sets the session cookie, or `401` when authentication failed.
-
 ### Logout
 
 ```text

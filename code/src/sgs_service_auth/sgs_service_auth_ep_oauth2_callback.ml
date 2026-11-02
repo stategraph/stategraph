@@ -1,18 +1,8 @@
 (* OAuth2 Callback Handler
 
-   This endpoint is called after oauth2-proxy successfully authenticates a user.
-   It creates/finds the user in the StateGraph database and generates a StateGraph
-   session cookie, then redirects to the final destination.
-
-   Flow:
-   1. User authenticates via oauth2-proxy
-   2. oauth2-proxy redirects to /api/v1/oauth2/complete?rd=<original_url>
-   3. This handler:
-      a. Calls oauth2-proxy /oauth2/userinfo to get user info
-      b. Creates/finds user in database (based on email + auth_origin)
-      c. Creates StateGraph session
-      d. Sets session cookie
-      e. Redirects to rd (original URL)
+   The provider redirects here after the user signs in. This handler completes the OAuth2 flow,
+   finds or creates the user (based on external id + auth_origin), creates a StateGraph session,
+   sets the session cookie, and redirects to the destination the sign-in started with.
 *)
 
 module Fc = Abbs_fc
@@ -64,44 +54,10 @@ module Sql = struct
       sql /^ update_user_avatar_sql /% Var.(option (text "avatar_url")) /% Var.uuid "user_id")
 end
 
-(* User info returned from oauth2-proxy /oauth2/userinfo *)
-module User_info = struct
-  type t = {
-    email : string;
-    user : string option; [@default None]
-    preferred_username : string option; [@default None]
-    groups : string list; [@default []]
-    picture : string option; [@default None]
-  }
-  [@@deriving yojson { strict = false }]
-end
-
 (* Google userinfo response - contains the picture URL *)
 module Google_userinfo = struct
   type t = { picture : string option [@default None] } [@@deriving yojson { strict = false }]
 end
-
-(* Fetch user info from oauth2-proxy, forwarding the oauth2-proxy cookie *)
-let fetch_user_info ~token oauth2_proxy_port cookie_header =
-  let uri = Printf.sprintf "http://127.0.0.1:%d/oauth2/userinfo" oauth2_proxy_port in
-  let headers = Http.Headers.of_list [ ("Cookie", cookie_header) ] in
-  let open Abb.Future.Infix_monad in
-  Http.call ~headers `GET (Uri.of_string uri)
-  >>= function
-  | Ok (resp, body) ->
-      let status = Http.Status.to_int (Http.Response.status resp) in
-      if status = 200 then (
-        match Yojson.Safe.from_string body |> User_info.of_yojson with
-        | Ok info -> Abbs_fc.return_ok info
-        | Error err ->
-            Logs.err (fun m -> m "%s : Failed to parse userinfo: %s body=%s" token err body);
-            Abbs_fc.return_err `Parse_error)
-      else (
-        Logs.err (fun m -> m "%s : userinfo returned status %d body=%s" token status body);
-        Abbs_fc.return_err `Userinfo_failed)
-  | Error err ->
-      Logs.err (fun m -> m "%s : Failed to fetch userinfo: %a" token Http.pp_request_err err);
-      Abbs_fc.return_err `Fetch_error
 
 (* Fetch picture URL from Google's userinfo endpoint using access token *)
 let fetch_google_picture ~token access_token =
@@ -125,34 +81,6 @@ let fetch_google_picture ~token access_token =
   | Error err ->
       Logs.warn (fun m ->
           m "%s : Failed to fetch Google userinfo: %a" token Http.pp_request_err err);
-      Abb.Future.return None
-
-(* Fetch access token from oauth2-proxy /oauth2/auth endpoint *)
-let fetch_access_token ~token oauth2_proxy_port cookie_header =
-  let uri = Printf.sprintf "http://127.0.0.1:%d/oauth2/auth" oauth2_proxy_port in
-  let headers = Http.Headers.of_list [ ("Cookie", cookie_header) ] in
-  let open Abb.Future.Infix_monad in
-  Http.call ~headers `GET (Uri.of_string uri)
-  >>= function
-  | Ok (resp, _body) ->
-      let status = Http.Status.to_int (Http.Response.status resp) in
-      if status = 202 || status = 200 then (
-        (* Access token is in X-Auth-Request-Access-Token header *)
-        let resp_headers = Http.Response.headers resp in
-        let access_token = Http.Headers.get "x-auth-request-access-token" resp_headers in
-        Logs.debug (fun m ->
-            m
-              "%s : Got access token from /oauth2/auth: %s"
-              token
-              (match access_token with
-              | Some t -> CCString.sub t 0 (min 20 (CCString.length t)) ^ "..."
-              | None -> "none"));
-        Abb.Future.return access_token)
-      else (
-        Logs.warn (fun m -> m "%s : /oauth2/auth returned status %d" token status);
-        Abb.Future.return None)
-  | Error err ->
-      Logs.warn (fun m -> m "%s : Failed to fetch /oauth2/auth: %a" token Http.pp_request_err err);
       Abb.Future.return None
 
 (* Find or create user based on OAuth info *)
@@ -347,58 +275,73 @@ module Make (Cloud : Sgs_cloud.S) = struct
              Logs.warn (fun m ->
                  m "%s : AEGIS_FIRST_TOUCH_FAILED : %s : %a" token email Sgs_cloud.pp_err err))
 
+  (* Back to the login page, which says why. [prompt=1] keeps it from forwarding straight back to
+     the provider. *)
+  let respond_login_failed err ctx =
+    let params =
+      match err with
+      | `Idp_error (error, description) ->
+          [
+            ("error", "idp");
+            ("reason", if CCString.is_empty description then error else description);
+          ]
+      | `Invalid_state | `Missing_csrf_cookie | `Csrf_token_mismatch -> [ ("error", "expired") ]
+      | `Unverified_email _ | `Unauthorized -> [ ("error", "denied") ]
+    in
+    let location =
+      Uri.to_string (Uri.with_query' (Uri.of_string "/login") (("prompt", "1") :: params))
+    in
+    Brtl_ctx.set_response
+      (Brtl_rspnc.create
+         ~status:`Found
+         ~headers:(Cohttp.Header.of_list [ ("Location", location) ])
+         "")
+      ctx
+
   (* Main callback handler *)
-  let run config storage oauth2_proxy provider rd =
-    let rd = CCOption.get_or ~default:"/" rd in
+  let run config storage oauth2 _provider =
     Brtl_ep.run ~content_type:"text/html" ~f:(fun ctx ->
-        let port = Sgs_service_auth_oauth2_proxy.port oauth2_proxy in
         let token = Brtl_ctx.token ctx in
-        let rd =
-          match Sgs_redirect.url ~ui_base:(Sgs_config.ui_base config) rd with
-          | Some rd -> rd
-          | None ->
-              Logs.warn (fun m -> m "%s : UNSAFE_REDIRECT : %s" token rd);
-              "/"
+        (* Every exit ends the sign-in, so a failed one expires the CSRF cookie too. *)
+        let failed ctx =
+          Brtl_ctx.set_response
+            (Oauth2_htp_cookie.add_to_response
+               (Oauth2_htp.clear_cookies (Sgs_service_oauth2.Provider.authenticator oauth2))
+               (Brtl_ctx.response ctx))
+            ctx
         in
         let open Abb.Future.Infix_monad in
-        (* Get OAuth config to extract auth_origin and config_hash *)
+        (* Get OAuth config to extract config_hash *)
         match Sgs_config.oauth2 config with
         | None ->
             Logs.err (fun m -> m "%s : OAuth callback but no OAuth configured" token);
-            Abb.Future.return (Sgs_eplib.respond_internal_error ~body:"OAuth not configured" ctx)
+            Abb.Future.return
+              (failed (Sgs_eplib.respond_internal_error ~body:"OAuth not configured" ctx))
         | Some oauth_config -> (
-            let auth_origin = provider in
+            let auth_origin = Sgs_service_oauth2.Provider.provider_name oauth2 in
             let config_hash = oauth_config.Sgs_config.oauth2_config_hash in
-
-            (* Extract cookie header from the browser request *)
-            let request = Brtl_ctx.request ctx in
-            let headers = Cohttp.Request.headers request in
-            let cookie_header = CCOption.get_or ~default:"" (Cohttp.Header.get headers "cookie") in
-
-            Logs.debug (fun m ->
-                m
-                  "%s : OAuth2 callback - fetching userinfo with cookie: %s"
-                  token
-                  (if CCString.length cookie_header > 50 then
-                     CCString.sub cookie_header 0 50 ^ "..."
-                   else cookie_header));
-
-            (* Fetch user info from oauth2-proxy, forwarding the oauth2-proxy cookie *)
-            fetch_user_info ~token port cookie_header
+            Abb.Sys.time ()
+            >>= fun now ->
+            Oauth2_htp.oauth_callback
+              ~now
+              (Sgs_service_oauth2.Provider.authenticator oauth2)
+              (Oauth2_htp_request.of_ctx ctx)
             >>= function
-            | Ok User_info.{ email; user; preferred_username; groups; picture = _ } -> (
-                let external_id = CCOption.get_or ~default:email user in
-                let display_name = preferred_username in
-
-                (* Fetch access token and then get picture from Google *)
-                fetch_access_token ~token port cookie_header
-                >>= fun access_token_opt ->
-                (match access_token_opt with
-                  | Some access_token -> fetch_google_picture ~token access_token
+            | Ok { Oauth2_htp.Callback_result.session; redirect = rd; set_cookies } -> (
+                let rd =
+                  match Sgs_redirect.url ~ui_base:(Sgs_config.ui_base config) rd with
+                  | Some rd -> rd
                   | None ->
-                      Logs.warn (fun m ->
-                          m "%s : No access token available for fetching picture" token);
-                      Abb.Future.return None)
+                      Logs.warn (fun m -> m "%s : UNSAFE_REDIRECT : %s" token rd);
+                      "/"
+                in
+                let { Oauth2_htp_session.email; user; groups; access_token } = session in
+                let external_id = if CCString.is_empty user then email else user in
+                let display_name = None in
+                (match oauth_config.Sgs_config.oauth2_provider with
+                  | Sgs_config.Google _ when not (CCString.is_empty access_token) ->
+                      fetch_google_picture ~token access_token
+                  | Sgs_config.Google _ | Sgs_config.Oidc _ -> Abb.Future.return None)
                 >>= fun avatar_url ->
                 Logs.info (fun m ->
                     m
@@ -435,11 +378,23 @@ module Make (Cloud : Sgs_cloud.S) = struct
                     (* Recompute-and-persist the effective capabilities before minting the session: the
                      user's manual baseline unioned with the grants of every group rule matching
                      their IdP [groups]. Login is the sole recompute point for the [capabilities]
-                     column, and the fresh snapshot is what the session below is granted. *)
-                    Sgs_caps_rules.list_alive db
-                    >>= fun rules ->
-                    let group_caps = Sgs_caps_rules.eval rules ~groups in
-                    Sgs_user.recompute_login_capabilities ~group_caps db (Sgs_user.id user)
+                     column, and the fresh snapshot is what the session below is granted. When the
+                     groups could not be read, the user keeps the capabilities of their last
+                     sign-in. *)
+                    (match groups with
+                      | Some groups ->
+                          Sgs_caps_rules.list_alive db
+                          >>= fun rules ->
+                          let group_caps = Sgs_caps_rules.eval rules ~groups in
+                          Sgs_user.recompute_login_capabilities ~group_caps db (Sgs_user.id user)
+                      | None ->
+                          Logs.warn (fun m ->
+                              m
+                                "%s : OAUTH2_GROUPS_UNKNOWN : %s keeps the capabilities of their \
+                                 last sign-in"
+                                token
+                                email);
+                          Abbs_fc.return_ok (Sgs_user.capabilities user))
                     >>= fun capabilities ->
                     (* DB-backed login session carrying the just-recomputed capabilities; a later
                      capability change revokes it, forcing a fresh sign-in. *)
@@ -455,19 +410,34 @@ module Make (Cloud : Sgs_cloud.S) = struct
                     let rd = if is_new then append_signup_marker rd else rd in
                     let headers = Cohttp.Header.of_list [ ("Location", rd) ] in
                     Abb.Future.return
-                      (Brtl_ctx.set_response (Brtl_rspnc.create ~status:`Found ~headers "") ctx)
+                      (Brtl_ctx.set_response
+                         (Oauth2_htp_cookie.add_to_response
+                            set_cookies
+                            (Brtl_rspnc.create ~status:`Found ~headers ""))
+                         ctx)
                 | Error (#Pgsql_io.err as err) ->
                     Logs.err (fun m -> m "%s : Database error: %a" token Pgsql_io.pp_err err);
-                    Abb.Future.return (Sgs_eplib.respond_internal_error ~body:"Database error" ctx)
+                    Abb.Future.return
+                      (failed (Sgs_eplib.respond_internal_error ~body:"Database error" ctx))
                 | Error (#Pgsql_pool.err as err) ->
                     Logs.err (fun m -> m "%s : Pool error: %a" token Pgsql_pool.pp_err err);
-                    Abb.Future.return (Sgs_eplib.respond_internal_error ~body:"Database error" ctx)
+                    Abb.Future.return
+                      (failed (Sgs_eplib.respond_internal_error ~body:"Database error" ctx))
                 | Error _ ->
                     Abb.Future.return
-                      (Sgs_eplib.respond_internal_error ~body:"Failed to create session" ctx))
-            | Error _ ->
+                      (failed
+                         (Sgs_eplib.respond_internal_error ~body:"Failed to create session" ctx)))
+            | Error
+                (( `Idp_error _
+                 | `Invalid_state
+                 | `Missing_csrf_cookie
+                 | `Csrf_token_mismatch
+                 | `Unverified_email _
+                 | `Unauthorized ) as err) ->
+                Logs.warn (fun m -> m "%s : OAUTH2_LOGIN_FAILED : %a" token Oauth2_htp.pp_err err);
+                Abb.Future.return (failed (respond_login_failed err ctx))
+            | Error err ->
+                Logs.err (fun m -> m "%s : OAUTH2_CALLBACK : %a" token Oauth2_htp.pp_err err);
                 Abb.Future.return
-                  (Brtl_ctx.set_response
-                     (Brtl_rspnc.create ~status:`Unauthorized "Authentication failed")
-                     ctx)))
+                  (failed (Sgs_eplib.respond_internal_error ~body:"Sign-in failed" ctx))))
 end

@@ -211,6 +211,113 @@ let test_header_without_algorithm =
         ];
       ())
 
+let b64 s = Base64.encode_string ~pad:false ~alphabet:Base64.uri_safe_alphabet s
+
+(* A token for [alg], signed over its header and payload by [sign]. *)
+let signed_token alg sign =
+  let hp = b64 (Printf.sprintf {|{"alg":"%s","typ":"JWT"}|} alg) ^ "." ^ b64 {|{"sub":"1"}|} in
+  hp ^ "." ^ b64 (sign hp)
+
+let tampered token =
+  match CCString.split_on_char '.' token with
+  | [ h; p; sg ] ->
+      let sg = Base64.decode_exn ~pad:false ~alphabet:Base64.uri_safe_alphabet sg in
+      let flipped = Bytes.of_string sg in
+      Bytes.set flipped 0 (Char.chr (Char.code (Bytes.get flipped 0) lxor 1));
+      h ^ "." ^ p ^ "." ^ b64 (Bytes.to_string flipped)
+  | _ -> token
+
+let verifies verifier token =
+  CCOption.is_some (Jwt.verify verifier (CCOption.get_exn_or "of_token" (Jwt.of_token token)))
+
+(* An uncompressed point is [0x04 || x || y]; a JWK carries [x] and [y] apart. *)
+let ec_key ~crv octets =
+  let n = (CCString.length octets - 1) / 2 in
+  CCOption.get_exn_or
+    crv
+    (Jwt.Verifier.Ec_pub_key.create
+       ~crv
+       ~x:(b64 (CCString.sub octets 1 n))
+       ~y:(Some (b64 (CCString.sub octets (1 + n) n))))
+
+let rsa_keys () =
+  let priv =
+    match CCResult.get_exn (X509.Private_key.decode_pem private_key) with
+    | `RSA priv -> priv
+    | _ -> Oth.Assert.false_ "unexpected key type"
+  in
+  (priv, Jwt.Verifier.Pub_key.of_pub_key (Mirage_crypto_pk.Rsa.pub_of_priv priv))
+
+let assert_verifies verifier token =
+  Oth.Assert.true_ (verifies verifier token);
+  Oth.Assert.not_true (verifies verifier (tampered token))
+
+let test_rsa_algorithms =
+  Oth.test ~name:"Verify RS384, RS512, PS256, PS384 and PS512" (fun _ ->
+      let priv, pub = rsa_keys () in
+      let pkcs1 hash hp = Mirage_crypto_pk.Rsa.PKCS1.sign ~hash ~key:priv (`Message hp) in
+      let pss (module H : Digestif.S) hp =
+        let module Pss = Mirage_crypto_pk.Rsa.PSS (H) in
+        Pss.sign ~key:priv (`Message hp)
+      in
+      CCList.iter
+        (fun (alg, verifier, sign) -> assert_verifies verifier (signed_token alg sign))
+        Jwt.Verifier.
+          [
+            ("RS384", RS384 pub, pkcs1 `SHA384);
+            ("RS512", RS512 pub, pkcs1 `SHA512);
+            ("PS256", PS256 pub, pss (module Digestif.SHA256));
+            ("PS384", PS384 pub, pss (module Digestif.SHA384));
+            ("PS512", PS512 pub, pss (module Digestif.SHA512));
+          ])
+
+let test_ec_algorithms =
+  Oth.test ~name:"Verify ES256, ES384, ES512 and EdDSA" (fun _ ->
+      let module Ec = Mirage_crypto_ec in
+      let digest (module H : Digestif.S) hp = H.(to_raw_string (digest_string hp)) in
+      let p256, p256_pub = Ec.P256.Dsa.generate () in
+      let p384, p384_pub = Ec.P384.Dsa.generate () in
+      let p521, p521_pub = Ec.P521.Dsa.generate () in
+      let ed, ed_pub = Ec.Ed25519.generate () in
+      let rs (r, s) = r ^ s in
+      let p256_key = ec_key ~crv:"P-256" (Ec.P256.Dsa.pub_to_octets p256_pub) in
+      let p384_key = ec_key ~crv:"P-384" (Ec.P384.Dsa.pub_to_octets p384_pub) in
+      let es256 =
+        signed_token "ES256" (fun hp ->
+            rs (Ec.P256.Dsa.sign ~key:p256 (digest (module Digestif.SHA256) hp)))
+      in
+      CCList.iter
+        (fun (_, verifier, token) -> assert_verifies verifier token)
+        Jwt.Verifier.
+          [
+            ("ES256", ES256 p256_key, es256);
+            ( "ES384",
+              ES384 p384_key,
+              signed_token "ES384" (fun hp ->
+                  rs (Ec.P384.Dsa.sign ~key:p384 (digest (module Digestif.SHA384) hp))) );
+            ( "ES512",
+              ES512 (ec_key ~crv:"P-521" (Ec.P521.Dsa.pub_to_octets p521_pub)),
+              signed_token "ES512" (fun hp ->
+                  rs (Ec.P521.Dsa.sign ~key:p521 (digest (module Digestif.SHA512) hp))) );
+            ( "EdDSA",
+              EdDSA
+                (CCOption.get_exn_or
+                   "Ed25519"
+                   (Jwt.Verifier.Ec_pub_key.create
+                      ~crv:"Ed25519"
+                      ~x:(b64 (Ec.Ed25519.pub_to_octets ed_pub))
+                      ~y:None)),
+              signed_token "EdDSA" (fun hp -> Ec.Ed25519.sign ~key:ed hp) );
+          ];
+      (* A key on another curve, or a verifier for another alg, does not verify. *)
+      Oth.Assert.not_true (verifies (Jwt.Verifier.ES256 p384_key) es256);
+      Oth.Assert.not_true (verifies (Jwt.Verifier.ES384 p256_key) es256);
+      Oth.Assert.true_
+        (CCOption.is_none (Jwt.Verifier.Ec_pub_key.create ~crv:"secp256k1" ~x:"AA" ~y:(Some "AA")));
+      Oth.Assert.true_
+        (CCOption.is_none
+           (Jwt.Verifier.Ec_pub_key.create ~crv:"P-256" ~x:(b64 "x") ~y:(Some (b64 "y")))))
+
 let test =
   Oth.parallel
     [
@@ -225,6 +332,8 @@ let test =
       test_sign_hs256;
       test_sign_hs512;
       test_sign_rs256;
+      test_rsa_algorithms;
+      test_ec_algorithms;
     ]
 
 let () =
