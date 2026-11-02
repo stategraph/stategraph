@@ -28,13 +28,13 @@ Releases follow [semantic versioning](https://semver.org/). For the CLI and imag
 
 ## Boot-time migrations
 
-At each start, Stategraph migrates the `stategraph` database, then serves requests. With Orchestration on, it also migrates the `terrateam` database, in parallel and with no order dependency.
+At each start, Stategraph migrates the `stategraph` database, then serves requests. With Orchestration on, it migrates the `terrateam` database after the `stategraph` database, and before it serves.
 
 - Stategraph checks that the applied migrations are a prefix of its own list. If they differ, it exits non-zero and applies nothing on top.
 - Each migration commits by itself, so an interrupted run leaves a consistent prefix, never a partial migration.
 - Replicas that migrate at the same time are safe: primary keys guard the bookkeeping rows. The loser of the race fails with a visible duplicate-key error, retries at restart, and never applies a migration twice.
 - `/health/ready` answers `502` until Stategraph has migrated and serves, so a load balancer or readiness probe keeps traffic on the old containers. `/health/live` answers `200` as soon as Stategraph listens on port 8080. See [Health checks](/docs/admin/operations/health-checks).
-- After a failed Orchestration migration, Stategraph waits 30 seconds before it retries, so retries come at a steady interval with the error in the log.
+- A failed Orchestration migration stops the start when `STATEGRAPH_ORCHESTRATION_ENABLED=true`. When only `STATEGRAPH_FDW_PASSWORD` turns on Orchestration, Stategraph logs the error and serves without Orchestration until its next start.
 - A failed Stategraph server restarts every few seconds. In Docker Compose, the container waits for a healthy PostgreSQL through `depends_on`.
 - With Orchestration on, the `stategraph` migration also drops and rebuilds the `postgres_fdw` bridge to `terrateam` at each start. On managed PostgreSQL, this needs superuser rights: see [Enable Orchestration](/docs/admin/self-hosting/orchestration).
 

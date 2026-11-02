@@ -5,7 +5,7 @@ order: 6
 ---
 
 
-Stategraph Orchestration is on by default on a [self-hosted](/docs/admin/self-hosting) server. `STATEGRAPH_ORCHESTRATION_ENABLED=true` turns it on, `false` turns it off, and when the variable is unset, Orchestration is on exactly when `STATEGRAPH_FDW_PASSWORD` is set. To use it, give it two database passwords and your public URL, and connect a GitHub App or GitLab.
+Stategraph Orchestration is on in the [Docker Compose](/docs/admin/self-hosting/docker-compose) setup. `STATEGRAPH_ORCHESTRATION_ENABLED=true` turns it on, `false` turns it off, and when the variable is unset, Orchestration is on exactly when `STATEGRAPH_FDW_PASSWORD` is set. To use it, give it two database passwords and your public URL, and connect a GitHub App or GitLab.
 
 ## Turn it on
 
@@ -35,7 +35,7 @@ At each start with Orchestration on, Stategraph migrates the Orchestration datab
 
 Orchestration stores its data in a second database, `terrateam`, on the same PostgreSQL server as `stategraph`. The console reads it through `postgres_fdw`, as the `stategraph_mql` role, and writes the GitHub App and the GitLab group connections as the `stategraph_provisioner` role. Stategraph creates the database and the roles, and keeps the grants of the roles current. You give the roles their passwords, one time.
 
-With the Docker Compose PostgreSQL, there is nothing to do: it creates the database and the roles at the first start of a new volume, with the passwords `stategraph_mql` and `stategraph_provisioner`. Use those values in `STATEGRAPH_FDW_PASSWORD` and `STATEGRAPH_FDW_PROVISIONER_PASSWORD`.
+With the [Docker Compose](/docs/admin/self-hosting/docker-compose) setup, there is nothing to do: its `orchestration-db` script creates the database and the roles at the first start of a new `db` volume, with the passwords that `docker-compose.yml` sets in `STATEGRAPH_FDW_PASSWORD` and `STATEGRAPH_FDW_PROVISIONER_PASSWORD`. For an existing volume, see [Connect GitHub or GitLab](/docs/admin/self-hosting/docker-compose#connect-github-or-gitlab).
 
 On any other PostgreSQL, create the roles before the first start with Orchestration on. If Stategraph already created them, use `ALTER ROLE` instead.
 
@@ -49,7 +49,7 @@ CREATE ROLE stategraph_provisioner LOGIN PASSWORD '<provisioner-password>';
 On Amazon RDS, Cloud SQL, and other managed PostgreSQL, the role that Stategraph connects as is usually not a superuser. Then:
 
 - `postgres_fdw` needs superuser rights. On Amazon RDS, grant the role `rds_superuser`. Otherwise, create the foreign server and the user mapping in the `stategraph` database in advance. Without one of these, the Stategraph server does not start, and the error is in the server log.
-- When the role cannot create databases, create `terrateam` yourself, owned by that role. Orchestration logs the statement, waits 30 seconds, and tries again:
+- When the role cannot create databases, create `terrateam` yourself, owned by that role. Stategraph logs the statement at each start. With `STATEGRAPH_ORCHESTRATION_ENABLED=true`, the start fails, and the server restarts a few seconds later. When only `STATEGRAPH_FDW_PASSWORD` turns on Orchestration, the server runs without Orchestration until its next start:
 
 ```sql
 CREATE DATABASE terrateam OWNER stategraph;

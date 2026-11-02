@@ -93,7 +93,7 @@ A missing or invalid sign-in variable stops the server at start, with the reason
 |----------|---------|-------------|
 | `STATEGRAPH_ORCHESTRATION_ENABLED` | on when `STATEGRAPH_FDW_PASSWORD` is set | `true` turns on Orchestration, `false` turns it off. Unset: on exactly when `STATEGRAPH_FDW_PASSWORD` is set. With Orchestration on, the FDW bridge is rebuilt at each start |
 | `TERRAT_API_BASE` | `STATEGRAPH_UI_BASE` plus `/api` | Public base of the Orchestration API. The runner base URL, the webhook URL, and the callback URLs of a GitHub App created from the console come from it |
-| `TERRAT_UI_BASE` | `STATEGRAPH_UI_BASE` | Public URL of the server |
+| `TERRAT_UI_BASE` | `STATEGRAPH_UI_BASE` | Public URL of the Terrateam console. The run links of a `terrateam`-brand repository point there: see `TERRAT_BRAND`. Give it a host of its own, which then serves the Terrateam console instead of the Stategraph console. When it names the `STATEGRAPH_UI_BASE` host, the default, that host keeps the Stategraph console |
 | `TERRAT_WEB_BASE_URL` | `https://app.terrateam.io` | Base of the run links in comments and commit checks when `STATEGRAPH_UI_BASE` and `TERRAT_UI_BASE` are unset |
 | `TERRAT_DB_HOST` / `TERRAT_DB_PORT` / `TERRAT_DB_USER` / `TERRAT_DB_PASS` | the `DB_*` values | Orchestration database connection. Each unset one takes the matching `DB_*` value |
 | `TERRAT_DB_NAME` | `terrateam` | Orchestration database. It never takes `DB_NAME` |

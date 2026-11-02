@@ -377,7 +377,7 @@ Orchestration is not enabled on this server, so GitLab groups cannot be connecte
 
 **Solutions**:
 
-- Set `STATEGRAPH_ORCHESTRATION_ENABLED=true` and `STATEGRAPH_FDW_PROVISIONER_PASSWORD`, and give the `stategraph_provisioner` role that password. See [Database](/docs/admin/self-hosting/orchestration#database).
+- [Turn on Orchestration](/docs/admin/self-hosting/orchestration#turn-it-on), set `STATEGRAPH_FDW_PROVISIONER_PASSWORD`, and give the `stategraph_provisioner` role that password. See [Database](/docs/admin/self-hosting/orchestration#database).
 - For a connected group, continue its setup, or rotate its credentials in the wizard.
 - Ask a tenant admin to connect the group.
 

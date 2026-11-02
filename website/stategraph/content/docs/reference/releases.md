@@ -66,7 +66,7 @@ Both images are on GitHub Container Registry.
 
 ### Server
 
-Host Stategraph yourself with this image, the Enterprise build. Orchestration is off until you set `STATEGRAPH_ORCHESTRATION_ENABLED=true`.
+Host Stategraph yourself with this image, the Enterprise build. Orchestration is on in the [Docker Compose](/docs/admin/self-hosting/docker-compose) setup. For other deployments, see [Enable Orchestration](/docs/admin/self-hosting/orchestration).
 
 ```bash
 docker pull ghcr.io/stategraph/stategraph-server:<version>
