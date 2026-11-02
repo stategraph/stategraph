@@ -9,6 +9,7 @@
   sgs_service_license
   sgs_service_license_oss
   sgs_service_orchestration
+  sgs_service_oauth2
   sgs_service_scheduler
   sgs_service_tenants
   sgs_service_terrat

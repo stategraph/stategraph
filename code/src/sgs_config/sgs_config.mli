@@ -55,7 +55,6 @@ val db_port : t -> int option
 val db_user : t -> string
 val enable_cors : t -> bool
 val oauth2 : t -> oauth2_config option
-val oauth2_api_key : t -> string
 val port : t -> int
 
 (** STATEGRAPH_COST_ENABLED: master on/off switch for cost estimation. *)

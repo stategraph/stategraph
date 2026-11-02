@@ -1,6 +1,6 @@
 (** Login Endpoint
 
-    Initiates the OAuth2 login flow by redirecting to oauth2-proxy. *)
+    Initiates the OAuth2 login flow. *)
 
 (** GET /api/v1/login/options - List available OAuth providers *)
 val options : Sgs_config.t -> Brtl_rtng.Handler.t
@@ -9,7 +9,7 @@ val options : Sgs_config.t -> Brtl_rtng.Handler.t
     [rd] is the redirect destination after login (defaults to "/") *)
 val run :
   Sgs_config.t ->
-  Sgs_service_auth_oauth2_proxy.t option ->
+  Sgs_service_oauth2.Provider.t option ->
   string ->
   string option ->
   Brtl_rtng.Handler.t

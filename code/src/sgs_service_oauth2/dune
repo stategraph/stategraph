@@ -1,0 +1,16 @@
+(library
+ (name sgs_service_oauth2)
+ (libraries
+  abb
+  abbs
+  containers
+  logs
+  oauth2_htp
+  sgs_config
+  sgs_service
+  sgs_service_config
+  sgs_svc_mngr
+  sln
+  uri)
+ (preprocess
+  (pps ppx_deriving.show)))

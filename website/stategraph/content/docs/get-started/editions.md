@@ -5,11 +5,11 @@ order: 4
 ---
 
 
-Stategraph Orchestration has an Open Source edition and an Enterprise edition, and you can add Infrastructure as a Database to them. You self-host them, or use a Stategraph Cloud plan.
+Stategraph Orchestration has an Open Source edition and an Enterprise edition. Infrastructure as a Database includes Orchestration Pro, with every Enterprise feature. You self-host them, or use a Stategraph Cloud plan.
 
 ## Feature matrix
 
-The Infrastructure as a Database column shows it with Orchestration Enterprise. Without Orchestration, you get only the rows that are No for Open Source and Enterprise.
+Infrastructure as a Database includes Orchestration Pro, so its column has every Enterprise row.
 
 | Capability | Open Source | Enterprise | Infrastructure as a Database |
 |---|---|---|---|
@@ -96,9 +96,9 @@ Enterprise is Open Source with no user limit, plus these governance features, ma
 Orchestration decides when and how changes run. Infrastructure as a Database scopes each operation to the resources that changed, not to a locked and replayed state file. Operations run at the same time without a global lock, and leave a complete record of your infrastructure that you can query.
 
 - With Orchestration: set the engine to `stategraph` to run each pull request through it. See [Use with Orchestration](/docs/infrastructure-as-a-database/orchestration).
-- Without Orchestration: use the `stategraph` CLI under your existing CI/CD or orchestration workflows. See [Infrastructure as a Database](/docs/infrastructure-as-a-database) and [CI and orchestrators](/docs/infrastructure-as-a-database/ci).
+- With other CI/CD: use the `stategraph` CLI under your existing CI/CD or orchestration workflows. See [Infrastructure as a Database](/docs/infrastructure-as-a-database) and [CI and orchestrators](/docs/infrastructure-as-a-database/ci).
 - Deployment: Stategraph Cloud, self-hosted, air-gapped, or BYOC (Stategraph engineers operate it in your AWS, GCP, or Azure account).
-- Pricing: from $25,000 per year, on an annual contract, with dedicated support and a custom SLA. It is priced separately from Orchestration. [Contact sales](https://stategraph.com/contact) for a quote, then follow [Setup](/docs/infrastructure-as-a-database/setup).
+- Pricing: from $25,000 per year, on an annual contract, with dedicated support and a custom SLA. It includes Orchestration Pro. [Contact sales](https://stategraph.com/contact) for a quote, then follow [Setup](/docs/infrastructure-as-a-database/setup).
 
 ## Stategraph Cloud plans
 
@@ -115,7 +115,7 @@ Manage your subscription, payment method, and invoices in the [Stripe customer p
 
 ## Choosing an edition
 
-You can move from Open Source to Enterprise, then add Infrastructure as a Database. Each step keeps your repositories and your `.stategraph/config.yml`. Self-hosted, Open Source and Enterprise are different server images, so the move to Enterprise is a new deployment.
+You can move from Open Source to Enterprise, then to Infrastructure as a Database, which includes Orchestration Pro. Each step keeps your repositories and your `.stategraph/config.yml`. Self-hosted, Open Source and Enterprise are different server images, so the move to Enterprise is a new deployment.
 
 Choose Open Source when:
 

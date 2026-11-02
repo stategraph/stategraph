@@ -12,6 +12,7 @@
   containers
   logs
   mql_sql
+  oauth2_htp
   pgsql_io
   pgsql_pool
   sg_caps_json
@@ -23,6 +24,7 @@
   sgs_redirect
   sgs_service
   sgs_service_config
+  sgs_service_oauth2
   sgs_service_scheduler
   sgs_service_storage
   sgs_svc_mngr
@@ -36,4 +38,4 @@
  (preprocessor_deps
   (glob_files_rec sql/*))
  (preprocess
-  (pps ppx_blob ppx_deriving_yojson)))
+  (pps ppx_blob ppx_deriving.show ppx_deriving_yojson)))

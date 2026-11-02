@@ -1,0 +1,16 @@
+(test
+ (name test)
+ (libraries
+  abb
+  base64
+  cohttp
+  containers
+  duration
+  jwk
+  mirage-crypto-rng
+  mirage-crypto-rng.unix
+  oauth2_htp
+  oth
+  oth_abb
+  uri
+  yojson))

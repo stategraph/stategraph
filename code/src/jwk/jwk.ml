@@ -4,26 +4,38 @@ module Key = struct
   let get = Sln_map.String.get
 end
 
-type t = Key.t Sln_map.String.t
+type t = {
+  by_kid : Key.t Sln_map.String.t;
+  keys : Key.t list;
+}
 
-let get_kid = Sln_map.String.get
+let get_kid kid t = Sln_map.String.get kid t.by_kid
+let keys t = t.keys
 
 let of_string =
   CCOption.wrap (fun s ->
       let json = Yojson.Basic.from_string s in
-      let keys = Yojson.Basic.Util.(to_list (member "keys" json)) in
-      CCListLabels.fold_left
-        ~f:(fun acc k ->
-          let kid = Yojson.Basic.Util.(to_string (member "kid" k)) in
-          let assoc = Yojson.Basic.Util.to_assoc k in
-          Sln_map.String.add
-            kid
-            (Sln_map.String.of_list
-               (CCList.map
-                  (fun (k, v) ->
-                    let v = Yojson.Basic.Util.to_string v in
-                    (k, v))
-                  assoc))
-            acc)
-        ~init:Sln_map.String.empty
-        keys)
+      let keys =
+        CCList.map
+          (fun k ->
+            Sln_map.String.of_list
+              (CCList.filter_map
+                 (fun (k, v) ->
+                   match v with
+                   | `String v -> Some (k, v)
+                   | `Assoc _ | `Bool _ | `Float _ | `Int _ | `List _ | `Null -> None)
+                 (Yojson.Basic.Util.to_assoc k)))
+          Yojson.Basic.Util.(to_list (member "keys" json))
+      in
+      {
+        by_kid =
+          CCList.fold_left
+            (fun acc key ->
+              CCOption.map_or
+                ~default:acc
+                (fun kid -> Sln_map.String.add kid key acc)
+                (Key.get "kid" key))
+            Sln_map.String.empty
+            keys;
+        keys;
+      })

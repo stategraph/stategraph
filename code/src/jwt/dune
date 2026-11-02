@@ -1,3 +1,11 @@
 (library
  (name jwt)
- (libraries base64 containers digestif eqaf mirage-crypto-pk sln yojson))
+ (libraries
+  base64
+  containers
+  digestif
+  eqaf
+  mirage-crypto-ec
+  mirage-crypto-pk
+  sln
+  yojson))

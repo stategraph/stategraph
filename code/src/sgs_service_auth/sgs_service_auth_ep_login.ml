@@ -1,12 +1,12 @@
 (* Login Endpoint
 
-   This endpoint initiates the OAuth2 login flow by redirecting to oauth2-proxy.
-   After successful authentication, users are redirected to the /api/v1/oauth2/complete
-   callback which creates the StateGraph session.
+   This endpoint initiates the OAuth2 login flow. After successful authentication,
+   the /oauth2/{provider}/callback handler creates the StateGraph session and
+   redirects to the original path.
 
    Usage:
-   - GET /api/v1/login?rd=/original/path
-   - Redirects to /oauth2/start?rd=/api/v1/oauth2/complete?rd=/original/path
+   - GET /api/v1/login/{provider}?rd=/original/path
+   - Redirects to /oauth2/{provider}/start?rd=/original/path
 *)
 
 let src = Logs.Src.create "ep_login"
@@ -152,13 +152,12 @@ let logout config rd =
       in
       let headers =
         Cohttp.Header.of_list
-          (("Location", location)
-          :: CCList.map clear_cookie ([ "_oauth2_proxy"; "session" ] @ terrat_cookies))
+          (("Location", location) :: CCList.map clear_cookie ("session" :: terrat_cookies))
       in
       Abb.Future.return (Brtl_ctx.set_response (Brtl_rspnc.create ~status:`Found ~headers "") ctx))
 
 (* GET /api/v1/login/{provider} - Initiate OAuth2 login flow *)
-let run config oauth2_proxy provider rd =
+let run config oauth2 provider rd =
   let rd = CCOption.get_or ~default:"/" rd in
   Brtl_ep.run ~content_type:"text/html" ~f:(fun ctx ->
       let rd =
@@ -168,21 +167,20 @@ let run config oauth2_proxy provider rd =
             Logs.warn (fun m -> m "%s : UNSAFE_REDIRECT : %s" (Brtl_ctx.token ctx) rd);
             "/"
       in
-      match oauth2_proxy with
+      match oauth2 with
       | None ->
           Logs.warn (fun m -> m "%s : Login attempt but OAuth not configured" (Brtl_ctx.token ctx));
           Abb.Future.return
             (Brtl_ctx.set_response
                (Brtl_rspnc.create ~status:`Service_unavailable "OAuth login not available")
                ctx)
-      | Some _proxy ->
-          (* Build the callback URL that oauth2-proxy will redirect to after auth *)
-          let callback_url =
-            Printf.sprintf "/api/v1/oauth2/%s/complete?rd=%s" provider (Uri.pct_encode rd)
-          in
-          (* Build the oauth2-proxy start URL with our callback as the redirect *)
+      | Some _oauth2 ->
           let oauth2_start_url =
-            Printf.sprintf "/oauth2/%s/start?rd=%s" provider (Uri.pct_encode callback_url)
+            Uri.to_string
+              (Uri.make
+                 ~path:(Printf.sprintf "/oauth2/%s/start" provider)
+                 ~query:[ ("rd", [ rd ]) ]
+                 ())
           in
 
           Logs.info (fun m ->

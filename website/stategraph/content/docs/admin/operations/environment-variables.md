@@ -61,17 +61,16 @@ Local email and password sign-in needs no variable. For the sign-in modes, see [
 | `STATEGRAPH_OAUTH_CLIENT_ID` | | OAuth client ID. Required with `STATEGRAPH_OAUTH_TYPE` |
 | `STATEGRAPH_OAUTH_CLIENT_SECRET` | | OAuth client secret. Required with `STATEGRAPH_OAUTH_TYPE` |
 | `STATEGRAPH_OAUTH_REDIRECT_BASE` | `http://localhost:<port>` | Base URL of the `/oauth2/{provider}/callback` callbacks. Set it to the public URL, as in `STATEGRAPH_UI_BASE` |
-| `STATEGRAPH_OAUTH_EMAIL_DOMAIN` | `*` | Email domain that can sign in. With `*`, any identity that the provider authenticates signs in, and the first to sign in while no instance admin exists becomes one. Restrict it to your domain on any public deployment |
+| `STATEGRAPH_OAUTH_EMAIL_DOMAIN` | `*` | Email domains that can sign in, comma-separated. With `*`, any identity that the provider authenticates signs in, and the first to sign in while no instance admin exists becomes one. Restrict it to your domain on any public deployment |
 | `STATEGRAPH_OAUTH_DISPLAY_NAME` | `Google` or `SSO` | Provider name on the sign-in button |
-| `STATEGRAPH_OAUTH_COOKIE_SECRET` | random per process | Signs session and CSRF cookies: 16, 24, or 32 characters. Set it on each replica of a multi-replica deployment, or replicas do not share sessions |
+| `STATEGRAPH_OAUTH_COOKIE_SECRET` | random per process | Signs the sign-in CSRF cookie: 16, 24, or 32 characters. Set it on each replica of a multi-replica deployment, or a sign-in that starts on one replica fails on another |
 | `STATEGRAPH_OAUTH_OIDC_ISSUER_URL` | | OIDC issuer URL, required with `STATEGRAPH_OAUTH_TYPE=oidc`. The provider must support discovery at `{issuer}/.well-known/openid-configuration` |
 | `STATEGRAPH_OAUTH_OIDC_USE_AUTH0_LOGOUT` | `false` | Use the Auth0 logout endpoint for OIDC sign-out |
-| `STATEGRAPH_OAUTH_GOOGLE_GROUP` | unset | Google Group whose members can sign in. Needs the two variables below |
-| `STATEGRAPH_OAUTH_GOOGLE_ADMIN_EMAIL` | unset | Google Workspace super admin email, for Google Groups API access |
+| `STATEGRAPH_OAUTH_GOOGLE_GROUP` | unset | Google Groups whose members can sign in, comma-separated. Needs the two variables below |
+| `STATEGRAPH_OAUTH_GOOGLE_ADMIN_EMAIL` | unset | Google Workspace super admin email, for Google Groups API access. With the service account key and no group, every user signs in and group rules get all of the user's groups |
 | `STATEGRAPH_OAUTH_GOOGLE_SERVICE_ACCOUNT_JSON` | unset | Google Admin API service account key, as inline JSON or a file path |
-| `STATEGRAPH_OAUTH2_PROXY_PATH` | `/usr/local/bin/oauth2-proxy` | Path of the oauth2-proxy binary that Stategraph runs |
 
-A missing or invalid sign-in variable stops the server at start, with the reason in the server log. If the sign-in provider does not start, the server runs without OAuth sign-in, with the reason in `/tmp/oauth2-proxy.log` in the container.
+A missing or invalid sign-in variable stops the server at start, with the reason in the server log. If the sign-in provider cannot be set up, the server logs the reason, tries again every second, and accepts no requests until the setup succeeds.
 
 ## Server tuning
 

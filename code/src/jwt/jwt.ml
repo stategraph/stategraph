@@ -22,24 +22,100 @@ module Verifier = struct
     let of_pub_key = CCFun.id
   end
 
+  module Ec_pub_key = struct
+    module Ec = Mirage_crypto_ec
+
+    type t =
+      | P256 of Ec.P256.Dsa.pub
+      | P384 of Ec.P384.Dsa.pub
+      | P521 of Ec.P521.Dsa.pub
+      | Ed25519 of Ec.Ed25519.pub
+
+    let create ~crv ~x ~y =
+      let open CCOption.Infix in
+      let decode =
+        CCOption.wrap (Base64.decode_exn ~pad:false ~alphabet:Base64.uri_safe_alphabet)
+      in
+      (* An uncompressed point: [0x04 || x || y]. *)
+      let point = decode x >>= fun x -> y >>= decode >|= fun y -> "\x04" ^ x ^ y in
+      let pub of_octets octets = octets >>= fun octets -> CCResult.to_opt (of_octets octets) in
+      match crv with
+      | "P-256" -> pub Ec.P256.Dsa.pub_of_octets point >|= fun k -> P256 k
+      | "P-384" -> pub Ec.P384.Dsa.pub_of_octets point >|= fun k -> P384 k
+      | "P-521" -> pub Ec.P521.Dsa.pub_of_octets point >|= fun k -> P521 k
+      | "Ed25519" -> pub Ec.Ed25519.pub_of_octets (decode x) >|= fun k -> Ed25519 k
+      | _ -> None
+  end
+
   type t =
     | HS256 of string
     | HS512 of string
     | RS256 of Pub_key.t
+    | RS384 of Pub_key.t
+    | RS512 of Pub_key.t
+    | PS256 of Pub_key.t
+    | PS384 of Pub_key.t
+    | PS512 of Pub_key.t
+    | ES256 of Ec_pub_key.t
+    | ES384 of Ec_pub_key.t
+    | ES512 of Ec_pub_key.t
+    | EdDSA of Ec_pub_key.t
 
-  let rs256_verify key hp signature =
-    try Mirage_crypto_pk.Rsa.PKCS1.verify ~hashp:(( = ) `SHA256) ~key ~signature (`Message hp)
+  let pkcs1_verify hash key hp signature =
+    try Mirage_crypto_pk.Rsa.PKCS1.verify ~hashp:(( = ) hash) ~key ~signature (`Message hp)
+    with Invalid_argument _ | Failure _ -> false
+
+  let pss_verify (module H : Digestif.S) key hp signature =
+    let module Pss = Mirage_crypto_pk.Rsa.PSS (H) in
+    try Pss.verify ~key ~signature (`Message hp) with Invalid_argument _ | Failure _ -> false
+
+  (* A JWS ECDSA signature is [r || s], each the curve's byte length. *)
+  let ecdsa_verify (module H : Digestif.S) ~byte_length verify hp signature =
+    match CCString.length signature = 2 * byte_length with
+    | false -> false
+    | true -> (
+        let rs =
+          (CCString.sub signature 0 byte_length, CCString.sub signature byte_length byte_length)
+        in
+        try verify rs H.(to_raw_string (digest_string hp))
+        with Invalid_argument _ | Failure _ -> false)
+
+  let eddsa_verify key hp signature =
+    try Mirage_crypto_ec.Ed25519.verify ~key signature ~msg:hp
     with Invalid_argument _ | Failure _ -> false
 
   (* Constant-time comparison to prevent timing attacks *)
   let mac_verify algo hp signature = Eqaf.equal (algo hp) signature
 
   let verify t hp signature =
+    let module Ec = Mirage_crypto_ec in
     let f =
       match t with
       | HS256 x -> mac_verify (fun m -> Digestif.SHA256.(to_raw_string (hmac_string ~key:x m)))
       | HS512 x -> mac_verify (fun m -> Digestif.SHA512.(to_raw_string (hmac_string ~key:x m)))
-      | RS256 x -> rs256_verify x
+      | RS256 x -> pkcs1_verify `SHA256 x
+      | RS384 x -> pkcs1_verify `SHA384 x
+      | RS512 x -> pkcs1_verify `SHA512 x
+      | PS256 x -> pss_verify (module Digestif.SHA256) x
+      | PS384 x -> pss_verify (module Digestif.SHA384) x
+      | PS512 x -> pss_verify (module Digestif.SHA512) x
+      | ES256 (Ec_pub_key.P256 key) ->
+          ecdsa_verify
+            (module Digestif.SHA256)
+            ~byte_length:Ec.P256.Dsa.byte_length
+            (Ec.P256.Dsa.verify ~key)
+      | ES384 (Ec_pub_key.P384 key) ->
+          ecdsa_verify
+            (module Digestif.SHA384)
+            ~byte_length:Ec.P384.Dsa.byte_length
+            (Ec.P384.Dsa.verify ~key)
+      | ES512 (Ec_pub_key.P521 key) ->
+          ecdsa_verify
+            (module Digestif.SHA512)
+            ~byte_length:Ec.P521.Dsa.byte_length
+            (Ec.P521.Dsa.verify ~key)
+      | EdDSA (Ec_pub_key.Ed25519 key) -> eddsa_verify key
+      | ES256 _ | ES384 _ | ES512 _ | EdDSA _ -> fun _ _ -> false
     in
     f hp signature
 
@@ -47,6 +123,15 @@ module Verifier = struct
     | HS256 _ -> "HS256"
     | HS512 _ -> "HS512"
     | RS256 _ -> "RS256"
+    | RS384 _ -> "RS384"
+    | RS512 _ -> "RS512"
+    | PS256 _ -> "PS256"
+    | PS384 _ -> "PS384"
+    | PS512 _ -> "PS512"
+    | ES256 _ -> "ES256"
+    | ES384 _ -> "ES384"
+    | ES512 _ -> "ES512"
+    | EdDSA _ -> "EdDSA"
 end
 
 module Signer = struct

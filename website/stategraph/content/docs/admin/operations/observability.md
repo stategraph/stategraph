@@ -32,7 +32,7 @@ The server logs at debug level. A failed start logs the reason:
 - a missing GitLab variable
 - a `CREATE DATABASE` statement for you to run for Orchestration
 
-If the sign-in provider does not start, the server runs without OAuth sign-in, with the reason in `/tmp/oauth2-proxy.log` in the container.
+If the sign-in provider cannot be set up, the server logs the reason, tries again every second, and accepts no requests until the setup succeeds.
 
 ### Access log
 

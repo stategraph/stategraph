@@ -1,0 +1,18 @@
+(test
+ (name test)
+ (libraries
+  abb
+  brtl
+  cohttp
+  containers
+  mirage-crypto-rng.unix
+  oauth2_htp
+  oth
+  sgs_cloud_oss
+  sgs_config
+  sgs_service
+  sgs_service_config
+  sgs_service_oauth2
+  sgs_svc_mngr
+  unix
+  uri))

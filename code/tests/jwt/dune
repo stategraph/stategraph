@@ -1,3 +1,12 @@
 (test
  (name test)
- (libraries base64 containers jwt oth x509 mirage-crypto-rng.unix))
+ (libraries
+  base64
+  containers
+  digestif
+  jwt
+  mirage-crypto-ec
+  mirage-crypto-pk
+  oth
+  x509
+  mirage-crypto-rng.unix))

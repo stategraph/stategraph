@@ -1,3 +1,0 @@
-(test
- (name test)
- (libraries abb containers oth sgs_config sgs_service_auth unix))
