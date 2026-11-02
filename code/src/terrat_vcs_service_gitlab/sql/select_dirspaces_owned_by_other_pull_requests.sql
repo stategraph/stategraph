@@ -20,8 +20,8 @@ inner join gitlab_pull_requests as our_pr
 where our_pr.repository = $repository
       and our_pr.pull_number = $pull_number
       and gpr.pull_number <> our_pr.pull_number
-      and dsprl.path = any($dirs)
-      and dsprl.workspace = any($workspaces)
+      and (dsprl.path, dsprl.workspace) in (select dir, workspace
+                                            from unnest($dirs, $workspaces) as v(dir, workspace))
       and (dsprl.branch_target = 'all'
            or (dsprl.branch_target = 'dest_branch'
                and our_pr.base_branch = gpr.base_branch))

@@ -2038,16 +2038,17 @@ struct
                       _;
                     } as change)
                  ->
+                let workflow =
+                  CCList.find_idx
+                    (fun { Terrat_base_repo_config_v1.Workflows.Entry.tag_query; _ } ->
+                      Terrat_change_match3.match_tag_query ~tag_query change)
+                    workflows
+                in
                 Terrat_change.Dirspaceflow.
                   {
                     dirspace;
                     workflow =
-                      CCOption.map
-                        (fun (idx, workflow) -> Workflow.{ idx; workflow })
-                        (CCList.find_idx
-                           (fun { Terrat_base_repo_config_v1.Workflows.Entry.tag_query; _ } ->
-                             Terrat_change_match3.match_tag_query ~tag_query change)
-                           workflows);
+                      CCOption.map (fun (idx, workflow) -> Workflow.{ idx; workflow }) workflow;
                     variables = Some variables;
                   })
               matches
@@ -2110,16 +2111,17 @@ struct
                       _;
                     } as change)
                  ->
+                let workflow =
+                  CCList.find_idx
+                    (fun { Terrat_base_repo_config_v1.Workflows.Entry.tag_query; _ } ->
+                      Terrat_change_match3.match_tag_query ~tag_query change)
+                    workflows
+                in
                 Terrat_change.Dirspaceflow.
                   {
                     dirspace;
                     workflow =
-                      CCOption.map
-                        (fun (idx, workflow) -> Workflow.{ idx; workflow })
-                        (CCList.find_idx
-                           (fun { Terrat_base_repo_config_v1.Workflows.Entry.tag_query; _ } ->
-                             Terrat_change_match3.match_tag_query ~tag_query change)
-                           workflows);
+                      CCOption.map (fun (idx, workflow) -> Workflow.{ idx; workflow }) workflow;
                     variables = Some variables;
                   })
               matches
