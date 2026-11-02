@@ -85,7 +85,6 @@ A missing or invalid sign-in variable stops the server at start, with the reason
 | `STATEGRAPH_FOCUS_SYNC_PARALLELISM` | | Parallelism of focus synchronization |
 | `STATEGRAPH_INTERP_MEMO` | on | Memoization in the HCL interpreter. `false`, `0`, or `off` turns it off |
 | `STATEGRAPH_INTERP_MEMO_VERIFY` | off | `true`, `1`, or `on` compares memoized results with a fresh evaluation |
-| `STATEGRAPH_HCL_TYPE_COERCION_STRICT` | | Strict type coercion in the HCL interpreter |
 
 ## Orchestration
 
