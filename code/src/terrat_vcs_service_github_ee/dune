@@ -8,7 +8,8 @@
   terrat_vcs_access_token
   terrat_vcs_provider2
   terrat_vcs_service
-  terrat_vcs_service_github)
+  terrat_vcs_service_github
+  terrat_stategraph)
  (preprocessor_deps
   (glob_files sql/*.sql))
  (preprocess

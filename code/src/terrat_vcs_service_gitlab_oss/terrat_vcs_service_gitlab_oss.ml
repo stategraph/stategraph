@@ -1,4 +1,4 @@
-module Provider : Terrat_vcs_provider2_gitlab.S = struct
+module Provider : Terrat_vcs_provider2_gitlab.Shared = struct
   let name = Terrat_vcs_service_gitlab_provider.name
   let enforce_installation_access = Terrat_vcs_service_gitlab_provider.enforce_installation_access
 
@@ -22,7 +22,7 @@ module Provider : Terrat_vcs_provider2_gitlab.S = struct
   module Stacks = Terrat_vcs_service_gitlab_provider.Stacks
 end
 
-include
+module Make (Stategraph : Terrat_stategraph.S) =
   Terrat_vcs_service_gitlab.Make
     (Provider)
     (struct
@@ -30,3 +30,7 @@ include
 
       let routes _ _ = []
     end)
+    (struct
+      let stategraph_parallel_applies = false
+    end)
+    (Stategraph)

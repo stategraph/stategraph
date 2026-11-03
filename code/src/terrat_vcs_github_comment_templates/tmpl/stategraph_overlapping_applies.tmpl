@@ -1,0 +1,17 @@
+## Overlapping applies :heavy_multiplication_x:
+
+Cannot apply.  Other pull requests are applying, or have applied, resources that this pull request's plan changes, and that plan was made before their changes.  Stategraph would refuse the commit, so the apply was not started.
+
+| Dir | Workspace | Pull Request | State | Resources |
+| --- | --------- | ------------ | ----- | --------- |
+@#overlaps-@
+| `@dir@` | `@workspace@` | #@pull_number@ | @?applied-@applied@-/applied@@!applied-@applying@-/applied@ | @#addresses-@`@address@` @/addresses-@ |
+@/overlaps-@
+
+Once the pull requests above have merged, bring the base branch into this one and plan again:
+
+```
+stategraph plan
+```
+
+If an apply above fails, this plan stands.  Comment `stategraph apply` again once it has ended.

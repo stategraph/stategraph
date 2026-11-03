@@ -2,7 +2,7 @@ module type S = sig
   val vcs : string
 end
 
-module Make (_ : Terrat_vcs_provider2.S) (S : S) = struct
+module Make (_ : Terrat_vcs_provider2.Shared) (S : S) = struct
   let src = Logs.Src.create ("vcs_access_control_" ^ S.vcs)
 
   module Logs = (val Logs.src_log src : Logs.LOG)

@@ -22,6 +22,7 @@
   terrat_job_context
   terrat_output_diff
   terrat_pull_request
+  terrat_stategraph
   terrat_tag_query
   terrat_tier
   terrat_vcs_api

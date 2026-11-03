@@ -54,8 +54,12 @@ module Db = struct
   let store_dirspace_summaries ~request_id db context ~sha ~work_manifest summaries =
     raise (Failure "nyi")
 
-  let query_next_pending_work_manifest ?new_age ~request_id db = raise (Failure "nyi")
-  let work_manifest_can_run ~request_id ~work_manifest_id db = raise (Failure "nyi")
+  let query_next_pending_work_manifest ?new_age ~request_id ~stategraph_parallel_applies db =
+    raise (Failure "nyi")
+
+  let work_manifest_can_run ~request_id ~work_manifest_id ~stategraph_parallel_applies db =
+    raise (Failure "nyi")
+
   let set_job_restart_of ~request_id ~job_id ~restart_of db = raise (Failure "nyi")
   let inherit_job_restart_of ~request_id ~job_id ~from_job_id db = raise (Failure "nyi")
   let query_job_restart ~request_id ~job_id db = raise (Failure "nyi")
@@ -73,6 +77,7 @@ module Db = struct
       ~request_id
       ~base_ref
       ~branch_ref
+      ~stategraph_parallel_apply_dirspaces:_
       db
       pull_request
       dirspaces =
@@ -86,16 +91,31 @@ module Db = struct
       ~job_id
       ~start_timeout
       ~changed_dirspaces
+      ~stategraph_parallel_apply_dirspaces:_
       db
       context
       dirspaces
       op =
     raise (Failure "nyi")
 
-  let query_blocking_work_manifests_in_repo_for_context ~request_id ~job_id db context dirspaces =
+  let query_blocking_work_manifests_in_repo_for_context
+      ~request_id
+      ~job_id
+      db
+      context
+      dirspaces
+      ~stategraph_parallel_apply_dirspaces:_ =
     raise (Failure "nyi")
 
-  let query_dirspaces_owned_by_other_pull_requests ~request_id db pull_request dirspaces =
+  let query_dirspaces_owned_by_other_pull_requests
+      ~request_id
+      db
+      pull_request
+      dirspaces
+      ~stategraph_parallel_apply_dirspaces:_ =
+    raise (Failure "nyi")
+
+  let query_parallel_apply_transactions ~request_id db pull_request dirspaces =
     raise (Failure "nyi")
 
   let query_missing_drift_scheduled_runs ~request_id db = raise (Failure "nyi")

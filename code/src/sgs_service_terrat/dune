@@ -10,11 +10,15 @@
   pgsql_io
   pgsql_pool
   sgs_service
+  sgs_service_storage
+  sgs_storage
   sgs_svc_mngr
   sgs_terrat_config
+  sln
   terrat
   terrat_config
   terrat_storage
   terrat_vcs_event_evaluator2
   terrat_vcs_service
+  terrat_stategraph
   uuidm))

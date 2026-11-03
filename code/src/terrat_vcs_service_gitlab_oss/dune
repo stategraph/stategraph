@@ -3,4 +3,5 @@
  (libraries
   terrat_vcs_provider2
   terrat_vcs_service
-  terrat_vcs_service_gitlab))
+  terrat_vcs_service_gitlab
+  terrat_stategraph))
