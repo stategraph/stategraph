@@ -8,7 +8,6 @@ _opam/
 code/src/hermes/node_modules/
 code/src/hermes/.next/
 website/
-webhooks/
 CODEOWNERS
 CONTRIBUTING.md
 docker/stategraph/.env

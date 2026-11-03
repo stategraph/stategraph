@@ -59,13 +59,6 @@ module Make (Cloud : Sgs_cloud.S) = struct
       ~kind:(Sgs_service_scheduler.Id.of_string Sgs_service_auth_login_session_gc.kind)
       Sgs_service_scheduler.Schedule.Hourly
       Sgs_service_auth_login_session_gc.run
-    |> Abb.Future.map (fun () -> Ok ())
-    >>= fun () ->
-    Sgs_service_scheduler.register_scheduled_kind
-      scheduler
-      ~kind:(Sgs_service_scheduler.Id.of_string Sgs_service_auth_oauth2_session_gc.kind)
-      Sgs_service_scheduler.Schedule.Hourly
-      Sgs_service_auth_oauth2_session_gc.run
     |> Abb.Future.map (fun () ->
         Ok { config; storage; oauth2 = Sgs_service_oauth2.provider oauth2 })
 
