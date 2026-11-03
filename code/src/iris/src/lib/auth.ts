@@ -144,18 +144,6 @@ export async function getCurrentUser(): Promise<User | null> {
     user.set(userData);
     isAuthenticated.set(true);
     
-    // Check if this is a new user and track Reddit conversion if applicable
-    const existingUserKey = 'terrateam_known_user';
-    const isExistingUser = localStorage.getItem(existingUserKey) === 'true';
-    
-    if (!isExistingUser) {
-      // Mark user as known for future logins
-      localStorage.setItem(existingUserKey, 'true');
-      
-      // Track Reddit conversion for new signup
-      await trackRedditSignupConversion(userData.id);
-    }
-    
     // Determine which VCS provider the user logged in with
     let provider: 'github' | 'gitlab' = 'github'; // default
     if (userData.vcs && userData.vcs.length > 0) {
@@ -315,86 +303,15 @@ export function initializeGitHubLogin(web_base_url: string, clientId: string): v
   window.location.href = githubOAuthUrl;
 }
 
-// Track Reddit conversion for new signups
-async function trackRedditSignupConversion(userId: string): Promise<void> {
-  const analyticsEnabled = (window as any).terrateamConfig?.ui_analytics === 'enabled';
-  
-  if (!analyticsEnabled) {
-    return; // Don't track if analytics are disabled
-  }
-
-  try {
-    // Get stored Reddit tracking parameters
-    const rdtCid = sessionStorage.getItem('rdt_cid');
-    const rdtUuid = sessionStorage.getItem('rdt_uuid') || 
-                   document.cookie
-                     .split('; ')
-                     .find(row => row.startsWith('_rdt_uuid='))
-                     ?.split('=')[1];
-
-    // Only track if we have tracking parameters (came from Reddit)
-    if (!rdtCid && !rdtUuid) {
-      return;
-    }
-
-    const webhooksUrl = (window as any).terrateamConfig?.webhooks_url || 'https://webhooks.terrateam.workers.dev';
-    
-    const payload = {
-      eventType: 'SignUp',
-      userId: userId.toString(),
-      rdt_cid: rdtCid,
-      rdt_uuid: rdtUuid,
-      timestamp: new Date().toISOString()
-    };
-    
-    const response = await fetch(`${webhooksUrl}/reddit-conversion`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (response.ok) {
-      // Clear the tracking params after successful conversion
-      sessionStorage.removeItem('rdt_cid');
-      sessionStorage.removeItem('rdt_uuid');
-    } else if (response.status === 403) {
-      // Fallback to client-side tracking
-      if (typeof window !== 'undefined' && (window as any).rdt) {
-        (window as any).rdt('track', 'SignUp');
-      }
-    }
-  } catch (e) {
-    // Fallback to client-side tracking
-    if (typeof window !== 'undefined' && (window as any).rdt) {
-      (window as any).rdt('track', 'SignUp');
-    }
-  }
-}
-
 export async function handleAuthCallback(): Promise<void> {
   
   // The production Terrateam backend handles the OAuth flow and sets authentication cookies
   // We just need to check if the user is now authenticated
   
-  // Check if this user has been seen before (simple client-side check)
-  const existingUserKey = 'terrateam_known_user';
-  const isExistingUser = localStorage.getItem(existingUserKey) === 'true';
-  
   // Check if user is authenticated after the OAuth callback
   const userData = await getCurrentUser();
   
   if (userData) {
-    // If this is a new user (first time we've seen them), track the signup
-    if (!isExistingUser) {
-      // Mark user as known for future logins
-      localStorage.setItem(existingUserKey, 'true');
-      
-      // Track Reddit conversion for new signup
-      await trackRedditSignupConversion(userData.id);
-    }
-    
     // First priority: Check for stored intended URL
     if (redirectToIntendedUrl()) {
       return;
