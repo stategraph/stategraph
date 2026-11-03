@@ -78,11 +78,11 @@ Stategraph needs its database connection and its public URL. All other settings 
 
 ## Optional features
 
-Each feature is off by default. To turn it on, set one variable in the container environment.
+Each feature is off by default, except Orchestration in the [Docker Compose](/docs/admin/self-hosting/docker-compose) setup. To turn one on, set its variables in the container environment.
 
 | Feature | Setting |
 |---------|---------|
-| [Stategraph Orchestration](/docs/admin/self-hosting/orchestration) | `STATEGRAPH_ORCHESTRATION_ENABLED=true` |
+| [Stategraph Orchestration](/docs/admin/self-hosting/orchestration) | `STATEGRAPH_ORCHESTRATION_ENABLED=true`, with `STATEGRAPH_FDW_PASSWORD` |
 | [Cost estimation](/docs/admin/self-hosting/cost) | `STATEGRAPH_COST_ENABLED=true` |
 | [Security scanning](/docs/admin/self-hosting/security-scanning) | `STATEGRAPH_SECURITY=1` |
 | [Google or OIDC sign-in](/docs/admin/access-control) | `STATEGRAPH_OAUTH_TYPE=google` or `oidc` |

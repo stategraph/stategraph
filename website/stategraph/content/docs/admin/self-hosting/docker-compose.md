@@ -10,7 +10,7 @@ Run Stategraph and PostgreSQL on one host with Docker Compose, and set up sign-i
 ## Before you begin
 
 - Docker Engine 20.10 or later
-- Docker Compose v2
+- Docker Compose 2.23.1 or later
 - Port 8080 free on the host
 
 ## Quick start
@@ -33,12 +33,15 @@ services:
       POSTGRES_USER: "stategraph"
       POSTGRES_DB: "stategraph"
     healthcheck:
-      test: ["CMD", "pg_isready", "-d", "stategraph", "-U", "stategraph"]
+      test: ["CMD", "pg_isready", "-h", "localhost", "-p", "5432", "-d", "stategraph", "-U", "stategraph"]
       interval: 3s
       timeout: 3s
       retries: 5
     volumes:
       - db:/var/lib/postgresql/data/
+    configs:
+      - source: orchestration-db
+        target: /docker-entrypoint-initdb.d/orchestration.sql
     networks:
       - stategraph
 
@@ -54,6 +57,9 @@ services:
       DB_PASS: "stategraph"
       DB_NAME: "stategraph"
       STATEGRAPH_UI_BASE: "http://localhost:8080"
+      STATEGRAPH_ORCHESTRATION_ENABLED: "true"
+      STATEGRAPH_FDW_PASSWORD: "stategraph_mql"
+      STATEGRAPH_FDW_PROVISIONER_PASSWORD: "stategraph_provisioner"
     ports:
       - "8080:8080"
     stop_grace_period: 60s
@@ -69,6 +75,13 @@ services:
     networks:
       - stategraph
 
+configs:
+  orchestration-db:
+    content: |
+      CREATE DATABASE terrateam;
+      CREATE ROLE stategraph_mql LOGIN PASSWORD 'stategraph_mql';
+      CREATE ROLE stategraph_provisioner LOGIN PASSWORD 'stategraph_provisioner';
+
 networks:
   stategraph:
 
@@ -77,6 +90,7 @@ volumes:
 ```
 
 - `STATEGRAPH_UI_BASE` is the URL that users open. Keep `http://localhost:8080` for a local trial. Otherwise, set the public HTTPS URL.
+- `STATEGRAPH_ORCHESTRATION_ENABLED` turns on Stategraph Orchestration. At the first start of a new `db` volume, the `orchestration-db` script creates the `terrateam` database of Orchestration and its two database roles. The two `STATEGRAPH_FDW_*` passwords are the passwords of these roles: change both places together.
 - `stop_grace_period: 60s` lets Stategraph finish the requests in progress when it stops.
 
 ### 3. Start Stategraph
@@ -182,40 +196,34 @@ docker compose up -d
 
 Stategraph then loads the price book into `cloud_pricing` on the `db` volume, in the background, and refreshes it weekly. For verification and air-gapped installs, see [Enable cost estimation](/docs/admin/self-hosting/cost).
 
-## Enable Orchestration
+## Connect GitHub or GitLab
 
-Stategraph Orchestration is on as soon as `STATEGRAPH_FDW_PASSWORD` is set. To turn it on:
+Stategraph Orchestration is on from the first start. To connect your provider:
 
-1. Create the `terrateam` database and the two Orchestration roles on the Compose PostgreSQL, one time, before the first start with Orchestration on:
-
-```bash
-docker compose exec db psql -U stategraph -d stategraph \
-  -c "CREATE DATABASE terrateam OWNER stategraph;" \
-  -c "CREATE ROLE stategraph_mql LOGIN PASSWORD '<fdw-password>';" \
-  -c "CREATE ROLE stategraph_provisioner LOGIN PASSWORD '<provisioner-password>';"
-```
-
-2. Add the two passwords to `.env`. For GitLab, also add the credentials:
+1. Set `STATEGRAPH_UI_BASE` and `STATEGRAPH_OAUTH_REDIRECT_BASE` to your public URL. The webhook and callback URLs derive from them, so GitHub or GitLab must reach that URL over HTTPS.
+2. For GitLab, add the credentials to `.env`, and recreate the container with `docker compose up -d`:
 
 ```bash
 # .env
-STATEGRAPH_FDW_PASSWORD=<fdw-password>
-STATEGRAPH_FDW_PROVISIONER_PASSWORD=<provisioner-password>
-
 GITLAB_APP_ID=...
 GITLAB_APP_SECRET=...
 GITLAB_ACCESS_TOKEN=...
 ```
 
-3. Recreate the container:
+3. For GitHub, sign in as the instance admin, open **Get Started > Set up your first repository > Connect GitHub**, and create the App on the **Create** step. GitHub opens with the App filled in, and returns you to the console.
+
+To bring a GitHub App that you manage outside the console, set the six `GITHUB_*` variables in `.env` instead. They win over an App created from the console. For self-managed GitLab, also set `GITLAB_API_BASE_URL` and `GITLAB_WEB_BASE_URL`. For the GitHub App by hand, the GitLab credentials, GitLab groups, and the two roles, see [Enable Orchestration](/docs/admin/self-hosting/orchestration).
+
+To turn Orchestration off, set `STATEGRAPH_ORCHESTRATION_ENABLED` to `"false"` in `docker-compose.yml`, and recreate the container.
+
+PostgreSQL runs the `orchestration-db` script only at the first start of a new `db` volume. On an existing volume, create what is missing one time, with the passwords of `docker-compose.yml`, or put the passwords of the existing roles in `docker-compose.yml`. Then recreate the container:
 
 ```bash
-docker compose up -d
+docker compose exec db psql -U stategraph -d stategraph \
+  -c "CREATE DATABASE terrateam OWNER stategraph;" \
+  -c "CREATE ROLE stategraph_mql LOGIN PASSWORD 'stategraph_mql';" \
+  -c "CREATE ROLE stategraph_provisioner LOGIN PASSWORD 'stategraph_provisioner';"
 ```
-
-4. For GitHub, sign in as the instance admin, open **Get Started > Set up your first repository > Connect GitHub**, and create the App on the **Create** step. GitHub opens with the App filled in, and returns you to the console. The webhook and callback URLs derive from `STATEGRAPH_UI_BASE` and `STATEGRAPH_OAUTH_REDIRECT_BASE`, so both must be the public URL.
-
-To bring a GitHub App that you manage outside the console, set the six `GITHUB_*` variables in `.env` instead. They win over an App created from the console. For self-managed GitLab, also set `GITLAB_API_BASE_URL` and `GITLAB_WEB_BASE_URL`. `STATEGRAPH_ORCHESTRATION_ENABLED=false` turns Orchestration off. For the GitHub App by hand, the GitLab credentials, GitLab groups, and the two roles, see [Enable Orchestration](/docs/admin/self-hosting/orchestration).
 
 ## Enable security scanning
 
@@ -228,7 +236,7 @@ Set `STATEGRAPH_SECURITY=1` in `.env`, and recreate the container. Nothing else 
 
 ### Use external PostgreSQL
 
-For durability and backups, point the server at a managed PostgreSQL service, and remove the `db` service:
+For durability and backups, point the server at a managed PostgreSQL service, and remove the `db` service and the `configs` block:
 
 ```yaml
 services:
@@ -241,9 +249,12 @@ services:
       DB_PASS: "${DB_PASSWORD}"
       DB_NAME: "stategraph"
       STATEGRAPH_UI_BASE: "https://stategraph.example.com"
+      STATEGRAPH_ORCHESTRATION_ENABLED: "true"
+      STATEGRAPH_FDW_PASSWORD: "${FDW_PASSWORD}"
+      STATEGRAPH_FDW_PROVISIONER_PASSWORD: "${FDW_PROVISIONER_PASSWORD}"
 ```
 
-Create the `stategraph` database before the first start. With Orchestration on, the FDW bridge needs superuser rights on managed PostgreSQL: see [Enable Orchestration](/docs/admin/self-hosting/orchestration).
+Create the `stategraph` database and the two Orchestration roles before the first start. The FDW bridge needs superuser rights on managed PostgreSQL: see [Database](/docs/admin/self-hosting/orchestration#database).
 
 ## Updating
 
@@ -292,7 +303,7 @@ ports:
 
 ### Orchestration does not start
 
-Only the container log shows the cause. Orchestration retries 30 seconds after each failed start. In the log, look for:
+Only the container log shows the cause. With `STATEGRAPH_ORCHESTRATION_ENABLED=true`, as in this setup, a failed start of Orchestration stops the server, which restarts a few seconds later. In the log, look for:
 
 - `GITHUB_APP : WAITING`: there is no GitHub App yet. Create it from the console, or set the `GITHUB_*` variables.
 - `GITHUB_WEBHOOK_SECRET must be set`: `GITHUB_APP_ID` is set without `GITHUB_WEBHOOK_SECRET`.

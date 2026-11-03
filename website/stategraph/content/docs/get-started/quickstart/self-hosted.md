@@ -14,7 +14,7 @@ The Enterprise build needs a license key to complete the first-time setup, and c
 
 ## Before you begin
 
-- Docker Engine 20.10 or later, and Docker Compose v2.
+- Docker Engine 20.10 or later, and Docker Compose 2.23.1 or later.
 - Port 8080 free on the host.
 - For Orchestration, a URL that GitHub or GitLab can reach over HTTPS.
 - For GitHub, admin rights in the GitHub organization, to create and install a GitHub App.
@@ -35,12 +35,15 @@ services:
       POSTGRES_USER: "stategraph"
       POSTGRES_DB: "stategraph"
     healthcheck:
-      test: ["CMD", "pg_isready", "-d", "stategraph", "-U", "stategraph"]
+      test: ["CMD", "pg_isready", "-h", "localhost", "-p", "5432", "-d", "stategraph", "-U", "stategraph"]
       interval: 3s
       timeout: 3s
       retries: 5
     volumes:
       - db:/var/lib/postgresql/data/
+    configs:
+      - source: orchestration-db
+        target: /docker-entrypoint-initdb.d/orchestration.sql
     networks:
       - stategraph
 
@@ -54,6 +57,9 @@ services:
       DB_USER: "stategraph"
       DB_PASS: "stategraph"
       DB_NAME: "stategraph"
+      STATEGRAPH_ORCHESTRATION_ENABLED: "true"
+      STATEGRAPH_FDW_PASSWORD: "stategraph_mql"
+      STATEGRAPH_FDW_PROVISIONER_PASSWORD: "stategraph_provisioner"
     ports:
       - "8080:8080"
     healthcheck:
@@ -68,6 +74,13 @@ services:
     networks:
       - stategraph
 
+configs:
+  orchestration-db:
+    content: |
+      CREATE DATABASE terrateam;
+      CREATE ROLE stategraph_mql LOGIN PASSWORD 'stategraph_mql';
+      CREATE ROLE stategraph_provisioner LOGIN PASSWORD 'stategraph_provisioner';
+
 networks:
   stategraph:
 
@@ -75,13 +88,15 @@ volumes:
   db:
 ```
 
+`STATEGRAPH_ORCHESTRATION_ENABLED` turns on Stategraph Orchestration. At the first start of the `db` volume, the `orchestration-db` script creates the `terrateam` database of Orchestration and its two database roles: `stategraph_mql`, through which Stategraph reads Orchestration's data, and `stategraph_provisioner`, through which the console writes the GitHub App and the GitLab group connections. The two `STATEGRAPH_FDW_*` passwords are the passwords of these roles: change both places together.
+
 3. Create `.env`:
 
 ```bash
 STATEGRAPH_UI_BASE=http://localhost:8080
 ```
 
-`STATEGRAPH_UI_BASE`, the public URL of the console, is required. All other settings, including Orchestration, go into `.env`. Leave optional variables unset, not empty: for some, an empty value differs from an absent one.
+`STATEGRAPH_UI_BASE`, the public URL of the console, is required. All other settings go into `.env`. Leave optional variables unset, not empty: for some, an empty value differs from an absent one.
 
 ## Start and verify
 
@@ -109,43 +124,26 @@ At start, Stategraph migrates the `stategraph` database, then serves requests. `
 
 Open [http://localhost:8080](http://localhost:8080). The first visit shows the setup screen. It asks for the license key first, unless `STATEGRAPH_LICENSE_KEY` is set in `.env`. With local authentication, the default, it then creates the first account, with a password of at least 8 characters, and signs you in as the instance admin.
 
-As on Stategraph Cloud, you can connect GitHub or GitLab, or import your state. To connect, you need Orchestration, which the next section turns on. For Google or OIDC sign-in, see [Access control](/docs/admin/access-control).
+As on Stategraph Cloud, you can connect GitHub or GitLab, or import your state. To connect, follow the next section. For Google or OIDC sign-in, see [Access control](/docs/admin/access-control).
 
-## Enable Orchestration
+## Connect GitHub or GitLab
 
-### 1. Create the Orchestration database and roles
-
-Orchestration keeps its own `terrateam` database on the same PostgreSQL server. Stategraph reads it through `postgres_fdw` as the `stategraph_mql` role, and the console writes to it as the `stategraph_provisioner` role. Create all three one time in the running `db` container, with passwords that you choose:
-
-```bash
-docker compose exec db psql -U stategraph -d stategraph \
-  -c "CREATE DATABASE terrateam OWNER stategraph;" \
-  -c "CREATE ROLE stategraph_mql LOGIN PASSWORD '<fdw-password>';" \
-  -c "CREATE ROLE stategraph_provisioner LOGIN PASSWORD '<provisioner-password>';"
-```
-
-Orchestration updates the grants of both roles after every migration. On managed PostgreSQL such as Amazon RDS, the `postgres_fdw` connection needs superuser rights (`rds_superuser`). See [Enable Orchestration](/docs/admin/self-hosting/orchestration).
-
-### 2. Write the variables to `.env`
+### 1. Set the public URL
 
 `STATEGRAPH_UI_BASE` becomes the public URL. Replace `.env` with:
 
 ```bash
 STATEGRAPH_UI_BASE=https://stategraph.example.com
 STATEGRAPH_OAUTH_REDIRECT_BASE=https://stategraph.example.com
-STATEGRAPH_FDW_PASSWORD=<fdw-password>
-STATEGRAPH_FDW_PROVISIONER_PASSWORD=<provisioner-password>
 ```
 
 | Variable | Purpose |
 |----------|---------|
 | `STATEGRAPH_OAUTH_REDIRECT_BASE` | Base of the OAuth callback URLs, including those of the GitHub App. Default `http://localhost:<port>`, which GitHub cannot reach |
-| `STATEGRAPH_FDW_PASSWORD` | The `stategraph_mql` password. Setting it turns on Orchestration |
-| `STATEGRAPH_FDW_PROVISIONER_PASSWORD` | The `stategraph_provisioner` password. Without it, the console cannot create the GitHub App or connect a GitLab group |
 
 The webhook and runner URLs derive from `STATEGRAPH_UI_BASE`, and `TERRAT_DB_*` need no setting: Orchestration uses the `DB_*` values with the database name `terrateam`. Telemetry is on by default. To turn it off, set `TERRAT_TELEMETRY_LEVEL=disabled`. All variables are in [Environment variables](/docs/admin/operations/environment-variables).
 
-For GitHub, nothing else goes into `.env`: you create the App from the console in step 4. For GitLab, add the application and the bot user now.
+For GitHub, nothing else goes into `.env`: you create the App from the console in step 3. For GitLab, add the application and the bot user now.
 
 #### GitLab
 
@@ -170,7 +168,7 @@ GITLAB_ACCESS_TOKEN=<access token>
 
 When `GITLAB_APP_ID` is set, the other two are required. Each GitLab group gets its own access token and webhook secret later, when you connect it in the console. On self-managed GitLab, see [Self-managed GitLab](/docs/admin/self-hosting/orchestration#self-managed-gitlab) for the two URL variables that the wizard does not write, and the CI template to mirror.
 
-### 3. Restart
+### 2. Restart
 
 Restart, and follow the server log:
 
@@ -181,7 +179,7 @@ docker compose logs -f server
 
 Orchestration migrates the `terrateam` database at start. If Orchestration does not start, the log gives the cause. A missing GitLab variable logs a `CONFIG : ERROR` line that names it.
 
-### 4. Create the GitHub App
+### 3. Create the GitHub App
 
 Sign in to the console as the instance admin, and open **Get Started > Set up your first repository > Connect GitHub**. The first step is **Create**:
 

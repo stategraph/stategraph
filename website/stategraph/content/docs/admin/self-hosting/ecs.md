@@ -246,7 +246,7 @@ At the first start, Stategraph loads the price book into `cloud_pricing` in the 
 
 ## Enable Orchestration
 
-Stategraph Orchestration is off by default. To turn it on, add `STATEGRAPH_ORCHESTRATION_ENABLED=true` to the server container environment, with the Orchestration public URLs. Keep each GitHub App or GitLab credential in Secrets Manager. For GitLab, these are `GITLAB_APP_ID`, `GITLAB_APP_SECRET`, `GITLAB_ACCESS_TOKEN`, and `STATEGRAPH_FDW_PROVISIONER_PASSWORD`.
+Stategraph Orchestration is off by default. To turn it on, add `STATEGRAPH_ORCHESTRATION_ENABLED=true` and `STATEGRAPH_FDW_PASSWORD` to the server container environment, with the Orchestration public URLs. Keep the FDW password and each GitHub App or GitLab credential in Secrets Manager. For GitLab, these are `GITLAB_APP_ID`, `GITLAB_APP_SECRET`, `GITLAB_ACCESS_TOKEN`, and `STATEGRAPH_FDW_PROVISIONER_PASSWORD`.
 
 Orchestration needs a second database, `terrateam`, on the RDS instance. The `stategraph` database reads it through `postgres_fdw`, which on Amazon RDS needs the `rds_superuser` role for the database user. [Enable Orchestration](/docs/admin/self-hosting/orchestration) lists the variables and the database steps.
 
