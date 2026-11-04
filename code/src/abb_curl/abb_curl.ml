@@ -808,7 +808,7 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
                    else (
                      process_finished t;
                      trigger_out_events t)));
-            ignore (Curl.Multi.action_timeout t.mt);
+            ignore (Curl.Multi.action_timeout' t.mt);
             ignore (Luv.Loop.run ~loop:t.loop ());
             ignore (Luv.Loop.close t.loop)
 
@@ -857,7 +857,7 @@ module Make (Abb : Abb_intf.S with type Native.t = Unix.file_descr) = struct
               ignore (Luv.Timer.stop t.timer);
               ignore
                 (Luv.Timer.start t.timer timeout_ms (fun () ->
-                     Curl.Multi.action_timeout t.mt;
+                     ignore (Curl.Multi.action_timeout' t.mt);
                      process_finished t;
                      trigger_out_events t)));
         ignore (Domain.spawn (fun () -> run_loop_domain t));
