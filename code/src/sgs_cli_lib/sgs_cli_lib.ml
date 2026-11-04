@@ -219,7 +219,23 @@ Set STATEGRAPH_ORCHESTRATION_ENABLED=false to stop trying, or fix: %s|}
         bt_opt;
       assert false
 
-let server ~services ~orchestration_services () = server' ~services ~orchestration_services
+(* Planning a large configuration allocates heavily and keeps little of it: on a reconstruction of a
+   customer configuration (220 calls of one module, 2.9MB of state) the live heap stays near 200MB
+   while resident memory peaks near 900MB at the default [space_overhead] of 120, the rest being
+   garbage the major GC has not reclaimed yet. A lower [space_overhead] makes it collect sooner:
+   measured on that configuration, 80 brings the peak to ~710MB (20% reduction) and
+   40 to ~650MB (25% reduction), with no measurable change in the server's CPU time or the plan's duration.
+
+   Set here rather than left to OCAMLRUNPARAM so every server gets it, the server image setting
+   OCAMLRUNPARAM=b for backtraces included, and skipped when OCAMLRUNPARAM sets [o] itself. *)
+let server ~services ~orchestration_services () =
+  let sets_space_overhead =
+    CCOption.exists
+      (fun param -> CCList.exists (CCString.prefix ~pre:"o=") (CCString.split_on_char ',' param))
+      (Sys.getenv_opt "OCAMLRUNPARAM")
+  in
+  if not sets_space_overhead then Gc.set { (Gc.get ()) with Gc.space_overhead = 40 };
+  server' ~services ~orchestration_services
 
 (* An orchestration step of [migrate]. Its failure stops the migration only when orchestration was
    asked for explicitly. Otherwise the step logs the failure, and the deployment runs without

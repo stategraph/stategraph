@@ -1,0 +1,14 @@
+-- Second logical database for the orchestration engine (terrat), created at
+-- first boot alongside POSTGRES_DB (stategraph). Runs as POSTGRES_USER, so
+-- ownership matches the role both servers connect as -- on PG15+ a
+-- differently-owned database would fail terrat's migrations on the public
+-- schema.
+--
+-- initdb scripts run on FIRST boot of a fresh volume only. An existing
+-- volume needs the one-liner by hand (or a volume reset):
+--   CREATE DATABASE terrateam;
+-- `stategraph-server migrate` also creates it at boot when its role has
+-- CREATEDB, so this script is belt and braces for the compose topology.
+-- The name is fixed here; a non-default TERRAT_DB_NAME relies on the
+-- create-at-boot path of `stategraph-server migrate`.
+CREATE DATABASE terrateam;

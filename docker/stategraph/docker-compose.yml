@@ -1,0 +1,122 @@
+services:
+  db:
+    image: postgres:17-alpine
+    user: postgres
+    environment:
+      POSTGRES_PASSWORD: "stategraph"
+      POSTGRES_USER: "stategraph"
+      POSTGRES_DB: "stategraph"
+    healthcheck:
+      # Probe TCP (-h localhost) not the unix socket. The postgres image
+      # runs a temporary unix-socket-only postgres for init scripts, then
+      # restarts as the final TCP listener. A unix-socket probe returns
+      # ready during the temp phase and races the restart.
+      test: ["CMD", "pg_isready", "-h", "localhost", "-p", "5432", "-d", "stategraph", "-U", "stategraph"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - db:/var/lib/postgresql/data/
+      # First-boot creation of the terrateam logical database (orchestration
+      # engine). First boot of a fresh volume only -- see initdb/*.sql.
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    networks:
+      - stategraph
+
+  server:
+    # OSS users: set STATEGRAPH_IMAGE=ghcr.io/stategraph/stategraph-server-oss:latest
+    image: ${STATEGRAPH_IMAGE:-ghcr.io/stategraph/stategraph-server:latest}
+    env_file:
+      - path: orchestration.env
+      - path: ../../.env
+        required: false
+    environment:
+      # Database configuration
+      DB_HOST: "db"
+      DB_PORT: "5432"
+      DB_USER: "stategraph"
+      DB_PASS: "stategraph"
+      DB_NAME: "stategraph"
+
+      # Server configuration
+      STATEGRAPH_ACCESS_LOG: "${STATEGRAPH_ACCESS_LOG:-off}"
+      STATEGRAPH_CLIENT_MAX_BODY_SIZE: "${STATEGRAPH_CLIENT_MAX_BODY_SIZE:-512m}"
+      DISABLE_IPV6: "${DISABLE_IPV6:-0}"
+
+      # STATEGRAPH_UI_BASE and STATEGRAPH_OAUTH_REDIRECT_BASE come from .env file
+      # These must be set to your public URL (e.g., https://stategraph.example.com)
+      # For local testing: http://localhost:8080
+
+      # Cost estimation (off by default).  To enable it, set
+      # STATEGRAPH_COST_ENABLED=true in your .env; it lives in your deployment
+      # config, so it survives container recreation (redeploy, host reboot).
+      # The in-image pricing service then starts automatically, loads the
+      # Infracost price book into the cloud_pricing database on first boot, and
+      # refreshes it weekly.  See https://stategraph.com/docs/cost/setup.
+      STATEGRAPH_COST_ENABLED: "${STATEGRAPH_COST_ENABLED:-}"
+      # Point at an external pricing service instead of the bundled one
+      # (defaults to http://localhost:8090 inside the container).
+      STATEGRAPH_PRICING_SERVICE_URL: "${STATEGRAPH_PRICING_SERVICE_URL:-}"
+      # Override the weekly (168h) price-book refresh cadence if desired.
+      PRICING_REFRESH_HOURS: "${PRICING_REFRESH_HOURS:-}"
+
+      # Security scanning (off by default).  To enable it, set
+      # STATEGRAPH_SECURITY=true in your .env.
+      STATEGRAPH_SECURITY: "${STATEGRAPH_SECURITY:-}"
+
+      # Orchestration (terrat's services) is ON: orchestration.env (env_file
+      # above) sets STATEGRAPH_ORCHESTRATION_ENABLED=true, so a failure to
+      # start it stops the server, and carries the FDW role passwords that
+      # initdb/ creates; the console then offers to create the GitHub App.
+      # Set STATEGRAPH_ORCHESTRATION_ENABLED=false in the repo-root .env
+      # to turn it off; TERRAT_*/GITHUB_* there are overrides -- see README.md
+      # "Running with orchestration". Deliberately NOT mirrored into this
+      # environment block: `environment:` outranks env_file, and `${VAR:-}`
+      # interpolates against the shell/project-dir env (NOT env_file), so
+      # mirroring would clobber every .env value with "". TERRAT_DB_* need no
+      # wiring either way: the stategraph server defaults them to the DB_* values
+      # above with database name "terrateam", which this compose's Postgres
+      # creates at first boot (initdb/).
+
+      # The PRICING_DB_* overrides below are only needed when the pricing
+      # database lives on a different host than the main stategraph DB.
+      # Defaults (db:5432 / stategraph / cloud_pricing) match this compose
+      # file's `db` service.
+      PRICING_DB_HOST: "${PRICING_DB_HOST:-}"
+      PRICING_DB_PORT: "${PRICING_DB_PORT:-5432}"
+      PRICING_DB_USER: "${PRICING_DB_USER:-stategraph}"
+      PRICING_DB_PASSWORD: "${PRICING_DB_PASSWORD:-stategraph}"
+      PRICING_DB_NAME: "${PRICING_DB_NAME:-cloud_pricing}"
+
+      # OAuth2 configuration is loaded from .env file (env_file above)
+      # Required variables for OAuth:
+      #   STATEGRAPH_OAUTH_TYPE: "google" or "oidc"
+      #   STATEGRAPH_OAUTH_CLIENT_ID: OAuth client ID
+      #   STATEGRAPH_OAUTH_CLIENT_SECRET: OAuth client secret
+      # Optional:
+      #   STATEGRAPH_OAUTH_DISPLAY_NAME: Login button text (default: "Login")
+      #   STATEGRAPH_OAUTH_EMAIL_DOMAIN: Restrict to domain (default: "*")
+      #   STATEGRAPH_OAUTH_REDIRECT_BASE: Override callback URL base
+      # Google-specific:
+      #   STATEGRAPH_OAUTH_GOOGLE_GROUP, STATEGRAPH_OAUTH_GOOGLE_ADMIN_EMAIL,
+      #   STATEGRAPH_OAUTH_GOOGLE_SERVICE_ACCOUNT_JSON
+      # OIDC-specific:
+      #   STATEGRAPH_OAUTH_OIDC_ISSUER_URL
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - stategraph
+
+networks:
+  stategraph:
+
+volumes:
+  db:
