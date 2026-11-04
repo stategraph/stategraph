@@ -51,6 +51,32 @@ module Menhir : PARSER = struct
       | '\r' -> s
       | _ -> s ^ "\n"
 
+  (* The lexbuf of a source. Valid UTF-8 is decoded up front into an array sized to its own code
+     point count; [Sedlexing.Utf8.from_string] would fill a 512 code point buffer instead, too
+     large for the minor heap, so even a short parse would allocate in the major heap, and a long source
+     grows the buffer by doubling.
+
+     Invalid UTF-8 keeps that incremental reader, which raises
+     [Sedlexing.MalFormed] at the offending byte, as the error positions expect. *)
+  let lexbuf_of_string s =
+    if CCString.is_valid_utf_8 s then (
+      let len = CCString.length s in
+      let rec count i n =
+        if i >= len then n
+        else count (i + Uchar.utf_decode_length (CCString.get_utf_8_uchar s i)) (n + 1)
+      in
+      (* Precise memory allocation *)
+      let a = Array.make (count 0 0) Uchar.min in
+      let rec fill i k =
+        if i < len then (
+          let d = String.get_utf_8_uchar s i in
+          a.(k) <- Uchar.utf_decode_uchar d;
+          fill (i + Uchar.utf_decode_length d) (k + 1))
+      in
+      fill 0 0;
+      Sedlexing.from_uchar_array ~bytes_per_char:Uchar.utf_8_byte_length a)
+    else Sedlexing.Utf8.from_string s
+
   let state checkpoint =
     let module I = Hcl_parser.MenhirInterpreter in
     I.current_state_number checkpoint
@@ -86,7 +112,7 @@ module Menhir : PARSER = struct
      non-significant, matching how the shim's parser treats interpolation
      bodies. *)
   let parse_expr_string s =
-    let lexbuf = Sedlexing.Utf8.from_string (with_trailing_newline (Hcl_ast_utf8.sanitize s)) in
+    let lexbuf = lexbuf_of_string (with_trailing_newline (Hcl_ast_utf8.sanitize s)) in
     let lexer = Sedlexing.with_tokenizer Hcl_lexer.token lexbuf in
     match
       loop
@@ -107,7 +133,7 @@ module Menhir : PARSER = struct
     (* Guarantee there is a new line at the end of the file.  The HCL spec
        requires a new line after a block but looks like it will accept
        files that do not have a new line. *)
-    let lexbuf = Sedlexing.Utf8.from_string (with_trailing_newline (Hcl_ast_utf8.sanitize s)) in
+    let lexbuf = lexbuf_of_string (with_trailing_newline (Hcl_ast_utf8.sanitize s)) in
     let lexer = Sedlexing.with_tokenizer Hcl_lexer.token lexbuf in
     let get_lexing_position () = Sedlexing.lexing_positions lexbuf |> snd in
     let to_pos () =
@@ -145,7 +171,7 @@ module Menhir : PARSER = struct
         Error (`Error (Some hcl_pos, s, "Invalid UTF-8 encoding"))
 
   let of_expr_string s =
-    let lexbuf = Sedlexing.Utf8.from_string (with_trailing_newline (Hcl_ast_utf8.sanitize s)) in
+    let lexbuf = lexbuf_of_string (with_trailing_newline (Hcl_ast_utf8.sanitize s)) in
     let lexer = Sedlexing.with_tokenizer Hcl_lexer.token lexbuf in
     let to_pos () =
       let _, pos = Sedlexing.lexing_positions lexbuf in
