@@ -609,6 +609,11 @@ module Make (S : Terrat_vcs_provider2.S) = struct
 
   let iter_job : unit Key.t = Hmap.Key.create "iter_job"
   let eval_work_manifest_failure : unit Key.t = Hmap.Key.create "eval_work_manifest_failure"
+
+  (* The dispatcher of a failed action run asks for the release of the work the
+     node still owes.  It is a task, so it runs inside the transaction of the
+     caller and shares its holds. *)
+  let release_compute_node_work : unit Key.t = Hmap.Key.create "release_compute_node_work"
   let eval_push_event : unit Key.t = Hmap.Key.create "eval_push_event"
   let run_missing_drift_schedules : int Key.t = Hmap.Key.create "run_missing_drift_schedules"
 end

@@ -6,6 +6,9 @@ module Ui : sig
     Terrat_vcs_api_github.Account.t ->
     string
 
+  (** The page of the console of [brand] that shows the plan of an installation. *)
+  val subscription_url : brand:Terrat_brand.t -> Terrat_vcs_api_github.Config.t -> Uri.t
+
   val work_manifest_url :
     brand:Terrat_brand.t ->
     Terrat_vcs_api_github.Config.t ->

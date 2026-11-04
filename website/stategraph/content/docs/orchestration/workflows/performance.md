@@ -342,16 +342,16 @@ batch_runs:
   max_workspaces_per_batch: 50
 ```
 
-With `batch_runs` enabled, workspaces beyond `max_workspaces_per_batch` go into more runs.
+With `batch_runs` enabled, workspaces beyond `max_workspaces_per_batch` go into more work manifests.
 
-!!! warning "No concurrency cap"
-    Orchestration does not limit how many CI runs it starts at the same time. A change to 100 workspaces with `max_workspaces_per_batch: 1` starts 100 jobs at once. Each job is a separate container with its own filesystem, so each one downloads its own providers. Set `max_workspaces_per_batch` high enough that each batch is worth its own setup.
+!!! note "Concurrency"
+    Orchestration limits the runs of one operation with `work_manifests.concurrent_runs`, which is `10` by default. A change to 100 workspaces with `max_workspaces_per_batch: 1` makes 100 work manifests, and with the default `max_work_manifests_per_node: 9` they take `ceil(100 / 9) = 12` runs — so the `concurrent_runs` default of `10` binds first, and the operation runs `10` at a time until they are done. Each run is a separate container with its own filesystem, so each one downloads its own providers. Set `max_workspaces_per_batch` high enough that each work manifest is worth its own setup.
 
 See [batch_runs](/docs/reference/orchestration/configuration/batch-runs).
 
 ### `merge_steps`
 
-`max_workspaces_per_batch` splits an operation into more runs. `merge_steps` puts the steps of one operation into fewer runs, because each extra run pays for its own checkout, provider download, and queue wait.
+`max_workspaces_per_batch` splits an operation into more work manifests. `merge_steps` puts the steps of one operation into fewer runs, because each extra run pays for its own checkout, provider download, and queue wait.
 
 ```yaml
 batch_runs:
@@ -365,14 +365,14 @@ batch_runs:
 | `none` | Nothing joins. Every step gets its own run. |
 | `setup` | Tree builder, config builder, and the indexer. The default. |
 | `setup_and_plan` | The above, plus a plan. |
-| `all` | The above, plus an apply, so a stack of layers can share one run. |
+| `all` | The above, plus an apply, so a stack of layers can share one run while the job's work manifests fit `max_work_manifests_per_node`. |
 | `by_phase` | Everything, but setup work (tree builder, config builder, indexer) and layer work (plan and apply) never share a run. |
 
-Joining is best effort. A step joins a run only when the run has the same environment, the same `runs_on`, and the same checked-out ref, and when `max_workspaces_per_batch` still holds for the whole run. A step that cannot join gets its own run. So a higher `merge_steps` never breaks an operation. At worst, it saves no run.
+Joining is best effort. A step joins a run only when the run is still queued or starting, when it has the same environment, the same `runs_on`, and the same head commit, and when it has been given fewer work manifests than `max_work_manifests_per_node`. A step that cannot join gets its own run. So a higher `merge_steps` never breaks an operation. At worst, it saves no run.
 
 Two rules to know:
 
-- `enabled` does not gate `merge_steps`. `enabled` gates only `max_workspaces_per_batch`, so `merge_steps` applies also with `batch_runs` off.
+- `enabled` does not gate `merge_steps` or `max_work_manifests_per_node`. `enabled` gates only `max_workspaces_per_batch`, so both apply also with `batch_runs` off.
 - Orchestration reads `merge_steps` from the config file in the repository, never from a generated config. The tree builder, config builder, and indexer run before a generated config exists, so a config builder cannot set it.
 
 When to use each value:

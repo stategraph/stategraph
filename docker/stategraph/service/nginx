@@ -41,6 +41,15 @@ else
     export STATEGRAPH_GTM_SUB_FILTER=""
 fi
 
+# Stripe pricing table of the Plan section in the console settings. Only in
+# COMMUNISM mode, and only when both values are set. The console reads them
+# from the document head.
+if [ "$STATEGRAPH_MODE" = "COMMUNISM" ] && [ -n "${TERRATEAM_UI_STRIPE_PUBLISHABLE_KEY:-}" ] && [ -n "${TERRATEAM_UI_STRIPE_PRICING_TABLE_ID:-}" ]; then
+    export STATEGRAPH_BILLING_SUB_FILTER="sub_filter '</head>' '<meta name=\"stategraph-stripe-publishable-key\" content=\"${TERRATEAM_UI_STRIPE_PUBLISHABLE_KEY}\"><meta name=\"stategraph-stripe-pricing-table-id\" content=\"${TERRATEAM_UI_STRIPE_PRICING_TABLE_ID}\"></head>';"
+else
+    export STATEGRAPH_BILLING_SUB_FILTER=""
+fi
+
 # Orchestration engine routes: the stategraph server serves terrat's routes at
 # their NATIVE paths -- the same /api/github/v1/events etc. as the standalone
 # terrat image, so webhook URLs do not change when migrating to the unified
@@ -274,5 +283,5 @@ export STATEGRAPH_IRIS_SERVER
 export NGINX_WORKER_SHUTDOWN_TIMEOUT="${NGINX_WORKER_SHUTDOWN_TIMEOUT:-35}"
 
 mkdir -p /run/nginx
-envsubst '$NGINX_WORKER_SHUTDOWN_TIMEOUT $STATEGRAPH_UI_BASE $IPV6_LISTEN $STATEGRAPH_ACCESS_LOG $STATEGRAPH_CLIENT_MAX_BODY_SIZE $STATEGRAPH_GTM_SUB_FILTER $STATEGRAPH_GITHUB_WEB_BASE $STATEGRAPH_TERRAT_ROUTES $STATEGRAPH_IRIS_SERVER' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
+envsubst '$NGINX_WORKER_SHUTDOWN_TIMEOUT $STATEGRAPH_UI_BASE $IPV6_LISTEN $STATEGRAPH_ACCESS_LOG $STATEGRAPH_CLIENT_MAX_BODY_SIZE $STATEGRAPH_GTM_SUB_FILTER $STATEGRAPH_BILLING_SUB_FILTER $STATEGRAPH_GITHUB_WEB_BASE $STATEGRAPH_TERRAT_ROUTES $STATEGRAPH_IRIS_SERVER' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
 exec /usr/sbin/nginx -c /etc/nginx/nginx.conf

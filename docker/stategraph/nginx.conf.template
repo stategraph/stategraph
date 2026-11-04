@@ -140,6 +140,10 @@ http {
             # value is built by the nginx service entrypoint from STATEGRAPH_MODE.
             ${STATEGRAPH_GTM_SUB_FILTER}
 
+            # Stripe pricing table of the console settings: COMMUNISM mode only, built by the
+            # nginx service entrypoint from the TERRATEAM_UI_STRIPE_* values.
+            ${STATEGRAPH_BILLING_SUB_FILTER}
+
             # The document is the shell of a signed-in console, so it is not cacheable; the
             # hashed bundles it pulls are, above. The map keeps this off the fonts, logos and
             # favicons this same location serves.
@@ -155,7 +159,7 @@ http {
             # reporting endpoint is the next step before enforcing. Note browsers ignore
             # upgrade-insecure-requests in a report-only policy; it is carried here so the
             # string is the one that will later be enforced. See #2162.
-            add_header Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self' https://www.googletagmanager.com https://eu-assets.i.posthog.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://eu.i.posthog.com https://eu-assets.i.posthog.com; frame-src https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; form-action 'self' ${STATEGRAPH_GITHUB_WEB_BASE}; frame-ancestors 'none'; manifest-src 'self'; upgrade-insecure-requests;" always;
+            add_header Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self' https://www.googletagmanager.com https://eu-assets.i.posthog.com https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://eu.i.posthog.com https://eu-assets.i.posthog.com; frame-src https://www.googletagmanager.com https://js.stripe.com; object-src 'none'; base-uri 'self'; form-action 'self' ${STATEGRAPH_GITHUB_WEB_BASE}; frame-ancestors 'none'; manifest-src 'self'; upgrade-insecure-requests;" always;
             add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
             add_header X-Frame-Options "DENY" always;
             add_header X-Content-Type-Options "nosniff" always;

@@ -24,6 +24,10 @@ module Tjc = Terrat_job_context
 module Wm = Terrat_work_manifest3
 module We = V1.Workflows.Entry
 
+(* The hard ceiling of a node, which is also the default of
+   [batch_runs.max_work_manifests_per_node]. *)
+let max_per_node = Compute_node.max_work_manifests_per_compute_node
+
 let dsf ?environment ?runs_on ~dir ~workspace () =
   {
     Dsf.dirspace = { Terrat_dirspace.dir; workspace };
@@ -378,11 +382,11 @@ let wm ?(branch_ref = "deadbeef") ?(environment = None) ?(dirspaceflows = []) st
 
 (* A node that is going, made from the capabilities of the work manifest it was
    made for.  [Starting] is the one state that can take more work. *)
-let node ?(max_workspaces = None) work_manifest =
+let node work_manifest =
   {
     Tjc.Compute_node.id = Uuidm.nil;
     state = Tjc.Compute_node.State.Starting;
-    capabilities = Compute_node.capabilities_of ~max_workspaces work_manifest;
+    capabilities = Compute_node.capabilities_of work_manifest;
     created_at = "";
     updated_at = "";
   }
@@ -396,7 +400,7 @@ let test_capabilities_of_writes_the_phase =
       CCList.iter
         (fun (steps, expected) ->
           let { Tjc.Compute_node.Capabilities.merge_phase; _ } =
-            Compute_node.capabilities_of ~max_workspaces:None (wm steps)
+            Compute_node.capabilities_of (wm steps)
           in
           Oth.Assert.true_
             ~fail_msg:(CCString.concat "," (CCList.map Step.to_string steps))
@@ -428,7 +432,12 @@ let test_can_run_reads_the_phase_of_the_node =
           Oth.Assert.true_
             ~fail_msg:
               (Ms.show merge_steps ^ " " ^ CCString.concat "," (CCList.map Step.to_string steps))
-            (Compute_node.can_run ~merge_steps ~max_workspaces:None node (wm steps) = expected))
+            (Compute_node.can_run
+               ~merge_steps
+               ~max_work_manifests_per_node:max_per_node
+               node
+               (wm steps)
+            = expected))
         [
           (Ms.By_phase, setup_node, [ Step.Build_config ], true);
           (Ms.By_phase, setup_node, [ Step.Index ], true);
@@ -454,7 +463,7 @@ let test_by_phase_keeps_the_other_tests =
         ~fail_msg:"a plan of the same phase and the same ref joins"
         (Compute_node.can_run
            ~merge_steps:Ms.By_phase
-           ~max_workspaces:None
+           ~max_work_manifests_per_node:max_per_node
            layer_node
            (wm [ Step.Plan ]));
       Oth.Assert.true_
@@ -462,7 +471,7 @@ let test_by_phase_keeps_the_other_tests =
         (not
            (Compute_node.can_run
               ~merge_steps:Ms.By_phase
-              ~max_workspaces:None
+              ~max_work_manifests_per_node:max_per_node
               layer_node
               (wm ~branch_ref:"cafebabe" [ Step.Plan ])));
       Oth.Assert.true_
@@ -470,17 +479,132 @@ let test_by_phase_keeps_the_other_tests =
         (not
            (Compute_node.can_run
               ~merge_steps:Ms.By_phase
-              ~max_workspaces:None
+              ~max_work_manifests_per_node:max_per_node
               layer_node
               (wm ~environment:(Some "production") [ Step.Plan ])));
       Oth.Assert.true_
-        ~fail_msg:"a node that is not Starting takes nothing"
+        ~fail_msg:"a Running node takes no more work"
         (not
            (Compute_node.can_run
               ~merge_steps:Ms.By_phase
-              ~max_workspaces:None
+              ~max_work_manifests_per_node:max_per_node
               { layer_node with Tjc.Compute_node.state = Tjc.Compute_node.State.Running }
               (wm [ Step.Plan ])));
+      ())
+
+(* The even spread of one creation call.  Ten work manifests with a cap of nine
+   make two nodes of five, not nine and one: a node of nine and one makes the last
+   work manifest wait for a whole run of its own. *)
+let test_spread_over_nodes_is_even =
+  Oth.test ~name:"compute_node: spread_over_nodes is even" (fun _ ->
+      let sizes ~max_per_node count =
+        Compute_node.spread_over_nodes ~max_per_node (CCList.init count CCInt.to_string)
+        |> CCList.map CCList.length
+      in
+      CCList.iter
+        (fun (max_per_node, count, expected) ->
+          Oth.Assert.eq
+            ~eq:(CCList.equal CCInt.equal)
+            ~pp:(CCList.pp CCInt.pp)
+            expected
+            (sizes ~max_per_node count))
+        [
+          (9, 10, [ 5; 5 ]);
+          (9, 19, [ 7; 6; 6 ]);
+          (1, 3, [ 1; 1; 1 ]);
+          (9, 5, [ 5 ]);
+          (9, 100, [ 9; 9; 9; 9; 8; 8; 8; 8; 8; 8; 8; 8 ]);
+        ];
+      ())
+
+(* The cap is the hard ceiling and the list is never split above it, and no work
+   manifest is lost or repeated.  A cap below one is clamped, because the schema
+   rejects it but a configuration built in memory can hold it. *)
+let test_spread_over_nodes_holds_the_cap =
+  Oth.test ~name:"compute_node: spread_over_nodes never splits above the cap" (fun _ ->
+      CCList.iter
+        (fun (max_per_node, count) ->
+          let groups =
+            Compute_node.spread_over_nodes ~max_per_node (CCList.init count CCInt.to_string)
+          in
+          let cap =
+            CCInt.max 1 (CCInt.min max_per_node Compute_node.max_work_manifests_per_compute_node)
+          in
+          CCList.iter
+            (fun group ->
+              Oth.Assert.true_
+                ~fail_msg:
+                  (Printf.sprintf "a group of %d is above the cap of %d" (CCList.length group) cap)
+                (CCList.length group <= cap))
+            groups;
+          Oth.Assert.eq
+            ~eq:CCInt.equal
+            ~pp:CCInt.pp
+            count
+            (CCList.fold_left (fun n group -> n + CCList.length group) 0 groups))
+        [ (9, 10); (9, 0); (1, 5); (0, 5); (100, 20); (3, 7) ];
+      ())
+
+(* A node the server has just made is [Queued], and it must take the rest of the
+   work of the call that made it.  A [Running] node takes nothing: its result
+   evaluation forks, and it gives its next layer a node of its own. *)
+let test_can_run_admits_a_queued_node =
+  Oth.test ~name:"compute_node: can_run admits a queued node and refuses a running one" (fun _ ->
+      let node_in state = { (node (wm [ Step.Build_tree ])) with Tjc.Compute_node.state } in
+      let open Tjc.Compute_node.State in
+      CCList.iter
+        (fun (name, state, expected) ->
+          Oth.Assert.true_
+            ~fail_msg:name
+            (Compute_node.can_run
+               ~merge_steps:Ms.Setup
+               ~max_work_manifests_per_node:max_per_node
+               (node_in state)
+               (wm [ Step.Build_config ])
+            = expected))
+        [
+          ("queued", Queued, true);
+          ("starting", Starting, true);
+          ("running", Running, false);
+          ("terminated", Terminated, false);
+        ];
+      ())
+
+(* The cap bounds the node: a node that has performed its cap takes nothing more,
+   whatever state it is in.  The clamp holds at both ends. *)
+let test_can_run_holds_the_cap =
+  Oth.test ~name:"compute_node: can_run holds the configured cap" (fun _ ->
+      let node_with ~used =
+        let n = node (wm [ Step.Build_tree ]) in
+        {
+          n with
+          Tjc.Compute_node.capabilities =
+            {
+              n.Tjc.Compute_node.capabilities with
+              Tjc.Compute_node.Capabilities.used_work_manifests = used;
+            };
+        }
+      in
+      CCList.iter
+        (fun (max_per_node, used, expected) ->
+          Oth.Assert.true_
+            ~fail_msg:(Printf.sprintf "cap %d, used %d" max_per_node used)
+            (Compute_node.can_run
+               ~merge_steps:Ms.Setup
+               ~max_work_manifests_per_node:max_per_node
+               (node_with ~used)
+               (wm [ Step.Build_config ])
+            = expected))
+        [
+          (9, 0, true);
+          (9, 8, true);
+          (9, 9, false);
+          (3, 2, true);
+          (3, 3, false);
+          (0, 0, true);
+          (0, 1, false);
+          (100, 9, false);
+        ];
       ())
 
 let test =
@@ -503,6 +627,10 @@ let test =
       test_capabilities_of_writes_the_phase;
       test_can_run_reads_the_phase_of_the_node;
       test_by_phase_keeps_the_other_tests;
+      test_spread_over_nodes_is_even;
+      test_spread_over_nodes_holds_the_cap;
+      test_can_run_admits_a_queued_node;
+      test_can_run_holds_the_cap;
     ]
 
 let () =

@@ -235,9 +235,25 @@ struct
     let publish_comment =
       run ~name:"publish_comment" (fun _ _ -> Abbs_fc.return_ok (fun _ -> Abbs_fc.return_ok ()))
 
-    let create_commit_checks =
-      run ~name:"create_commit_checks" (fun _ _ ->
-          Abbs_fc.return_ok (fun _ _ -> Abbs_fc.return_ok ()))
+    (* The branch flow publishes the setup checks: a push that does the work must say so.  The
+       plan and apply checks keep their own gate ([status_checks_enabled]), so the writer itself
+       stays generic. *)
+    let commit_checks =
+      run ~name:"commit_checks" (fun s { Bs.Fetcher.fetch } ->
+          let open Irm in
+          fetch Keys.client
+          >>= fun client ->
+          fetch Keys.repo
+          >>= fun repo ->
+          fetch Keys.branch_ref
+          >>= fun branch_ref ->
+          Logs.info (fun m ->
+              m
+                "%s : FETCH_COMMIT_CHECKS : repo = %s : branch = %s"
+                (Builder.log_id s)
+                (S.Api.Repo.to_string repo)
+                (S.Api.Ref.to_string branch_ref));
+          S.Api.fetch_commit_checks ~request_id:(Builder.log_id s) client repo branch_ref)
 
     let access_control_eval_apply =
       run ~name:"access_control_eval_apply" (fun _ { Bs.Fetcher.fetch } ->
@@ -292,8 +308,8 @@ struct
     |> Hmap.add
          (coerce Keys.check_conflicting_apply_work_manifests)
          Tasks.check_conflicting_apply_work_manifests
-    |> Hmap.add (coerce Keys.create_commit_checks) Tasks.create_commit_checks
-    |> Hmap.add (coerce Keys.create_commit_checks) Tasks.create_commit_checks
+    |> Hmap.add (coerce Keys.commit_checks) Tasks.commit_checks
+    |> Hmap.add (coerce Keys.create_commit_checks) Tasks_base.create_commit_checks
     |> Hmap.add (coerce Keys.dest_branch_name) Tasks.dest_branch_name
     |> Hmap.add (coerce Keys.dest_branch_ref) Tasks.dest_branch_ref
     |> Hmap.add (coerce Keys.is_draft_pr) Tasks.is_draft_pr

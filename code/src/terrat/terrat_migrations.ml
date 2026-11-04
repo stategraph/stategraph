@@ -348,6 +348,12 @@ let migrations =
     ("add-github-app", run_sql [%blob "migrations/2026-09-28-add-github-app.sql"]);
     ( "add-work-manifest-dispatched-at",
       run_sql [%blob "migrations/2026-10-22-add-work-manifest-dispatched-at.sql"] );
+    ( "add-job-work-manifest-work-manifest-index",
+      run_sql [%blob "migrations/2026-10-23-add-job-work-manifest-work-manifest-index.sql"] );
+    ( "add-compute-node-work-created-index",
+      run_sql [%blob "migrations/2026-10-23-add-compute-node-work-created-index.sql"] );
+    ( "drop-compute-node-work-wm-state-index",
+      run_sql [%blob "migrations/2026-10-23-drop-compute-node-work-wm-state-index.sql"] );
   ]
 
 let run config storage = Mig.run { Migrate.config; storage; tx = () } migrations

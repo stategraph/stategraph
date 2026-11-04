@@ -405,14 +405,17 @@ struct
         (Evaluator2.run_repo_tree_cleanup ~request_id:(Ouuid.to_string (Ouuid.v4 ())) ~storage ())
       >>= fun () -> Abb.Sys.sleep one_hour >>= fun () -> repo_tree_cleanup config storage
 
-    let rec stale_work_manifest_cleanup config storage =
+    let rec stale_work_manifest_cleanup config storage exec =
       let open Abb.Future.Infix_monad in
       Abbs_fc.ignore
         (Evaluator2.run_stale_work_manifest_cleanup
            ~request_id:(Ouuid.to_string (Ouuid.v4 ()))
+           ~config
            ~storage
+           ~exec
            ())
-      >>= fun () -> Abb.Sys.sleep one_hour >>= fun () -> stale_work_manifest_cleanup config storage
+      >>= fun () ->
+      Abb.Sys.sleep one_hour >>= fun () -> stale_work_manifest_cleanup config storage exec
 
     let name _ = "github"
 
@@ -438,7 +441,7 @@ struct
         <*> Abb.Future.fork (plan_cleanup config storage)
         <*> Abb.Future.fork (repo_config_cleanup config storage)
         <*> Abb.Future.fork (repo_tree_cleanup config storage)
-        <*> Abb.Future.fork (stale_work_manifest_cleanup config storage))
+        <*> Abb.Future.fork (stale_work_manifest_cleanup config storage exec))
       >>= fun ( drift,
                 flow_state_cleanup,
                 plan_cleanup,

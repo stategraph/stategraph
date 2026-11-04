@@ -168,10 +168,9 @@ struct
      one work manifest can do, and whether a node that is going can take one
      more.  They sit outside this functor so that a test can ask them without
      standing up a provider. *)
-  let workspaces_of = Compute_node.workspaces_of
   let capabilities_of = Compute_node.capabilities_of
 
-  let create_compute_node ~max_workspaces s ({ Wm.id; _ } as work_manifest) db =
+  let create_compute_node s ({ Wm.id; _ } as work_manifest) db =
     time_it
       s
       (fun m log_id time ->
@@ -180,14 +179,15 @@ struct
         let open Irm in
         S.Job_context.Compute_node.create
           ~request_id:(Builder.log_id s)
-          ~capabilities:(capabilities_of ~max_workspaces work_manifest)
+          ~capabilities:(capabilities_of work_manifest)
           db
-        >>= fun { Tjc.Compute_node.id = compute_node_id; _ } ->
+        >>= fun ({ Tjc.Compute_node.id = compute_node_id; _ } as compute_node) ->
         S.Job_context.Compute_node.add_work
           ~request_id:(Builder.log_id s)
           ~compute_node_id
           ~work_manifest:id
-          db)
+          db
+        >>| fun () -> compute_node)
 
   (* The configuration that the repository holds gives the limit.  A step that
      prepares a job runs before a built configuration exists, thus the built
@@ -197,18 +197,32 @@ struct
     let module V1 = Terrat_base_repo_config_v1 in
     (V1.batch_runs repo_config).V1.Batch_runs.merge_steps
 
+  (* The cap is read from the same configuration value as [merge_steps], and for
+     the same reason: a step that prepares a job runs before a built configuration
+     exists.  [batch_runs.enabled] does not gate it, as it does not gate
+     [merge_steps].
+
+     The configuration bounds the value between one and nine, so the answer is
+     already the cap a node may use.  The unique index
+     [compute_node_work_wm_state_idx] is gone
+     ([migrations/2026-10-23-drop-compute-node-work-wm-state-index.sql]), so a
+     node may hold several rows in the state [created]. *)
+  let max_work_manifests_per_node_of repo_config =
+    let module V1 = Terrat_base_repo_config_v1 in
+    (V1.batch_runs repo_config).V1.Batch_runs.max_work_manifests_per_node
+
   let can_run = Compute_node.can_run
 
-  (* Give a compute node a second work manifest.  Only
-     [node_that_can_take_it] may answer for this, because it is what proves the
-     node owes nothing.
+  (* Give a compute node another work manifest.  Only [node_that_can_take_it] may
+     answer for this, because it re-reads the node under its row lock and asks
+     [can_run], which is what bounds how much work a node takes.
 
      The work manifest that ran before this one leaves the state [created] on its
      own.  The [Result] branch of [run] calls [update_state_completed] for it,
      and that write fires the trigger
      [work_manifest_compute_node_work_state_trigger], which moves the row of the
      node out of [created]. *)
-  let attach_to_compute_node ~max_workspaces s compute_node ({ Wm.id; _ } as work_manifest) db =
+  let attach_to_compute_node s compute_node { Wm.id; _ } db =
     let module C = Tjc.Compute_node in
     let module Cap = C.Capabilities in
     time_it
@@ -236,10 +250,7 @@ struct
           db
           {
             compute_node.C.capabilities with
-            Cap.max_workspaces;
-            used_workspaces =
-              compute_node.C.capabilities.Cap.used_workspaces + workspaces_of work_manifest;
-            used_work_manifests = compute_node.C.capabilities.Cap.used_work_manifests + 1;
+            Cap.used_work_manifests = compute_node.C.capabilities.Cap.used_work_manifests + 1;
           })
 
   (* The compute node of this evaluation, when that node can take this work
@@ -248,43 +259,63 @@ struct
      Ask the database, and not the node in the store.  That node is a snapshot of
      the transaction that put it there.  The chain of layers evaluates the next
      layer in a transaction of its own, so the snapshot is one transaction old:
-     the node may have taken work since, and its budget may have moved.
+     the node may have taken work since, and its count may have moved.
 
-     A node owes one work manifest at a time.  The index
-     [compute_node_work_wm_state_idx] permits one row in the state [created] for
-     each node, so a second row raises a unique violation and fails the whole
-     transaction.  The read of the outstanding row is what keeps that from
-     happening.  It sees the rows of this transaction as well, so one create that
-     makes a work manifest for each batch also gives at most one of them to the
-     node. *)
-  let node_that_can_take_it ~merge_steps ~max_workspaces s compute_node work_manifest db =
+     The read takes the row lock of the node: [select_compute_node.sql] ends in
+     [for update of cn], so the count that [can_run] reads is the count of the
+     committed transaction, and two evaluations cannot both see room for one work
+     manifest.  That lock is what keeps [used_work_manifests] authoritative now
+     that [compute_node_work_wm_state_idx] is gone.  The database no longer
+     refuses a second row in the state [created] for one node, so the count in
+     [can_run] is the only bound. *)
+  let node_that_can_take_it
+      ~merge_steps
+      ~max_work_manifests_per_node
+      s
+      compute_node
+      work_manifest
+      db =
     let module C = Tjc.Compute_node in
     let open Irm in
     match compute_node with
     | Some { C.id = compute_node_id; _ } -> (
         S.Job_context.Compute_node.query ~request_id:(Builder.log_id s) ~compute_node_id db
         >>= function
-        | Some compute_node when can_run ~merge_steps ~max_workspaces compute_node work_manifest
-          -> (
-            S.Job_context.Compute_node.query_work ~request_id:(Builder.log_id s) ~compute_node_id db
-            >>| function
-            | Some _ -> None
-            | None -> Some compute_node)
+        | Some compute_node
+          when can_run ~merge_steps ~max_work_manifests_per_node compute_node work_manifest ->
+            Abbs_fc.return_ok (Some compute_node)
         | Some _ | None -> Abbs_fc.return_ok None)
     | None -> Abbs_fc.return_ok None
 
-  (* Give each new work manifest a compute node.  A work manifest joins the
-     compute node of this evaluation when that node can take it, and gets a node
-     of its own when it cannot. *)
-  let make_compute_nodes ~compute_node ~merge_steps ~max_workspaces s wms db =
+  (* Give the new work manifests of this evaluation their compute nodes.
+
+     The work of one call is spread evenly over as few nodes as the cap requires,
+     and each group fills one node.  The node of this evaluation fills the first
+     group, so a call that makes one node's worth of work keeps it on the node that
+     is already going.  Every later group fills a node that this call makes.
+
+     A group spills onto a second node when the node it fills has no room left, or
+     when [merge_steps] does not let one of its work manifests join that node.
+     [can_run] decides both, under the row lock of the node. *)
+  let make_compute_nodes ~compute_node ~merge_steps ~max_work_manifests_per_node s wms db =
     let open Irm in
-    Abbs_fc.List_result.iter
-      ~f:(fun wm ->
-        node_that_can_take_it ~merge_steps ~max_workspaces s compute_node wm db
-        >>= function
-        | Some compute_node -> attach_to_compute_node ~max_workspaces s compute_node wm db
-        | None -> create_compute_node ~max_workspaces s wm db)
-      wms
+    let fill compute_node group =
+      Abbs_fc.List_result.fold_left
+        ~f:(fun compute_node wm ->
+          node_that_can_take_it ~merge_steps ~max_work_manifests_per_node s compute_node wm db
+          >>= function
+          | Some compute_node ->
+              attach_to_compute_node s compute_node wm db >>| fun () -> Some compute_node
+          | None -> create_compute_node s wm db >>| fun compute_node -> Some compute_node)
+        ~init:compute_node
+        group
+      >>| fun _ -> ()
+    in
+    match Compute_node.spread_over_nodes ~max_per_node:max_work_manifests_per_node wms with
+    | [] -> Abbs_fc.return_ok ()
+    | first :: rest ->
+        fill compute_node first
+        >>= fun () -> Abbs_fc.List_result.iter ~f:(fun group -> fill None group) rest
 
   let update_state_completed s name work_manifest_id db =
     let open Abbs_fc.Infix_result_monad in
@@ -412,7 +443,6 @@ struct
       ~branch_ref
       ~branch
       ~create
-      ~max_workspaces
       ~initiate
       ~fail
       ~result
@@ -522,13 +552,16 @@ struct
              exists. *)
               fetch Keys.repo_config_raw'
               >>= fun (_, repo_config_raw) ->
-              (* Ask for the budget only here.  A step that prepares a job
-             runs before there is a repo config to read it from. *)
-              max_workspaces ()
-              >>= fun max_workspaces ->
               let merge_steps = merge_steps_of repo_config_raw in
+              let max_work_manifests_per_node = max_work_manifests_per_node_of repo_config_raw in
               Builder.run_db s ~f:(fun db ->
-                  make_compute_nodes ~compute_node ~merge_steps ~max_workspaces s wms db)
+                  make_compute_nodes
+                    ~compute_node
+                    ~merge_steps
+                    ~max_work_manifests_per_node
+                    s
+                    wms
+                    db)
               >>? fun () -> Error (`Suspend_eval name))
     in
     (* Decide what the slot does now from the work manifests of the job.

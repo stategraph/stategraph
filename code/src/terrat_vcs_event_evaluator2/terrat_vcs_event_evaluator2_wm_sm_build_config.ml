@@ -62,6 +62,14 @@ struct
     let branch_name = S.Api.Ref.to_string branch_name in
     if branch = branch_name then "terrateam build-config" else "terrateam build-config " ^ branch
 
+  (* A [true] answer means a build-config result succeeded for this head and config hash: the
+     only writer of the cache is the [Ok] arm of [result].  The gate is advisory, not a
+     serialization point: [stored] is an unlocked read and [create]'s insert is not serialized
+     against it, so two evaluations in different jobs can both see no stored config and each
+     create a build for one head, then both store the same JSON and both write a status.  The
+     reader keeps the newest status per title, so the duplicate is harmless but not idempotent.
+     The real remedy is a lock, e.g. [S.Db.lock_repository], or a partial unique index on the
+     cache; not made here.  TODO: make it idempotent with one of those two. *)
   let stored ~cache_ref s { Bs.Fetcher.fetch } =
     let open Irm in
     fetch Keys.account
@@ -131,6 +139,8 @@ struct
         >>= fun branch_ref ->
         fetch Keys.branch_name
         >>= fun branch_name ->
+        fetch Keys.repo
+        >>= fun repo ->
         let module Ch = Terrat_commit_check in
         let check_title = status_name ~branch ~branch_name in
         let unfinished_checks =
@@ -142,9 +152,27 @@ struct
               | _ -> None)
             commit_checks
         in
+        (* A cache hit proves the build succeeded, but not that its status landed: the write that
+           follows the store can have been discarded, which was the case while the branch flow's
+           writer was a stub.  So a cache hit with no check of the title gets the terminal status
+           made here.  A check that exists, whatever its state, is left to the completion above. *)
+        let missing =
+          if CCList.exists (fun c -> CCString.equal c.Ch.title check_title) commit_checks then []
+          else
+            [
+              S.Commit_check.make_str
+                ~config:(Builder.State.config s)
+                ~description:"Completed"
+                ~status:Ch.Status.Completed
+                ~repo
+                ~account
+                check_title;
+            ]
+        in
         fetch Keys.create_commit_checks
         >>= fun create_commit_checks ->
-        create_commit_checks' create_commit_checks branch_ref unfinished_checks >>| fun () -> []
+        create_commit_checks' create_commit_checks branch_ref (unfinished_checks @ missing)
+        >>| fun () -> []
 
   let initiate ~branch ({ Wm.id; _ } as work_manifest) s { Bs.Fetcher.fetch } =
     let open Irm in
@@ -337,8 +365,6 @@ struct
       ~branch_ref
       ~branch
       ~create:(create ~cache_ref)
-        (* A step that prepares a job has no dirspace, so it spends no budget. *)
-      ~max_workspaces:(fun () -> Abbs_fc.return_ok None)
       ~initiate:(initiate ~branch)
       ~fail:(fail ~branch)
       ~result:(result ~cache_ref ~branch_ref ~branch)

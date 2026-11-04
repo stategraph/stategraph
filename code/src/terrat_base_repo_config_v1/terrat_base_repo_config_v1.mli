@@ -405,6 +405,14 @@ module Batch_runs : sig
 
   type t = {
     enabled : bool; [@default false]
+    max_work_manifests_per_node : int; [@default 9]
+        (** How many work manifests one action run may perform. The
+            [batch_runs.max_work_manifests_per_node] key of the configuration file gives the value,
+            and the default is nine. The value must be at least 1 and at most 9, and a configuration
+            outside that range is a parse error. The server holds the upper bound whatever the
+            configuration says: the action stops after eleven turns of its loop and one of them must
+            collect [done], so a node that gave out more work would leave a work manifest on a run
+            that has gone. [enabled] does not gate this key. *)
     max_workspaces_per_batch : int; [@default 1]
     merge_steps : Merge_steps.t; [@default Merge_steps.Setup]
   }
@@ -970,6 +978,14 @@ end
 module Work_manifests : sig
   (** Limits on the work manifests of the repository. *)
   type t = {
+    concurrent_runs : int; [@default 10]
+        (** How many work manifests of one job may run at the same time (RFD 2903). The
+            [work_manifests.concurrent_runs] key of the configuration file gives the value, and the
+            default is ten. The value must be at least 1 and at most [Int32.max_int], and a
+            configuration outside that range is a parse error. The limit is for each job, so a job
+            that is at its limit does not hold back the work manifests of another job. The
+            dispatcher reads this value from the derived configuration of the repository, one read
+            for each candidate, because the dispatch statement is one global statement. *)
     start_timeout : Duration.t; [@default Duration.of_sec 180]
         (** How long a dispatched work manifest has to call home before the server treats it as
             stale and aborts it (RFD 2826). The [work_manifests.start_timeout_sec] key of the

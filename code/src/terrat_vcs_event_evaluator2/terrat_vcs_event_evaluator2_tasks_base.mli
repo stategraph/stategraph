@@ -34,6 +34,20 @@ module Make
     result
     Abb.Future.t
 
+  (** The task that publishes commit checks. The PR flow and the branch flow register the same task:
+      the body is identical for the two, and the ref that receives the checks is an argument of the
+      returned function. *)
+  val create_commit_checks :
+    Builder.Bs.key_repr list ->
+    Builder.Bs.state ->
+    Builder.Bs.Fetcher.t ->
+    ( S.Api.Ref.t ->
+      Terrat_commit_check.t list ->
+      (unit, Terrat_vcs_api.call_err) result Abb.Future.t,
+      Builder.err )
+    result
+    Abb.Future.t
+
   (** The paths whose contents differ between the stored tree of [base_ref] and the stored tree of
       the given ref, with the time of the query in the log. *)
   val query_repo_tree_changes :

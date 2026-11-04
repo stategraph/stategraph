@@ -27,6 +27,7 @@ end
 
 type t = {
   enabled : bool; [@default false]
+  max_work_manifests_per_node : int; [@default 9]
   max_workspaces_per_batch : int; [@default 1]
   merge_steps : Merge_steps.t; [@default `Setup]
 }

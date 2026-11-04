@@ -32,6 +32,12 @@ type ast = Hcl_parser_value.t list [@@deriving show]
 (** Convert an HCL AST back to its source-code string representation. *)
 val ast : ast -> string
 
+(** [escape_hcl_string s] is [s] with each HCL string-literal escape applied: a double quote, a
+    backslash, a newline, a carriage return, and a tab each gain a backslash, and the template
+    introducers [${] / [%{] are doubled, so the output re-parses to the same literal string rather
+    than being interpreted as interpolation. *)
+val escape_hcl_string : string -> string
+
 (** Convert template parts to HCL string representation (without surrounding quotes). *)
 val template : Hcl_parser_value.Template_part.t list -> string
 

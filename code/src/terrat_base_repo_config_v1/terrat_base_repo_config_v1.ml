@@ -691,6 +691,7 @@ module Batch_runs = struct
 
   type t = {
     enabled : bool; [@default false]
+    max_work_manifests_per_node : int; [@default 9]
     max_workspaces_per_batch : int; [@default 1]
     merge_steps : Merge_steps.t; [@default Merge_steps.Setup]
   }
@@ -1368,21 +1369,69 @@ module Tree_builder = struct
   [@@deriving make, show, yojson, eq]
 end
 
-(* The largest value that the configuration accepts, which is the largest interval that
-   [CCInt32.of_int] converts without wrapping.  The stale checks give the value to the database as
-   an interval. *)
-let max_config_seconds = Int32.to_int Int32.max_int
+(* The largest value that the configuration accepts, which is the largest integer that
+   [CCInt32.of_int] converts without wrapping.  The stale checks give the value to the database
+   as an interval, and a plain integer goes to the database as an int4. *)
+let max_config_int = Int32.to_int Int32.max_int
+
+(* The default of [work_manifests.concurrent_runs] (RFD 2903).  The schema and the generated
+   type carry the same ten as a literal, because the ppx of the generated type needs a literal.
+   The dispatch statement carries it in its [coalesce], and its comment points here. *)
+let default_concurrent_runs = 10
 
 (* The configuration file gives seconds. A value outside the range that the schema allows is a
-   parse error: a negative value has no meaning, and a value above [max_config_seconds] wraps when
+   parse error: a negative value has no meaning, and a value above [max_config_int] wraps when
    the server gives it to the database. *)
 let duration_of_config_seconds seconds =
-  if seconds < 1 || seconds > max_config_seconds then
-    Error (Printf.sprintf "must be between 1 and %d seconds" max_config_seconds)
+  if seconds < 1 || seconds > max_config_int then
+    Error (Printf.sprintf "must be between 1 and %d seconds" max_config_int)
   else Ok (Duration.of_sec seconds)
+
+(* [concurrent_runs] is a plain integer, and it shares the bound of the second values: a value
+   below one has no meaning, and a value above [max_config_int] wraps when the server gives it
+   to the database. *)
+let bounded_int_of_config value =
+  if value < 1 || value > max_config_int then
+    Error (Printf.sprintf "must be between 1 and %d" max_config_int)
+  else Ok value
+
+(* The largest number of work manifests that one action run may perform.  The action stops after
+   eleven turns of its loop, and one of them must collect [done], so a node that gave out more work
+   would leave a work manifest on a run that has gone.  The schema and the generated type carry the
+   same nine, because the ppx of the generated type needs a literal, and
+   [Terrat_vcs_event_evaluator2_compute_node.max_work_manifests_per_compute_node] carries it
+   because the server holds the bound whatever the configuration says. *)
+let max_work_manifests_per_node = 9
+
+(* [max_work_manifests_per_node] of the configuration is bounded at both ends: a value below one
+   would let no work manifest join a node, and a value above the bound above would leave work on a
+   run that has gone. *)
+let bounded_work_manifests_per_node value =
+  if value < 1 || value > max_work_manifests_per_node then
+    Error (Printf.sprintf "must be between 1 and %d" max_work_manifests_per_node)
+  else Ok value
+
+(* An out-of-range value never reaches here from a configuration file, because
+   [of_version_1_json] rejects it.  A version 1 configuration that is built in memory can hold one,
+   and the default applies to it. *)
+let work_manifests_per_node_or_default value =
+  match bounded_work_manifests_per_node value with
+  | Ok value -> value
+  | Error _ -> max_work_manifests_per_node
 
 module Work_manifests = struct
   type t = {
+    concurrent_runs :
+      (int
+      [@default default_concurrent_runs]
+      [@to_yojson fun concurrent_runs -> `Int concurrent_runs]
+      [@of_yojson
+        function
+        | `Int concurrent_runs -> (
+            match bounded_int_of_config concurrent_runs with
+            | Ok concurrent_runs -> Ok concurrent_runs
+            | Error err -> Error ("concurrent_runs " ^ err))
+        | _ -> Error "concurrent_runs must be an integer"]);
     start_timeout :
       (Duration.t
       [@default Duration.of_sec 180]
@@ -2470,9 +2519,17 @@ let of_version_automerge automerge =
 
 let of_version_1_batch_runs batch_runs =
   let module Br = Terrat_repo_config_batch_runs in
-  let { Br.enabled; max_workspaces_per_batch; merge_steps } = batch_runs in
+  let { Br.enabled; max_work_manifests_per_node; max_workspaces_per_batch; merge_steps } =
+    batch_runs
+  in
   let merge_steps = Batch_runs.Merge_steps.make merge_steps in
-  Ok (Batch_runs.make ~enabled ~max_workspaces_per_batch ~merge_steps ())
+  Ok
+    (Batch_runs.make
+       ~enabled
+       ~max_work_manifests_per_node:(work_manifests_per_node_or_default max_work_manifests_per_node)
+       ~max_workspaces_per_batch
+       ~merge_steps
+       ())
 
 let of_version_1_config_builder { Terrat_repo_config.Config_builder.enabled; script } =
   Ok (Config_builder.make ~enabled ?script ())
@@ -2983,15 +3040,32 @@ let of_version_1_tags tags =
    check of the JSON.  This is the schema error of such a value. *)
 let work_manifests_schema_err = function
   | None -> None
-  | Some { Terrat_repo_config.Work_manifests.start_timeout_sec; stale_timeout_sec } -> (
+  | Some { Terrat_repo_config.Work_manifests.concurrent_runs; start_timeout_sec; stale_timeout_sec }
+    -> (
       match
-        (duration_of_config_seconds start_timeout_sec, duration_of_config_seconds stale_timeout_sec)
+        ( duration_of_config_seconds start_timeout_sec,
+          duration_of_config_seconds stale_timeout_sec,
+          bounded_int_of_config concurrent_runs )
       with
-      | Ok _, Ok _ -> None
-      | Error msg, _ ->
+      | Ok _, Ok _, Ok _ -> None
+      | Error msg, _, _ ->
           Some { Jsonschema_check.Validation_err.msg; path = "work_manifests.start_timeout_sec" }
-      | _, Error msg ->
-          Some { Jsonschema_check.Validation_err.msg; path = "work_manifests.stale_timeout_sec" })
+      | _, Error msg, _ ->
+          Some { Jsonschema_check.Validation_err.msg; path = "work_manifests.stale_timeout_sec" }
+      | _, _, Error msg ->
+          Some { Jsonschema_check.Validation_err.msg; path = "work_manifests.concurrent_runs" })
+
+(* The same for [batch_runs.max_work_manifests_per_node].  The version 1 type holds a plain
+   integer, so a value that decodes never reaches the schema check of the JSON. *)
+let batch_runs_schema_err = function
+  | None -> None
+  | Some { Terrat_repo_config.Batch_runs.max_work_manifests_per_node; _ } -> (
+      match bounded_work_manifests_per_node max_work_manifests_per_node with
+      | Ok _ -> None
+      | Error msg ->
+          Some
+            { Jsonschema_check.Validation_err.msg; path = "batch_runs.max_work_manifests_per_node" }
+      )
 
 (* An out-of-range value never reaches here from a configuration file, because the JSON entry
    point rejects it.  A version 1 configuration that is built in memory can hold one, and the
@@ -3001,10 +3075,16 @@ let seconds_or_default default seconds =
   | Ok seconds -> seconds
   | Error _ -> Duration.of_sec default
 
+let concurrent_runs_or_default concurrent_runs =
+  match bounded_int_of_config concurrent_runs with
+  | Ok concurrent_runs -> concurrent_runs
+  | Error _ -> default_concurrent_runs
+
 let of_version_1_work_manifests
-    { Terrat_repo_config.Work_manifests.start_timeout_sec; stale_timeout_sec } =
+    { Terrat_repo_config.Work_manifests.concurrent_runs; start_timeout_sec; stale_timeout_sec } =
   Ok
     (Work_manifests.make
+       ~concurrent_runs:(concurrent_runs_or_default concurrent_runs)
        ~start_timeout:(seconds_or_default 180 start_timeout_sec)
        ~stale_timeout:(seconds_or_default 86400 stale_timeout_sec)
        ())
@@ -3189,9 +3269,15 @@ let of_version_1 v1 =
 let of_version_1_json json =
   match Terrat_repo_config.Version_1.of_yojson json with
   | Ok config -> (
-      match work_manifests_schema_err config.V1.work_manifests with
-      | Some err -> Error (`Repo_config_schema_err [ err ])
-      | None -> of_version_1 config)
+      match
+        ( work_manifests_schema_err config.V1.work_manifests,
+          batch_runs_schema_err config.V1.batch_runs )
+      with
+      (* Both errors are collected: each field is checked on its own, so a configuration that
+         holds two out-of-range values reports both. *)
+      | Some err, Some err' -> Error (`Repo_config_schema_err [ err; err' ])
+      | Some err, _ | _, Some err -> Error (`Repo_config_schema_err [ err ])
+      | None, None -> of_version_1 config)
   | Error err -> (
       match
         Jsonschema_check.validate_json_schema ~schema:config_schema (Yojson.Safe.to_string json)
@@ -3346,7 +3432,9 @@ let to_version_1_automerge automerge =
 let to_version_1_batch_runs batch_runs =
   let module Br = Terrat_repo_config.Batch_runs in
   let module Ms = Batch_runs.Merge_steps in
-  let { Batch_runs.enabled; max_workspaces_per_batch; merge_steps } = batch_runs in
+  let { Batch_runs.enabled; max_work_manifests_per_node; max_workspaces_per_batch; merge_steps } =
+    batch_runs
+  in
   let merge_steps =
     match merge_steps with
     | Ms.All -> `All
@@ -3355,7 +3443,7 @@ let to_version_1_batch_runs batch_runs =
     | Ms.Setup -> `Setup
     | Ms.Setup_and_plan -> `Setup_and_plan
   in
-  { Br.enabled; max_workspaces_per_batch; merge_steps }
+  { Br.enabled; max_work_manifests_per_node; max_workspaces_per_batch; merge_steps }
 
 let to_version_1_config_builder config_builder =
   let module Cb = Terrat_repo_config.Config_builder in
@@ -4033,9 +4121,10 @@ let to_version_1_gate gate =
 
 let to_version_1_work_manifests work_manifests =
   let module Wm = Terrat_repo_config.Work_manifests in
-  let { Work_manifests.start_timeout; stale_timeout } = work_manifests in
+  let { Work_manifests.concurrent_runs; start_timeout; stale_timeout } = work_manifests in
   {
-    Wm.start_timeout_sec = Duration.to_sec start_timeout;
+    Wm.concurrent_runs;
+    start_timeout_sec = Duration.to_sec start_timeout;
     stale_timeout_sec = Duration.to_sec stale_timeout;
   }
 

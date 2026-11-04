@@ -487,29 +487,6 @@ struct
           >>= fun pull_request ->
           fetch Keys.user >>| fun user -> fun msg -> publish_comment s client user pull_request msg)
 
-    let create_commit_checks =
-      run ~name:"create_commit_checks" (fun s { Bs.Fetcher.fetch } ->
-          let open Irm in
-          fetch Keys.client
-          >>= fun client ->
-          fetch Keys.pull_request
-          >>= fun _pull_request ->
-          fetch Keys.repo
-          >>| fun repo ->
-          fun branch_ref checks ->
-           (* When updating commit checks, mark the existing key as dirty. *)
-           Builder.State.mark_dirty s Keys.commit_checks;
-           let open Abbs_fc.Infix_result_monad in
-           S.Repo_config.fetch_brand ~request_id:(Builder.log_id s) client repo
-           >>= fun brand ->
-           S.Api.create_commit_checks
-             ~request_id:(Builder.log_id s)
-             ~brand
-             client
-             repo
-             branch_ref
-             checks)
-
     let commit_checks =
       run ~name:"commit_checks" (fun s { Bs.Fetcher.fetch } ->
           let open Irm in
@@ -2513,7 +2490,7 @@ struct
     |> Hmap.add (coerce Keys.check_pull_request_state) Tasks.check_pull_request_state
     |> Hmap.add (coerce Keys.comment_id) Tasks.comment_id
     |> Hmap.add (coerce Keys.commit_checks) Tasks.commit_checks
-    |> Hmap.add (coerce Keys.create_commit_checks) Tasks.create_commit_checks
+    |> Hmap.add (coerce Keys.create_commit_checks) Tasks_base.create_commit_checks
     |> Hmap.add (coerce Keys.dest_branch_name) Tasks.dest_branch_name
     |> Hmap.add (coerce Keys.dest_branch_ref) Tasks.dest_branch_ref
     |> Hmap.add (coerce Keys.eval_pull_request_event) Tasks.eval_pull_request_event

@@ -107,11 +107,6 @@ module Make
       Builder.B.State.t ->
       Builder.Bs.Fetcher.t ->
       (existing_wm list, Builder.err) result Abb.Future.t) ->
-    (* The workspaces one action run may do, which is the cap of a batch held for
-       the whole run. Asked for only when a work manifest is made, because a step
-       that prepares a job runs before there is a repo config to read it from.
-       [None] means the run has no budget. *)
-    max_workspaces:(unit -> (int option, Builder.err) result Abb.Future.t) ->
     initiate:
       (existing_wm ->
       Builder.B.State.t ->

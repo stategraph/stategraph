@@ -1234,6 +1234,100 @@ let test_batch_runs_merge_steps_by_phase_round_trip =
           | Some _ | None -> failwith "Round-trip to Version_1 did not produce by_phase")
       | Error err -> failwith ("of_version_1_json failed: " ^ V1.show_of_version_1_json_err err))
 
+(* [batch_runs.max_work_manifests_per_node] is how many work manifests one action run may perform.
+   The default is nine, which is what a node already took before the key existed: the setup steps
+   of a job share one run under the default [merge_steps] of [setup]. *)
+let test_batch_runs_max_work_manifests_per_node_default =
+  Oth.test ~name:"of_version_1_json: max_work_manifests_per_node defaults to 9" (fun _ ->
+      let cfg = config_of_json (`Assoc []) in
+      let { V1.Batch_runs.max_work_manifests_per_node; _ } = V1.batch_runs cfg in
+      Oth.Assert.eq ~eq:CCInt.equal ~pp:CCInt.pp max_work_manifests_per_node 9;
+      ())
+
+let test_batch_runs_max_work_manifests_per_node_configured =
+  Oth.test ~name:"of_version_1_json: max_work_manifests_per_node" (fun _ ->
+      let json = `Assoc [ ("batch_runs", `Assoc [ ("max_work_manifests_per_node", `Int 3) ]) ] in
+      let cfg = config_of_json json in
+      let { V1.Batch_runs.max_work_manifests_per_node; _ } = V1.batch_runs cfg in
+      Oth.Assert.eq ~eq:CCInt.equal ~pp:CCInt.pp max_work_manifests_per_node 3;
+      ())
+
+(* The key only lowers the cap.  Nine is the highest value the schema gives it, because the action
+   stops after eleven turns of its loop. *)
+let test_batch_runs_max_work_manifests_per_node_maximum =
+  Oth.test ~name:"of_version_1_json: max_work_manifests_per_node accepts 9" (fun _ ->
+      let json = `Assoc [ ("batch_runs", `Assoc [ ("max_work_manifests_per_node", `Int 9) ]) ] in
+      let cfg = config_of_json json in
+      let { V1.Batch_runs.max_work_manifests_per_node; _ } = V1.batch_runs cfg in
+      Oth.Assert.eq ~eq:CCInt.equal ~pp:CCInt.pp max_work_manifests_per_node 9;
+      ())
+
+(* A value below one would let no work manifest join a node. *)
+let test_batch_runs_max_work_manifests_per_node_below_minimum =
+  Oth.test ~name:"of_version_1_json: max_work_manifests_per_node is at least 1" (fun _ ->
+      let json = `Assoc [ ("batch_runs", `Assoc [ ("max_work_manifests_per_node", `Int 0) ]) ] in
+      match Oth.Assert.error (V1.of_version_1_json json) with
+      | `Repo_config_schema_err _ -> ()
+      | err ->
+          Oth.Assert.false_
+            (Printf.sprintf
+               "Expected max_work_manifests_per_node to be rejected, got %s"
+               (V1.show_of_version_1_json_err err)))
+
+(* A value above nine would leave a work manifest on a run that has gone.  The
+   error names the key, because a value out of range is the only way to reach it. *)
+let test_batch_runs_max_work_manifests_per_node_above_maximum =
+  Oth.test ~name:"of_version_1_json: max_work_manifests_per_node is at most 9" (fun _ ->
+      let json = `Assoc [ ("batch_runs", `Assoc [ ("max_work_manifests_per_node", `Int 10) ]) ] in
+      match Oth.Assert.error (V1.of_version_1_json json) with
+      | `Repo_config_schema_err _ as err ->
+          Oth.Assert.str_contains
+            ~haystack:(V1.show_of_version_1_json_err err)
+            ~needle:"batch_runs.max_work_manifests_per_node"
+      | err ->
+          Oth.Assert.false_
+            (Printf.sprintf
+               "Expected max_work_manifests_per_node to be rejected, got %s"
+               (V1.show_of_version_1_json_err err)))
+
+(* Both fields are checked on their own, so two out-of-range values are both reported: the error
+   payload is a list, and a projection that kept only one of them would hide the other. *)
+let test_batch_runs_and_concurrent_runs_both_out_of_range =
+  Oth.test ~name:"of_version_1_json: both schema errors are reported" (fun _ ->
+      let json =
+        `Assoc
+          [
+            ( "work_manifests",
+              `Assoc [ ("concurrent_runs", `Int 0); ("start_timeout_sec", `Int 30) ] );
+            ("batch_runs", `Assoc [ ("max_work_manifests_per_node", `Int 10) ]);
+          ]
+      in
+      match Oth.Assert.error (V1.of_version_1_json json) with
+      | `Repo_config_schema_err _ as err ->
+          let shown = V1.show_of_version_1_json_err err in
+          Oth.Assert.str_contains ~haystack:shown ~needle:"work_manifests.concurrent_runs";
+          Oth.Assert.str_contains ~haystack:shown ~needle:"batch_runs.max_work_manifests_per_node"
+      | err ->
+          Oth.Assert.false_
+            (Printf.sprintf
+               "Expected both fields to be rejected, got %s"
+               (V1.show_of_version_1_json_err err)))
+
+(* A configured value comes back out of [to_version_1].  A block that holds only the default stays
+   out of it, which the merge_steps tests above already show. *)
+let test_batch_runs_max_work_manifests_per_node_round_trip =
+  Oth.test ~name:"to_version_1: max_work_manifests_per_node round-trip" (fun _ ->
+      let json = `Assoc [ ("batch_runs", `Assoc [ ("max_work_manifests_per_node", `Int 3) ]) ] in
+      let v1 =
+        V1.to_version_1
+          (Oth.Assert.ok_show ~show:V1.show_of_version_1_json_err (V1.of_version_1_json json))
+      in
+      Oth.Assert.Eq.option
+        ~eq:Repo.Batch_runs.equal
+        ~pp:Repo.Batch_runs.pp
+        ~expected:(Some (Repo.Batch_runs.make ~max_work_manifests_per_node:3 ()))
+        ~actual:v1.Repo.Version_1.batch_runs)
+
 (* [work_manifests.start_timeout_sec] is the number of seconds a dispatched work manifest has to
    call home before the stale check aborts it (RFD 2826).  The default is 180 seconds. *)
 let test_work_manifests_start_timeout_default =
@@ -1411,6 +1505,129 @@ let test_work_manifests_default_omitted =
       Oth.Assert.none
         ~fail_msg:"a default work_manifests was written out"
         v1.Repo.Version_1.work_manifests)
+
+(* [work_manifests.concurrent_runs] is the number of work manifests that one job may run at the
+   same time (RFD 2903).  The default is ten. *)
+let test_work_manifests_concurrent_runs_default =
+  Oth.test ~name:"of_version_1_json: work_manifests.concurrent_runs defaults to 10" (fun _ ->
+      let cfg = config_of_json (`Assoc []) in
+      Oth.Assert.eq
+        ~eq:V1.Work_manifests.equal
+        ~pp:V1.Work_manifests.pp
+        (V1.work_manifests cfg)
+        (V1.Work_manifests.make
+           ~concurrent_runs:10
+           ~start_timeout:(Duration.of_sec 180)
+           ~stale_timeout:(Duration.of_day 1)
+           ());
+      ())
+
+let test_work_manifests_concurrent_runs_configured =
+  Oth.test ~name:"of_version_1_json: work_manifests.concurrent_runs" (fun _ ->
+      let json = `Assoc [ ("work_manifests", `Assoc [ ("concurrent_runs", `Int 3) ]) ] in
+      let cfg = config_of_json json in
+      Oth.Assert.eq
+        ~eq:V1.Work_manifests.equal
+        ~pp:V1.Work_manifests.pp
+        (V1.work_manifests cfg)
+        (V1.Work_manifests.make
+           ~concurrent_runs:3
+           ~start_timeout:(Duration.of_sec 180)
+           ~stale_timeout:(Duration.of_day 1)
+           ());
+      ())
+
+(* One concurrent run is the smallest value that has meaning. *)
+let test_work_manifests_concurrent_runs_minimum =
+  Oth.test ~name:"of_version_1_json: work_manifests.concurrent_runs accepts 1" (fun _ ->
+      let json = `Assoc [ ("work_manifests", `Assoc [ ("concurrent_runs", `Int 1) ]) ] in
+      let cfg = config_of_json json in
+      let { V1.Work_manifests.concurrent_runs; _ } = V1.work_manifests cfg in
+      Oth.Assert.eq ~eq:CCInt.equal ~pp:CCInt.pp concurrent_runs 1;
+      ())
+
+(* A value below one has no meaning, and a value above [Int32.max_int] wraps when the server
+   gives it to the database, so the parse rejects both. *)
+let test_work_manifests_concurrent_runs_below_minimum =
+  Oth.test ~name:"of_version_1_json: work_manifests.concurrent_runs is at least 1" (fun _ ->
+      let json = `Assoc [ ("work_manifests", `Assoc [ ("concurrent_runs", `Int 0) ]) ] in
+      match Oth.Assert.error (V1.of_version_1_json json) with
+      | `Repo_config_schema_err _ -> ()
+      | err ->
+          Oth.Assert.false_
+            (Printf.sprintf
+               "Expected concurrent_runs to be rejected, got %s"
+               (V1.show_of_version_1_json_err err)))
+
+let test_work_manifests_concurrent_runs_above_maximum =
+  Oth.test
+    ~name:"of_version_1_json: work_manifests.concurrent_runs is at most Int32.max_int"
+    (fun _ ->
+      let json =
+        `Assoc
+          [
+            ("work_manifests", `Assoc [ ("concurrent_runs", `Int (Int32.to_int Int32.max_int + 1)) ]);
+          ]
+      in
+      match Oth.Assert.error (V1.of_version_1_json json) with
+      | `Repo_config_schema_err _ -> ()
+      | err ->
+          Oth.Assert.false_
+            (Printf.sprintf
+               "Expected concurrent_runs to be rejected, got %s"
+               (V1.show_of_version_1_json_err err)))
+
+(* A configured value comes back out of [to_version_1], and the default block stays out of it. *)
+let test_work_manifests_concurrent_runs_round_trip =
+  Oth.test ~name:"to_version_1: work_manifests.concurrent_runs round-trip" (fun _ ->
+      let json = `Assoc [ ("work_manifests", `Assoc [ ("concurrent_runs", `Int 3) ]) ] in
+      let v1 =
+        V1.to_version_1
+          (Oth.Assert.ok_show ~show:V1.show_of_version_1_json_err (V1.of_version_1_json json))
+      in
+      Oth.Assert.Eq.option
+        ~eq:Repo.Work_manifests.equal
+        ~pp:Repo.Work_manifests.pp
+        ~expected:(Some (Repo.Work_manifests.make ~concurrent_runs:3 ~start_timeout_sec:180 ()))
+        ~actual:v1.Repo.Version_1.work_manifests)
+
+(* The SQL that reads work_manifests.concurrent_runs casts the value out of the derived config
+   JSON without a guard (RFD 2903).  The server writes this key, and the writer emits a JSON
+   number for it.  The repository config schema rejects a value outside the range, so a row the
+   server wrote always casts.  The two tests below pin that fact on the encoded JSON rather than
+   on the record. *)
+
+(* Walks the encoded config down to [work_manifests.concurrent_runs]. *)
+let encoded_concurrent_runs v1 =
+  Yojson.Safe.Util.member
+    "concurrent_runs"
+    (Yojson.Safe.Util.member "work_manifests" (Repo.Version_1.to_yojson v1))
+
+let test_work_manifests_concurrent_runs_to_yojson =
+  Oth.test ~name:"to_yojson: work_manifests.concurrent_runs is a JSON integer" (fun _ ->
+      let json = `Assoc [ ("work_manifests", `Assoc [ ("concurrent_runs", `Int 3) ]) ] in
+      let cfg =
+        Oth.Assert.ok_show ~show:V1.show_of_version_1_json_err (V1.of_version_1_json json)
+      in
+      Oth.Assert.eq
+        ~eq:Yojson.Safe.equal
+        ~pp:Yojson.Safe.pp
+        (`Int 3)
+        (encoded_concurrent_runs (V1.to_version_1 cfg)))
+
+(* The writer drops a block that equals its default, so a default config encodes no
+   [work_manifests] key at all. *)
+let test_work_manifests_default_absent_from_to_yojson =
+  Oth.test ~name:"to_yojson: a default config writes no work_manifests key" (fun _ ->
+      let cfg =
+        Oth.Assert.ok_show ~show:V1.show_of_version_1_json_err (V1.of_version_1_json (`Assoc []))
+      in
+      let encoded = Repo.Version_1.to_yojson (V1.to_version_1 cfg) in
+      Oth.Assert.eq
+        ~eq:Yojson.Safe.equal
+        ~pp:Yojson.Safe.pp
+        `Null
+        (Yojson.Safe.Util.member "work_manifests" encoded))
 
 (* Tests for the global [when_modified.prechecks] key (RFD 2111).  These pin the parse, the round
    trip, and the two boundaries that the evaluator relies on: a precheck glob is a repository path
@@ -1664,6 +1881,13 @@ let test =
       test_batch_runs_merge_steps_each_value;
       test_batch_runs_merge_steps_round_trip;
       test_batch_runs_merge_steps_by_phase_round_trip;
+      test_batch_runs_max_work_manifests_per_node_default;
+      test_batch_runs_max_work_manifests_per_node_configured;
+      test_batch_runs_max_work_manifests_per_node_maximum;
+      test_batch_runs_max_work_manifests_per_node_below_minimum;
+      test_batch_runs_max_work_manifests_per_node_above_maximum;
+      test_batch_runs_and_concurrent_runs_both_out_of_range;
+      test_batch_runs_max_work_manifests_per_node_round_trip;
       test_work_manifests_start_timeout_default;
       test_work_manifests_start_timeout_configured;
       test_work_manifests_start_timeout_below_minimum;
@@ -1677,6 +1901,14 @@ let test =
       test_work_manifests_stale_timeout_round_trip;
       test_work_manifests_stale_old_key_rejected;
       test_work_manifests_default_omitted;
+      test_work_manifests_concurrent_runs_default;
+      test_work_manifests_concurrent_runs_configured;
+      test_work_manifests_concurrent_runs_minimum;
+      test_work_manifests_concurrent_runs_below_minimum;
+      test_work_manifests_concurrent_runs_above_maximum;
+      test_work_manifests_concurrent_runs_round_trip;
+      test_work_manifests_concurrent_runs_to_yojson;
+      test_work_manifests_default_absent_from_to_yojson;
       test_prechecks_default_empty;
       test_prechecks_parse_all_kinds;
       test_prechecks_globs_are_repo_paths;

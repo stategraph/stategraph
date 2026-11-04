@@ -837,34 +837,69 @@ module type Shared = sig
       (unit, [> `Error ]) result Abb.Future.t
 
     (* The next work manifest to start an action run for, with the compute node
-       it belongs to.  A work manifest whose node already runs is not returned,
-       because that node picks it up on its next poll.  The node is [None] for a
-       work manifest made before the server made a node with each one. *)
+       it belongs to and the id of its job, if it has one.  The statement holds
+       the row of the work manifest it answers, so the answer is a work
+       manifest no other dispatcher owns, and the hold lasts until the
+       transaction of the caller ends.  A work manifest whose node already runs
+       is not returned, because that node picks it up on its next poll.  The
+       node and the job are [None] for a work manifest made before the server
+       made a node with each one, and attached each work manifest to its job.
+
+       [exclude_jobs] removes the candidates of those jobs from the answer
+       only.  It is a choice of candidate for one drain of the dispatcher, and
+       never a rule: the rules must see the whole queue.  The dispatcher adds
+       the job of a candidate whose claim answered nothing, which means another
+       transaction holds the row of that job. *)
     val query_next_pending_work_manifest :
       ?new_age:bool ->
+      exclude_jobs:Uuidm.t list ->
       request_id:string ->
       stategraph_parallel_applies:bool ->
       t ->
       ( (( Api.Account.t,
            (unit Api.Pull_request.t, Api.Repo.t) Target.t )
          Terrat_work_manifest3.Existing.t
+        * Uuidm.t option
         * Uuidm.t option)
         option,
         [> `Error ] )
       result
       Abb.Future.t
 
+    (* Hold the row of a job without waiting for it.  [false] is a job row
+       another transaction holds: the caller ends its transaction, excludes the
+       job from its drain, and asks for the next candidate.  [true] holds the
+       row until the transaction of the caller ends, which makes the count of
+       the running work manifests of the job true for the dispatch that
+       follows, and keeps two dispatchers from passing one free slot of the
+       job's concurrent_runs limit.  The caller must ask inside a transaction,
+       or the hold ends before the caller acts on the answer. *)
+    val claim_work_manifest_job :
+      request_id:string -> job_id:Uuidm.t -> t -> (bool, [> `Error ]) result Abb.Future.t
+
     (* Whether a work manifest may run now, by the rules the dispatcher applies:
        a plan waits for an apply that runs on its dirspaces, and two applies
        never run on one dirspace at once.  A compute node asks this before it
        takes work, because work that a node performs never reaches the
-       dispatcher. *)
+       dispatcher.
+
+       The answer is three-valued.  [`No] is a rule of the query that declined
+       the work manifest.  [`Busy] is another transaction already dispatching
+       it: the hold of the row of the work manifest answered nothing.
+
+       The question holds the row of the job of the work manifest, then the row
+       of the work manifest itself, until the transaction of the caller ends.
+       The hold of the work manifest row is the reservation: the dispatcher asks
+       the same question after its own holds, so the two paths of the limit
+       share one rule and one mutex, and a 'yes' names no work manifest another
+       dispatcher can start.  The caller must ask inside a transaction, or the
+       holds end before the caller acts on the answer. *)
     val work_manifest_can_run :
       request_id:string ->
       work_manifest_id:Uuidm.t ->
       stategraph_parallel_applies:bool ->
       t ->
-      (bool, [> `Error ]) result Abb.Future.t
+      ([ `Busy | `No | `Yes ], [> `Error ]) result Abb.Future.t
 
     (** Record that [job_id] restarts [restart_of]. A drift whose files changed while its reconcile
         ran is reconciled again by a new job, and the chain of these jobs limits how many times (RFD
@@ -1580,11 +1615,14 @@ module type Shared = sig
         Db.t ->
         (Terrat_job_context.Compute_node.t option, [> `Error ]) result Abb.Future.t
 
+      (* The rows the node still owes, in the order the job made them.  A node is
+         one action run and it may hold more than one work manifest, so the poll
+         asks for all of them and serves the first that may run. *)
       val query_work :
         request_id:string ->
         compute_node_id:Uuidm.t ->
         Db.t ->
-        (Terrat_job_context.Compute_node_work.t option, [> `Error ]) result Abb.Future.t
+        (Terrat_job_context.Compute_node_work.t list, [> `Error ]) result Abb.Future.t
 
       val update_state :
         request_id:string ->

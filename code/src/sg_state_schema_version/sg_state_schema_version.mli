@@ -237,5 +237,27 @@
     rules). The server derives the reference at ingest from the block, as for version 12, and no
     migration rewrites a stored row. A state that is behind keeps the edge that names no node and
     keeps failing such a plan; the upgrade this counter forces derives the reference again from the
-    stored configuration (RFD 1423). *)
+    stored configuration (RFD 1423).
+
+    Version 19: a call that names a remote module and holds no body (RFD 1008 Phase 3). An upgrade
+    writes the identity of each remote call from its block alone, and writes the body of the module
+    only when the state already holds one. The upgrade applies with [replace=hcl], which deletes
+    each [tf_modules] row of the state, thus the upgrade of a state whose body an older client never
+    stored leaves a call that names its module with no [tf_modules] row and no [tf_module_hcl] row.
+    The walk then makes no instance below that call: a plan that deletes the call carries the
+    removal of its outputs alone, and a plan of a change inside its body drops each instance that
+    the change removes.
+
+    The upgrade now loads the body of a call whose body the state does not hold at the call's
+    address, with one [get] on the source and the version that the call's block names, and writes it
+    in the same transaction. The block names the identity, thus the body comes from the version that
+    the state holds and not from the checkout, which a plan of a pull request can point at another
+    version. A body that the download does not hold fails the upgrade, and the state stays at its
+    version.
+
+    No migration can write the body: it is not in the database, and only the client holds a network
+    and a source. Thus the bump is the only repair, and a state that stands at 18 with the shape is
+    behind once this build runs, which is what makes the same upgrade repair it.
+
+    A state that holds each body that its calls name upgrades with no download, as before. *)
 val version : int

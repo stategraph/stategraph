@@ -21,6 +21,10 @@
 -- gone falls back to the default of one day, so a row that is missing never drops a run from the
 -- sweep.
 --
+-- The server writes this key, and the writer emits a JSON number for it.  The
+-- repository config schema rejects a value outside the range, so a row the
+-- server wrote always casts.
+--
 -- The batch is bounded, as in delete_old_repo_trees.sql: a sweep that cannot keep up leaves the
 -- rest to the run of the next hour.
 with
