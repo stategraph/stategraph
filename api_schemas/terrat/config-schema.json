@@ -279,6 +279,13 @@
           "default": false,
           "type": "boolean"
         },
+        "max_work_manifests_per_node": {
+          "default": 9,
+          "description": "How many work manifests one action run may perform.  Default is 9.",
+          "maximum": 9,
+          "minimum": 1,
+          "type": "integer"
+        },
         "max_workspaces_per_batch": {
           "default": 1,
           "type": "integer"
@@ -1955,6 +1962,13 @@
     "work-manifests": {
       "additionalProperties": false,
       "properties": {
+        "concurrent_runs": {
+          "default": 10,
+          "description": "Number of work manifests that one job can run at the same time.  Default is 10.",
+          "maximum": 2147483647,
+          "minimum": 1,
+          "type": "integer"
+        },
         "stale_timeout_sec": {
           "default": 86400,
           "description": "Seconds that a run can stay in the running state before the hourly sweep aborts the run.  Default is 86400, one day.",

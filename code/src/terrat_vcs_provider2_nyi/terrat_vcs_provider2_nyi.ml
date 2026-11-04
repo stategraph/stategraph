@@ -54,8 +54,15 @@ module Db = struct
   let store_dirspace_summaries ~request_id db context ~sha ~work_manifest summaries =
     raise (Failure "nyi")
 
-  let query_next_pending_work_manifest ?new_age ~request_id ~stategraph_parallel_applies db =
+  let query_next_pending_work_manifest
+      ?new_age
+      ~exclude_jobs:_
+      ~request_id
+      ~stategraph_parallel_applies
+      db =
     raise (Failure "nyi")
+
+  let claim_work_manifest_job ~request_id ~job_id db = raise (Failure "nyi")
 
   let work_manifest_can_run ~request_id ~work_manifest_id ~stategraph_parallel_applies db =
     raise (Failure "nyi")

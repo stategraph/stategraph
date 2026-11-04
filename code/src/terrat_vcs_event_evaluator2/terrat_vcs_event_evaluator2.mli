@@ -9,6 +9,13 @@ module Exec : module type of Abb_bounded_suspendable_executor.Make (Abb) (CCStri
 
 val create_exec : slots:int -> unit -> Exec.t Abb.Future.t
 
+(** [wake_pending_compute ~drain body] runs [body] and forks [drain ()] when [body] is done. A
+    settled work manifest frees a slot of its job, and nothing else starts the next work manifest of
+    that job, so the arm that settles it must drain the queue. The drain is forked and ignored: the
+    result of the arm must not wait for the drain and must not carry its error. *)
+val wake_pending_compute :
+  drain:(unit -> 'a Abb.Future.t) -> (unit -> 'b Abb.Future.t) -> 'b Abb.Future.t
+
 module Make (S : Terrat_vcs_provider2.S) : sig
   type err = Terrat_vcs_event_evaluator2_builder.Make(S).err
 
@@ -102,8 +109,15 @@ module Make (S : Terrat_vcs_provider2.S) : sig
     request_id:string -> storage:Terrat_storage.t -> unit -> (unit, [> `Error ]) result Abb.Future.t
 
   (** [run_stale_work_manifest_cleanup] is the hourly sweep that aborts the runs that are still
-      running past their repository [stale_timeout_sec]. The threshold comes from the stored config,
-      so this entry needs no configuration and no executor. *)
+      running past their repository [stale_timeout_sec]. The threshold comes from the stored config.
+      This entry takes the configuration and the executor only because it forks the dispatcher when
+      it is done, and the dispatcher needs both: the sweep frees a slot of a job at its limit and
+      nothing else starts the next work manifest of that job (RFD 2903). *)
   val run_stale_work_manifest_cleanup :
-    request_id:string -> storage:Terrat_storage.t -> unit -> (unit, [> `Error ]) result Abb.Future.t
+    request_id:string ->
+    config:S.Api.Config.t ->
+    storage:Terrat_storage.t ->
+    exec:Exec.t ->
+    unit ->
+    (unit, [> `Error ]) result Abb.Future.t
 end

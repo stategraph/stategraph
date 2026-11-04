@@ -445,8 +445,7 @@ struct
       ~dest_branch_ref
       ~branch_ref
       ~branch
-      ~create (* A step that prepares a job has no dirspace, so it spends no budget. *)
-      ~max_workspaces:(fun () -> Abbs_fc.return_ok None)
+      ~create
       ~initiate:(initiate ~branch)
       ~fail:(fail ~branch)
       ~result:(result ~branch)

@@ -618,6 +618,7 @@ module Db = struct
         /% Var.(option (uuid "work_manifest")))
 
     let select_next_work_manifest_sql = Mql_sql.read [%blob "sql/select_next_work_manifest.sql"]
+    let claim_work_manifest_job_sql = Mql_sql.read [%blob "sql/claim_work_manifest_job.sql"]
 
     let select_next_work_manifest =
       Pgsql_io.Typed_sql.(
@@ -628,10 +629,27 @@ module Db = struct
         //
         (* compute_node *)
         Ret.(option uuid)
+        //
+        (* job_id *)
+        Ret.(option uuid)
         /^ select_next_work_manifest_sql
         /% Var.boolean "new_age"
         /% Var.(option (uuid "work_manifest_id"))
-        /% Var.boolean "stategraph_parallel_applies")
+        /% Var.boolean "stategraph_parallel_applies"
+        /% Var.(str_array (uuid "excluded_jobs")))
+
+    (* Hold the row of the job of a candidate without waiting.  An empty answer
+       means the job row is held by another transaction: the caller excludes
+       the job from its drain.  A work manifest with no job row never reaches
+       this statement. *)
+    let claim_work_manifest_job =
+      Pgsql_io.Typed_sql.(
+        sql
+        //
+        (* id *)
+        Ret.uuid
+        /^ claim_work_manifest_job_sql
+        /% Var.uuid "job_id")
 
     let update_job_restart_of_sql = Mql_sql.read [%blob "sql/update_job_restart_of.sql"]
 
@@ -681,6 +699,29 @@ module Db = struct
         /% Var.uuid "work_manifest_id")
 
     let select_work_manifest_can_run_sql = Mql_sql.read [%blob "sql/select_next_work_manifest.sql"]
+    let lock_work_manifest_job_sql = Mql_sql.read [%blob "sql/lock_work_manifest_job.sql"]
+    let lock_work_manifest_sql = Mql_sql.read [%blob "sql/lock_work_manifest.sql"]
+
+    let lock_work_manifest_job =
+      Pgsql_io.Typed_sql.(
+        sql
+        //
+        (* id *)
+        Ret.uuid
+        /^ lock_work_manifest_job_sql
+        /% Var.uuid "work_manifest_id")
+
+    (* Reserve the work manifest for the caller.  [skip locked] answers nothing
+       for a row another transaction already holds, which the caller reads as
+       'busy'. *)
+    let lock_work_manifest =
+      Pgsql_io.Typed_sql.(
+        sql
+        //
+        (* id *)
+        Ret.uuid
+        /^ lock_work_manifest_sql
+        /% Var.uuid "work_manifest_id")
 
     (* The same query, asked about one work manifest.
 
@@ -699,10 +740,14 @@ module Db = struct
         //
         (* compute_node *)
         Ret.(option uuid)
+        //
+        (* job_id *)
+        Ret.(option uuid)
         /^ select_work_manifest_can_run_sql
         /% Var.boolean "new_age"
         /% Var.(option (uuid "work_manifest_id"))
-        /% Var.boolean "stategraph_parallel_applies")
+        /% Var.boolean "stategraph_parallel_applies"
+        /% Var.(str_array (uuid "excluded_jobs")))
 
     let select_flow_state_query = Mql_sql.read [%blob "sql/select_flow_data.sql"]
 
@@ -2272,6 +2317,7 @@ module Db = struct
 
   let query_next_pending_work_manifest
       ?(new_age = false)
+      ~exclude_jobs
       ~request_id
       ~stategraph_parallel_applies
       db =
@@ -2285,14 +2331,15 @@ module Db = struct
             (fun () ->
               Pgsql_io.Prepared_stmt.fetch
                 db
-                ~f:(fun id compute_node -> (id, compute_node))
+                ~f:(fun id compute_node job_id -> (id, compute_node, job_id))
                 Sql.select_next_work_manifest
                 new_age
                 None
-                stategraph_parallel_applies))
+                stategraph_parallel_applies
+                exclude_jobs))
       >>= function
       | [] -> Abbs_fc.return_ok None
-      | [ (id, compute_node) ] ->
+      | [ (id, compute_node, job_id) ] ->
           Abbs_time_it.run
             (fun time ->
               Logs.info (fun m ->
@@ -2303,7 +2350,7 @@ module Db = struct
               | Some wm ->
                   let module Wm = Terrat_work_manifest3 in
                   assert (wm.Wm.state = Wm.State.Queued);
-                  Some (wm, compute_node)
+                  Some (wm, compute_node, job_id)
               | None -> None)
       | _ :: _ -> assert false
     in
@@ -2320,27 +2367,74 @@ module Db = struct
     | Error `Error -> Abbs_fc.return_err `Error
 
   (* The same query as the dispatcher, asked about one work manifest.  The rules
-     that decide it live in that one file, so the two cannot drift. *)
+     that decide it live in that one file, so the two cannot drift.
+
+     The answer is three-valued.  'No' is a rule of the query that declined the
+     work manifest.  'Busy' is the reservation statement, which answers nothing
+     while another transaction holds the row of the work manifest: that
+     transaction is dispatching it.
+
+     The answer comes with two holds: the row of the job of the work manifest,
+     then the row of the work manifest itself.  The count that the query
+     applies is true of the state that the locks serialized, and the hold of
+     the work manifest row is the reservation: no other dispatcher can answer
+     'yes' for it while the caller acts on the answer.  The caller must ask
+     inside a transaction, or the holds end before the caller acts on the
+     answer. *)
   let work_manifest_can_run ~request_id ~work_manifest_id ~stategraph_parallel_applies db =
     let open Abb.Future.Infix_monad in
-    Pgsql_io.Prepared_stmt.fetch
-      db
-      ~f:(fun id compute_node -> (id, compute_node))
-      Sql.select_work_manifest_can_run
-      true
-      (Some work_manifest_id)
-      stategraph_parallel_applies
+    Pgsql_io.Prepared_stmt.fetch db Sql.lock_work_manifest_job ~f:CCFun.id work_manifest_id
     >>= function
-    | Ok [] -> Abbs_fc.return_ok false
-    | Ok (_ :: _) -> Abbs_fc.return_ok true
     | Error (#Pgsql_io.err as err) ->
-        Logs.err (fun m -> m "%s : WORK_MANIFEST_CAN_RUN : %a" request_id Pgsql_io.pp_err err);
+        Logs.err (fun m -> m "%s : LOCK_WORK_MANIFEST_JOB : %a" request_id Pgsql_io.pp_err err);
         Abbs_fc.return_err `Error
     | Error `Error -> Abbs_fc.return_err `Error
+    | Ok _ -> (
+        Pgsql_io.Prepared_stmt.fetch db Sql.lock_work_manifest ~f:CCFun.id work_manifest_id
+        >>= function
+        | Ok [] -> Abbs_fc.return_ok `Busy
+        | Ok _ -> (
+            Pgsql_io.Prepared_stmt.fetch
+              db
+              ~f:(fun id compute_node _job_id -> (id, compute_node))
+              Sql.select_work_manifest_can_run
+              true
+              (Some work_manifest_id)
+              stategraph_parallel_applies
+              []
+            >>= function
+            | Ok [] -> Abbs_fc.return_ok `No
+            | Ok (_ :: _) -> Abbs_fc.return_ok `Yes
+            | Error (#Pgsql_io.err as err) ->
+                Logs.err (fun m ->
+                    m "%s : WORK_MANIFEST_CAN_RUN : %a" request_id Pgsql_io.pp_err err);
+                Abbs_fc.return_err `Error
+            | Error `Error -> Abbs_fc.return_err `Error)
+        | Error (#Pgsql_io.err as err) ->
+            Logs.err (fun m -> m "%s : LOCK_WORK_MANIFEST : %a" request_id Pgsql_io.pp_err err);
+            Abbs_fc.return_err `Error
+        | Error `Error -> Abbs_fc.return_err `Error)
 
   let log_pgsql_err ~request_id name err =
     Prmths.Counter.inc_one Metrics.pgsql_errors_total;
     Logs.err (fun m -> m "%s : %s : %a" request_id name Pgsql_io.pp_err err)
+
+  (* Hold the row of the job of a candidate without waiting for it.  [false] is
+     a job row another transaction holds: the caller excludes the job from its
+     drain and asks for the next candidate.  [true] holds the row until the
+     transaction of the caller ends, which makes the count of the running work
+     manifests of the job true for the dispatch that follows. *)
+  let claim_work_manifest_job ~request_id ~job_id db =
+    let open Abb.Future.Infix_monad in
+    Pgsql_io.Prepared_stmt.fetch db Sql.claim_work_manifest_job ~f:CCFun.id job_id
+    >>= function
+    | Ok [] -> Abbs_fc.return_ok false
+    | Ok [ _ ] -> Abbs_fc.return_ok true
+    | Ok _ -> Abbs_fc.return_err `Error
+    | Error (#Pgsql_io.err as err) ->
+        log_pgsql_err ~request_id "CLAIM_WORK_MANIFEST_JOB" err;
+        Abbs_fc.return_err `Error
+    | Error `Error -> Abbs_fc.return_err `Error
 
   let set_job_restart_of ~request_id ~job_id ~restart_of db =
     let open Abb.Future.Infix_monad in
@@ -7533,7 +7627,7 @@ module Job_context = struct
           { Tjc.Compute_node_work.compute_node_id; created_at; state; work; work_manifest })
         compute_node_id
       >>= function
-      | Ok r -> Abbs_fc.return_ok (CCOption.of_list r)
+      | Ok _ as r -> Abb.Future.return r
       | Error (#Pgsql_io.err as err) ->
           Logs.err (fun m -> m "%s : COMPUTE_NODE : QUERY_WORK : %a" request_id Pgsql_io.pp_err err);
           Abbs_fc.return_err `Error

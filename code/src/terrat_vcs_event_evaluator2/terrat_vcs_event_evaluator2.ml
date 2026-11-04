@@ -89,6 +89,14 @@ end
 
 let create_exec ~slots () = Exec.create ~logger:Exec_logger.metrics ~slots ()
 
+(* A settled work manifest frees a slot of its job, and nothing else starts the
+   next work manifest of that job.  So the drain runs the dispatcher after the
+   body.  It runs in its own task and is ignored, because the arm's own result
+   must not wait for it and must not carry its error. *)
+let wake_pending_compute ~drain body =
+  Fc.with_finally body ~finally:(fun () ->
+      Fc.ignore @@ Abb.Task.run ~name:"wake-pending-compute" (fun () -> drain ()))
+
 module Make (S : Terrat_vcs_provider2.S) = struct
   let src = Logs.Src.create ("vcs_event_evaluator2." ^ S.name)
 
@@ -187,9 +195,133 @@ module Make (S : Terrat_vcs_provider2.S) = struct
     in
     log_err ~request_id run
 
-  let rec run_next_pending_compute ~request_id ~config ~storage ~exec () =
+  (* The failure of a dispatch leaves the node holding work manifests its dead
+     run will never serve.  Release them through the task, inside the open
+     transaction, so the holds of the dispatcher cover the release and no poll
+     can admit a sibling onto the node while it runs (RFD 2903). *)
+  let run_release_compute_node_work ~request_id ~config ~exec ~db ~compute_node_id =
+    let run =
+      let open Abb.Future.Infix_monad in
+      let target = Keys.release_compute_node_work in
+      let store = Hmap.empty |> Keys.Key.add Keys.compute_node_id (Some compute_node_id) in
+      Builder.State.make ~log_id:request_id ~config ~store ~exec ~db ~tasks ()
+      >>= fun s ->
+      Logs.info (fun m -> m "%s : target=%s" (Builder.log_id s) (Hmap.Key.info target));
+      Builder.eval s target
+    in
+    log_err ~request_id run
+
+  let rec run_next_pending_compute ?(exclude_jobs = []) ~request_id ~config ~storage ~exec () =
     let module Wm = Terrat_work_manifest3 in
     let open Irm in
+    (* Dispatch the work manifest the caller reserved.  The re-ask through
+       work_manifest_can_run is the rule authority: the select evaluated the
+       rules on the snapshot of the reader, and another dispatcher can have
+       committed work since.  The holds that the answer takes are already
+       ours, the row of the work manifest from the select and the row of the
+       job from the claim, so the re-ask only reads the rules under them.
+
+       A busy answer cannot happen here: the reservation from the select is
+       a hold of the row that lock_work_manifest asks for.  A declined
+       answer stays queued, and the next iteration asks the query again,
+       whose snapshot now counts the committed work. *)
+    let dispatch_reserved ~db ~wm ~compute_node_id =
+      S.Db.work_manifest_can_run
+        ~request_id
+        ~work_manifest_id:wm.Wm.id
+        ~stategraph_parallel_applies:S.stategraph_parallel_applies
+        db
+      >>= function
+      | `No ->
+          Logs.info (fun m ->
+              m "%s : RUN_WORK_MANIFEST : id=%a : declined" request_id Uuidm.pp wm.Wm.id);
+          Abbs_fc.return_ok `Cont
+      | `Busy ->
+          Logs.info (fun m ->
+              m "%s : RUN_WORK_MANIFEST : id=%a : busy" request_id Uuidm.pp wm.Wm.id);
+          Abbs_fc.return_ok `Done
+      | `Yes -> (
+          Logs.info (fun m -> m "%s : RUN_WORK_MANIFEST : id=%a" request_id Uuidm.pp wm.Wm.id);
+          (* A work manifest made before the server made a node with
+             each one has no node, so make it here, with its row.
+             The row matters: the database chooses the id of a node
+             now, so a node without a row names no work manifest
+             and the poll would have nothing to give the action. *)
+          (match compute_node_id with
+            | Some compute_node_id -> Abbs_fc.return_ok compute_node_id
+            | None ->
+                S.Job_context.Compute_node.create
+                  ~request_id
+                  ~capabilities:
+                    {
+                      Tjc.Compute_node.Capabilities.flags = [];
+                      sha = wm.Wm.branch_ref;
+                      environment = wm.Wm.environment;
+                      runs_on = wm.Wm.runs_on;
+                      (* This node is for one work manifest that
+                         was made before the server made a node
+                         with each one.  It has no phase, so no
+                         work manifest joins it under [by_phase]. *)
+                      used_work_manifests = 1;
+                      merge_phase = None;
+                    }
+                  db
+                >>= fun { Tjc.Compute_node.id = compute_node_id; _ } ->
+                S.Job_context.Compute_node.add_work
+                  ~request_id
+                  ~compute_node_id
+                  ~work_manifest:wm.Wm.id
+                  db
+                >>| fun () -> compute_node_id)
+          >>= fun compute_node_id ->
+          S.Api.create_client ~request_id config wm.Wm.account db
+          >>= fun client ->
+          let open Abb.Future.Infix_monad in
+          Abbs_time_it.run
+            (fun time ->
+              Logs.info (fun m ->
+                  m "%s : RUN_WORK_MANIFEST : id=%a : time=%f" request_id Uuidm.pp wm.Wm.id time))
+            (fun () -> S.Work_manifest.run ~request_id ~compute_node_id config client wm)
+          >>= function
+          | Ok () ->
+              let open Fc.Infix_result_monad in
+              S.Work_manifest.update_state ~request_id db wm.Wm.id Wm.State.Running
+              >>= fun () ->
+              (* A node is written [queued], whether it was made
+                 with its work manifest or by the fallback above,
+                 and only the dispatcher moves it on.  Without this
+                 write it stays [queued] for all of its life. *)
+              S.Job_context.Compute_node.update_state
+                ~request_id
+                ~compute_node_id
+                db
+                Tjc.Compute_node.State.Starting
+              >>| fun () -> `Cont
+          | Error err ->
+              let open Fc.Infix_result_monad in
+              (* Abort the work manifest of the dead run first,
+                 so the trigger takes its own compute node work
+                 row out of the state [created] before the
+                 release reads the rows the node still owes.
+                 The release also terminates the node, which
+                 replaces the bare [Terminated] write the arm
+                 made before (RFD 2903). *)
+              S.Work_manifest.update_state ~request_id db wm.Wm.id Wm.State.Aborted
+              >>= fun () ->
+              Fc.to_result (Tasks_base.release_stategraph_reservation ~request_id wm.Wm.id)
+              >>= fun () ->
+              run_release_compute_node_work ~request_id ~config ~exec ~db ~compute_node_id
+              >>= fun () ->
+              let open Abb.Future.Infix_monad in
+              run_work_manifest_event
+                ~request_id
+                ~config
+                ~db
+                ~exec
+                (Keys.Work_manifest_event.Fail { work_manifest = wm; error = err })
+              >>= fun _ -> Abbs_fc.return_ok `Cont)
+    in
+
     Abbs_time_it.run
       (fun t -> Logs.info (fun m -> m "%s : RUN_WORK_MANIFEST : time=%f" request_id t))
       (fun () ->
@@ -197,99 +329,65 @@ module Make (S : Terrat_vcs_provider2.S) = struct
             Pgsql_io.tx db ~f:(fun () ->
                 S.Db.query_next_pending_work_manifest
                   ~new_age:true
+                  ~exclude_jobs
                   ~request_id
                   ~stategraph_parallel_applies:S.stategraph_parallel_applies
                   db
                 >>= function
-                | Some (wm, compute_node_id) -> (
-                    Logs.info (fun m ->
-                        m "%s : RUN_WORK_MANIFEST : id=%a" request_id Uuidm.pp wm.Wm.id);
-                    (* A work manifest made before the server made a node with
-                       each one has no node, so make it here, with its row.  The
-                       row matters: the database chooses the id of a node now, so
-                       a node without a row names no work manifest and the poll
-                       would have nothing to give the action. *)
-                    (match compute_node_id with
-                      | Some compute_node_id -> Abbs_fc.return_ok compute_node_id
-                      | None ->
-                          S.Job_context.Compute_node.create
-                            ~request_id
-                            ~capabilities:
-                              {
-                                Tjc.Compute_node.Capabilities.flags = [];
-                                sha = wm.Wm.branch_ref;
-                                environment = wm.Wm.environment;
-                                runs_on = wm.Wm.runs_on;
-                                (* This node is for one work manifest that was
-                                   made before the server made a node with each
-                                   one.  It takes no more work, so it needs no
-                                   budget and no phase. *)
-                                max_workspaces = None;
-                                used_workspaces = CCList.length wm.Wm.changes;
-                                used_work_manifests = 1;
-                                merge_phase = None;
-                              }
-                            db
-                          >>= fun { Tjc.Compute_node.id = compute_node_id; _ } ->
-                          S.Job_context.Compute_node.add_work
-                            ~request_id
-                            ~compute_node_id
-                            ~work_manifest:wm.Wm.id
-                            db
-                          >>| fun () -> compute_node_id)
-                    >>= fun compute_node_id ->
-                    S.Api.create_client ~request_id config wm.Wm.account db
-                    >>= fun client ->
-                    let open Abb.Future.Infix_monad in
-                    Abbs_time_it.run
-                      (fun time ->
-                        Logs.info (fun m ->
-                            m
-                              "%s : RUN_WORK_MANIFEST : id=%a : time=%f"
-                              request_id
-                              Uuidm.pp
-                              wm.Wm.id
-                              time))
-                      (fun () -> S.Work_manifest.run ~request_id ~compute_node_id config client wm)
+                | Some (wm, compute_node_id, job_id) -> (
+                    (* The select holds the row of the work manifest of the
+                       candidate.  Hold the row of its compute node next.  The
+                       dispatcher waits on the node row and on nothing else:
+                       its hold of the work manifest row and its claim of the
+                       job row both skip instead of wait, so no transaction
+                       that waits for a work manifest row can close a cycle
+                       with it.  The read is lock-only: the candidate answer
+                       already carries everything it decides.  A work manifest
+                       with no node takes the fallback in dispatch_reserved,
+                       which makes one, and a node made here conflicts with no
+                       reader of another node. *)
+                      (match compute_node_id with
+                      | Some compute_node_id ->
+                          S.Job_context.Compute_node.query ~request_id ~compute_node_id db
+                          >>| fun _ -> ()
+                      | None -> Abbs_fc.return_ok ())
+                    >>= fun () ->
+                    (* Claim the row of the job of the candidate without
+                       waiting.  The claim is the mutex of the
+                       concurrent_runs limit: two dispatchers that count the
+                       running work manifests of one job at the same time can
+                       pass the same free slot, and the row lock makes the
+                       second count include the work manifest that the first
+                       one starts.  The claim never waits: the job row can be
+                       held by a transaction that waits for a work manifest
+                       row, and a wait here would close that cycle (RFD
+                       2903).  A work manifest with no job row takes no
+                       claim. *)
+                    (match job_id with
+                      | Some job_id ->
+                          S.Db.claim_work_manifest_job ~request_id ~job_id db
+                          >>| fun claimed -> if claimed then None else Some job_id
+                      | None -> Abbs_fc.return_ok None)
                     >>= function
-                    | Ok () ->
-                        let open Fc.Infix_result_monad in
-                        S.Work_manifest.update_state ~request_id db wm.Wm.id Wm.State.Running
-                        >>= fun () ->
-                        (* A node is written [queued], whether it was made with
-                           its work manifest or by the fallback above, and only
-                           the dispatcher moves it on.  Without this write it
-                           stays [queued] for all of its life. *)
-                        S.Job_context.Compute_node.update_state
-                          ~request_id
-                          ~compute_node_id
-                          db
-                          Tjc.Compute_node.State.Starting
-                        >>| fun () -> `Cont
-                    | Error err ->
-                        let open Fc.Infix_result_monad in
-                        S.Work_manifest.update_state ~request_id db wm.Wm.id Wm.State.Aborted
-                        >>= fun () ->
-                        Fc.to_result
-                          (Tasks_base.release_stategraph_reservation ~request_id wm.Wm.id)
-                        >>= fun () ->
-                        S.Job_context.Compute_node.update_state
-                          ~request_id
-                          ~compute_node_id
-                          db
-                          Tjc.Compute_node.State.Terminated
-                        >>= fun () ->
-                        let open Abb.Future.Infix_monad in
-                        run_work_manifest_event
-                          ~request_id
-                          ~config
-                          ~db
-                          ~exec
-                          (Keys.Work_manifest_event.Fail { work_manifest = wm; error = err })
-                        >>= fun _ -> Abbs_fc.return_ok `Cont)
+                    | Some job_id ->
+                        (* The job row is held by another transaction: a
+                           sibling dispatch in flight, or a job going terminal.
+                           End this transaction, which releases the
+                           reservation of the candidate, and come back with
+                           the job excluded from the drain. *)
+                        Abbs_fc.return_ok (`Skip_job job_id)
+                    | None -> dispatch_reserved ~db ~wm ~compute_node_id)
                 | None -> Abbs_fc.return_ok `Done)))
     >>= function
-    | `Cont -> run_next_pending_compute ~request_id ~config ~storage ~exec ()
+    | `Cont -> run_next_pending_compute ~exclude_jobs ~request_id ~config ~storage ~exec ()
+    | `Skip_job job_id ->
+        run_next_pending_compute
+          ~exclude_jobs:(job_id :: exclude_jobs)
+          ~request_id
+          ~config
+          ~storage
+          ~exec
+          ()
     | `Done -> Abbs_fc.return_ok ()
 
   let run_pull_request_event
@@ -443,11 +541,18 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                     Builder.pp_err
                     err);
               with_conn storage ~f:(fun db ->
-                  S.Job_context.Job.update_state
-                    ~request_id
-                    db
-                    ~job_id:job.Tjc.Job.id
-                    Tjc.Job.State.Failed)
+                  (* The state write and the abort of the live work manifests
+                     of the job are two statements, and the abort holds the
+                     rows of the work manifests behind the row of the job.
+                     Run them in a transaction, so the pair is atomic and its
+                     lock order is the order of the dispatcher and the poll
+                     (RFD 2903). *)
+                  Pgsql_io.tx db ~f:(fun () ->
+                      S.Job_context.Job.update_state
+                        ~request_id
+                        db
+                        ~job_id:job.Tjc.Job.id
+                        Tjc.Job.State.Failed))
               >>| fun () -> `Noop
         in
         log_err ~request_id run)
@@ -465,9 +570,9 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                  repo
                  pull_request_id))
         >>= fun () ->
-        Fc.ignore
-        @@ Abb.Future.fork
-        @@ run_next_pending_compute ~request_id ~config ~storage ~exec ())
+        wake_pending_compute
+          ~drain:(fun () -> run_next_pending_compute ~request_id ~config ~storage ~exec ())
+          (fun () -> Abb.Future.return ()))
 
   let pull_request_event
       ~request_id
@@ -536,23 +641,29 @@ module Make (S : Terrat_vcs_provider2.S) = struct
           >>| fun _ -> CCOption.map (fun wm -> wm.Terrat_work_manifest3.id) work_manifest)
     in
     let open Abb.Future.Infix_monad in
-    log_err ~request_id run
-    >>= function
-    | Ok work_manifest_id ->
-        CCOption.map_or
-          ~default:(Abb.Future.return ())
-          (fun work_manifest_id ->
-            Fc.ignore
-              (Abb.Future.fork
-                 (S.Comment.drain_unified_comment
-                    ~request_id
-                    ~fetch_brand:(S.Repo_config.fetch_brand ~request_id)
-                    config
-                    storage
-                    work_manifest_id)))
-          work_manifest_id
-        >>| fun () -> Ok ()
-    | Error _ -> Abbs_fc.return_err `Error
+    (* The failure aborts the running work manifest of the job, which frees
+       a slot.  Nothing else starts the next work manifest of the job, so
+       fork the dispatcher here (RFD 2903). *)
+    wake_pending_compute
+      ~drain:(fun () -> run_next_pending_compute ~request_id ~config ~storage ~exec ())
+      (fun () ->
+        log_err ~request_id run
+        >>= function
+        | Ok work_manifest_id ->
+            CCOption.map_or
+              ~default:(Abb.Future.return ())
+              (fun work_manifest_id ->
+                Fc.ignore
+                  (Abb.Future.fork
+                     (S.Comment.drain_unified_comment
+                        ~request_id
+                        ~fetch_brand:(S.Repo_config.fetch_brand ~request_id)
+                        config
+                        storage
+                        work_manifest_id)))
+              work_manifest_id
+            >>| fun () -> Ok ()
+        | Error _ -> Abbs_fc.return_err `Error)
 
   let compute_node_poll ~request_id ~config ~storage ~exec ~compute_node_id offering =
     let open Abb.Future.Infix_monad in
@@ -578,16 +689,13 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                     offering.Offering.run_id);
               tx_safe ~request_id @@ Builder.eval s target))
     in
-    Fc.with_finally
+    wake_pending_compute
+      ~drain:(fun () -> run_next_pending_compute ~request_id ~config ~storage ~exec ())
       (fun () ->
         log_err ~request_id run
         >>= function
         | Ok (`Ok r) -> Abbs_fc.return_ok r
         | Ok (`Suspend_eval _) | Ok `Noop | Ok (`Rerun _) | Error _ -> Abbs_fc.return_err `Error)
-      ~finally:(fun () ->
-        Fc.ignore
-        @@ Abb.Future.fork
-        @@ run_next_pending_compute ~request_id ~config ~storage ~exec ())
 
   let run_missing_drift_schedules ?request_id ~config ~storage ~exec () =
     let open Abb.Future.Infix_monad in
@@ -617,12 +725,9 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                 | Ok (`Noop | `Suspend_eval _ | `Rerun _) | Error _ -> true))
             ~betwixt:(fun _ -> Fc.unit))
     in
-    Fc.with_finally
+    wake_pending_compute
+      ~drain:(fun () -> run_next_pending_compute ~request_id ~config ~storage ~exec ())
       (fun () -> Fc.ignore @@ log_err ~request_id run)
-      ~finally:(fun () ->
-        Fc.ignore
-        @@ Abb.Future.fork
-        @@ run_next_pending_compute ~request_id ~config ~storage ~exec ())
 
   let cleanup_flow_states request_id db =
     Abbs_time_it.run
@@ -682,20 +787,29 @@ module Make (S : Terrat_vcs_provider2.S) = struct
         Logs.err (fun m -> m "%s : REPO_CONFIG_CLEANUP : %a" request_id Pgsql_pool.pp_err err);
         Fc.return_err `Error
 
-  let run_stale_work_manifest_cleanup ~request_id ~storage () =
-    let open Abb.Future.Infix_monad in
-    Logs.info (fun m -> m "%s : STALE_WORK_MANIFEST_CLEANUP : START" request_id);
-    Abbs_time_it.run
-      (fun t ->
-        Logs.info (fun m -> m "%s : STALE_WORK_MANIFEST_CLEANUP : END : time=%f" request_id t))
-      (fun () -> with_conn storage ~f:(fun db -> S.Db.cleanup_stale_work_manifests ~request_id db))
-    >>= function
-    | Ok () -> Fc.return_ok ()
-    | Error `Error -> Fc.return_err `Error
-    | Error (#Pgsql_pool.err as err) ->
-        Logs.err (fun m ->
-            m "%s : STALE_WORK_MANIFEST_CLEANUP : %a" request_id Pgsql_pool.pp_err err);
-        Fc.return_err `Error
+  (* The sweep frees a slot of a work manifest whose run went silent.  Nothing
+     else starts the next work manifest of the job it belonged to, so fork the
+     dispatcher here (RFD 2903).  The queue of a job at its limit otherwise waits
+     for the next event of any kind, and the sweep is what killed the runs whose
+     polls would have supplied that event. *)
+  let run_stale_work_manifest_cleanup ~request_id ~config ~storage ~exec () =
+    wake_pending_compute
+      ~drain:(fun () -> run_next_pending_compute ~request_id ~config ~storage ~exec ())
+      (fun () ->
+        let open Abb.Future.Infix_monad in
+        Logs.info (fun m -> m "%s : STALE_WORK_MANIFEST_CLEANUP : START" request_id);
+        Abbs_time_it.run
+          (fun t ->
+            Logs.info (fun m -> m "%s : STALE_WORK_MANIFEST_CLEANUP : END : time=%f" request_id t))
+          (fun () ->
+            with_conn storage ~f:(fun db -> S.Db.cleanup_stale_work_manifests ~request_id db))
+        >>= function
+        | Ok () -> Fc.return_ok ()
+        | Error `Error -> Fc.return_err `Error
+        | Error (#Pgsql_pool.err as err) ->
+            Logs.err (fun m ->
+                m "%s : STALE_WORK_MANIFEST_CLEANUP : %a" request_id Pgsql_pool.pp_err err);
+            Fc.return_err `Error)
 
   let work_manifest_result ~request_id ~config ~storage ~exec ~work_manifest_id result =
     let query_work_manifest db =
@@ -801,12 +915,16 @@ module Make (S : Terrat_vcs_provider2.S) = struct
 
        So run it before the answer while a node is still able to take it, and put
        it in the background when none is, which is what every run did before
-       this. *)
+       this.  The states are the ones [Compute_node.can_run] admits: a node this
+       very evaluation made is [Queued], and a node the dispatcher has started is
+       [Starting].  Admitting only [Starting] would fork the evaluation in the
+       background while the node could still take the work, and the fork races the
+       poll into making a second node. *)
     let a_node_waits_for_work s =
       let module C = Tjc.Compute_node in
       match Hmap.find Keys.compute_node (Builder.State.orig_store s) with
-      | Some (Ok (Some { C.state = C.State.Starting; _ })) -> true
-      | Some (Ok (Some { C.state = C.State.(Queued | Running | Terminated); _ }))
+      | Some (Ok (Some { C.state = C.State.(Queued | Starting); _ })) -> true
+      | Some (Ok (Some { C.state = C.State.(Running | Terminated); _ }))
       | Some (Ok None)
       | Some (Error _)
       | None -> false
@@ -929,7 +1047,8 @@ module Make (S : Terrat_vcs_provider2.S) = struct
           let open Abb.Future.Infix_monad in
           run_next_layer_eval
             s
-            (Fc.with_finally
+            (wake_pending_compute
+               ~drain:(fun () -> run_next_pending_compute ~request_id ~config ~storage ~exec ())
                (fun () ->
                  with_conn storage ~f:(fun db ->
                      Pgsql_io.tx db ~f:(fun () ->
@@ -955,17 +1074,14 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                              | Tjc.Context.Scope.Branch _ ->
                                  Tasks_branch.tasks @@ Builder.State.tasks s)
                            ()
-                         >>= fun s -> tx_safe ~request_id @@ Builder.eval s Keys.run_next_layer)))
-               ~finally:(fun () ->
-                 Fc.ignore
-                 @@ Abb.Future.fork
-                 @@ run_next_pending_compute ~request_id ~config ~storage ~exec ()))
+                         >>= fun s -> tx_safe ~request_id @@ Builder.eval s Keys.run_next_layer))))
           >>= fun _ -> Abbs_fc.return_ok (`Ok ())
       | Ok (s, work_manifest, job, `Suspend_eval _) ->
           let open Abb.Future.Infix_monad in
           run_next_layer_eval
             s
-            (Fc.with_finally
+            (wake_pending_compute
+               ~drain:(fun () -> run_next_pending_compute ~request_id ~config ~storage ~exec ())
                (fun () ->
                  with_conn storage ~f:(fun db ->
                      let { Tjc.Job.context = { Tjc.Context.scope; _ }; _ } = job in
@@ -990,46 +1106,41 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                          @@ Builder.eval s Keys.maybe_complete_job_from_work_manifest_event))
                  >>= function
                  | Ok (`Ok ()) ->
-                     Fc.with_finally
-                       (fun () ->
-                         with_conn storage ~f:(fun db ->
-                             let { Tjc.Job.context = { Tjc.Context.scope; _ }; _ } = job in
-                             let store =
-                               s
-                               |> Builder.State.orig_store
-                               |> Keys.Key.add Keys.job job
-                               |> Tasks_base.forward_std_keys s
-                               |> add_work_manifest_keys work_manifest
-                               |> Builder.State.forward_store_value Keys.work_manifests_for_job s
-                             in
-                             let open Abb.Future.Infix_monad in
-                             Builder.State.make
-                               ~log_id:request_id
-                               ~config
-                               ~store
-                               ~db
-                               ~exec
-                               ~tasks:
-                                 (match scope with
-                                 | Tjc.Context.Scope.Pull_request _ ->
-                                     Tasks_pr.tasks @@ Builder.State.tasks s
-                                 | Tjc.Context.Scope.Branch _ ->
-                                     Tasks_branch.tasks @@ Builder.State.tasks s)
-                               ()
-                             >>= fun s ->
-                             Pgsql_io.tx db ~f:(fun () ->
-                                 log_err ~request_id
-                                 @@ tx_safe ~request_id
-                                 @@ Builder.eval s Keys.run_next_layer)))
-                       ~finally:(fun () ->
-                         Fc.ignore
-                         @@ Abb.Future.fork
-                         @@ run_next_pending_compute ~request_id ~config ~storage ~exec ())
-                 | (Ok (`Suspend_eval _ | `Noop | `Rerun _) | Error _) as r -> Abb.Future.return r)
-               ~finally:(fun () ->
-                 Fc.ignore
-                 @@ Abb.Future.fork
-                 @@ run_next_pending_compute ~request_id ~config ~storage ~exec ()))
+                     (* No [wake_pending_compute] here: the outer one of this arm
+                        already fires on every outcome of the body, and its
+                        coverage is a strict superset of a second one's.  Two
+                        drains would park a second pooled connection on the job
+                        row lock for the length of the first drain's request. *)
+                     with_conn storage ~f:(fun db ->
+                         let { Tjc.Job.context = { Tjc.Context.scope; _ }; _ } = job in
+                         let store =
+                           s
+                           |> Builder.State.orig_store
+                           |> Keys.Key.add Keys.job job
+                           |> Tasks_base.forward_std_keys s
+                           |> add_work_manifest_keys work_manifest
+                           |> Builder.State.forward_store_value Keys.work_manifests_for_job s
+                         in
+                         let open Abb.Future.Infix_monad in
+                         Builder.State.make
+                           ~log_id:request_id
+                           ~config
+                           ~store
+                           ~db
+                           ~exec
+                           ~tasks:
+                             (match scope with
+                             | Tjc.Context.Scope.Pull_request _ ->
+                                 Tasks_pr.tasks @@ Builder.State.tasks s
+                             | Tjc.Context.Scope.Branch _ ->
+                                 Tasks_branch.tasks @@ Builder.State.tasks s)
+                           ()
+                         >>= fun s ->
+                         Pgsql_io.tx db ~f:(fun () ->
+                             log_err ~request_id
+                             @@ tx_safe ~request_id
+                             @@ Builder.eval s Keys.run_next_layer))
+                 | (Ok (`Suspend_eval _ | `Noop | `Rerun _) | Error _) as r -> Abb.Future.return r))
           >>= fun _ -> Abbs_fc.return_ok (`Ok ())
       | Ok (_, _, _, `Noop) -> Abbs_fc.return_ok `Noop
       | Error #err as err ->
@@ -1132,15 +1243,12 @@ module Make (S : Terrat_vcs_provider2.S) = struct
       @@ Abb.Future.fork
       @@ run_missing_drift_schedules ~config ~storage ~exec ()
     in
-    Fc.with_finally
+    wake_pending_compute
+      ~drain:(fun () -> run_next_pending_compute ~request_id ~config ~storage ~exec ())
       (fun () ->
         let open Abb.Future.Infix_monad in
         log_err ~request_id run
         >>= function
         | Ok _ -> Abbs_fc.return_ok ()
         | Error _ -> Abbs_fc.return_err `Error)
-      ~finally:(fun () ->
-        Fc.ignore
-        @@ Abb.Future.fork
-        @@ run_next_pending_compute ~request_id ~config ~storage ~exec ())
 end

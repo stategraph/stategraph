@@ -500,19 +500,6 @@ struct
       commit_checks
     >>| fun () -> work_manifests
 
-  (* The workspaces one action run may do.  A batch caps one work manifest, and a
-     node that ran several would pass that cap, so the cap holds for the whole
-     run.  Read the config here and not in [Wm_sm], because a step that prepares
-     a job runs before there is a config to read. *)
-  let max_workspaces { Bs.Fetcher.fetch } () =
-    let module V1 = Terrat_base_repo_config_v1 in
-    let open Irm in
-    fetch Keys.repo_config
-    >>| fun repo_config ->
-    let batch_runs = V1.batch_runs repo_config in
-    if batch_runs.V1.Batch_runs.enabled then Some batch_runs.V1.Batch_runs.max_workspaces_per_batch
-    else None
-
   module Staleness = Terrat_vcs_event_evaluator2_staleness
 
   let dirspaces_of_wm wm =
@@ -1409,7 +1396,6 @@ struct
         ~branch_ref
         ~branch
         ~create
-        ~max_workspaces:(max_workspaces fetcher)
         ~initiate
         ~fail
         ~result
@@ -1680,7 +1666,6 @@ struct
         ~branch_ref
         ~branch
         ~create
-        ~max_workspaces:(max_workspaces fetcher)
         ~initiate
         ~fail
         ~result

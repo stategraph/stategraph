@@ -27,8 +27,6 @@ let test_a_row_from_before_the_rfd =
       sha = "abc123";
       environment = None;
       runs_on = None;
-      max_workspaces = None;
-      used_workspaces = 0;
       used_work_manifests = 0;
       merge_phase = None;
     }
@@ -43,8 +41,6 @@ let test_a_row_with_flags =
       sha = "abc123";
       environment = None;
       runs_on = None;
-      max_workspaces = None;
-      used_workspaces = 0;
       used_work_manifests = 0;
       merge_phase = None;
     }
@@ -62,8 +58,6 @@ let test_a_row_without_the_work_manifest_count =
       sha = "abc123";
       environment = Some "production";
       runs_on = Some (`Assoc [ ("labels", `List [ `String "self-hosted" ]) ]);
-      max_workspaces = Some 3;
-      used_workspaces = 2;
       used_work_manifests = 0;
       merge_phase = None;
     }
@@ -82,9 +76,23 @@ let test_a_row_without_the_merge_phase =
       sha = "abc123";
       environment = Some "production";
       runs_on = Some (`Assoc [ ("labels", `List [ `String "self-hosted" ]) ]);
-      max_workspaces = Some 3;
-      used_workspaces = 2;
       used_work_manifests = 2;
+      merge_phase = None;
+    }
+
+(* The two fields this version removed must not stop an old row from decoding.
+   The deriving is lenient for exactly this reason, and the two tests above carry
+   the removed keys for the same reason.  This one asks the question alone. *)
+let test_a_row_with_only_the_removed_fields =
+  decode
+    "a capabilities row that carries only the removed workspace fields decodes"
+    {|{"sha": "abc123", "max_workspaces": 3, "used_workspaces": 2}|}
+    {
+      Cap.flags = [ Cap.Flags.One_shot ];
+      sha = "abc123";
+      environment = None;
+      runs_on = None;
+      used_work_manifests = 0;
       merge_phase = None;
     }
 
@@ -99,8 +107,6 @@ let test_a_row_of_the_setup_phase =
       sha = "abc123";
       environment = None;
       runs_on = None;
-      max_workspaces = None;
-      used_workspaces = 0;
       used_work_manifests = 0;
       merge_phase = Some Cap.Merge_phase.Setup;
     }
@@ -115,8 +121,6 @@ let test_a_row_of_this_version_round_trips =
           sha = "deadbeef";
           environment = Some "development";
           runs_on = Some (`Assoc [ ("labels", `List [ `String "ubuntu-latest" ]) ]);
-          max_workspaces = Some 5;
-          used_workspaces = 4;
           used_work_manifests = 2;
           merge_phase = Some Cap.Merge_phase.Layer;
         }
@@ -132,6 +136,7 @@ let test =
       test_a_row_with_flags;
       test_a_row_without_the_work_manifest_count;
       test_a_row_without_the_merge_phase;
+      test_a_row_with_only_the_removed_fields;
       test_a_row_of_the_setup_phase;
       test_a_row_of_this_version_round_trips;
     ]

@@ -1,0 +1,20 @@
+-- Drop the index that held a compute node to one work manifest.
+--
+-- The index [compute_node_work_wm_state_idx] admitted one row in the state
+-- [created] for each node, so one node owed one work manifest and one action run
+-- ran one work manifest.  A node now takes the work manifests of one group, up to
+-- [batch_runs.max_work_manifests_per_node], so a second row in the state [created]
+-- must be allowed.  While the index was here that write failed with SQLSTATE
+-- 23505.
+--
+-- The order of the poll needs no unique index: [compute_node_work_created_idx]
+-- answers the read in the order the job made the rows, and
+-- [compute_node_work_work_manifest_idx] keeps a work manifest unique, so a row
+-- moves between nodes and is never copied.  The count of [can_run] under the row
+-- lock of [select_compute_node.sql] is what bounds the work of a node now, not the
+-- database.
+--
+-- [if exists] is a guard and not the normal path: the index comes from
+-- [2025-07-24-add-builder-tables.sql], so every database that ran that migration
+-- holds it.
+drop index if exists compute_node_work_wm_state_idx;

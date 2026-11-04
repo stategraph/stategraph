@@ -106,6 +106,30 @@ struct
   let time_it s l f =
     Abbs_time_it.run (fun time -> Logs.info (fun m -> l m (Builder.log_id s) time)) f
 
+  (* Publishing commit checks is the same work in the PR flow and in the branch flow: only the
+     ref that receives the checks differs, and the ref is an argument of the returned function.
+     Both flows register this task; a rule written twice drifts. *)
+  let create_commit_checks =
+    run ~name:"create_commit_checks" (fun s { Builder.Bs.Fetcher.fetch } ->
+        let open Abbs_fc.Infix_result_monad in
+        fetch Keys.client
+        >>= fun client ->
+        fetch Keys.repo
+        >>| fun repo ->
+        fun branch_ref checks ->
+         (* When updating commit checks, mark the existing key as dirty. *)
+         Builder.State.mark_dirty s Keys.commit_checks;
+         let open Abbs_fc.Infix_result_monad in
+         S.Repo_config.fetch_brand ~request_id:(Builder.log_id s) client repo
+         >>= fun brand ->
+         S.Api.create_commit_checks
+           ~request_id:(Builder.log_id s)
+           ~brand
+           client
+           repo
+           branch_ref
+           checks)
+
   let query_repo_tree_changes ~base_ref s db account branch_ref =
     time_it
       s

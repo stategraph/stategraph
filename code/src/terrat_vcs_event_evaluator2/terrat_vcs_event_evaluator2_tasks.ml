@@ -2548,9 +2548,9 @@ struct
        manifest has one node and one row.
 
        The new node takes the capabilities of the old one, because the two run the
-       same work in the same way.  It takes the charge of this work manifest
-       alone.  The old node carried what every work manifest it performed had
-       spent, and none of that is the charge of this one.
+       same work in the same way.  It counts this work manifest alone: the old
+       node was charged every work manifest it was given, and none of that is the
+       count of this one.
 
        The phase comes from this work manifest, and not from the old node.  The
        phase of a node is the phase of the work the node was made for, and this
@@ -2558,7 +2558,7 @@ struct
     let move_work_manifest_to_its_own_node s compute_node work_manifest =
       let module C = Tjc.Compute_node in
       let module Wm = Terrat_work_manifest3 in
-      let { Wm.id = work_manifest_id; changes; steps; _ } = work_manifest in
+      let { Wm.id = work_manifest_id; steps; _ } = work_manifest in
       let open Irm in
       Builder.run_db s ~f:(fun db ->
           time_it
@@ -2578,8 +2578,7 @@ struct
                 ~capabilities:
                   {
                     compute_node.C.capabilities with
-                    C.Capabilities.used_workspaces = CCList.length changes;
-                    used_work_manifests = 1;
+                    C.Capabilities.used_work_manifests = 1;
                     merge_phase = Merge_steps.phase_of steps;
                   }
                 db
@@ -2590,7 +2589,7 @@ struct
                 ~work_manifest:work_manifest_id
                 db))
 
-    let terminate_compute_node s compute_node =
+    let terminate_compute_node_id s compute_node_id =
       let module C = Tjc.Compute_node in
       Builder.run_db s ~f:(fun db ->
           time_it
@@ -2601,14 +2600,101 @@ struct
                  time=%f"
                 log_id
                 Uuidm.pp
-                compute_node.C.id
+                compute_node_id
                 time)
             (fun () ->
               S.Job_context.Compute_node.update_state
                 ~request_id:(Builder.log_id s)
-                ~compute_node_id:compute_node.C.id
+                ~compute_node_id
                 db
                 C.State.Terminated))
+
+    let terminate_compute_node s compute_node =
+      let module C = Tjc.Compute_node in
+      terminate_compute_node_id s compute_node.C.id
+
+    (* The run of a work manifest is dead: it can no longer post a result.
+       Nothing else takes the work manifest out of [running], and a work
+       manifest that runs holds back every apply queued against its dirspaces,
+       so end it here. *)
+    let abort_dead_work_manifest s work_manifest_id =
+      let open Abbs_fc.Infix_result_monad in
+      Builder.run_db s ~f:(fun db ->
+          time_it
+            s
+            (fun m log_id time ->
+              m
+                "%s : WORK_MANIFEST : ABORT_DEAD : work_manifest_id = %a : time=%f"
+                log_id
+                Uuidm.pp
+                work_manifest_id
+                time)
+            (fun () ->
+              S.Work_manifest.update_state
+                ~request_id:(Builder.log_id s)
+                db
+                work_manifest_id
+                Terrat_work_manifest3.State.Aborted))
+      >>= fun () ->
+      Abbs_fc.to_result
+        (Tasks_base.release_stategraph_reservation ~request_id:(Builder.log_id s) work_manifest_id)
+
+    (* A compute node can owe more work manifests than the one its run was
+       started for, which is how the tree builder step and the config builder
+       step share one action run.  When the run of the node dies, those work
+       manifests are queued and they have no run id, because one takes a run id
+       only when the node polls for it.  The run of this node is dead, so that
+       poll never comes:
+
+         - the dispatcher does not start them, because it starts a node in the
+           state [queued] and this node is [starting]; and
+         - no task finds them, because the failure task finds a work manifest
+           by run id.
+
+       They would then stay queued for ever, and their state machines would
+       suspend the job on every later evaluation.  End every one of them with
+       this run, and terminate the node, so a later evaluation can make the
+       work again.
+
+       The caller aborts the work manifest of the dead run first, so the
+       trigger has taken its own row out of the state [created].  The rows
+       below are therefore the work manifests the node still owes, and no row
+       means the node owed nothing.
+
+       No work manifest here is ever [running] with work of its own: a node
+       that polls serves its rows, and a row the poll did not serve belongs to
+       a run that never started, so every row below is [queued] and aborting it
+       needs no rerun of its job. *)
+    let abort_work_the_node_still_owes s compute_node_id =
+      let module Cw = Tjc.Compute_node_work in
+      let open Irm in
+      Builder.run_db s ~f:(fun db ->
+          S.Job_context.Compute_node.query_work ~request_id:(Builder.log_id s) ~compute_node_id db)
+      >>= fun work_rows ->
+      Abbs_fc.List_result.iter
+        ~f:(fun { Cw.work_manifest; _ } ->
+          Logs.info (fun m ->
+              m
+                "%s : WORK_MANIFEST : ABORT_ORPHANED : work_manifest_id = %a : compute_node_id = %a"
+                (Builder.log_id s)
+                Uuidm.pp
+                work_manifest
+                Uuidm.pp
+                compute_node_id);
+          abort_dead_work_manifest s work_manifest)
+        work_rows
+      >>= fun () -> terminate_compute_node_id s compute_node_id
+
+    (* The node-keyed release of the work the node still owes.  The caller puts
+       the compute node id in the store, and the release runs inside the
+       transaction of the caller and shares its holds. *)
+    let release_compute_node_work =
+      run ~name:"release_compute_node_work" (fun s { Bs.Fetcher.fetch } ->
+          let open Irm in
+          fetch Keys.compute_node_id
+          >>= function
+          | None -> Abbs_fc.return_err (`Missing_dep_err "compute_node_id")
+          | Some compute_node_id -> abort_work_the_node_still_owes s compute_node_id)
 
     let eval_compute_node_poll =
       let query_job_by_work_manifest s db work_manifest_id =
@@ -2754,7 +2840,7 @@ struct
                       ~request_id:(Builder.log_id s)
                       ~compute_node_id:compute_node.C.id
                       db))
-            >>= fun work ->
+            >>= fun work_rows ->
             CCOption.map_lazy
               (fun () ->
                 Builder.run_db s ~f:(fun db -> query_work_manifest s db work_manifest.Wm.id)
@@ -2788,26 +2874,22 @@ struct
                 | Some Wm.State.Completed | None ->
                     Abbs_fc.return_ok (Wmc.Work_manifest_done { Wmd.type_ = `Done }))
               Abbs_fc.return_ok
-              (CCOption.flat_map (fun cw -> cw.Cw.work) work)
+              (CCList.find_opt
+                 (fun { Cw.work_manifest = id; _ } -> Uuidm.equal id work_manifest.Wm.id)
+                 work_rows
+              |> CCOption.flat_map (fun cw -> cw.Cw.work))
       in
-      (* [work] is what the compute node already owes the action, read from its
-         row in [compute_node_work] by the caller. *)
+      (* Hand the action the response the server has already made for a work
+         manifest, or make that response.  [work] is that response, read from the
+         row of [compute_node_work] by the caller, and [None] means the server has
+         not made it yet.
+
+         A work manifest that is over never reaches here: [serve_held_work] skips
+         its row, because ending the node on it would leave the work the node still
+         owes on a node that is gone. *)
       let handle_sha_match s compute_node work_manifest work offering =
-        let module Wm = Terrat_work_manifest3 in
-        let module Wmc = Terrat_api_components.Work_manifest in
-        let module Wmd = Terrat_api_components.Work_manifest_done in
-        let open Irm in
-        (* The response already exists, so deliver it. *)
         CCOption.map_lazy
-          (fun () ->
-            match work_manifest with
-            (* The node owes nothing and its work manifest is over. *)
-            | { Wm.state = Wm.State.(Completed | Aborted); _ } ->
-                terminate_compute_node s compute_node
-                >>| fun () -> Wmc.Work_manifest_done { Wmd.type_ = `Done }
-            (* The node has the work manifest, but the server has not made the
-               response yet.  Take the path that makes it. *)
-            | work_manifest -> make_work_manifest_response s compute_node work_manifest offering)
+          (fun () -> make_work_manifest_response s compute_node work_manifest offering)
           Abbs_fc.return_ok
           work
       in
@@ -2856,6 +2938,148 @@ struct
           let module Wmc = Terrat_api_components.Work_manifest in
           let module Wmd = Terrat_api_components.Work_manifest_done in
           let open Irm in
+          (* Hand the action the work of one row of the node.  [work] is the
+             response the server has already made for that work manifest, when it
+             has one.  [`Superseded] says that a newer plan of the pull request
+             replaced this one, so the node has ended. *)
+          let serve_the_row compute_node work_manifest work =
+            fetch Keys.compute_node_offering
+            >>= fun offering ->
+            (* The runner can offer a sha that is not the one the node was made
+               for: the branch moved between the evaluation of the job and the
+               run.  A moved commit is not a reason to abort on its own (RFD
+               2356): the start of the state machine compares the files of the
+               dirspaces and restarts only on a proven impact.  A plan that a
+               newer plan of the pull request replaced is aborted before that. *)
+            (if CCOption.is_some work then Abbs_fc.return_ok None
+             else supersede_plan s compute_node work_manifest offering)
+            >>= function
+            | Some response -> Abbs_fc.return_ok (`Superseded (offering, response))
+            | None ->
+                handle_sha_match s compute_node work_manifest work offering
+                >>| fun served -> `Served served
+          in
+
+          (* Give every work manifest the node still owes a node of its own, so
+             that no row stays in the state [created] on a node that is over.  No
+             sweep reaches such a row, and the work it holds would wait for ever.
+
+             The path that needs this is the supersede: a newer plan of the pull
+             request replaced the plan of this row, so the node ends, and the
+             work the node still owes is not the superseded plan. *)
+          let rec release_held_work compute_node offering = function
+            | [] -> Abbs_fc.return_ok ()
+            | { Cw.work_manifest = work_manifest_id; work; _ } :: rest -> (
+                let module Offering = Terrat_api_components.Work_manifest_initiate in
+                Builder.run_db s ~f:(fun db -> query_work_manifest s db work_manifest_id)
+                >>= function
+                | Some { Wm.state = Wm.State.(Completed | Aborted); _ } ->
+                    release_held_work compute_node offering rest
+                | Some ({ Wm.state = Wm.State.Running; _ } as work_manifest) -> (
+                    (* The dispatcher started this work manifest and no poll ever
+                       served it.  Nothing will ever complete it: the run of this
+                       node is over, and a work manifest in the state [running] is
+                       never dispatched again.  Abort it and evaluate its job
+                       again, the way [START_UNANSWERED] does.  A row whose
+                       response was already made is left alone: the run is
+                       performing it, and finishing it drains the row.
+
+                       On this path the row cannot be the one the dispatcher
+                       started: the superseded row is that row, and it never
+                       reaches [rest].  The state is reachable after a server
+                       restart between the dispatch and the first poll, and it is
+                       the wreck the ranking of the dispatcher and the order of
+                       the poll used to leave behind when they disagreed. *)
+                    match work with
+                    | Some _ -> release_held_work compute_node offering rest
+                    | None ->
+                        Builder.run_db s ~f:(fun db ->
+                            Tasks_base.abort_work_manifest
+                              s
+                              db
+                              work_manifest.Wm.id
+                              offering.Offering.run_id)
+                        >>= fun () ->
+                        rerun_job s work_manifest.Wm.id
+                        >>= fun _response -> release_held_work compute_node offering rest)
+                | Some work_manifest ->
+                    move_work_manifest_to_its_own_node s compute_node work_manifest
+                    >>= fun () -> release_held_work compute_node offering rest
+                | None -> release_held_work compute_node offering rest)
+          in
+
+          (* Serve one row, or release the rest of the held work when a newer plan
+             of the pull request replaced this one. *)
+          let serve_and_finish compute_node work_manifest work rest =
+            serve_the_row compute_node work_manifest work
+            >>= function
+            | `Served served -> Abbs_fc.return_ok served
+            | `Superseded (offering, response) ->
+                release_held_work compute_node offering rest >>| fun () -> response
+          in
+
+          (* Serve the first work manifest the node holds that may run.
+
+             The node holds up to [batch_runs.max_work_manifests_per_node] work
+             manifests, and it serves them in the order the job made them.  A work
+             manifest that joined this node never reached the dispatcher, so the
+             dispatcher cannot hold it back.  Ask the dispatcher's own question
+             here instead: may this work manifest run now?  A plan waits for an
+             apply that runs on its dirspaces, and two applies never run on one
+             dirspace at once.
+
+             Ask it of a work manifest in the state [queued] only.  That state is
+             what tells the two apart.  The dispatcher moves a work manifest it
+             starts to [running] before the action of the node can poll, and it
+             asked these questions itself to pick it.  A work manifest that joined
+             a node stays [queued] until [make_work_manifest_response] above makes
+             its response.
+
+             A node never waits.  A blocked work manifest gets a node of its own in
+             the state [queued] and the poll goes on to the next one.  When none may
+             run, the node ends, and the dispatcher starts each moved work manifest
+             in the usual way once it is free. *)
+          let rec serve_held_work compute_node = function
+            | [] ->
+                terminate_compute_node s compute_node
+                >>| fun () -> Wmc.Work_manifest_done { Wmd.type_ = `Done }
+            | { Cw.work_manifest = work_manifest_id; work; _ } :: rest -> (
+                Builder.run_db s ~f:(fun db -> query_work_manifest s db work_manifest_id)
+                >>= fun work_manifest ->
+                (* A row in the state [created] whose work manifest is over is not
+                   work the node owes.  The trigger
+                   [work_manifest_compute_node_work_state_trigger] moves such a row
+                   out of [created] when the work manifest finishes, so this is a
+                   safety net: skip the row, and leave the rest of the held work to
+                   be served.  Ending the node here would leave those rows on a
+                   [terminated] node, and no sweep reaches them. *)
+                match work_manifest with
+                | Some { Wm.state = Wm.State.(Completed | Aborted); _ } ->
+                    serve_held_work compute_node rest
+                | Some ({ Wm.state = Wm.State.Queued; _ } as work_manifest) -> (
+                    Builder.run_db s ~f:(fun db ->
+                        S.Db.work_manifest_can_run
+                          ~request_id:(Builder.log_id s)
+                          ~work_manifest_id
+                          ~stategraph_parallel_applies:S.stategraph_parallel_applies
+                          db)
+                    >>= function
+                    | `Yes -> serve_and_finish compute_node work_manifest work rest
+                    | `No | `Busy ->
+                        Logs.info (fun m ->
+                            m
+                              "%s : COMPUTE_NODE : WORK_MANIFEST_BLOCKED : work_manifest_id = %a"
+                              (Builder.log_id s)
+                              Uuidm.pp
+                              work_manifest_id);
+                        move_work_manifest_to_its_own_node s compute_node work_manifest
+                        >>= fun () -> serve_held_work compute_node rest)
+                | Some work_manifest -> serve_and_finish compute_node work_manifest work rest
+                | None ->
+                    (* If anything failed, be sure to return to the querying node to give up. *)
+                    Logs.info (fun m -> m "%s : UNKNOWN_WORK_MANIFEST" (Builder.log_id s));
+                    Abbs_fc.return_ok (Wmc.Work_manifest_done { Wmd.type_ = `Done }))
+          in
           fetch Keys.compute_node
           >>= function
           | None -> Abbs_fc.return_err (`Missing_dep_err "compute_node")
@@ -2877,81 +3101,18 @@ struct
                         ~request_id:(Builder.log_id s)
                         ~compute_node_id:compute_node.C.id
                         db))
-              (* The row of the node names the work manifest of this poll, and
-                 the row is in the state [created] only, so it is always work the
-                 node still owes.
+              (* The rows of the node name the work manifests it still owes, in
+                 the order the job made them, and every row is in the state
+                 [created], so it is always work the node still owes.
 
                  No row means the node owes nothing.  Its id names no work
                  manifest, because the database chooses it, so there is nothing
                  else to look for: tell the action to stop and end the node. *)
               >>= function
-              | None ->
+              | [] ->
                   terminate_compute_node s compute_node
                   >>| fun () -> Wmc.Work_manifest_done { Wmd.type_ = `Done }
-              | Some { Cw.work_manifest = work_manifest_id; work; _ } -> (
-                  Builder.run_db s ~f:(fun db -> query_work_manifest s db work_manifest_id)
-                  >>= fun work_manifest ->
-                  (* A work manifest that joined this node never reached the
-                     dispatcher, so the dispatcher cannot hold it back.  Ask the
-                     dispatcher's own question here instead: may this work
-                     manifest run now?  A plan waits for an apply that runs on
-                     its dirspaces, and two applies never run on one dirspace at
-                     once.
-
-                     Ask it of a work manifest in the state [queued] only.  That
-                     state is what tells the two apart.  The dispatcher moves a
-                     work manifest it starts to [running] before the action of the
-                     node can poll, and it asked these questions itself to pick
-                     it.  A work manifest that joined a node stays [queued] until
-                     [make_work_manifest_response] below makes its response.
-
-                     A node never waits.  When the answer is no, give the work
-                     manifest a node of its own in the state [queued], end this
-                     node, and answer done.  The dispatcher then starts it in the
-                     usual way once it is free. *)
-                  (match work_manifest with
-                    | Some ({ Wm.state = Wm.State.Queued; _ } as work_manifest) ->
-                        Builder.run_db s ~f:(fun db ->
-                            S.Db.work_manifest_can_run
-                              ~request_id:(Builder.log_id s)
-                              ~work_manifest_id
-                              ~stategraph_parallel_applies:S.stategraph_parallel_applies
-                              db)
-                        >>| fun can_run -> if can_run then `Can_run else `Blocked work_manifest
-                    | Some _ | None -> Abbs_fc.return_ok `Can_run)
-                  >>= function
-                  | `Blocked work_manifest ->
-                      Logs.info (fun m ->
-                          m
-                            "%s : COMPUTE_NODE : WORK_MANIFEST_BLOCKED : work_manifest_id = %a"
-                            (Builder.log_id s)
-                            Uuidm.pp
-                            work_manifest_id);
-                      move_work_manifest_to_its_own_node s compute_node work_manifest
-                      >>= fun () ->
-                      terminate_compute_node s compute_node
-                      >>| fun () -> Wmc.Work_manifest_done { Wmd.type_ = `Done }
-                  | `Can_run -> (
-                      match work_manifest with
-                      | Some work_manifest ->
-                          fetch Keys.compute_node_offering
-                          >>= fun offering ->
-                          (* The runner can offer a sha that is not the one the node was made
-                             for: the branch moved between the evaluation of the job and the run.
-                             A moved commit is not a reason to abort on its own (RFD 2356): the
-                             start of the state machine compares the files of the dirspaces and
-                             restarts only on a proven impact.  A plan that a newer plan of the pull
-                             request replaced is aborted before that. *)
-                          (if CCOption.is_some work then Abbs_fc.return_ok None
-                           else supersede_plan s compute_node work_manifest offering)
-                          >>= CCOption.map_lazy
-                                (fun () ->
-                                  handle_sha_match s compute_node work_manifest work offering)
-                                Abbs_fc.return_ok
-                      | None ->
-                          (* If anything failed, be sure to return to the querying node to give up. *)
-                          Logs.info (fun m -> m "%s : UNKNOWN_WORK_MANIFEST" (Builder.log_id s));
-                          Abbs_fc.return_ok (Wmc.Work_manifest_done { Wmd.type_ = `Done })))))
+              | work_rows -> serve_held_work compute_node work_rows))
 
     let work_manifest_event_job =
       run ~name:"work_manifest_event_job" (fun s { Bs.Fetcher.fetch } ->
@@ -3189,55 +3350,12 @@ struct
             Builder.run_db s ~f:(fun db -> update_job_state_failed s job_id db)
         | Some _ | None -> Abbs_fc.return_ok ()
       in
-      (* The run is dead: it can no longer post a result.  Nothing else takes the
-         work manifest out of [running], and a work manifest that runs holds back
-         every apply queued against its dirspaces, so end it here. *)
-      let abort_dead_work_manifest s work_manifest_id =
-        let open Abbs_fc.Infix_result_monad in
-        Builder.run_db s ~f:(fun db ->
-            time_it
-              s
-              (fun m log_id time ->
-                m
-                  "%s : WORK_MANIFEST : ABORT_DEAD : work_manifest_id = %a : time=%f"
-                  log_id
-                  Uuidm.pp
-                  work_manifest_id
-                  time)
-              (fun () ->
-                S.Work_manifest.update_state
-                  ~request_id:(Builder.log_id s)
-                  db
-                  work_manifest_id
-                  Wm.State.Aborted))
-        >>= fun () ->
-        Abbs_fc.to_result
-          (Tasks_base.release_stategraph_reservation
-             ~request_id:(Builder.log_id s)
-             work_manifest_id)
-      in
-      (* A compute node can owe a second work manifest, which is how the tree
-         builder step and the config builder step share one action run.  That
-         work manifest is queued and it has no run id, because it takes one only
-         when the node polls for it.  The run of this node is dead, so that poll
-         never comes:
-
-           - the dispatcher does not start it, because it starts a node in the
-             state [queued] and this node is [starting]; and
-           - this task does not find it, because this task finds a work manifest
-             by run id.
-
-         It would then stay queued for ever, and its state machine would suspend
-         the job on every later evaluation.  End it with its run, and terminate
-         the node, so a later evaluation can make the step again.
-
-         The work manifest of the dead run is already aborted here, so the
-         trigger has taken its own row out of the state [created].  The read
-         below therefore gives the second work manifest, and no row means the
-         node owed nothing. *)
-      let abort_work_the_node_still_owes s work_manifest_id =
+      (* The release of the work the node still owes, keyed by the work
+         manifest whose run died.  A work manifest made before the server
+         wrote a row with each work manifest owns its node alone, so there is
+         nothing to release for it. *)
+      let abort_work_of_the_node_of_work_manifest s work_manifest_id =
         let module C = Tjc.Compute_node in
-        let module Cw = Tjc.Compute_node_work in
         let open Irm in
         Builder.run_db s ~f:(fun db ->
             S.Job_context.Compute_node.query_by_work_manifest
@@ -3245,29 +3363,8 @@ struct
               ~work_manifest_id
               db)
         >>= function
-        (* A work manifest made before the server wrote a row with each work
-           manifest owns its node alone, so there is nothing to release. *)
         | None -> Abbs_fc.return_ok ()
-        | Some compute_node ->
-            Builder.run_db s ~f:(fun db ->
-                S.Job_context.Compute_node.query_work
-                  ~request_id:(Builder.log_id s)
-                  ~compute_node_id:compute_node.C.id
-                  db)
-            >>= (function
-            | Some { Cw.work_manifest; _ } ->
-                Logs.info (fun m ->
-                    m
-                      "%s : WORK_MANIFEST : ABORT_ORPHANED : work_manifest_id = %a : \
-                       compute_node_id = %a"
-                      (Builder.log_id s)
-                      Uuidm.pp
-                      work_manifest
-                      Uuidm.pp
-                      compute_node.C.id);
-                abort_dead_work_manifest s work_manifest
-            | None -> Abbs_fc.return_ok ())
-            >>= fun () -> terminate_compute_node s compute_node
+        | Some compute_node -> abort_work_the_node_still_owes s compute_node.C.id
       in
       let bail_out_aborted s work_manifest_id run_id =
         let open Irm in
@@ -3316,7 +3413,7 @@ struct
                  to run in. *)
               abort_dead_work_manifest s work_manifest.Wm.id
               >>= fun () ->
-              abort_work_the_node_still_owes s work_manifest.Wm.id
+              abort_work_of_the_node_of_work_manifest s work_manifest.Wm.id
               >>= fun () -> dispatch_fail_event s work_manifest run_id)
 
     let eval_push_event =
@@ -4464,6 +4561,7 @@ struct
     |> Hmap.add (coerce Keys.eval_push_event) Tasks.eval_push_event
     |> Hmap.add (coerce Keys.eval_work_manifest_event) Tasks.eval_work_manifest_event
     |> Hmap.add (coerce Keys.eval_work_manifest_failure) Tasks.eval_work_manifest_failure
+    |> Hmap.add (coerce Keys.release_compute_node_work) Tasks.release_compute_node_work
     |> Hmap.add
          (coerce Keys.finalize_unfinished_terrateam_checks)
          Tasks.finalize_unfinished_terrateam_checks
