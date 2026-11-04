@@ -571,6 +571,10 @@ let migrations =
     ( "add-tf-module-hcl-remote-tf-state-refs",
       run_sql [%blob "./migrations/2026-10-14-add-tf-module-hcl-remote-tf-state-refs.sql"] );
     ("drop-oauth2-sessions", run_sql [%blob "./migrations/2026-11-03-drop-oauth2-sessions.sql"]);
+    (* The 'commit-reserved' transaction state, the orchestration's commit lock on a transaction its
+       apply is about to commit; see the comment in the file. *)
+    ( "add-tx-commit-reserved-state",
+      run_sql [%blob "./migrations/2026-10-30-add-tx-commit-reserved-state.sql"] );
   ]
 
 let run config storage = Mig.run { Migrate.config; storage; tx = () } migrations

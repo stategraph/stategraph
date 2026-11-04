@@ -530,6 +530,9 @@ module Make (S : Terrat_vcs_provider2.S) = struct
   let check_dirspaces_owned_by_other_pull_requests : unit Key.t =
     Hmap.Key.create "check_dirspaces_owned_by_other_pull_requests"
 
+  let check_stategraph_overlapping_applies : unit Key.t =
+    Hmap.Key.create "check_stategraph_overlapping_applies"
+
   let check_pull_request_state : unit Key.t = Hmap.Key.create "check_pull_request_state"
 
   let maybe_create_completed_apply_check : unit Key.t =

@@ -13,7 +13,7 @@ With `engine: stategraph` in `.stategraph/config.yml`, Stategraph Orchestration 
 - A plan adds the other states that the change reaches through `terraform_remote_state`. See [Multi-state transactions](/docs/infrastructure-as-a-database/multi-state).
 - Conflicts are checked per resource at commit time. If two pull requests change different resources in the same state, both applies commit.
 - If they overlap, Stategraph rejects the second, so that it cannot overwrite the first. You must plan it again. See [Resource-level locking](/docs/infrastructure-as-a-database/resource-locking).
-- Orchestration directory locks still follow your [lock policy](/docs/reference/orchestration/configuration/lock-policy).
+- In the Enterprise edition, pull requests apply the same directory in parallel instead of waiting for its lock, whatever the lock policy. When Orchestration runs inside the Stategraph server, it refuses an apply that Stategraph would reject before it starts, and names the pull request and the resources. A pull request whose plan opened its transaction after another one's apply committed must plan again, and then wait for that one to merge. See [Locks in Infrastructure as a Database](/docs/orchestration/workflows/advanced/lock-management#locks-in-infrastructure-as-a-database). With other engines, directory locks follow your [lock policy](/docs/reference/orchestration/configuration/lock-policy).
 - Each run is a transaction that records what changed, in which state, and by whom. See it with `stategraph tx list`, the **State Changes** page in the console, or SQL.
 
 ## Before you begin

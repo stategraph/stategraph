@@ -72,6 +72,22 @@ Any value other than `strict` is less safe. Use it only where a stale infrastruc
 
 Orchestration locks are per pull request and per dirspace. Infrastructure as a Database also locks single resources in a state, so two transactions that change different resources in the same state do not conflict. See [Resource-level locking](/docs/infrastructure-as-a-database/resource-locking).
 
+In the Enterprise edition, a dirspace that runs `engine: stategraph`, set for the whole repository or in its workflow, is not locked for other pull requests, whatever its `lock_policy`. Pull requests apply it in parallel, and Stategraph rejects an apply that changes a resource another apply committed since its plan. You must plan it again. Plans do not wait for another pull request's apply on such a dirspace either, nor applies for another pull request's plans.
+
+When Orchestration runs inside the Stategraph server, it asks Stategraph before it starts an apply. An apply whose plan changes a resource that another pull request is applying, or has applied since the plan was made, is refused with **Overlapping applies**, which names that pull request and the resources, instead of being started and rejected at commit. Wait for that pull request to merge, bring the base branch into yours and plan again. If its apply fails, your plan stands: apply again.
+
+An apply that passes the check reserves its transactions: from then until the commit, Stategraph rejects any other transaction that overlaps them, including one applied outside Orchestration with the `stategraph` CLI, so what the check allowed stays allowed. The reservation ends with the apply, or after an hour if the run never reports back. A reserved transaction shows the state `commit-reserved` in `stategraph tx list`.
+
+One rule still applies. Stategraph settles an overlap only between a transaction and the transactions committed after it opened. A plan whose transaction opened after another pull request's apply committed would undo that pull request's change, because your branch does not contain it, so Orchestration refuses such an apply until the other pull request merges:
+
+1. Jane's and John's pull requests both plan `(dir1, default)`.
+2. Jane's pull request applies. John's pull request can still apply, during or after Jane's apply: his plan's transaction opened before hers committed, so Stategraph checks the two for an overlap. If they change the same resource, his apply is refused before it starts or rejected at commit, and he plans again.
+3. If John plans after Jane's apply committed, his apply is refused until Jane's pull request merges.
+
+The runner reports the transaction of each plan and apply to Orchestration. Without that report, from an older runner, Orchestration compares the times of the runs themselves instead. That is safe, but it refuses more often: a plan that overlapped another pull request's apply in time then counts as made after it.
+
+A failed apply does not block other pull requests.
+
 ## Best practices
 
 - Tell your team when you work on shared directories, so that applies do not wait for each other.

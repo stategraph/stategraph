@@ -156,7 +156,14 @@ struct
         m "%s : LOCK_REPOSITORY : repo=%s : time=%f" log_id (S.Api.Repo.to_string repo) time)
       (fun () -> S.Db.lock_repository ~request_id:(Builder.log_id s) db account repo)
 
-  let query_dirspaces_without_valid_plans ~base_ref ~branch_ref s db pull_request dirspaces =
+  let query_dirspaces_without_valid_plans
+      ~base_ref
+      ~branch_ref
+      ~stategraph_parallel_apply_dirspaces
+      s
+      db
+      pull_request
+      dirspaces =
     time_it
       s
       (fun m log_id time ->
@@ -170,6 +177,7 @@ struct
           ~request_id:(Builder.log_id s)
           ~base_ref
           ~branch_ref
+          ~stategraph_parallel_apply_dirspaces
           db
           pull_request
           dirspaces)
@@ -268,6 +276,7 @@ struct
       ~job_id
       ~start_timeout
       ~changed_dirspaces
+      ~stategraph_parallel_apply_dirspaces
       context
       dirspaces
       op =
@@ -286,6 +295,7 @@ struct
           ~job_id
           ~start_timeout
           ~changed_dirspaces
+          ~stategraph_parallel_apply_dirspaces
           db
           context
           dirspaces
@@ -319,7 +329,12 @@ struct
           time)
       (fun () -> S.Gate.eval ~request_id:(Builder.log_id s) client dirspaces pull_request db)
 
-  let query_dirspaces_owned_by_other_pull_requests s db pull_request dirspaces =
+  let query_dirspaces_owned_by_other_pull_requests
+      s
+      db
+      pull_request
+      dirspaces
+      ~stategraph_parallel_apply_dirspaces =
     time_it
       s
       (fun m log_id time ->
@@ -333,7 +348,108 @@ struct
           ~request_id:(Builder.log_id s)
           db
           pull_request
-          dirspaces)
+          dirspaces
+          ~stategraph_parallel_apply_dirspaces)
+
+  (* The applies of other pull requests among the rows of a dirspace, each with its transaction
+     parsed.  A row without an apply, or whose apply reported no id, is left out. *)
+  let other_applies ~request_id rows =
+    let module Pat = P2.Parallel_apply_tx in
+    CCList.filter_map
+      (fun { Pat.other; _ } ->
+        CCOption.flat_map
+          (fun ({ Pat.Other.tx; _ } as other) ->
+            CCOption.map (fun id -> (id, other)) (Tasks_base.stategraph_tx ~request_id tx))
+          other)
+      rows
+
+  (* The question itself: the transaction of our plan of the dirspace against those of the other
+     applies on it. *)
+  let ask_stategraph_overlaps s ~installation ~dirspace ~tx others =
+    time_it
+      s
+      (fun m log_id time ->
+        m
+          "%s : STATEGRAPH_OVERLAPS : dir=%s : workspace=%s : tx=%a : others=%d : time=%f"
+          log_id
+          dirspace.Terrat_change.Dirspace.dir
+          dirspace.Terrat_change.Dirspace.workspace
+          Uuidm.pp
+          tx
+          (CCList.length others)
+          time)
+      (fun () ->
+        S.Stategraph.overlaps
+          ~request_id:(Builder.log_id s)
+          ~installation
+          ~tx
+          ~other_tx_ids:(CCList.map fst others))
+
+  (* The answer is by transaction; the apply it came from says whose it is. *)
+  let overlaps_of_shared dirspace others shared =
+    let module Pat = P2.Parallel_apply_tx in
+    let module So = P2.Stategraph_overlap in
+    CCList.filter_map
+      (fun (id, { Pat.Other.pull_number; state; _ }) ->
+        Sln_map.Uuidm.find_opt id shared
+        |> CCOption.map (fun addresses ->
+            { So.dirspace; pull_number; state; addresses = Sln_set.String.to_list addresses }))
+      others
+
+  (* A pull request with several applies on the dirspace is named once, with everything they share
+     with our plan. *)
+  let merge_overlaps_by_pull_request overlaps =
+    let module Pat = P2.Parallel_apply_tx in
+    let module So = P2.Stategraph_overlap in
+    overlaps
+    |> CCList.group_by
+         ~hash:(fun { So.pull_number; _ } -> pull_number)
+         ~eq:(fun a b -> a.So.pull_number = b.So.pull_number)
+    |> CCList.filter_map (function
+      | [] -> None
+      | first :: _ as same_pull_request ->
+          Some
+            {
+              first with
+              So.state =
+                CCList.fold_left
+                  (fun state { So.state = s; _ } -> Pat.Other.State.merge state s)
+                  Pat.Other.State.Applying
+                  same_pull_request;
+              addresses =
+                same_pull_request
+                |> CCList.flat_map (fun { So.addresses; _ } -> addresses)
+                |> Sln_list.String.sort_uniq;
+            })
+
+  (* One question to Stategraph for the rows of one dirspace.  They all carry the same plan and
+     installation, so the first row says what to ask.  A dirspace with no other apply, or whose plan
+     reported no id, asks nothing. *)
+  let stategraph_overlaps_of_dirspace s rows =
+    let module Pat = P2.Parallel_apply_tx in
+    let request_id = Builder.log_id s in
+    match (rows, other_applies ~request_id rows) with
+    | [], _ | _, [] -> Abbs_fc.return_ok []
+    | { Pat.dirspace; installation; tx; _ } :: _, others -> (
+        match Tasks_base.stategraph_tx ~request_id tx with
+        | None -> Abbs_fc.return_ok []
+        | Some tx ->
+            let open Abbs_fc.Infix_result_monad in
+            ask_stategraph_overlaps s ~installation ~dirspace ~tx others
+            >>| overlaps_of_shared dirspace others
+            >>| merge_overlaps_by_pull_request)
+
+  (* The applies of other pull requests that Stategraph would refuse our plans for, one question per
+     dirspace. *)
+  let stategraph_overlaps s candidates =
+    let module Pat = P2.Parallel_apply_tx in
+    let open Abbs_fc.Infix_result_monad in
+    candidates
+    |> CCList.group_by
+         ~hash:(fun { Pat.dirspace; _ } -> Hashtbl.hash dirspace)
+         ~eq:(fun a b -> Terrat_change.Dirspace.equal a.Pat.dirspace b.Pat.dirspace)
+    |> Abbs_fc.List_result.map ~f:(stategraph_overlaps_of_dirspace s)
+    >>| CCList.flatten
 
   let store_stacks s db account repo pull_request config =
     time_it
@@ -528,6 +644,8 @@ struct
           >>= fun account ->
           fetch Keys.synthesized_config
           >>= fun config ->
+          fetch Keys.repo_config
+          >>= fun repo_config ->
           (* Which producer of a stored tree answers: the ids of a tree the tree builder script made
              and of a tree read from the forge do not compare (RFD 2356). *)
           fetch Keys.repo_config_raw'
@@ -592,10 +710,17 @@ struct
               asks this query and refuses on both, thus the selection has to ask it too or the two
               answers disagree.  [Never_planned] is the third reason and it is not here: it says
               this pull request has no run to keep, which the rules find on their own. *)
+            Abb.Future.return
+              (H.dirspaceflows_of_changes
+                 repo_config
+                 (CCList.filter_map (Terrat_change_match3.of_dirspace config) dirspaces))
+            >>= fun dirspaceflows ->
             Builder.run_db s ~f:(fun db ->
                 query_dirspaces_without_valid_plans
                   ~base_ref
                   ~branch_ref
+                  ~stategraph_parallel_apply_dirspaces:
+                    (Tasks_base.stategraph_parallel_apply_dirspaces repo_config dirspaceflows)
                   s
                   db
                   pull_request
@@ -1192,6 +1317,7 @@ struct
                 ~job_id:job.Tjc.Job.id
                 ~start_timeout
                 ~changed_dirspaces
+                ~stategraph_parallel_apply_dirspaces:[]
                 context
                 dirspaces
                 `Plan)
@@ -1454,6 +1580,13 @@ struct
           >>= fun job ->
           fetch Keys.work_manifest_start_timeout
           >>= fun start_timeout ->
+          fetch Keys.repo_config
+          >>= fun repo_config ->
+          Abb.Future.return (H.dirspaceflows_of_changes repo_config passed_dirspaces)
+          >>= fun dirspaceflows ->
+          let stategraph_parallel_apply_dirspaces =
+            Tasks_base.stategraph_parallel_apply_dirspaces repo_config dirspaceflows
+          in
           Builder.run_db s ~f:(fun db ->
               (* An apply aborts no plan, thus the changed dirspaces are not asked for. *)
               S.Db.query_conflicting_work_manifests_in_repo_for_context
@@ -1461,6 +1594,7 @@ struct
                 ~job_id:job.Tjc.Job.id
                 ~start_timeout
                 ~changed_dirspaces:dirspaces
+                ~stategraph_parallel_apply_dirspaces
                 db
                 context
                 dirspaces
@@ -1499,10 +1633,16 @@ struct
               :> (R.t, [> Terrat_access_control2.err ]) result)
           >>= fun { Terrat_access_control2.R.pass = working_set_matches; _ } ->
           let working_dirspaces = CCList.map (fun dc -> dc.Dc.dirspace) working_set_matches in
+          fetch Keys.repo_config
+          >>= fun repo_config ->
+          Abb.Future.return (H.dirspaceflows_of_changes repo_config working_set_matches)
+          >>= fun dirspaceflows ->
           Builder.run_db s ~f:(fun db ->
               query_dirspaces_without_valid_plans
                 ~base_ref
                 ~branch_ref
+                ~stategraph_parallel_apply_dirspaces:
+                  (Tasks_base.stategraph_parallel_apply_dirspaces repo_config dirspaceflows)
                 s
                 db
                 pull_request
@@ -1858,12 +1998,16 @@ struct
           >>= fun (repo_config, pull_request, all_matches) ->
           Abb.Future.return (H.dirspaceflows_of_changes repo_config (CCList.flatten all_matches))
           >>= fun all_match_dirspaceflows ->
+          let stategraph_parallel_apply_dirspaces =
+            Tasks_base.stategraph_parallel_apply_dirspaces repo_config all_match_dirspaceflows
+          in
           Builder.run_db s ~f:(fun db ->
               query_dirspaces_owned_by_other_pull_requests
                 s
                 db
                 pull_request
-                (CCList.map Terrat_change.Dirspaceflow.to_dirspace all_match_dirspaceflows))
+                (CCList.map Terrat_change.Dirspaceflow.to_dirspace all_match_dirspaceflows)
+                ~stategraph_parallel_apply_dirspaces)
           >>= function
           | [] -> Abbs_fc.return_ok ()
           | owned_dirspaces ->
@@ -1873,6 +2017,44 @@ struct
                 publish_comment
                 (Msg.Dirspaces_owned_by_other_pull_request owned_dirspaces)
               >>? fun () -> Error `Noop)
+
+    (* The resource-level check of an apply on a dirspace that applies in parallel.  Where the
+       orchestration reaches Stategraph, the user learns here that Stategraph would refuse the
+       commit, and for which resources; on its own ([Terrat_stategraph.Standalone]) nothing overlaps
+       here, and Stategraph refuses the commit itself when the apply runs. *)
+    let check_stategraph_overlapping_applies =
+      run ~name:"check_stategraph_overlapping_applies" (fun s { Bs.Fetcher.fetch } ->
+          let module R = Terrat_access_control2.R in
+          let open Irm in
+          fetch Keys.access_control_eval_apply
+          >>= fun access_control_eval ->
+          Abb.Future.return
+            (access_control_eval
+              : (R.t, Terrat_access_control2.err) result
+              :> (R.t, [> Terrat_access_control2.err ]) result)
+          >>= fun { R.pass = passed_dirspaces; _ } ->
+          Ee2_fc.all2 (fetch Keys.repo_config) (fetch Keys.pull_request)
+          >>= fun (repo_config, pull_request) ->
+          Abb.Future.return (H.dirspaceflows_of_changes repo_config passed_dirspaces)
+          >>= fun dirspaceflows ->
+          match Tasks_base.stategraph_parallel_apply_dirspaces repo_config dirspaceflows with
+          | [] -> Abbs_fc.return_ok ()
+          | parallel_dirspaces -> (
+              Builder.run_db s ~f:(fun db ->
+                  S.Db.query_parallel_apply_transactions
+                    ~request_id:(Builder.log_id s)
+                    db
+                    pull_request
+                    parallel_dirspaces)
+              >>= fun candidates ->
+              stategraph_overlaps s candidates
+              >>= function
+              | [] -> Abbs_fc.return_ok ()
+              | overlaps ->
+                  fetch Keys.publish_comment
+                  >>= fun publish_comment ->
+                  publish_comment' publish_comment (Msg.Stategraph_overlapping_applies overlaps)
+                  >>? fun () -> Error `Noop))
 
     let check_access_control_repo_config =
       run ~name:"check_access_control_repo_config" (fun _s { Bs.Fetcher.fetch } ->
@@ -2053,7 +2235,7 @@ struct
             fetch Keys.warn_tag_query_dropped_dirspaces
             >>= fun () ->
             Ee2_fc.Infix_result_app.(
-              (fun () () () () () () () () () () () _ -> ())
+              (fun () () () () () () () () () () () () _ -> ())
               <$> fetch Keys.check_access_control_ci_change
               <*> fetch Keys.check_access_control_apply
               <*> fetch Keys.check_access_control_files
@@ -2063,6 +2245,7 @@ struct
               <*> fetch Keys.check_conflicting_apply_work_manifests
               <*> fetch Keys.check_dirspaces_missing_plans
               <*> fetch Keys.check_dirspaces_owned_by_other_pull_requests
+              <*> fetch Keys.check_stategraph_overlapping_applies
               <*> fetch Keys.check_gates
               <*> fetch Keys.check_merge_conflict
               <*> fetch Keys.check_apply_requirements)
@@ -2316,6 +2499,9 @@ struct
     |> Hmap.add
          (coerce Keys.check_dirspaces_owned_by_other_pull_requests)
          Tasks.check_dirspaces_owned_by_other_pull_requests
+    |> Hmap.add
+         (coerce Keys.check_stategraph_overlapping_applies)
+         Tasks.check_stategraph_overlapping_applies
     |> Hmap.add (coerce Keys.check_dirspaces_to_apply) Tasks.check_dirspaces_to_apply
     |> Hmap.add (coerce Keys.check_dirspaces_to_plan) Tasks.check_dirspaces_to_plan
     |> Hmap.add (coerce Keys.check_gates) Tasks.check_gates

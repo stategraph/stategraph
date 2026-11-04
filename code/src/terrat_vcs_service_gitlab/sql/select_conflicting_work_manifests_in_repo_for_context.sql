@@ -25,6 +25,9 @@ context as (
 dirspaces as (
     select dir, workspace from unnest($dirs, $workspaces) as v(dir, workspace)
 ),
+parallel_dirspaces as (
+    select dir, workspace from unnest($parallel_dirs, $parallel_workspaces) as v(dir, workspace)
+),
 wm as (
    select
      gwm.*
@@ -50,7 +53,14 @@ work_manifests_for_dirspace as (
         ((gwm.state = 'running'
           and gwm.run_id is null
           and (now() - core.dispatched_at > make_interval(secs => $start_timeout)))
-         or (now() - gwm.created_at > interval '1 hour')) as maybe_stale
+         or (now() - gwm.created_at > interval '1 hour')) as maybe_stale,
+        bool_or(
+          not coalesce(
+            parallel_dirspaces.dir is not null
+            and gwm.pull_number is distinct from c.pull_number,
+            false
+          )
+        ) as blocks_apply
     from dirspaces
     inner join work_manifest_dirspaceflows as gwmdsfs
         on dirspaces.dir = gwmdsfs.path and dirspaces.workspace = gwmdsfs.workspace
@@ -61,7 +71,10 @@ work_manifests_for_dirspace as (
         on core.id = gwm.id
     inner join context as c
       on c.repo = gwm.repository
-    group by gwm.id, gwm.state, gwm.run_id, gwm.created_at, core.dispatched_at
+    left join parallel_dirspaces
+      on parallel_dirspaces.dir = gwmdsfs.path
+         and parallel_dirspaces.workspace = gwmdsfs.workspace
+    group by gwm.id, gwm.state, gwm.run_id, gwm.created_at, core.dispatched_at, gwm.pull_number, c.pull_number
 )
 select
     gwm.id,
@@ -95,7 +108,8 @@ where gwm.state in ('queued', 'running')
 -- against those dirspaces, because a second apply is not queued behind the
 -- first.  Either is in conflict with work that looks stale, because stale work
 -- blocks the queue until it is unlocked.
-      and (($run_type in ('autoapply', 'apply', 'unsafe-apply')
-            and gwm.run_type in ('autoapply', 'apply', 'unsafe-apply'))
-           or work_manifests_for_dirspace.maybe_stale)
+       and (work_manifests_for_dirspace.maybe_stale
+            or ($run_type in ('autoapply', 'apply', 'unsafe-apply')
+                and gwm.run_type in ('autoapply', 'apply', 'unsafe-apply')
+                and work_manifests_for_dirspace.blocks_apply))
 order by gwm.created_at

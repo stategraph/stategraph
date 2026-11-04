@@ -2915,6 +2915,7 @@ struct
                             S.Db.work_manifest_can_run
                               ~request_id:(Builder.log_id s)
                               ~work_manifest_id
+                              ~stategraph_parallel_applies:S.stategraph_parallel_applies
                               db)
                         >>| fun can_run -> if can_run then `Can_run else `Blocked work_manifest
                     | Some _ | None -> Abbs_fc.return_ok `Can_run)
@@ -3192,6 +3193,7 @@ struct
          work manifest out of [running], and a work manifest that runs holds back
          every apply queued against its dirspaces, so end it here. *)
       let abort_dead_work_manifest s work_manifest_id =
+        let open Abbs_fc.Infix_result_monad in
         Builder.run_db s ~f:(fun db ->
             time_it
               s
@@ -3208,6 +3210,11 @@ struct
                   db
                   work_manifest_id
                   Wm.State.Aborted))
+        >>= fun () ->
+        Abbs_fc.to_result
+          (Tasks_base.release_stategraph_reservation
+             ~request_id:(Builder.log_id s)
+             work_manifest_id)
       in
       (* A compute node can owe a second work manifest, which is how the tree
          builder step and the config builder step share one action run.  That

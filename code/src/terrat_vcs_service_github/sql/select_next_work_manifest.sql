@@ -3,6 +3,9 @@ wms as (
     select
         wm.id as id,
         wm.created_at as created_at,
+        wm.base_sha as base_sha,
+        wm.sha as sha,
+        wm.pull_request as pull_request,
         grm.repository_id as repository,
         wm.state as state,
         (case wm.run_type
@@ -47,83 +50,91 @@ wms as (
                    and (drift_unlocks.unlocked_at is null or drift_unlocks.unlocked_at < wm.created_at))
                or wm.run_kind = 'index')
 ),
+-- Whether a dirspace of a run applies in parallel, see below: the edition
+-- allows it ($stategraph_parallel_applies) and the dirspace runs the Stategraph
+-- engine, the engine of its workflow or else the default one, read from the
+-- derived config of the run's (repo, branch, sha), the per-repository copy of a
+-- config that the database keeps (abort_stale_work_manifests.sql).  A run whose
+-- config row is gone is not parallel: it waits, as it always has.
 dirspaces_for_work_manifests as (
     select
-        work_manifest,
-        path,
-        workspace
+        gwmds.work_manifest,
+        gwmds.path,
+        gwmds.workspace,
+        $stategraph_parallel_applies
+        and coalesce(coalesce(rc.data -> 'workflows' -> gwmds.workflow_idx::int -> 'engine' ->> 'name',
+                              rc.data -> 'engine' ->> 'name') = 'stategraph',
+                     false) as stategraph_parallel_apply
     from work_manifest_dirspaceflows as gwmds
     inner join wms
         on gwmds.work_manifest = wms.id
+    inner join work_manifests as wm
+        on wm.id = wms.id
+    inner join github_repositories_map as grm
+        on grm.core_id = wm.repo
+    inner join github_installation_repositories as gir
+        on gir.id = grm.repository_id
+    inner join github_installations_map as gim
+        on gim.installation_id = gir.installation_id
+    left join repo_configs as rc
+        on rc.kind = 'derived'
+        and rc.installation = gim.core_id
+        and rc.repo = wm.repo
+        and rc.branch = wm.branch
+        and rc.sha = wm.sha
 ),
-queued_dirspaces_per_repo as (
-    select distinct
-        wms.repository as repository,
-        wms.unified_run_type as unified_run_type,
-        path,
-        workspace
-    from work_manifest_dirspaceflows as gwmds
-    inner join wms
-        on gwmds.work_manifest = wms.id
-    where wms.state = 'queued'
-),
-running_dirspaces_per_repo as (
-    select distinct
-        wms.repository as repository,
-        wms.unified_run_type as unified_run_type,
-        path,
-        workspace
-    from work_manifest_dirspaceflows as gwmds
-    inner join wms
-        on gwmds.work_manifest = wms.id
-    where wms.state = 'running'
-),
--- The dirspaces a queued work manifest cannot be run against yet, along with
--- the kind of work manifest that has to wait on it.  A plan and an apply never
--- run against the same dirspace at the same time, and two applies never run
--- against the same dirspace at the same time.
-blocked_dirspaces as (
-    -- An apply waits for every operation running against its dirspaces to
-    -- complete.  It does not cancel them.
-    select distinct
-        rds.repository as repository,
-        rds.path as path,
-        rds.workspace as workspace,
-        'apply' as unified_run_type
-    from running_dirspaces_per_repo as rds
-    union
-    -- A plan waits for an apply running against its dirspaces.
-    select distinct
-        rds.repository as repository,
-        rds.path as path,
-        rds.workspace as workspace,
-        'plan' as unified_run_type
-    from running_dirspaces_per_repo as rds
-    where rds.unified_run_type = 'apply'
-    union
-    -- A queued apply skips the line: every plan queued against its dirspaces,
-    -- those queued before it and those queued after it, runs only once the
-    -- apply has completed.  This is what bounds how long an apply waits, the
-    -- set of work it is waiting on can only shrink.
-    select distinct
-        qds.repository as repository,
-        qds.path as path,
-        qds.workspace as workspace,
-        'plan' as unified_run_type
-    from queued_dirspaces_per_repo as qds
-    where qds.unified_run_type = 'apply'
-),
--- Reject all those work manifests that have a dirspace blocked for their kind
--- of run
+-- A queued work manifest and another one that it may not run beside.  The
+-- rules are the ones the dispatcher has always had, written per pair rather
+-- than per dirspace so that the exemption below can look at both sides.
+--
+-- Two runs on the same dirspace may overlap only when both are eligible
+-- Stategraph runs (stategraph_parallel_apply) of two different pull requests.
+-- Stategraph detects a resource-level overlap atomically when a transaction
+-- commits, and a plan taken beside another pull request's apply counts as
+-- planned after it (select_dirspaces_owned_by_other_pull_requests.sql).  A
+-- drift or index run has no pull request and never overlaps anything.
 rejected_work_manifests as (
-    select distinct wms.id as id from wms
-    inner join dirspaces_for_work_manifests as dswm
-        on dswm.work_manifest = wms.id
-    inner join blocked_dirspaces as bds
-        on bds.repository = wms.repository
-           and bds.path = dswm.path
-           and bds.workspace = dswm.workspace
-           and bds.unified_run_type = wms.unified_run_type
+    select distinct queued.id
+    from wms as queued
+    inner join dirspaces_for_work_manifests as queued_ds
+        on queued_ds.work_manifest = queued.id
+    inner join wms as other
+        on other.repository = queued.repository
+           and other.id <> queued.id
+    inner join dirspaces_for_work_manifests as other_ds
+        on other_ds.work_manifest = other.id
+           and other_ds.path = queued_ds.path
+           and other_ds.workspace = queued_ds.workspace
+    where queued.state = 'queued'
+          and (
+              -- An apply waits for plans running against its dirspaces.
+              (queued.unified_run_type = 'apply'
+               and other.state = 'running'
+               and other.unified_run_type = 'plan')
+              -- A plan waits for an apply running against its dirspaces.
+              or (queued.unified_run_type = 'plan'
+                  and other.state = 'running'
+                  and other.unified_run_type = 'apply')
+              -- A queued apply skips the line: every plan queued against its
+              -- dirspaces, those queued before it and those queued after it,
+              -- runs only once the apply has completed.  This is what bounds how
+              -- long an apply waits, the set of work it is waiting on can only
+              -- shrink.
+              or (queued.unified_run_type = 'plan'
+                  and other.state = 'queued'
+                  and other.unified_run_type = 'apply')
+              -- An apply waits for an apply running against its dirspaces.
+              or (queued.unified_run_type = 'apply'
+                  and other.state = 'running'
+                  and other.unified_run_type = 'apply')
+          )
+          and not (
+              queued_ds.stategraph_parallel_apply
+              and other_ds.stategraph_parallel_apply
+              and queued.pull_request is not null
+              and other.pull_request is not null
+              and queued.pull_request <> other.pull_request
+          )
 ),
 -- A work manifest that belongs to a compute node which already runs must not
 -- start a second action run.  The node picks it up on its next poll instead.

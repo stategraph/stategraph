@@ -615,7 +615,8 @@ module Db = struct
         (* compute_node *)
         Ret.(option uuid)
         /^ select_next_work_manifest_sql
-        /% Var.(option (uuid "work_manifest_id")))
+        /% Var.(option (uuid "work_manifest_id"))
+        /% Var.boolean "stategraph_parallel_applies")
 
     let update_job_restart_of_sql = Mql_sql.read [%blob "sql/update_job_restart_of.sql"]
 
@@ -684,7 +685,8 @@ module Db = struct
         (* compute_node *)
         Ret.(option uuid)
         /^ select_work_manifest_can_run_sql
-        /% Var.(option (uuid "work_manifest_id")))
+        /% Var.(option (uuid "work_manifest_id"))
+        /% Var.boolean "stategraph_parallel_applies")
 
     let select_flow_state_query = Mql_sql.read [%blob "sql/select_flow_data.sql"]
 
@@ -802,7 +804,9 @@ module Db = struct
         /% Var.(str_array (text "dirs"))
         /% Var.(str_array (text "workspaces"))
         /% Var.(ud (text "base_ref") Api.Ref.to_string)
-        /% Var.(ud (text "branch_ref") Api.Ref.to_string))
+        /% Var.(ud (text "branch_ref") Api.Ref.to_string)
+        /% Var.(str_array (text "parallel_dirs"))
+        /% Var.(str_array (text "parallel_workspaces")))
 
     let update_abort_duplicate_work_manifests_query =
       Mql_sql.read [%blob "sql/abort_duplicate_work_manifests.sql"]
@@ -834,6 +838,8 @@ module Db = struct
         /% Var.(ud (text "run_type") Terrat_work_manifest3.Step.to_string)
         /% Var.(str_array (text "dirs"))
         /% Var.(str_array (text "workspaces"))
+        /% Var.(str_array (text "parallel_dirs"))
+        /% Var.(str_array (text "parallel_workspaces"))
         /% Var.uuid "job_id"
         /% Var.(str_array (text "changed_dirs"))
         /% Var.(str_array (text "changed_workspaces"))
@@ -891,6 +897,8 @@ module Db = struct
         /% Var.(ud (uuid "context_id") (fun c -> c.Terrat_job_context.Context.id))
         /% Var.(str_array (text "dirs"))
         /% Var.(str_array (text "workspaces"))
+        /% Var.(str_array (text "parallel_dirs"))
+        /% Var.(str_array (text "parallel_workspaces"))
         /% Var.uuid "job_id")
 
     let select_dirspaces_owned_by_other_pull_requests_query =
@@ -936,6 +944,41 @@ module Db = struct
         (* username *)
         Ret.(option text)
         /^ select_dirspaces_owned_by_other_pull_requests_query
+        /% Var.bigint "repository"
+        /% Var.bigint "pull_number"
+        /% Var.(str_array (text "dirs"))
+        /% Var.(str_array (text "workspaces"))
+        /% Var.(str_array (text "parallel_dirs"))
+        /% Var.(str_array (text "parallel_workspaces")))
+
+    let select_parallel_apply_transactions_sql =
+      Mql_sql.read [%blob "sql/select_parallel_apply_transactions.sql"]
+
+    let select_parallel_apply_transactions () =
+      Pgsql_io.Typed_sql.(
+        sql
+        //
+        (* dir *)
+        Ret.text
+        //
+        (* workspace *)
+        Ret.text
+        //
+        (* installation *)
+        Ret.uuid
+        //
+        (* tx *)
+        Ret.text
+        //
+        (* other pull_number *)
+        Ret.(option bigint)
+        //
+        (* other tx *)
+        Ret.(option text)
+        //
+        (* other applied *)
+        Ret.(option boolean)
+        /^ select_parallel_apply_transactions_sql
         /% Var.bigint "repository"
         /% Var.bigint "pull_number"
         /% Var.(str_array (text "dirs"))
@@ -2145,7 +2188,11 @@ module Db = struct
   let store_dirspace_summaries ~request_id:_ _db _context ~sha:_ ~work_manifest:_ _summaries =
     Abbs_fc.return_ok ()
 
-  let query_next_pending_work_manifest ?new_age:(_ = false) ~request_id db =
+  let query_next_pending_work_manifest
+      ?new_age:(_ = false)
+      ~request_id
+      ~stategraph_parallel_applies
+      db =
     let run =
       let open Abbs_fc.Infix_result_monad in
       Metrics.Psql_query_time.time (Metrics.psql_query_time "select_next_work_manifest") (fun () ->
@@ -2158,7 +2205,8 @@ module Db = struct
                 db
                 ~f:(fun id compute_node -> (id, compute_node))
                 Sql.select_next_work_manifest
-                None))
+                None
+                stategraph_parallel_applies))
       >>= function
       | [] -> Abbs_fc.return_ok None
       | [ (id, compute_node) ] ->
@@ -2190,13 +2238,14 @@ module Db = struct
 
   (* The same query as the dispatcher, asked about one work manifest.  The rules
      that decide it live in that one file, so the two cannot drift. *)
-  let work_manifest_can_run ~request_id ~work_manifest_id db =
+  let work_manifest_can_run ~request_id ~work_manifest_id ~stategraph_parallel_applies db =
     let open Abb.Future.Infix_monad in
     Pgsql_io.Prepared_stmt.fetch
       db
       ~f:(fun id compute_node -> (id, compute_node))
       Sql.select_work_manifest_can_run
       (Some work_manifest_id)
+      stategraph_parallel_applies
     >>= function
     | Ok [] -> Abbs_fc.return_ok false
     | Ok (_ :: _) -> Abbs_fc.return_ok true
@@ -2407,6 +2456,7 @@ module Db = struct
       ~request_id
       ~base_ref
       ~branch_ref
+      ~stategraph_parallel_apply_dirspaces
       db
       pull_request
       dirspaces =
@@ -2435,7 +2485,13 @@ module Db = struct
           (CCList.map (fun { Terrat_change.Dirspace.dir; _ } -> dir) dirspaces)
           (CCList.map (fun { Terrat_change.Dirspace.workspace; _ } -> workspace) dirspaces)
           base_ref
-          branch_ref)
+          branch_ref
+          (CCList.map
+             (fun { Terrat_change.Dirspace.dir; _ } -> dir)
+             stategraph_parallel_apply_dirspaces)
+          (CCList.map
+             (fun { Terrat_change.Dirspace.workspace; _ } -> workspace)
+             stategraph_parallel_apply_dirspaces))
     >>= function
     | Ok _ as ret -> Abb.Future.return ret
     | Error (#Pgsql_io.err as err) ->
@@ -2520,6 +2576,7 @@ module Db = struct
       ~job_id
       ~start_timeout
       ~changed_dirspaces
+      ~stategraph_parallel_apply_dirspaces
       db
       context
       dirspaces
@@ -2533,6 +2590,14 @@ module Db = struct
     let dirs = CCList.map (fun Terrat_change.Dirspace.{ dir; _ } -> dir) dirspaces in
     let workspaces =
       CCList.map (fun Terrat_change.Dirspace.{ workspace; _ } -> workspace) dirspaces
+    in
+    let parallel_dirs =
+      CCList.map (fun Terrat_change.Dirspace.{ dir; _ } -> dir) stategraph_parallel_apply_dirspaces
+    in
+    let parallel_workspaces =
+      CCList.map
+        (fun Terrat_change.Dirspace.{ workspace; _ } -> workspace)
+        stategraph_parallel_apply_dirspaces
     in
     let changed_dirs =
       CCList.map (fun Terrat_change.Dirspace.{ dir; _ } -> dir) changed_dirspaces
@@ -2553,6 +2618,8 @@ module Db = struct
             run_type
             dirs
             workspaces
+            parallel_dirs
+            parallel_workspaces
             job_id
             changed_dirs
             changed_workspaces
@@ -2606,10 +2673,24 @@ module Db = struct
         Logs.err (fun m -> m "%s : ERROR : %a" request_id Pgsql_io.pp_err err);
         Abbs_fc.return_err `Error
 
-  let query_blocking_work_manifests_in_repo_for_context ~request_id ~job_id db context dirspaces =
+  let query_blocking_work_manifests_in_repo_for_context
+      ~request_id
+      ~job_id
+      db
+      context
+      dirspaces
+      ~stategraph_parallel_apply_dirspaces =
     let dirs = CCList.map (fun Terrat_change.Dirspace.{ dir; _ } -> dir) dirspaces in
     let workspaces =
       CCList.map (fun Terrat_change.Dirspace.{ workspace; _ } -> workspace) dirspaces
+    in
+    let parallel_dirs =
+      CCList.map (fun Terrat_change.Dirspace.{ dir; _ } -> dir) stategraph_parallel_apply_dirspaces
+    in
+    let parallel_workspaces =
+      CCList.map
+        (fun Terrat_change.Dirspace.{ workspace; _ } -> workspace)
+        stategraph_parallel_apply_dirspaces
     in
     let run =
       let open Abbs_fc.Infix_result_monad in
@@ -2623,6 +2704,8 @@ module Db = struct
             context
             dirs
             workspaces
+            parallel_dirs
+            parallel_workspaces
             job_id)
       >>= fun ids ->
       Abbs_fc.List_result.map ~f:(query_work_manifest ~request_id db) ids
@@ -2638,7 +2721,12 @@ module Db = struct
         Logs.err (fun m -> m "%s : ERROR : %a" request_id Pgsql_io.pp_err err);
         Abbs_fc.return_err `Error
 
-  let query_dirspaces_owned_by_other_pull_requests ~request_id db pull_request dirspaces =
+  let query_dirspaces_owned_by_other_pull_requests
+      ~request_id
+      db
+      pull_request
+      dirspaces
+      ~stategraph_parallel_apply_dirspaces =
     let open Abb.Future.Infix_monad in
     Metrics.Psql_query_time.time
       (Metrics.psql_query_time "select_dirspaces_owned_by_other_pull_requests")
@@ -2681,6 +2769,49 @@ module Db = struct
                 ~title
                 ~user
                 () ))
+          (CCInt64.of_int @@ Api.Repo.id @@ Api.Pull_request.repo pull_request)
+          (CCInt64.of_int @@ Api.Pull_request.id pull_request)
+          (CCList.map (fun { Terrat_change.Dirspace.dir; _ } -> dir) dirspaces)
+          (CCList.map (fun { Terrat_change.Dirspace.workspace; _ } -> workspace) dirspaces)
+          (CCList.map
+             (fun { Terrat_change.Dirspace.dir; _ } -> dir)
+             stategraph_parallel_apply_dirspaces)
+          (CCList.map
+             (fun { Terrat_change.Dirspace.workspace; _ } -> workspace)
+             stategraph_parallel_apply_dirspaces))
+    >>= function
+    | Ok _ as res -> Abb.Future.return res
+    | Error (#Pgsql_io.err as err) ->
+        Prmths.Counter.inc_one Metrics.pgsql_errors_total;
+        Logs.err (fun m -> m "%s : ERROR : %a" request_id Pgsql_io.pp_err err);
+        Abbs_fc.return_err `Error
+
+  let query_parallel_apply_transactions ~request_id db pull_request dirspaces =
+    let open Abb.Future.Infix_monad in
+    Metrics.Psql_query_time.time
+      (Metrics.psql_query_time "select_parallel_apply_transactions")
+      (fun () ->
+        Pgsql_io.Prepared_stmt.fetch
+          db
+          (Sql.select_parallel_apply_transactions ())
+          ~f:(fun dir workspace installation tx other_pull_number other_tx other_applied ->
+            let module Pat = Terrat_vcs_provider2.Parallel_apply_tx in
+            {
+              Pat.dirspace = Terrat_change.Dirspace.{ dir; workspace };
+              installation;
+              tx;
+              other =
+                (match (other_pull_number, other_tx, other_applied) with
+                | Some pull_number, Some tx, Some applied ->
+                    Some
+                      {
+                        Pat.Other.pull_number = CCInt64.to_int pull_number;
+                        tx;
+                        state =
+                          (if applied then Pat.Other.State.Applied else Pat.Other.State.Applying);
+                      }
+                | None, _, _ | _, None, _ | _, _, None -> None);
+            })
           (CCInt64.of_int @@ Api.Repo.id @@ Api.Pull_request.repo pull_request)
           (CCInt64.of_int @@ Api.Pull_request.id pull_request)
           (CCList.map (fun { Terrat_change.Dirspace.dir; _ } -> dir) dirspaces)
@@ -4414,6 +4545,67 @@ module Comment = struct
           pull_request
           "DIRSPACES_OWNED_BY_OTHER_PRS"
           (Tmpl.dirspaces_owned_by_other_pull_requests brand)
+          kv
+    | Msg.Stategraph_overlapping_applies overlaps ->
+        let module So = Terrat_vcs_provider2.Stategraph_overlap in
+        let module State = Terrat_vcs_provider2.Parallel_apply_tx.Other.State in
+        let kv =
+          Snabela.Kv.(
+            Map.of_list
+              [
+                ( "overlaps",
+                  list
+                    (CCList.map
+                       (fun {
+                              So.dirspace = Terrat_change.Dirspace.{ dir; workspace };
+                              pull_number;
+                              state;
+                              addresses;
+                            }
+                          ->
+                         Map.of_list
+                           [
+                             ("dir", string dir);
+                             ("workspace", string workspace);
+                             ("pull_number", int pull_number);
+                             ( "applied",
+                               bool
+                                 (match state with
+                                 | State.Applied -> true
+                                 | State.Applying -> false) );
+                             ( "addresses",
+                               list
+                                 (CCList.map
+                                    (fun address -> Map.of_list [ ("address", string address) ])
+                                    addresses) );
+                           ])
+                       overlaps) );
+              ])
+        in
+        CCList.iter
+          (fun {
+                 So.dirspace = Terrat_change.Dirspace.{ dir; workspace };
+                 pull_number;
+                 addresses;
+                 _;
+               }
+             ->
+            Logs.info (fun m ->
+                m
+                  "%s : STATEGRAPH_OVERLAPPING_APPLIES : dir=%s : workspace=%s : pull_number=%d : \
+                   addresses=%s"
+                  request_id
+                  dir
+                  workspace
+                  pull_number
+                  (CCString.concat "," addresses)))
+          overlaps;
+        Gcm_api.apply_template_and_publish
+          ~request_id
+          client
+          pull_request
+          "STATEGRAPH_OVERLAPPING_APPLIES"
+          (Tmpl.stategraph_overlapping_applies brand)
           kv
     | Msg.Gate_check_failure denied ->
         let module G = Terrat_vcs_provider2.Gate_eval in

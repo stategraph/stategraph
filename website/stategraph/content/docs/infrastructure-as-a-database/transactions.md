@@ -20,6 +20,7 @@ Create -> Preview (plan) -> Commit (apply)
 | `open` | Created, changes recorded |
 | `previewing` | Plan in progress |
 | `previewed` | Plan ready, waits for the commit |
+| `reserved` | Plan ready, held for an apply that Orchestration is about to run; overlapping transactions are rejected meanwhile |
 | `committing` | Apply in progress |
 | `committed` | Apply succeeded, state updated |
 | `failed` | Error during the preview, or the apply did not run |
