@@ -1,13 +1,37 @@
 #!/usr/bin/env bash
 set -euf -o pipefail
 
-# Source config file for base_image
-CONFIG_FILE="$(dirname "$0")/../config/base_image_config.sh"
-if [[ -f "$CONFIG_FILE" ]]; then
-    source "$CONFIG_FILE"
-fi
+# BASE_IMAGE is ghcr.io/terrateamio/terrat-base:<tag>. The tag is a digest of
+# the inputs of the build-base stage of docker/terrat/Dockerfile: the stage
+# itself, code/opam.pins, opam/, vendor/ISO8601 and vendor/cohttp. The image
+# with that tag is built once, by .github/workflows/base.yml.
+#
+# Prints BASE_IMAGE=<image> and BASE_IMAGE_TAG=<tag>, for $GITHUB_ENV.
 
-# Set BASE_IMAGE to $1 if provided; otherwise, use the config file's BASE_IMAGE
-BASE_IMAGE="${1:-${BASE_IMAGE}}"
+cd "$(dirname "$0")/.."
+
+: "${CONTAINER_REGISTRY:=ghcr.io}"
+: "${BASE_IMAGE_NAME:=terrat-base}"
+
+sum() {
+    if command -v sha256sum > /dev/null 2>&1; then
+        sha256sum "$@"
+    else
+        shasum -a 256 "$@"
+    fi
+}
+
+stage() {
+    sed -n '/ AS build-base$/,/ AS build-setup$/p' docker/terrat/Dockerfile | sed '$d'
+}
+
+inputs() {
+    stage
+    git ls-files -z -- code/opam.pins opam vendor/ISO8601 vendor/cohttp | LC_ALL=C sort -z | xargs -0 sum
+}
+
+BASE_IMAGE_TAG="sha-$(inputs | sum | cut -c1-16)"
+BASE_IMAGE="${CONTAINER_REGISTRY}/terrateamio/${BASE_IMAGE_NAME}:${BASE_IMAGE_TAG}"
 
 echo "BASE_IMAGE=${BASE_IMAGE}"
+echo "BASE_IMAGE_TAG=${BASE_IMAGE_TAG}"

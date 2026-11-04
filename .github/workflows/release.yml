@@ -78,8 +78,17 @@ jobs:
         run: |
           ./scripts/create_tag
 
+  base-image:
+    needs: release-gate
+    if: needs.release-gate.outputs.release == 'true'
+    uses: ./.github/workflows/base.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+
   build:
-    needs: set-version-tag
+    needs: [set-version-tag, base-image]
     runs-on: ${{ matrix.runs-on }}
     environment: ${{ github.event.inputs.environment || 'production' }}
 

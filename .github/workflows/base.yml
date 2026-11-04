@@ -1,29 +1,55 @@
 name: base
 
+# ghcr.io/terrateamio/terrat-base at the tag that scripts/base_image derives
+# from the inputs of the build-base stage of docker/terrat/Dockerfile. The
+# build runs only when that tag is not on the registry.
 on:
+  workflow_call:
+    outputs:
+      base_image:
+        description: The image, as scripts/base_image prints it
+        value: ${{ jobs.tag.outputs.base_image }}
   workflow_dispatch:
 
-jobs:
-  set-version-tag:
-    runs-on: ubuntu-22.04
-    environment: production
+defaults:
+  run:
+    shell: bash
 
+jobs:
+  tag:
+    runs-on: ubuntu-22.04
     outputs:
-      version_tag: ${{ steps.set-version-tag.outputs.version_tag }}
+      base_image: ${{ steps.tag.outputs.base_image }}
+      base_image_tag: ${{ steps.tag.outputs.base_image_tag }}
+      exists: ${{ steps.exists.outputs.exists }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set version tag
-        id: set-version-tag
+      - name: Derive the tag from the inputs of the build-base stage
+        id: tag
         run: |
-          VERSION_TAG=$(./scripts/version_tag)
-          echo "VERSION_TAG=${VERSION_TAG}" >> "${GITHUB_ENV}"
-          echo "version_tag=${VERSION_TAG}" >> "${GITHUB_OUTPUT}"
+          eval "$(./scripts/base_image)"
+          echo "base_image=${BASE_IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "base_image_tag=${BASE_IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Look for the image on the registry
+        id: exists
+        env:
+          BASE_IMAGE: ${{ steps.tag.outputs.base_image }}
+        run: |
+          if docker manifest inspect "${BASE_IMAGE}" > /dev/null; then
+            echo "${BASE_IMAGE} exists."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "${BASE_IMAGE} is missing: building it."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
 
   build:
-    needs: set-version-tag
+    needs: tag
+    if: needs.tag.outputs.exists == 'false'
     runs-on: ${{ matrix.runs-on }}
     environment: production
 
@@ -37,12 +63,11 @@ jobs:
             runs-on: ubuntu-22.04-arm
 
     permissions:
-      contents: write
+      contents: read
       packages: write
-      id-token: write
 
     env:
-      VERSION_TAG: ${{ needs.set-version-tag.outputs.version_tag }}
+      VERSION_TAG: ${{ needs.tag.outputs.base_image_tag }}
 
     steps:
       - name: Checkout code
@@ -66,19 +91,19 @@ jobs:
             ghcr.io/terrateamio/terrat-base:${{ env.VERSION_TAG }}-${{ matrix.arch }}
 
   create-manifest:
-    needs: [set-version-tag, build]
+    needs: [tag, build]
+    if: needs.tag.outputs.exists == 'false'
     runs-on: ubuntu-22.04
     environment: production
 
     permissions:
-      contents: write
+      contents: read
       packages: write
-      id-token: write
 
     env:
-      VERSION_TAG: ${{ needs.set-version-tag.outputs.version_tag }}
+      VERSION_TAG: ${{ needs.tag.outputs.base_image_tag }}
       GITHUB_REF: ${{ github.ref }}
-      TERRATEAM_ENVIRONMENT: ${{ github.event.inputs.environment || 'production' }}
+      TERRATEAM_ENVIRONMENT: production
 
     steps:
       - name: Checkout code

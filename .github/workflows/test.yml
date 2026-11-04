@@ -5,12 +5,6 @@ on:
     branches:
       - "main"
   workflow_dispatch:
-    inputs:
-      build_base_image:
-        description: 'Build base image'
-        required: false
-        default: false
-        type: boolean
 
 env:
   REGISTRY: ghcr.io
@@ -54,8 +48,19 @@ jobs:
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
 
-  format-check:
+  # Builds ghcr.io/terrateamio/terrat-base at the tag scripts/base_image derives
+  # from the inputs of the build-base stage, when that tag does not exist yet.
+  base-image:
     needs: changes
+    if: needs.changes.outputs.code == 'true'
+    uses: ./.github/workflows/base.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+
+  format-check:
+    needs: [changes, base-image]
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-22.04
     permissions:
@@ -95,8 +100,12 @@ jobs:
   # contexts the ruleset requires, which leaves the PR blocked just as the old
   # `paths-ignore` did. So the job runs and each step opts out instead; the
   # six checks are reported and pass in seconds for docs-only changes.
+  # `!cancelled()` keeps it running when base-image is skipped or fails: a job
+  # whose `needs` did not succeed is skipped, and the first step fails it when
+  # the base image is missing.
   build-test:
-    needs: changes
+    needs: [changes, base-image]
+    if: ${{ !cancelled() }}
     runs-on: ${{ matrix.runs-on }}
     permissions:
       contents: read
@@ -119,6 +128,15 @@ jobs:
             platform: linux/arm64
 
     steps:
+      - name: Require the jobs this build needs
+        if: needs.changes.result != 'success' || (needs.changes.outputs.code == 'true' && needs.base-image.result != 'success')
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          BASE_IMAGE_JOB: ${{ needs.base-image.result }}
+        run: |
+          echo "::error::changes ended with ${CHANGES} and base-image with ${BASE_IMAGE_JOB}; the build needs both."
+          exit 1
+
       - name: Checkout code
         if: needs.changes.outputs.code == 'true'
         uses: actions/checkout@v4
@@ -151,12 +169,12 @@ jobs:
           echo "branch=${BRANCH_NAME}-${SHORT_SHA}" >> $GITHUB_OUTPUT
 
       - name: Set base image
-        if: ${{ needs.changes.outputs.code == 'true' && ! inputs.build_base_image }}
+        if: needs.changes.outputs.code == 'true'
         run: |
           ./scripts/base_image >> $GITHUB_ENV
 
-      - name: Build and push ${{ matrix.target }} with BASE_IMAGE
-        if: ${{ needs.changes.outputs.code == 'true' && ! inputs.build_base_image }}
+      - name: Build and push ${{ matrix.target }}
+        if: needs.changes.outputs.code == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -164,18 +182,6 @@ jobs:
           target: ${{ matrix.target }}
           build-args: |
             BASE_IMAGE=${{ env.BASE_IMAGE }}
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.target }}-dev:${{ steps.date.outputs.date }}-${{ steps.branch.outputs.branch }}-${{ matrix.arch }}
-          platforms: ${{ matrix.platform }}
-
-      - name: Build and push ${{ matrix.target }} without BASE_IMAGE
-        if: ${{ needs.changes.outputs.code == 'true' && inputs.build_base_image }}
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/terrat/Dockerfile
-          target: ${{ matrix.target }}
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.target }}-dev:${{ steps.date.outputs.date }}-${{ steps.branch.outputs.branch }}-${{ matrix.arch }}
