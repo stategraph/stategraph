@@ -20,6 +20,7 @@
   terrat_precheck
   terrat_storage
   terrat_vcs_event_evaluator2_targets
-  terrat_vcs_provider2)
+  terrat_vcs_provider2
+  terrat_stategraph)
  (preprocess
   (pps ppx_deriving.eq ppx_deriving.show ppx_deriving_yojson)))

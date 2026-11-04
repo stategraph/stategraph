@@ -195,7 +195,11 @@ module Make (S : Terrat_vcs_provider2.S) = struct
       (fun () ->
         with_conn storage ~f:(fun db ->
             Pgsql_io.tx db ~f:(fun () ->
-                S.Db.query_next_pending_work_manifest ~new_age:true ~request_id db
+                S.Db.query_next_pending_work_manifest
+                  ~new_age:true
+                  ~request_id
+                  ~stategraph_parallel_applies:S.stategraph_parallel_applies
+                  db
                 >>= function
                 | Some (wm, compute_node_id) -> (
                     Logs.info (fun m ->
@@ -265,6 +269,9 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                     | Error err ->
                         let open Fc.Infix_result_monad in
                         S.Work_manifest.update_state ~request_id db wm.Wm.id Wm.State.Aborted
+                        >>= fun () ->
+                        Fc.to_result
+                          (Tasks_base.release_stategraph_reservation ~request_id wm.Wm.id)
                         >>= fun () ->
                         S.Job_context.Compute_node.update_state
                           ~request_id
@@ -724,11 +731,14 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                 request_id
                 Uuidm.pp
                 work_manifest_id);
+          let open Irm in
           S.Work_manifest.update_state
             ~request_id
             db
             work_manifest_id
             Terrat_work_manifest3.State.Aborted
+          >>= fun () ->
+          Fc.to_result (Tasks_base.release_stategraph_reservation ~request_id work_manifest_id)
       | Terrat_work_manifest3.State.(Completed | Aborted) -> Abbs_fc.return_ok ()
     in
     (* Read the node through [compute_node_work].  The id of a node names no work
@@ -1033,6 +1043,8 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                 db
                 work_manifest_id
                 Terrat_work_manifest3.State.Aborted
+              >>= fun () ->
+              Fc.to_result (Tasks_base.release_stategraph_reservation ~request_id work_manifest_id)
               >>= fun () ->
               let open Abb.Future.Infix_monad in
               (* Best effort so the unified comment reflects the abort. *)

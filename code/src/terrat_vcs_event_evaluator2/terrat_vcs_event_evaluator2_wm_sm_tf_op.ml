@@ -443,7 +443,22 @@ struct
             time_it
               s
               (fun m log_id time -> m "%s : WORK_MANIFEST : CREATE : time=%f" log_id time)
-              (fun () -> S.Work_manifest.create ~request_id:(Builder.log_id s) db work_manifest))
+              (fun () -> S.Work_manifest.create ~request_id:(Builder.log_id s) db work_manifest)
+            >>= fun work_manifest ->
+            (* The apply commits the plans of its dirspaces that apply in parallel: hold them from
+               now on, so that no other commit overlaps them between this check and the commit. *)
+            (match (op, target) with
+              | `Apply, P2.Target.Pr pull_request ->
+                  Tasks_base.reserve_stategraph_plans
+                    ~request_id:(Builder.log_id s)
+                    db
+                    pull_request
+                    work_manifest.Wm.id
+                    (Tasks_base.stategraph_parallel_apply_dirspaces_of_work_manifest
+                       repo_config
+                       changes)
+              | `Apply, P2.Target.Drift _ | `Plan, _ -> Abb.Future.return ())
+            |> Abb.Future.map (fun () -> Ok work_manifest))
         >>| fun work_manifest ->
         ( work_manifest,
           op_commit_checks
@@ -1429,11 +1444,14 @@ struct
     let maybe_comment_queued_behind wms s { Bs.Fetcher.fetch } =
       let module Tjc = Terrat_job_context in
       let open Irm in
-      let dirspaces =
-        CCList.flat_map
-          (fun { Wm.changes; _ } ->
-            CCList.map (fun { Terrat_change.Dirspaceflow.dirspace; _ } -> dirspace) changes)
-          wms
+      let changes = CCList.flat_map (fun { Wm.changes; _ } -> changes) wms in
+      let dirspaces = CCList.map Terrat_change.Dirspaceflow.to_dirspace changes in
+      fetch Keys.repo_config
+      >>= fun repo_config ->
+      (* The applies are not yet tied to the job, thus the query cannot read
+         their dirspaces and is given them. *)
+      let stategraph_parallel_apply_dirspaces =
+        Tasks_base.stategraph_parallel_apply_dirspaces_of_work_manifest repo_config changes
       in
       fetch Keys.context
       >>= function
@@ -1452,7 +1470,8 @@ struct
                     ~job_id:job.Tjc.Job.id
                     db
                     context
-                    dirspaces)
+                    dirspaces
+                    ~stategraph_parallel_apply_dirspaces)
               >>= function
               | [] -> Abbs_fc.return_ok ()
               | blocking_wms ->
@@ -1612,6 +1631,11 @@ struct
                       db
                       work_manifest.Wm.id
                       Wm.State.Completed)
+                >>= fun () ->
+                Abbs_fc.to_result
+                  (Tasks_base.release_stategraph_reservation
+                     ~request_id:(Builder.log_id s)
+                     work_manifest.Wm.id)
                 >>= fun () ->
                 fetch Keys.publish_comment
                 >>= fun publish_comment ->

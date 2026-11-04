@@ -206,6 +206,7 @@ struct
                     ~job_id:job.Tjc.Job.id
                     ~start_timeout
                     ~changed_dirspaces:dirspaces
+                    ~stategraph_parallel_apply_dirspaces:[]
                     db
                     context
                     dirspaces

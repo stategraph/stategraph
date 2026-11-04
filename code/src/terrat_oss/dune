@@ -3,4 +3,5 @@
  (libraries
   terrat_cli
   terrat_vcs_service_github_oss
-  terrat_vcs_service_gitlab_oss))
+  terrat_vcs_service_gitlab_oss
+  terrat_stategraph))

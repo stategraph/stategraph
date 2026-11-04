@@ -161,6 +161,104 @@ struct
     |> CCList.map (fun dc -> dc.Terrat_change_match3.Dirspace_config.dirspace)
     |> Terrat_data.Dirspace_set.of_list
 
+  let stategraph_parallel_apply repo_config workflow =
+    let module R = Terrat_base_repo_config_v1 in
+    let module E = R.Workflows.Entry in
+    let engine =
+      match workflow with
+      | Some { E.engine; _ } -> engine
+      | None -> R.engine repo_config
+    in
+    S.stategraph_parallel_applies
+    &&
+    match engine with
+    | R.Engine.Stategraph _ -> true
+    | R.Engine.(
+        Cdktf _ | Custom _ | Fly _ | Opentofu _ | Other _ | Pulumi | Terraform _ | Terragrunt _) ->
+        false
+
+  let stategraph_parallel_apply_dirspaces repo_config dirspaceflows =
+    let module Dsf = Terrat_change.Dirspaceflow in
+    CCList.filter_map
+      (fun { Dsf.dirspace; workflow; _ } ->
+        if
+          stategraph_parallel_apply
+            repo_config
+            (CCOption.map (fun { Dsf.Workflow.workflow; _ } -> workflow) workflow)
+        then Some dirspace
+        else None)
+      dirspaceflows
+
+  let stategraph_parallel_apply_dirspaces_of_work_manifest repo_config dirspaceflows =
+    let module Dsf = Terrat_change.Dirspaceflow in
+    let workflows = Terrat_base_repo_config_v1.workflows repo_config in
+    CCList.filter_map
+      (fun { Dsf.dirspace; workflow; _ } ->
+        if
+          stategraph_parallel_apply
+            repo_config
+            (CCOption.flat_map (CCList.nth_opt workflows) workflow)
+        then Some dirspace
+        else None)
+      dirspaceflows
+
+  let stategraph_tx ~request_id tx =
+    match Uuidm.of_string tx with
+    | Some _ as id -> id
+    | None ->
+        Logs.warn (fun m -> m "%s : STATEGRAPH_TX_NOT_UUID : tx=%s" request_id tx);
+        None
+
+  (* The reservation is the work manifest's: its id is the holder.  Both are best effort, because
+     the commit decides on its own without them: a failure here is logged and the apply goes on. *)
+  let reserve_stategraph_plans ~request_id db pull_request work_manifest_id dirspaces =
+    match dirspaces with
+    | [] -> Abb.Future.return ()
+    | dirspaces -> (
+        let module Pat = Terrat_vcs_provider2.Parallel_apply_tx in
+        let open Abb.Future.Infix_monad in
+        let run =
+          let open Abbs_fc.Infix_result_monad in
+          S.Db.query_parallel_apply_transactions ~request_id db pull_request dirspaces
+          >>= function
+          | [] -> Abbs_fc.return_ok ()
+          | { Pat.installation; _ } :: _ as rows ->
+              (* A dirspace gives one row per apply of another pull request on it: its plan's
+                 transaction once. *)
+              S.Stategraph.reserve
+                ~request_id
+                ~installation
+                ~holder:(Uuidm.to_string work_manifest_id)
+                ~txs:
+                  (rows
+                  |> CCList.map (fun { Pat.tx; _ } -> tx)
+                  |> Sln_list.String.sort_uniq
+                  |> CCList.filter_map (stategraph_tx ~request_id))
+        in
+        run
+        >>| function
+        | Ok () -> ()
+        | Error `Error ->
+            Logs.err (fun m ->
+                m
+                  "%s : STATEGRAPH_RESERVE_FAILED : work_manifest_id=%a"
+                  request_id
+                  Uuidm.pp
+                  work_manifest_id))
+
+  let release_stategraph_reservation ~request_id work_manifest_id =
+    let open Abb.Future.Infix_monad in
+    S.Stategraph.release ~request_id ~holder:(Uuidm.to_string work_manifest_id)
+    >>| function
+    | Ok () -> ()
+    | Error `Error ->
+        Logs.err (fun m ->
+            m
+              "%s : STATEGRAPH_RELEASE_FAILED : work_manifest_id=%a"
+              request_id
+              Uuidm.pp
+              work_manifest_id)
+
   (* With the tree builder off, the server reads a tree from the forge and stores it, as the
      [repo_tree_branch] task does.  With it on, only a tree build work manifest stores a tree, and
      starting one here would make the caller wait, which it must not. *)

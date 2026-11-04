@@ -56,6 +56,47 @@ module Make
   val dirspaces_of_paths :
     Terrat_change_match3.Config.t -> string list -> Terrat_data.Dirspace_set.t
 
+  (** Whether a dirspace run by [workflow] applies in parallel with the same dirspace of other pull
+      requests, rather than behind their locks: the edition allows it, and the dirspace runs the
+      Stategraph engine, whatever its lock policy. That is the engine of [workflow] or, for a
+      dirspace that no workflow matches, the engine of [repo_config]. Nothing is recorded: the
+      answer is read off the configuration each time it is asked. *)
+  val stategraph_parallel_apply :
+    'a Terrat_base_repo_config_v1.t -> Terrat_base_repo_config_v1.Workflows.Entry.t option -> bool
+
+  (** The dirspaces of [dirspaceflows] that apply in parallel, by {!stategraph_parallel_apply}. *)
+  val stategraph_parallel_apply_dirspaces :
+    'a Terrat_base_repo_config_v1.t ->
+    Terrat_change.Dirspaceflow.Workflow.t option Terrat_change.Dirspaceflow.t list ->
+    Terrat_change.Dirspace.t list
+
+  (** The same for the changes of a work manifest, which name their workflow by its index in the
+      workflows of [repo_config]. *)
+  val stategraph_parallel_apply_dirspaces_of_work_manifest :
+    'a Terrat_base_repo_config_v1.t ->
+    int option Terrat_change.Dirspaceflow.t list ->
+    Terrat_change.Dirspace.t list
+
+  (** The Stategraph transaction a runner-reported [tx] names, if it is a UUID. One that is not
+      names no transaction: it is logged, and the callers leave it out of what they ask. *)
+  val stategraph_tx : request_id:string -> string -> Uuidm.t option
+
+  (** Reserve, for the apply work manifest, the Stategraph transactions of the pull request's plans
+      of [dirspaces], through [S.Stategraph]: from now until the apply commits them or the work
+      manifest ends, Stategraph refuses an overlapping commit of another transaction. A failure is
+      logged and not an error: the commit decides on its own without the reservation. *)
+  val reserve_stategraph_plans :
+    request_id:string ->
+    S.Db.t ->
+    'diff S.Api.Pull_request.t ->
+    Uuidm.t ->
+    Terrat_change.Dirspace.t list ->
+    unit Abb.Future.t
+
+  (** Give back the transactions the work manifest reserved and did not commit. The counterpart of
+      [reserve_stategraph_plans], with the same silence. *)
+  val release_stategraph_reservation : request_id:string -> Uuidm.t -> unit Abb.Future.t
+
   (** The hash of a repository config, the part of the key of a built config that follows the config
       the build used. *)
   val repo_config_hash : Terrat_base_repo_config_v1.raw Terrat_base_repo_config_v1.t -> string

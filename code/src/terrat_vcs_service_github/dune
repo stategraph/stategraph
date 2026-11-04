@@ -38,6 +38,7 @@
   terrat_vcs_kv_store
   terrat_vcs_provider2
   terrat_vcs_provider2_github
+  terrat_stategraph
   terrat_vcs_service
   terrat_vcs_stacks)
  (preprocessor_deps

@@ -195,6 +195,56 @@ module Conflicting_work_manifests = struct
     | Maybe_stale of 'a list
 end
 
+(** The Stategraph transaction of our latest plan of a dirspace that applies in parallel, beside the
+    transaction of an apply of another pull request on it, when there is one. *)
+module Parallel_apply_tx = struct
+  module Other = struct
+    (** Where the other apply stands. A failed apply is not an [Other]: it stands against nothing.
+    *)
+    module State = struct
+      type t =
+        | Applied  (** Completed and succeeded: its transaction is committed. *)
+        | Applying  (** Queued or running: its transaction is not committed yet. *)
+      [@@deriving show, eq]
+
+      (** The state of several applies of one pull request on a dirspace: [Applied] once one of them
+          is, as its commit is what stands in the state. *)
+      let merge a b =
+        match (a, b) with
+        | Applied, _ | _, Applied -> Applied
+        | Applying, Applying -> Applying
+    end
+
+    type t = {
+      pull_number : int;
+      tx : string;  (** The transaction of the other pull request's apply. *)
+      state : State.t;
+    }
+    [@@deriving show]
+  end
+
+  type t = {
+    dirspace : Terrat_change.Dirspace.t;
+    installation : Uuidm.t;  (** The core id of the installation the repository belongs to. *)
+    tx : string;  (** The transaction of our plan. *)
+    other : Other.t option;
+  }
+  [@@deriving show]
+end
+
+(** An apply of another pull request that Stategraph refuses our plan of a dirspace for: the two
+    transactions share the nodes at [addresses] and the other one is applying, or committed after
+    our plan opened. *)
+module Stategraph_overlap = struct
+  type t = {
+    dirspace : Terrat_change.Dirspace.t;
+    pull_number : int;
+    state : Parallel_apply_tx.Other.State.t;
+    addresses : string list;
+  }
+  [@@deriving show]
+end
+
 module Target = struct
   type ('pr, 'repo) t =
     | Pr of 'pr
@@ -417,6 +467,7 @@ module Msg = struct
     | Repo_config_schema_err of (string * Jsonschema_check.Validation_err.t list)
     | Run_work_manifest_err of
         [ `Failed_to_start_with_msg_err of string | `Failed_to_start | `Missing_workflow ]
+    | Stategraph_overlapping_applies of Stategraph_overlap.t list
     | Str_template_err of Str_template.err
     | Synthesize_config_err of Terrat_change_match3.synthesize_config_err
     | Tag_query_err of Terrat_tag_query_ast.err
@@ -543,7 +594,8 @@ module Brand = struct
   end
 end
 
-module type S = sig
+(** What the editions of a provider share. *)
+module type Shared = sig
   val name : string
 
   module Api : Terrat_vcs_api.S
@@ -791,6 +843,7 @@ module type S = sig
     val query_next_pending_work_manifest :
       ?new_age:bool ->
       request_id:string ->
+      stategraph_parallel_applies:bool ->
       t ->
       ( (( Api.Account.t,
            (unit Api.Pull_request.t, Api.Repo.t) Target.t )
@@ -807,7 +860,11 @@ module type S = sig
        takes work, because work that a node performs never reaches the
        dispatcher. *)
     val work_manifest_can_run :
-      request_id:string -> work_manifest_id:Uuidm.t -> t -> (bool, [> `Error ]) result Abb.Future.t
+      request_id:string ->
+      work_manifest_id:Uuidm.t ->
+      stategraph_parallel_applies:bool ->
+      t ->
+      (bool, [> `Error ]) result Abb.Future.t
 
     (** Record that [job_id] restarts [restart_of]. A drift whose files changed while its reconcile
         ran is reconciled again by a new job, and the chain of these jobs limits how many times (RFD
@@ -899,6 +956,7 @@ module type S = sig
       request_id:string ->
       base_ref:Api.Ref.t ->
       branch_ref:Api.Ref.t ->
+      stategraph_parallel_apply_dirspaces:Terrat_change.Dirspace.t list ->
       t ->
       'diff Api.Pull_request.t ->
       Terrat_change.Dirspace.t list ->
@@ -935,6 +993,7 @@ module type S = sig
       job_id:Uuidm.t ->
       start_timeout:Duration.t ->
       changed_dirspaces:Terrat_change.Dirspace.t list ->
+      stategraph_parallel_apply_dirspaces:Terrat_change.Dirspace.t list ->
       t ->
       (Api.Pull_request.Id.t, Api.Ref.t) Terrat_job_context.Context.t ->
       Terrat_change.Dirspace.t list ->
@@ -951,13 +1010,16 @@ module type S = sig
     (* The work manifests that are running against [dirspaces], so an apply
        queued against them cannot start yet.  These are not conflicts: the apply
        is queued and will run once they finish.  [job_id] is the job asking, its
-       own work manifests are never reported. *)
+       own work manifests are never reported.  On a dirspace of
+       [stategraph_parallel_apply_dirspaces], the eligible plans and applies of
+       other pull requests do not hold the apply back. *)
     val query_blocking_work_manifests_in_repo_for_context :
       request_id:string ->
       job_id:Uuidm.t ->
       t ->
       (Api.Pull_request.Id.t, Api.Ref.t) Terrat_job_context.Context.t ->
       Terrat_change.Dirspace.t list ->
+      stategraph_parallel_apply_dirspaces:Terrat_change.Dirspace.t list ->
       ( ( Api.Account.t,
           (unit Api.Pull_request.t, Api.Repo.t) Target.t )
         Terrat_work_manifest3.Existing.t
@@ -966,12 +1028,29 @@ module type S = sig
       result
       Abb.Future.t
 
+    (** The dirspaces of the pull request that other pull requests block, each with the blocking
+        pull request. Those in [stategraph_parallel_apply_dirspaces] are blocked not by a lock but
+        by another pull request's apply that committed its Stategraph transaction before the
+        transaction of the pull request's latest plan of the dirspace opened. *)
     val query_dirspaces_owned_by_other_pull_requests :
       request_id:string ->
       t ->
       'diff Api.Pull_request.t ->
       Terrat_change.Dirspace.t list ->
+      stategraph_parallel_apply_dirspaces:Terrat_change.Dirspace.t list ->
       ((Terrat_change.Dirspace.t * unit Api.Pull_request.t) list, [> `Error ]) result Abb.Future.t
+
+    (** For each of [dirspaces], which apply in parallel, the transaction of the pull request's
+        latest completed plan beside the transaction of each apply of another pull request that
+        Stategraph may refuse that plan for, see {!Parallel_apply_tx}: one row per such apply, or
+        one row without when there is none. A dirspace whose plan has no reported transaction gives
+        no row, and an apply without one is left out: Stategraph then decides at commit. *)
+    val query_parallel_apply_transactions :
+      request_id:string ->
+      t ->
+      'diff Api.Pull_request.t ->
+      Terrat_change.Dirspace.t list ->
+      (Parallel_apply_tx.t list, [> `Error ]) result Abb.Future.t
 
     val query_missing_drift_scheduled_runs :
       request_id:string ->
@@ -1561,4 +1640,23 @@ module type S = sig
        and type Pull_request_id.t = Api.Pull_request.Id.t
        and type Config.t = Api.Config.t
        and type db = Db.t
+end
+
+(** What an edition decides. *)
+module type Edition = sig
+  (** Whether a dirspace that runs the Stategraph engine, whatever its lock policy, applies in
+      parallel with the same dirspace of other pull requests, rather than behind their locks:
+      Stategraph locks the resources, and the orchestration asks it about them where it can. True in
+      the enterprise editions only. *)
+  val stategraph_parallel_applies : bool
+end
+
+(** A provider as the evaluator runs on it: what the editions share, what the edition decides, and
+    Stategraph as the orchestration reaches it ({!Terrat_stategraph}). The VCS service is given the
+    last two when it is instantiated: the edition's answers, and the Stategraph of its process in
+    the unified server or {!Terrat_stategraph.Standalone} in the orchestration on its own. *)
+module type S = sig
+  include Shared
+  include Edition
+  module Stategraph : Terrat_stategraph.S
 end

@@ -287,6 +287,7 @@ struct
       wms
 
   let update_state_completed s name work_manifest_id db =
+    let open Abbs_fc.Infix_result_monad in
     time_it
       s
       (fun m log_id time ->
@@ -298,6 +299,9 @@ struct
           time)
       (fun () ->
         update_wm_state ~request_id:(Builder.log_id s) ~name work_manifest_id Wm.State.Completed db)
+    >>= fun () ->
+    Abbs_fc.to_result
+      (Tasks_base.release_stategraph_reservation ~request_id:(Builder.log_id s) work_manifest_id)
 
   let query_work_manifests s job_id db =
     time_it

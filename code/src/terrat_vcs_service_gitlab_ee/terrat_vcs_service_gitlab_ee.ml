@@ -362,4 +362,9 @@ module Routes = struct
   let routes config storage = Ep_access_token.routes config storage
 end
 
-include Terrat_vcs_service_gitlab.Make (Provider) (Routes)
+module Edition = struct
+  let stategraph_parallel_applies = true
+end
+
+module Make (Stategraph : Terrat_stategraph.S) =
+  Terrat_vcs_service_gitlab.Make (Provider) (Routes) (Edition) (Stategraph)
