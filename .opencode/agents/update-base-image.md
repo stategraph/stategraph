@@ -195,19 +195,17 @@ gh pr create --base main --title "#<ISSUE_NUM> ADD update base image <TAG>" --bo
 
 Stay on the current branch. Edit `config/base_image_config.sh`: change only the `BASE_IMAGE_TAG=` line to `BASE_IMAGE_TAG="<TAG>"`. Keep the `CONTAINER_REGISTRY` and `BASE_IMAGE_NAME` lines and the `BASE_IMAGE=` line untouched.
 
-Derive `<ISSUE_NUM>` from the commits already on this branch:
+Capture the subject of the current `HEAD` commit (on exported branches, this is the commit that produced the export) and use it verbatim as the tag-bump commit title. Do not derive an issue number and do not ask the user for one.
 
 ```bash
-git log main..HEAD --format=%s
+HEAD_SUBJECT="$(git log -1 --format=%s HEAD)"
 ```
-
-Take the first `#<num>` prefix (e.g. `grep -oE '^#[0-9]+' | head -1`) — commit subjects on this branch follow the `#<ISSUE_NUM> ACTION_TYPE ...` convention. If there is nothing to parse (no commits since `main`, or no `#<num>` prefix), ask the user (e.g. with the `question` tool) for the issue number and use that.
 
 One commit, kept local — do not push:
 
 ```bash
 git add config/base_image_config.sh
-git commit -m "#<ISSUE_NUM> ADD update base image <TAG>"
+git commit -m "$HEAD_SUBJECT"
 ```
 
 ## 9. Report
