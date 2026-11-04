@@ -7,6 +7,15 @@ module Ui = struct
       (Uri.to_string (Terrat_config.web_base_url (Api.Config.config config) brand))
       (Api.Account.id account)
 
+  let subscription_url ~brand config =
+    let base = Uri.to_string (Terrat_config.web_base_url (Api.Config.config config) brand) in
+    let suffix =
+      match brand with
+      | Terrat_brand.Stategraph -> "/settings/"
+      | Terrat_brand.Terrateam -> "/#/subscription"
+    in
+    Uri.of_string (base ^ suffix)
+
   (* For pull request runs, link to the PR-level runs page which lists every run
      for the pull request.  For non-pull-request targets (e.g. drift), which have
      no pull request to aggregate, fall back to the single work manifest's run. *)

@@ -507,7 +507,11 @@ module Publisher_tools = struct
              CCOption.map_or
                ~default:[]
                (fun { Terrat_tier.Check.used; limit } ->
-                 [ ("runs_used", `Int used); ("runs_limit", `Int limit) ])
+                 [
+                   ("runs_used", `Int used);
+                   ("runs_limit", `Int limit);
+                   ("subscription_url", `String (Uri.to_string (Ui.subscription_url ~brand config)));
+                 ])
                tier_runs;
              [
                ( "account_status",
