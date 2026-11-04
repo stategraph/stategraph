@@ -12,7 +12,7 @@ cstruct.6.3.0
 csv.2.4
 ctypes.0.24.0
 ctypes-foreign.0.24.0
-curl.0.10.0
+curl.0.10.1
 decompress.1.6.1
 dns-client.10.2.6
 domainslib.0.5.2

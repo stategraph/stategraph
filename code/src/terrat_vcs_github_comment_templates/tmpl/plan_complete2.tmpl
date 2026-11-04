@@ -77,7 +77,7 @@
   {%- endif %}
   {%- if runs_limit is defined and runs_used >= runs_limit * 0.8 %}
 > [!WARNING]
-> Your account has used **{{ runs_used }} of {{ runs_limit }}** runs included in your plan this month.  Once the limit is reached, further runs are blocked until next month.  To remove the limit, [upgrade your plan](https://app.terrateam.io/#/subscription).
+> Your account has used **{{ runs_used }} of {{ runs_limit }}** runs included in your plan this month.  Once the limit is reached, further runs are blocked until next month.  To remove the limit, [upgrade your plan]({{ subscription_url }}).
 
   {%- endif %}
   {%- if work_manifest_url is defined %}

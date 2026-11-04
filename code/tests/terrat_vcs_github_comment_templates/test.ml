@@ -809,6 +809,23 @@ let test_plan_complete2_no_changes_last_layer =
       Oth.Assert.str_doesnt_contain ~haystack:body ~needle:next_layer;
       Oth.Assert.str_doesnt_contain ~haystack:body ~needle:apply_footer)
 
+let test_plan_complete2_upgrade_link =
+  Oth.test ~tags:[ "plan_complete" ] ~name:"Plan complete: upgrade link" (fun _ ->
+      let kv =
+        Yojson.Safe.Util.combine
+          (plan_complete2_kv ~changes:[ false ] ~is_layered_run:false ~num_more_layers:0 ())
+          (`Assoc
+             [
+               ("runs_used", `Int 9);
+               ("runs_limit", `Int 10);
+               ("subscription_url", `String "https://app.stategraph.com/settings/");
+             ])
+      in
+      let body = render_brand Terrat_brand.Terrateam Tmpl.plan_complete2 kv in
+      Oth.Assert.str_contains
+        ~haystack:body
+        ~needle:"[upgrade your plan](https://app.stategraph.com/settings/)")
+
 let test_plan_complete2_no_changes_not_layered =
   Oth.test ~tags:[ "plan_complete" ] ~name:"Plan complete: no changes, not layered" (fun _ ->
       let body =
@@ -1309,6 +1326,7 @@ let test =
       test_plan_complete2_no_changes_more_layers;
       test_plan_complete2_no_changes_last_layer;
       test_plan_complete2_no_changes_not_layered;
+      test_plan_complete2_upgrade_link;
       test_plan_complete2_resource_summary;
       test_plan_complete2_resource_summary_missing;
       test_plan_complete2_unified_details;
