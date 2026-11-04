@@ -2,6 +2,34 @@ with
 dirspaces as (
     select path, workspace from unnest($dirs, $workspaces) as v(path, workspace)
 ),
+parallel_dirspaces as (
+    select path, workspace from unnest($parallel_dirs, $parallel_workspaces) as v(path, workspace)
+),
+-- When the Stategraph transaction of our latest completed plan of a parallel
+-- dirspace opened, as the runner reported it in the 'tx' key of the
+-- stategraph/plan step payload.  Null without the report.
+our_plan_txs as (
+    select distinct on (pds.path, pds.workspace)
+        pds.path,
+        pds.workspace,
+        (plan_step.payload->'tx'->>'created_at')::timestamptz as tx_created_at
+    from parallel_dirspaces as pds
+    inner join work_manifest_results as wmr
+        on wmr.path = pds.path and wmr.workspace = pds.workspace
+    inner join gitlab_work_manifests as gwm
+        on gwm.id = wmr.work_manifest
+    left join workflow_step_outputs as plan_step
+        on plan_step.work_manifest = gwm.id
+           and plan_step.step = 'stategraph/plan'
+           and plan_step.scope->>'type' = 'dirspace'
+           and plan_step.scope->>'dir' = pds.path
+           and plan_step.scope->>'workspace' = pds.workspace
+    where gwm.repository = $repository
+          and gwm.pull_number = $pull_number
+          and gwm.run_type in ('autoplan', 'plan')
+          and gwm.completed_at is not null
+    order by pds.path, pds.workspace, gwm.created_at desc
+),
 latest_pull_request_merged_sha as (
     select
         merged_sha
@@ -54,6 +82,28 @@ latest_dirspace_work_manifests as (
           and (gwm.pull_number is not distinct from $pull_number
                or gwm.run_type in ('autoapply', 'apply')
                or gpr.merged_at is not null)
+-- On a parallel dirspace, another pull request's eligible apply whose
+-- transaction committed after our latest plan's transaction opened does not
+-- invalidate that plan: Stategraph checks the two for an overlap when the plan
+-- is applied.  Both moments come from the 'tx' key the runner reports in the
+-- step payloads; without them the apply invalidates the plan, as it always has.
+-- A merged pull request invalidates it regardless: the plan then lags behind
+-- the base branch.
+          and not (gwm.pull_number is distinct from $pull_number
+                   and gpr.merged_at is null
+                   and gwm.run_type in ('autoapply', 'apply')
+                   and exists (select 1
+                               from workflow_step_outputs as apply_step
+                               inner join our_plan_txs
+                                   on our_plan_txs.path = wmr.path
+                                      and our_plan_txs.workspace = wmr.workspace
+                               where apply_step.work_manifest = gwm.id
+                                     and apply_step.step = 'stategraph/apply'
+                                     and apply_step.scope->>'type' = 'dirspace'
+                                     and apply_step.scope->>'dir' = wmr.path
+                                     and apply_step.scope->>'workspace' = wmr.workspace
+                                     and (apply_step.payload->'tx'->>'completed_at')::timestamptz
+                                         > our_plan_txs.tx_created_at))
 -- A work manifest affects the base branch when it runs or, for a merged pull
 -- request, when it is merged.  Rank by whichever happened later so that an
 -- overlapping dirspace applied or merged by another pull request after this

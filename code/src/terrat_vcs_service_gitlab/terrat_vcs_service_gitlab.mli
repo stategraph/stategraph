@@ -7,9 +7,14 @@ module type ROUTES = sig
     (Brtl_rtng.Method.t * Brtl_rtng.Handler.t Brtl_rtng.Route.Route.t) list
 end
 
+(** The service of a provider, given what the edition decides and Stategraph as the orchestration
+    reaches it: the one of its process in the unified server, {!Terrat_stategraph.Standalone} on its
+    own. *)
 module Make
-    (Provider :
-      Terrat_vcs_provider2_gitlab.S
+    (Shared :
+      Terrat_vcs_provider2_gitlab.Shared
         with type Api.Config.t = Terrat_vcs_service_gitlab_provider.Api.Config.t)
-    (_ : ROUTES with type config = Provider.Api.Config.t) :
-  Terrat_vcs_service.S with type Service.vcs_config = Provider.Api.Config.vcs_config
+    (_ : ROUTES with type config = Shared.Api.Config.t)
+    (_ : Terrat_vcs_provider2.Edition)
+    (_ : Terrat_stategraph.S) :
+  Terrat_vcs_service.S with type Service.vcs_config = Shared.Api.Config.vcs_config

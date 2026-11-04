@@ -12,11 +12,19 @@ module type ROUTES = sig
 end
 
 module Make
-    (Provider :
-      Terrat_vcs_provider2_github.S
+    (Shared :
+      Terrat_vcs_provider2_github.Shared
         with type Api.Config.t = Terrat_vcs_service_github_provider.Api.Config.t)
-    (Routes : ROUTES with type config = Provider.Api.Config.t) =
+    (Routes : ROUTES with type config = Shared.Api.Config.t)
+    (Edition : Terrat_vcs_provider2.Edition)
+    (Stategraph : Terrat_stategraph.S) =
 struct
+  module Provider = struct
+    include Shared
+    include Edition
+    module Stategraph = Stategraph
+  end
+
   module Evaluator2 = Terrat_vcs_event_evaluator2.Make (Provider)
   module Events = Terrat_vcs_service_github_ep_events3.Make (Provider)
   module Work_manifest = Terrat_vcs_service_github_ep_work_manifest.Make (Provider)

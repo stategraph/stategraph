@@ -1,4 +1,4 @@
-include Terrat_vcs_provider2_gitlab.S
+include Terrat_vcs_provider2_gitlab.Shared
 
 (* [Tier] with the OSS feature caps (Terrat_tier.oss) clamped over whatever
    tier the installation row carries. Linked by the oss binaries; the ee

@@ -3,7 +3,7 @@ let src = Logs.Src.create "vcs_service_github_oss"
 module Logs = (val Logs.src_log src : Logs.LOG)
 
 module Provider :
-  Terrat_vcs_provider2_github.S
+  Terrat_vcs_provider2_github.Shared
     with type Api.Config.t = Terrat_vcs_service_github_provider.Api.Config.t = struct
   let name = Terrat_vcs_service_github_provider.name
   let enforce_installation_access = Terrat_vcs_service_github_provider.enforce_installation_access
@@ -674,4 +674,9 @@ module Routes = struct
   let routes config storage = Ep_access_token.routes config storage
 end
 
-include Terrat_vcs_service_github.Make (Provider) (Routes)
+module Edition = struct
+  let stategraph_parallel_applies = true
+end
+
+module Make (Stategraph : Terrat_stategraph.S) =
+  Terrat_vcs_service_github.Make (Provider) (Routes) (Edition) (Stategraph)

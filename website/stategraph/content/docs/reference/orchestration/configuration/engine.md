@@ -72,7 +72,7 @@ Runs the `stategraph` CLI, with your state in Infrastructure as a Database. It n
 | `tf_cmd` | string | The Terraform-compatible program that the CLI runs. Default is `terraform`. |
 | `tf_version` | string | The version of that program (Terraform or OpenTofu) |
 
-The runner reads `STATEGRAPH_API_BASE`, `STATEGRAPH_API_KEY`, and `STATEGRAPH_TENANT_ID` from the environment. All three are required. The `stategraph` engine does not collect outputs.
+The runner reads `STATEGRAPH_API_BASE`, `STATEGRAPH_API_KEY`, and `STATEGRAPH_TENANT_ID` from the environment. All three are required. The `stategraph` engine does not collect outputs. It reports the Stategraph transaction of each plan and apply to Orchestration, which uses it to let pull requests apply the same directory in parallel, and to refuse an apply that overlaps another pull request's before it starts. See [Locks in Infrastructure as a Database](/docs/orchestration/workflows/advanced/lock-management#locks-in-infrastructure-as-a-database).
 
 ### pulumi
 

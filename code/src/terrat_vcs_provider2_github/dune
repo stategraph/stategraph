@@ -1,3 +1,3 @@
 (library
  (name terrat_vcs_provider2_github)
- (libraries terrat_vcs_api_github terrat_vcs_provider2))
+ (libraries terrat_vcs_api_github terrat_vcs_provider2 terrat_stategraph))

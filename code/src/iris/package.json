@@ -28,7 +28,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.0.7",
     "autoprefixer": "^10.4.16",
-    "knip": "^5.61.3",
+    "knip": "^5.88.1",
     "openapi-typescript": "^7.8.0",
     "postcss": "^8.4.32",
     "svelte": "^5.56.9",
@@ -46,7 +46,7 @@
     "marked": "^18.0.11",
     "posthog-js": "^1.257.0",
     "svelte-spa-router": "^5.1.1",
-    "zod": "^3.25.67"
+    "zod": "^4.6.7"
   },
   "overrides": {
     "postcss-selector-parser": "^7.1.6"

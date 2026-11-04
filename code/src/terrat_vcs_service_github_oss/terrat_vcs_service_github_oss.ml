@@ -1,5 +1,5 @@
 module Provider :
-  Terrat_vcs_provider2_github.S
+  Terrat_vcs_provider2_github.Shared
     with type Api.Config.t = Terrat_vcs_service_github_provider.Api.Config.t = struct
   let name = Terrat_vcs_service_github_provider.name
   let enforce_installation_access = Terrat_vcs_service_github_provider.enforce_installation_access
@@ -24,7 +24,7 @@ module Provider :
   module Stacks = Terrat_vcs_service_github_provider.Stacks
 end
 
-include
+module Make (Stategraph : Terrat_stategraph.S) =
   Terrat_vcs_service_github.Make
     (Provider)
     (struct
@@ -32,3 +32,7 @@ include
 
       let routes _ _ = []
     end)
+    (struct
+      let stategraph_parallel_applies = false
+    end)
+    (Stategraph)

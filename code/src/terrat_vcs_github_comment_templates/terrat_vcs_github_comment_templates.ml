@@ -73,6 +73,7 @@ module Tmpl = struct
   let apply_queued_behind_work_manifests =
     read [%blob "tmpl/apply_queued_behind_work_manifests.tmpl"]
 
+  let stategraph_overlapping_applies = read [%blob "tmpl/stategraph_overlapping_applies.tmpl"]
   let work_manifest_stale = jinja [%blob "tmpl/work_manifest_stale.tmpl"]
 
   let synthesize_config_err_stack_cycle =
