@@ -4,24 +4,24 @@
 - When you don't know how to do something, you consult the existing code in the project and match it.
 
 # Dune and make files
-- The build is dune-driven. The Makefile here is a thin wrapper that delegates to `dune` from the repo root (where `dune-project` lives).
+- The build is dune-driven. `code/Makefile` is a thin wrapper that delegates to `dune` from the repo root (where `dune-project` lives).
 - To add or change a library's dependencies, edit its `code/src/<name>/dune` directly.
 - New code conventionally lives in `code/src/<name>/` with a small `dune` declaring `(library (name <name>) (libraries ...))`. Tests live in `code/tests/<name>/` with `(test (name test) (libraries ...))`.
 
 # Editing Ocaml files
-- After editing an Ocaml file, run `ocamlformat -i src/<module>/<filename>`
+- After editing an Ocaml file, run `ocamlformat -i code/src/<module>/<filename>`
 - After an edit, build the relevant `make` target to verify the change is correct.
 
 # Building
-- To build a target run `make -j$(nproc) <target>` from `code/`.
+- To build a target run `make -j$(nproc) <target>` from `code/` (or `make -C code -j$(nproc) <target>` from the repo root).
 - To regenerate the OCaml API types from the schemas run `make generate-api-types` (or `dune build @code/generate-api-types`); to verify they are up-to-date run `make check-api-types`.
 - To build Terrateam client and server run `make terrat`.
 - Targets are also reachable directly via dune from the repo root, e.g. `dune build code/src/terrat_oss/terrat_oss.exe`. `dune-workspace` pins `(profile release)` as the default; the devcontainer overrides via `DUNE_PROFILE=dev`.
 - Always use `tail` to reduce the amount of data being processed when building.
-- If building fails, run `make <target>` and use `tail` to get the build error.
+- If building fails, run `make <target>` (from `code/`) and use `tail` to get the build error.
 
 # Testing
-- To run tests: `make test-terrat` (runs `dune runtest code/tests/`).
+- To run tests: `make test-terrat` from `code/` (runs `dune runtest code/tests/`).
 - Unit tests go in `code/tests/<name>` where `<name>` matches the library in `code/src/<name>`.
 
 # Style
