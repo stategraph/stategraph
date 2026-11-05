@@ -6593,7 +6593,40 @@ module Job_context = struct
         /% Var.uuid "context_id"
         /% Var.ud (Var.text "state") string_of_state
         /% Var.ud (Var.json "parameters") Type_.to_json
-        /% Var.ud (Var.option (Var.text "initiator")) (CCOption.map string_of_initiator))
+        /% Var.ud (Var.option (Var.text "initiator")) (CCOption.map string_of_initiator)
+        /% Var.option (Var.uuid "continuation_of"))
+
+    let select_job_origin_sql = Mql_sql.read [%blob "sql/select_job_origin.sql"]
+
+    let select_job_origin =
+      Pgsql_io.Typed_sql.(
+        sql
+        //
+        (* id *)
+        Ret.uuid
+        //
+        (* context_id *)
+        Ret.uuid
+        //
+        (* type *)
+        Ret.(u json Type_.of_json)
+        //
+        (* state *)
+        Ret.(u text state_of_string)
+        //
+        (* initiator *)
+        Ret.(option (u text initiator_of_string))
+        //
+        (* created_at *)
+        Ret.text
+        //
+        (* updated_at *)
+        Ret.text
+        //
+        (* completed_at *)
+        Ret.(option text)
+        /^ select_job_origin_sql
+        /% Var.uuid "id")
 
     let select_job_by_id_sql = Mql_sql.read [%blob "sql/select_job_by_id.sql"]
 
@@ -6932,7 +6965,7 @@ module Job_context = struct
   module Job = struct
     let query_context = query
 
-    let create ~request_id db type_ context initiator =
+    let create ~request_id ?continuation_of db type_ context initiator =
       let run =
         let open Abbs_fc.Infix_result_monad in
         Pgsql_io.Prepared_stmt.fetch
@@ -6943,6 +6976,7 @@ module Job_context = struct
           Tjc.Job.State.Running
           type_
           initiator
+          continuation_of
         >>= function
         | [] -> assert false
         | (id, created_at, _updated_at) :: _ ->
@@ -7003,6 +7037,45 @@ module Job_context = struct
       | Error `Error -> Abbs_fc.return_err `Error
       | Error (#Pgsql_io.err as err) ->
           Logs.err (fun m -> m "%s : JOB : QUERY : %a" request_id Pgsql_io.pp_err err);
+          Abbs_fc.return_err `Error
+
+    let query_origin ~request_id db ~job_id () =
+      let run =
+        let open Abbs_fc.Infix_result_monad in
+        Pgsql_io.Prepared_stmt.fetch
+          db
+          Sql.select_job_origin
+          ~f:(fun id context_id type_ state initiator created_at updated_at completed_at ->
+            (id, context_id, type_, state, initiator, created_at, updated_at, completed_at))
+          job_id
+        >>= function
+        | [] -> Abbs_fc.return_ok None
+        | (id, context_id, type_, state, initiator, created_at, updated_at, completed_at) :: _ -> (
+            query_context ~request_id db context_id
+            >>= function
+            | None -> assert false
+            | Some context ->
+                let module J = Terrat_job_context.Job in
+                Abbs_fc.return_ok
+                  (Some
+                     {
+                       J.completed_at;
+                       context;
+                       created_at;
+                       id;
+                       initiator;
+                       state;
+                       type_;
+                       updated_at;
+                     }))
+      in
+      let open Abb.Future.Infix_monad in
+      run
+      >>= function
+      | Ok _ as r -> Abb.Future.return r
+      | Error `Error -> Abbs_fc.return_err `Error
+      | Error (#Pgsql_io.err as err) ->
+          Logs.err (fun m -> m "%s : JOB : QUERY_ORIGIN : %a" request_id Pgsql_io.pp_err err);
           Abbs_fc.return_err `Error
 
     let query_all_by_context_id ~request_id:_ _db ~context_id:_ () = raise (Failure "nyi")

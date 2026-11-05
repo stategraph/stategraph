@@ -1824,6 +1824,50 @@ let test_apply_requirements_noop_check_off =
       if ar.V1.Apply_requirements.create_completed_apply_check_on_noop then
         failwith "create_completed_apply_check_on_noop ignored the false value")
 
+(* [require_explicit_apply] takes a boolean or the string [include_layers].  Stored built configs
+   are Version_1 JSON, so each value must come back out of [to_version_1] as it went in. *)
+
+let automerge_json require_explicit_apply =
+  `Assoc [ ("automerge", `Assoc [ ("require_explicit_apply", require_explicit_apply) ]) ]
+
+let assert_require_explicit_apply expected cfg =
+  Oth.Assert.eq
+    ~eq:V1.Automerge.Require_explicit_apply.equal
+    ~pp:V1.Automerge.Require_explicit_apply.pp
+    expected
+    (V1.automerge cfg).V1.Automerge.require_explicit_apply
+
+let require_explicit_apply_values =
+  V1.Automerge.Require_explicit_apply.
+    [ (`Bool false, Disabled); (`Bool true, Enabled); (`String "include_layers", Include_layers) ]
+
+let test_automerge_require_explicit_apply_default =
+  Oth.test ~name:"automerge: require_explicit_apply defaults to disabled" (fun _ ->
+      assert_require_explicit_apply
+        V1.Automerge.Require_explicit_apply.Disabled
+        (config_of_json (`Assoc [ ("automerge", `Assoc [ ("enabled", `Bool true) ]) ])))
+
+let test_automerge_require_explicit_apply_values =
+  Oth.test ~name:"automerge: require_explicit_apply reads each value" (fun _ ->
+      CCList.iter
+        (fun (json, expected) ->
+          assert_require_explicit_apply expected (config_of_json (automerge_json json)))
+        require_explicit_apply_values)
+
+let test_automerge_require_explicit_apply_round_trip =
+  Oth.test ~name:"automerge: require_explicit_apply round-trips through Version_1" (fun _ ->
+      CCList.iter
+        (fun (json, expected) ->
+          let v1 = V1.to_version_1 (config_of_json (automerge_json json)) in
+          assert_require_explicit_apply expected (config_of_json (Repo.Version_1.to_yojson v1)))
+        require_explicit_apply_values)
+
+let test_automerge_require_explicit_apply_unknown_rejected =
+  Oth.test ~name:"automerge: require_explicit_apply rejects an unknown string" (fun _ ->
+      match V1.of_version_1_json (automerge_json (`String "layers")) with
+      | Ok _ -> failwith "require_explicit_apply accepted an unknown string"
+      | Error _ -> ())
+
 let test =
   Oth.parallel
     [
@@ -1918,6 +1962,10 @@ let test =
       test_prechecks_not_inherited_by_a_dir;
       test_apply_requirements_noop_check_default;
       test_apply_requirements_noop_check_off;
+      test_automerge_require_explicit_apply_default;
+      test_automerge_require_explicit_apply_values;
+      test_automerge_require_explicit_apply_round_trip;
+      test_automerge_require_explicit_apply_unknown_rejected;
     ]
 
 let () =

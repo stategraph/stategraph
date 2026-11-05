@@ -2401,15 +2401,45 @@ struct
               in
               fetch Keys.job
               >>= fun job ->
+              (match require_explicit_apply with
+                | Am.Require_explicit_apply.Disabled | Am.Require_explicit_apply.Enabled ->
+                    Abbs_fc.return_ok job
+                | Am.Require_explicit_apply.Include_layers -> (
+                    (* The job that completes a run of several layers is the job of its last
+                       layer, which [run_next_layer] made.  The job at the head of that chain is
+                       the one that started the run. *)
+                    Builder.run_db s ~f:(fun db ->
+                        S.Job_context.Job.query_origin
+                          ~request_id:(Builder.log_id s)
+                          db
+                          ~job_id:job.Tjc.Job.id
+                          ())
+                    >>= function
+                    | Some origin -> Abbs_fc.return_ok origin
+                    | None -> assert false))
+              >>= fun decided_by ->
+              let explicit_apply_required =
+                match require_explicit_apply with
+                | Am.Require_explicit_apply.Disabled -> false
+                | Am.Require_explicit_apply.Enabled | Am.Require_explicit_apply.Include_layers ->
+                    true
+              in
               let is_explicit_apply =
-                match job.Tjc.Job.type_ with
+                match decided_by.Tjc.Job.type_ with
                 | Tjc.Job.Type_.Apply _ -> true
                 | _ -> false
               in
-              if
-                enabled
-                && ((require_explicit_apply && is_explicit_apply) || not require_explicit_apply)
-              then (
+              if enabled && explicit_apply_required && not is_explicit_apply then (
+                Logs.info (fun m ->
+                    m
+                      "%s : AUTOMERGE : REQUIRE_EXPLICIT_APPLY : job=%a : type=%a"
+                      (Builder.log_id s)
+                      Uuidm.pp
+                      decided_by.Tjc.Job.id
+                      Tjc.Job.Type_.pp
+                      decided_by.Tjc.Job.type_);
+                Abbs_fc.return_ok ())
+              else if enabled then (
                 fetch Keys.client
                 >>= fun client ->
                 fetch Keys.user

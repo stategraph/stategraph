@@ -262,8 +262,17 @@
           "type": "string"
         },
         "require_explicit_apply": {
-          "default": false,
-          "type": "boolean"
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "enum": [
+                "include_layers"
+              ],
+              "type": "string"
+            }
+          ]
         },
         "retain_pr_title": {
           "default": false,

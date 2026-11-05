@@ -362,11 +362,19 @@ module Automerge : sig
     val to_string : t -> string
   end
 
+  module Require_explicit_apply : sig
+    type t =
+      | Disabled
+      | Enabled
+      | Include_layers
+    [@@deriving show, yojson, eq]
+  end
+
   type t = {
     delete_branch : bool; [@default false]
     enabled : bool; [@default false]
     merge_strategy : Merge_strategy.t; [@default Merge_strategy.Merge]
-    require_explicit_apply : bool; [@default false]
+    require_explicit_apply : Require_explicit_apply.t; [@default Require_explicit_apply.Disabled]
     retain_pr_title : bool; [@default false]
   }
   [@@deriving make, show, yojson, eq]

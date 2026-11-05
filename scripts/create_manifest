@@ -1,14 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Check for required arguments
-if [[ $# -lt 1 ]]; then
-  echo "Usage: $0 <image-name> [<image-name> ...]"
-  exit 1
+usage() {
+  echo "Usage: $0 [--org <organization>] <image-name> [<image-name> ...]"
+  echo "  --org  GitHub organization owning the images on ghcr.io (default: terrateamio)"
+}
+
+# Set the container registry URL and the default organization
+CONTAINER_REGISTRY="ghcr.io"
+ORG="terrateamio"
+
+if [[ $# -ge 1 && "$1" == "--org" ]]; then
+  if [[ $# -lt 2 || -z "$2" ]]; then
+    usage
+    exit 1
+  fi
+  ORG="$2"
+  shift 2
 fi
 
-# Set the container registry URL
-CONTAINER_REGISTRY="ghcr.io"
+# Check for required arguments
+if [[ $# -lt 1 ]]; then
+  usage
+  exit 1
+fi
 
 # Check if the current GitHub ref and environment allow pushing the "latest" tag
 PUSH_LATEST=false
@@ -18,20 +33,21 @@ fi
 
 # Iterate over each image name provided as an argument
 for IMAGE_NAME in "$@"; do
-  echo "Creating and pushing multi-architecture manifest for ${IMAGE_NAME}..."
+  IMAGE="${CONTAINER_REGISTRY}/${ORG}/${IMAGE_NAME}"
+  echo "Creating and pushing multi-architecture manifest for ${IMAGE}..."
 
   # Create and push the multi-architecture manifest for the version tag
   docker buildx imagetools create \
-    --tag "${CONTAINER_REGISTRY}/terrateamio/${IMAGE_NAME}:${VERSION_TAG}" \
-    "${CONTAINER_REGISTRY}/terrateamio/${IMAGE_NAME}:${VERSION_TAG}-amd64" \
-    "${CONTAINER_REGISTRY}/terrateamio/${IMAGE_NAME}:${VERSION_TAG}-arm64"
+    --tag "${IMAGE}:${VERSION_TAG}" \
+    "${IMAGE}:${VERSION_TAG}-amd64" \
+    "${IMAGE}:${VERSION_TAG}-arm64"
 
   # Optionally create and push the "latest" tag if conditions are met
   if [[ "${IS_LATEST_VERSION_TAG:-false}" == "true" && "${PUSH_LATEST}" == "true" && "${IMAGE_NAME}" != "terrat-base" ]]; then
-    echo "Creating and pushing the 'latest' multi-architecture tag for ${IMAGE_NAME}..."
+    echo "Creating and pushing the 'latest' multi-architecture tag for ${IMAGE}..."
     docker buildx imagetools create \
-      --tag "${CONTAINER_REGISTRY}/terrateamio/${IMAGE_NAME}:latest" \
-      "${CONTAINER_REGISTRY}/terrateamio/${IMAGE_NAME}:${VERSION_TAG}-amd64" \
-      "${CONTAINER_REGISTRY}/terrateamio/${IMAGE_NAME}:${VERSION_TAG}-arm64"
+      --tag "${IMAGE}:latest" \
+      "${IMAGE}:${VERSION_TAG}-amd64" \
+      "${IMAGE}:${VERSION_TAG}-arm64"
   fi
 done

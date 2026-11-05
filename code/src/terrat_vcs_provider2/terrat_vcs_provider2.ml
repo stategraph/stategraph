@@ -1573,8 +1573,11 @@ module type Shared = sig
       Abb.Future.t
 
     module Job : sig
+      (** [continuation_of] is the job that the new job continues: the job whose completion made it,
+          when the new job runs a later layer of the same run. *)
       val create :
         request_id:string ->
+        ?continuation_of:Uuidm.t ->
         Db.t ->
         Terrat_job_context.Job.Type_.t ->
         (Api.Pull_request.Id.t, Api.Ref.t) Terrat_job_context.Context.t ->
@@ -1588,6 +1591,19 @@ module type Shared = sig
         request_id:string ->
         Db.t ->
         job_id:Uuidm.t ->
+        ( (Api.Pull_request.Id.t, Api.Ref.t, Api.User.t option) Terrat_job_context.Job.t option,
+          [> `Error ] )
+        result
+        Abb.Future.t
+
+      (** The job that started the run that [job_id] is a layer of: the job at the head of its chain
+          of continuations. A job that continues nothing is its own origin. [None] when no job has
+          the id. *)
+      val query_origin :
+        request_id:string ->
+        Db.t ->
+        job_id:Uuidm.t ->
+        unit ->
         ( (Api.Pull_request.Id.t, Api.Ref.t, Api.User.t option) Terrat_job_context.Job.t option,
           [> `Error ] )
         result

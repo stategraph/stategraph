@@ -25,7 +25,7 @@ automerge:
 | `enabled` | boolean | Turns on automerge. Default is `false`. |
 | `delete_branch` | boolean | Deletes the source branch after a successful merge. Default is `false`. |
 | `merge_strategy` | string | The merge method: `auto`, `merge`, `rebase`, or `squash`. Default is `auto`. See [Merge Strategy](#merge-strategy). |
-| `require_explicit_apply` | boolean | `true`: automerge runs only after an apply from a comment, such as `stategraph apply` or `stategraph apply-force`, not after an autoapply. Default is `false`. |
+| `require_explicit_apply` | boolean or string | `true`: automerge runs only after an apply from a comment, such as `stategraph apply` or `stategraph apply-force`, not after an autoplan. `include_layers`: also merges when a later layer of a run that an apply comment started completes the pull request. Default is `false`. See [Explicit Apply](#explicit-apply). |
 | `retain_pr_title` | boolean | Uses the pull request title as the commit title. Default is `false`. See [Commit Title](#commit-title). |
 
 Automerge does not force a merge. It respects the branch protection rules of the repository, and on GitLab the merge checks of the project. If the merge fails, Orchestration comments the reason on the pull request.
@@ -42,6 +42,17 @@ Automerge does not force a merge. It respects the branch protection rules of the
 The repository's merge settings must allow the strategy. If they do not, the merge fails. The exception is `auto` on GitHub, which falls back to squash.
 
 On GitLab, Orchestration only chooses whether to squash. The merge method in the project's merge request settings decides how GitLab merges.
+
+## Explicit Apply
+
+In a [layered run](/docs/orchestration/workflows/advanced/layered-runs), an apply comment applies the first layer, and Orchestration then plans the next layer. That plan can complete the pull request: it has no changes, or a [stack](/docs/reference/orchestration/configuration/stacks) rule with `auto_apply: true` applies it.
+
+| Value | Pull request after the last layer |
+| --- | --- |
+| `true` | Stays open. Comment `stategraph apply` again to merge it. |
+| `include_layers` | Merges, because an apply comment started the run. |
+
+Use `true` to review the plans of each layer before the merge.
 
 ## Commit Title
 
@@ -74,6 +85,14 @@ automerge:
 automerge:
   enabled: true
   merge_strategy: squash
+```
+
+### Merge After an Apply Comment and Its Layers
+
+```yaml
+automerge:
+  enabled: true
+  require_explicit_apply: include_layers
 ```
 
 ### Retain Pull Request Title in Squash Commit
