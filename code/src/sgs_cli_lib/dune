@@ -31,7 +31,8 @@
   sgs_user
   terrat
   terrat_config
-  terrat_storage)
+  terrat_storage
+  yojson)
  (preprocessor_deps
   ../sgs_terrateam_catalog/fdw_grants.sql
   ../sgs_terrateam_catalog/fdw_tables.sql
