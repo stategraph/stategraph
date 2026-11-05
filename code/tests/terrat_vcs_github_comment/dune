@@ -1,3 +1,10 @@
 (test
  (name test)
- (libraries containers oth sln terrat_api terrat_vcs_github_comment yojson))
+ (libraries
+  containers
+  oth
+  sln
+  terrat_api
+  terrat_vcs_comment
+  terrat_vcs_github_comment
+  yojson))

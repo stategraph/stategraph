@@ -8,7 +8,7 @@ order: 3
 !!! note "Edition differences"
     Both editions include drift detection. The Open Source edition supports one drift schedule per repository. More than one schedule per repository is an Enterprise feature: on the Open Source edition, Orchestration rejects a configuration with more than one entry under `drift.schedules`. See [Editions](/docs/get-started/editions).
 
-Drift detection in Stategraph Orchestration finds where your infrastructure differs from the desired state in your Terraform code, and can reconcile the difference. On a schedule, it runs a plan against all [dirspaces](/docs/get-started/core-concepts#repository-directory-and-workspace) in your repository. When it finds drift, Orchestration can open an issue in your GitHub repository or GitLab project, or apply the plan. Your infrastructure stays consistent and compliant.
+Drift detection in Stategraph Orchestration finds where your infrastructure differs from the desired state in your Terraform code, and can reconcile the difference. On a schedule, it runs a plan against all [dirspaces](/docs/get-started/core-concepts#repository-directory-and-workspace) in your repository. It runs on the default branch, and on each branch that [`destination_branches`](/docs/reference/orchestration/configuration/destination-branches) matches. When it finds drift, Orchestration can open an issue in your GitHub repository or GitLab project, or apply the plan. Your infrastructure stays consistent and compliant.
 
 ## Enabling drift detection
 
