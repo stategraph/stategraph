@@ -130,6 +130,7 @@ let test_operation_failed_vcs_api_timeout_err =
    own. *)
 (* Resource counts from the plan step's [resource_summary] payload. *)
 type counts = {
+  imported : int;
   created : int;
   updated : int;
   replaced : int;
@@ -137,19 +138,21 @@ type counts = {
 }
 
 let plan_complete2_kv ?counts ~changes ~is_layered_run ~num_more_layers () =
-  let created, updated, replaced, deleted =
+  let imported, created, updated, replaced, deleted =
     CCOption.map
-      (fun { created; updated; replaced; deleted } ->
-        ( CCInt.to_string created,
+      (fun { imported; created; updated; replaced; deleted } ->
+        ( CCInt.to_string imported,
+          CCInt.to_string created,
           CCInt.to_string updated,
           CCInt.to_string replaced,
           CCInt.to_string deleted ))
       counts
-    |> CCOption.get_or ~default:("-", "-", "-", "-")
+    |> CCOption.get_or ~default:("-", "-", "-", "-", "-")
   in
   let resource_totals =
     `Assoc
       [
+        ("imported", `String imported);
         ("created", `String created);
         ("updated", `String updated);
         ("replaced", `String replaced);
@@ -195,6 +198,7 @@ let plan_complete2_kv ?counts ~changes ~is_layered_run ~num_more_layers () =
                    ("has_changes", `Bool has_changes);
                    ("run_url", `Null);
                    ("applied", `Bool false);
+                   ("imported", `String imported);
                    ("created", `String created);
                    ("updated", `String updated);
                    ("replaced", `String replaced);
@@ -268,16 +272,21 @@ let test_plan_complete2_resource_summary =
         render
           Tmpl.plan_complete2
           (plan_complete2_kv
-             ~counts:{ created = 2; updated = 1; replaced = 0; deleted = 3 }
+             ~counts:{ imported = 4; created = 2; updated = 1; replaced = 0; deleted = 3 }
              ~changes:[ true ]
              ~is_layered_run:false
              ~num_more_layers:0
              ())
       in
-      Oth.Assert.str_contains ~haystack:body ~needle:"Create | Update | Replace | Delete";
-      Oth.Assert.str_contains ~haystack:body ~needle:"| 2 | 1 | 0 | 3 |";
-      Oth.Assert.str_contains ~haystack:body ~needle:"**Total**";
-      Oth.Assert.str_contains ~haystack:body ~needle:"**2** | **1** | **0** | **3**")
+      Oth.Assert.str_contains_all
+        ~haystack:body
+        ~needles:
+          [
+            "| Result | Import | Create | Update | Replace | Delete |";
+            "| 4 | 2 | 1 | 0 | 3 |";
+            "**Total**";
+            "| **4** | **2** | **1** | **0** | **3** |";
+          ])
 
 let test_plan_complete2_resource_summary_missing =
   Oth.test
@@ -289,8 +298,9 @@ let test_plan_complete2_resource_summary_missing =
           Tmpl.plan_complete2
           (plan_complete2_kv ~changes:[ true ] ~is_layered_run:false ~num_more_layers:0 ())
       in
-      Oth.Assert.str_contains ~haystack:body ~needle:"| - | - | - | - |";
-      Oth.Assert.str_contains ~haystack:body ~needle:"**-** | **-** | **-** | **-** |")
+      Oth.Assert.str_contains_all
+        ~haystack:body
+        ~needles:[ "| - | - | - | - | - |"; "| **-** | **-** | **-** | **-** | **-** |" ])
 
 let test_plan_complete2_changes_keep_apply =
   Oth.test ~tags:[ "plan_complete" ] ~name:"Plan complete: changes keep the apply footer" (fun _ ->

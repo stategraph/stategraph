@@ -101,6 +101,9 @@ module Sql = struct
       (* replaced *)
       Ret.(option bigint)
       //
+      (* imported *)
+      Ret.(option bigint)
+      //
       (* plan_output *)
       Ret.(option text)
       //
@@ -211,6 +214,7 @@ module Machine = struct
       updated : int64 option;
       deleted : int64 option;
       replaced : int64 option;
+      imported : int64 option;
       run_url : string option;
     }
     [@@deriving to_yojson]
@@ -241,6 +245,7 @@ module S = struct
     deleted : int64 option;
     dirspace : Terrat_dirspace.t;
     has_changes : bool;
+    imported : int64 option;
     output : string option;
     replaced : int64 option;
     status : Unified.Status.t;
@@ -302,6 +307,7 @@ module S = struct
           updated
           deleted
           replaced
+          imported
           plan_output
           apply_success
           apply_work_manifest
@@ -316,6 +322,7 @@ module S = struct
           deleted;
           dirspace = { Terrat_dirspace.dir = path; workspace };
           has_changes = CCOption.get_or ~default:false plan_has_changes;
+          imported;
           output = plan_output;
           replaced;
           status =
@@ -394,6 +401,7 @@ module S = struct
             updated = el.updated;
             deleted = el.deleted;
             replaced = el.replaced;
+            imported = el.imported;
             run_url = run_url t el;
           })
         els
@@ -440,6 +448,7 @@ module S = struct
                        ("dir", `String dir);
                        ("workspace", `String workspace);
                        ("status", `String (status_kv el.status));
+                       ("imported", `String (count_kv el el.imported));
                        ("created", `String (count_kv el el.created));
                        ("updated", `String (count_kv el el.updated));
                        ("replaced", `String (count_kv el el.replaced));
@@ -451,6 +460,8 @@ module S = struct
           ( "totals",
             `Assoc
               [
+                ( "imported",
+                  `String (Int64.to_string (sum (fun el -> shown_count el el.imported) els)) );
                 ( "created",
                   `String (Int64.to_string (sum (fun el -> shown_count el el.created) els)) );
                 ( "updated",

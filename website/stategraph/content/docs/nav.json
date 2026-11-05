@@ -587,6 +587,10 @@
               "label": "Enable security scanning"
             },
             {
+              "page": "/docs/admin/self-hosting/migrate-from-terrateam",
+              "label": "Migrate from Terrateam"
+            },
+            {
               "label": "Open Source",
               "items": [
                 {

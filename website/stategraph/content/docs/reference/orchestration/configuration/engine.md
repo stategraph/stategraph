@@ -91,7 +91,7 @@ Each step is optional. Orchestration skips a step that you do not set.
 | `init` | array | The command for the init step |
 | `plan` | array | The command for the plan step. To pass a plan file to the apply step, write it to the path in `TERRATEAM_PLAN_FILE`. The file format is up to your engine. |
 | `diff` | array | The command that prints a readable diff of the plan |
-| `resource_summary` | array | The command that prints the resource counts of the plan as a JSON object with the integer keys `created`, `updated`, `replaced`, and `deleted`. It runs after a plan with changes, and the counts show in the status check description and the summary comment. Orchestration skips the counts when the command fails or prints no JSON object. |
+| `resource_summary` | array | The command that prints the resource counts of the plan as a JSON object with the integer keys `created`, `updated`, `replaced`, `deleted`, and `imported`. It runs after a plan with changes, and the counts show in the status check description and the summary comment. The status check description shows `imported` only when it is above zero. Orchestration skips the counts when the command fails or prints no JSON object. |
 | `apply` | array | The command for the apply step |
 | `unsafe_apply` | array | The command for [`stategraph apply-autoapprove`](/docs/reference/orchestration/commands/apply-autoapprove), which applies with no stored plan file |
 | `outputs` | array | The command that returns the output values as a JSON string |

@@ -27,6 +27,7 @@
   };
 
   const slotClass: Record<keyof ResourceSummary, string> = {
+    imported: 'text-[var(--sg-accent)]',
     created: 'text-[var(--sg-op-create)]',
     updated: 'text-[var(--sg-op-update)]',
     replaced: 'text-[var(--sg-op-update)]',

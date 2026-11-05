@@ -74,7 +74,7 @@ With `mode: header`, each plan and apply comment starts with a summary header, a
 The header has a one-line rollup and a table of the dirspaces (directory and workspace combinations) of that comment. For each dirspace, the table shows:
 
 - The result.
-- For plans, the created, updated, replaced, and deleted resource counts that the runner reports. A runner or engine that reports no counts shows `-`.
+- For plans, the imported, created, updated, replaced, and deleted resource counts that the runner reports. The imported count includes every resource that the plan imports, whatever its action. A runner or engine that reports no counts shows `-`.
 
 In `header` mode, the per-dirspace changes tables of the plan and apply comments are never collapsed.
 

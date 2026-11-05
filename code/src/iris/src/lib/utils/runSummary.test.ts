@@ -18,7 +18,19 @@ test('runSummary: failed first, then changes, then dirspace, no result last; tot
   assert.deepEqual(rows.map((r) => r.dir), ['a', 'b', 'c', '0']);
   assert.deepEqual(rows[1].resources, { created: 2, updated: null });
   assert.equal(rows[2].resources, null);
-  assert.deepEqual(totals, { created: 2, updated: 0, replaced: 0, deleted: 0 });
+  assert.deepEqual(totals, { imported: 0, created: 2, updated: 0, replaced: 0, deleted: 0 });
+});
+
+test('runSummary: an import count alone is a reported summary and totals with the rest', () => {
+  const { rows, totals } = runSummary(
+    [ds('a', true), ds('b', true)],
+    [
+      plan('a', { has_changes: true, resource_summary: { imported: 2 } }),
+      plan('b', { has_changes: true, resource_summary: { imported: 1, updated: 1 } }),
+    ]
+  );
+  assert.deepEqual(rows[0].resources, { imported: 2 });
+  assert.deepEqual(totals, { imported: 3, created: 0, updated: 1, replaced: 0, deleted: 0 });
 });
 
 test('runSummary: totals are null when no dirspace reported a summary', () => {
