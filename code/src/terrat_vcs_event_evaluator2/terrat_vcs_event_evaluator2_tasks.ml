@@ -4011,6 +4011,7 @@ struct
                   Builder.run_db s ~f:(fun db ->
                       S.Job_context.Job.create
                         ~request_id:(Builder.log_id s)
+                        ~continuation_of:plan_job_id
                         db
                         (Tjc.Job.Type_.Apply { tag_query; kind; force = false })
                         context
@@ -4127,6 +4128,7 @@ struct
                         Builder.run_db s ~f:(fun db ->
                             S.Job_context.Job.create
                               ~request_id:(Builder.log_id s)
+                              ~continuation_of:job.Tjc.Job.id
                               db
                               job_type
                               context
@@ -4158,6 +4160,7 @@ struct
                             Builder.run_db s ~f:(fun db ->
                                 S.Job_context.Job.create
                                   ~request_id:(Builder.log_id s)
+                                  ~continuation_of:job.Tjc.Job.id
                                   db
                                   Tjc.Job.Type_.Autoapply
                                   context

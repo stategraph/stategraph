@@ -284,8 +284,9 @@ module Job_context = struct
   let query ~request_id db id = raise (Failure "nyi")
 
   module Job = struct
-    let create ~request_id db type_ context initiator = raise (Failure "nyi")
+    let create ~request_id ?continuation_of db type_ context initiator = raise (Failure "nyi")
     let query ~request_id db ~job_id = raise (Failure "nyi")
+    let query_origin ~request_id db ~job_id () = raise (Failure "nyi")
     let query_all_by_context_id ~request_id db ~context_id () = raise (Failure "nyi")
     let query_pending_by_context_id ~request_id db ~context_id () = raise (Failure "nyi")
     let query_explicit_plan_exists ~request_id db ~context_id () = raise (Failure "nyi")

@@ -661,11 +661,19 @@ module Automerge = struct
       | Squash -> "squash"
   end
 
+  module Require_explicit_apply = struct
+    type t =
+      | Disabled
+      | Enabled
+      | Include_layers
+    [@@deriving show, yojson, eq]
+  end
+
   type t = {
     delete_branch : bool; [@default false]
     enabled : bool; [@default false]
     merge_strategy : Merge_strategy.t; [@default Merge_strategy.Auto]
-    require_explicit_apply : bool; [@default false]
+    require_explicit_apply : Require_explicit_apply.t; [@default Require_explicit_apply.Disabled]
     retain_pr_title : bool; [@default false]
   }
   [@@deriving make, show, yojson, eq]
@@ -2508,6 +2516,13 @@ let of_version_automerge automerge =
     automerge
   in
   let merge_strategy = Automerge.Merge_strategy.make merge_strategy in
+  let require_explicit_apply =
+    let module Rea = Am.Require_explicit_apply in
+    match require_explicit_apply with
+    | None | Some (Rea.V0 false) -> Automerge.Require_explicit_apply.Disabled
+    | Some (Rea.V0 true) -> Automerge.Require_explicit_apply.Enabled
+    | Some (Rea.V1 `Include_layers) -> Automerge.Require_explicit_apply.Include_layers
+  in
   Ok
     (Automerge.make
        ~delete_branch
@@ -3426,6 +3441,13 @@ let to_version_1_automerge automerge =
     | Ms.Merge -> `Merge
     | Ms.Rebase -> `Rebase
     | Ms.Squash -> `Squash
+  in
+  let require_explicit_apply =
+    let module Rea = Am.Require_explicit_apply in
+    match require_explicit_apply with
+    | Automerge.Require_explicit_apply.Disabled -> None
+    | Automerge.Require_explicit_apply.Enabled -> Some (Rea.V0 true)
+    | Automerge.Require_explicit_apply.Include_layers -> Some (Rea.V1 `Include_layers)
   in
   { Am.delete_branch; enabled; merge_strategy; require_explicit_apply; retain_pr_title }
 

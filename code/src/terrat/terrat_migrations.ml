@@ -354,6 +354,7 @@ let migrations =
       run_sql [%blob "migrations/2026-10-23-add-compute-node-work-created-index.sql"] );
     ( "drop-compute-node-work-wm-state-index",
       run_sql [%blob "migrations/2026-10-23-drop-compute-node-work-wm-state-index.sql"] );
+    ("add-job-continuation-of", run_sql [%blob "migrations/2026-11-04-add-job-continuation-of.sql"]);
   ]
 
 let run config storage = Mig.run { Migrate.config; storage; tx = () } migrations
