@@ -14,111 +14,41 @@ The Enterprise build needs a license key to complete the first-time setup, and c
 
 ## Before you begin
 
-- Docker Engine 20.10 or later, and Docker Compose 2.23.1 or later.
+- Git, Docker Engine 20.10 or later, and Docker Compose 2.24 or later.
 - Port 8080 free on the host.
-- For Orchestration, a URL that GitHub or GitLab can reach over HTTPS.
 - For GitHub, admin rights in the GitHub organization, to create and install a GitHub App.
 - For GitLab, gitlab.com or self-managed GitLab 18.1 or later (see [GitLab version](/docs/admin/self-hosting/orchestration#gitlab-version)), a group (personal namespaces are not supported), and the rights to create an access token, add a project webhook, and change the project's CI/CD settings.
+- To connect GitHub or GitLab, a URL that they can reach over HTTPS. Without one, a GitHub or gitlab.com account for Terratunnel.
 
-## Create the Compose project
-
-1. Create a directory.
-2. In it, create `docker-compose.yml`:
-
-```yaml
-services:
-  db:
-    image: postgres:17-alpine
-    user: postgres
-    environment:
-      POSTGRES_PASSWORD: "stategraph"
-      POSTGRES_USER: "stategraph"
-      POSTGRES_DB: "stategraph"
-    healthcheck:
-      test: ["CMD", "pg_isready", "-h", "localhost", "-p", "5432", "-d", "stategraph", "-U", "stategraph"]
-      interval: 3s
-      timeout: 3s
-      retries: 5
-    volumes:
-      - db:/var/lib/postgresql/data/
-    configs:
-      - source: orchestration-db
-        target: /docker-entrypoint-initdb.d/orchestration.sql
-    networks:
-      - stategraph
-
-  server:
-    image: ghcr.io/stategraph/stategraph-server:latest
-    env_file:
-      - .env
-    environment:
-      DB_HOST: "db"
-      DB_PORT: "5432"
-      DB_USER: "stategraph"
-      DB_PASS: "stategraph"
-      DB_NAME: "stategraph"
-      STATEGRAPH_ORCHESTRATION_ENABLED: "true"
-      STATEGRAPH_FDW_PASSWORD: "stategraph_mql"
-      STATEGRAPH_FDW_PROVISIONER_PASSWORD: "stategraph_provisioner"
-    ports:
-      - "8080:8080"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 120s
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - stategraph
-
-configs:
-  orchestration-db:
-    content: |
-      CREATE DATABASE terrateam;
-      CREATE ROLE stategraph_mql LOGIN PASSWORD 'stategraph_mql';
-      CREATE ROLE stategraph_provisioner LOGIN PASSWORD 'stategraph_provisioner';
-
-networks:
-  stategraph:
-
-volumes:
-  db:
-```
-
-`STATEGRAPH_ORCHESTRATION_ENABLED` turns on Stategraph Orchestration. At the first start of the `db` volume, the `orchestration-db` script creates the `terrateam` database of Orchestration and its two database roles: `stategraph_mql`, through which Stategraph reads Orchestration's data, and `stategraph_provisioner`, through which the console writes the GitHub App and the GitLab group connections. The two `STATEGRAPH_FDW_*` passwords are the passwords of these roles: change both places together.
-
-3. Create `.env`:
+## Start Stategraph
 
 ```bash
-STATEGRAPH_UI_BASE=http://localhost:8080
+git clone --depth 1 https://github.com/stategraph/stategraph.git
+cd stategraph/docker/stategraph
 ```
 
-`STATEGRAPH_UI_BASE`, the public URL of the console, is required. All other settings go into `.env`. Leave optional variables unset, not empty: for some, an empty value differs from an absent one.
+Create `.env` in this directory, with the Enterprise image and your license key:
 
-## Start and verify
+```bash
+STATEGRAPH_IMAGE=ghcr.io/stategraph/stategraph-server:latest
+STATEGRAPH_LICENSE_KEY=<key>
+```
 
-1. Start the services:
+Without `STATEGRAPH_LICENSE_KEY`, the setup screen asks for the key. Your other settings go in the same `.env`. Then start:
 
 ```bash
 docker compose up -d
 ```
 
-2. Check the containers:
+The Compose file runs PostgreSQL and the Stategraph server with Orchestration on, at <http://localhost:8080>.
 
-```bash
-docker compose ps
-```
-
-3. Check that Stategraph is ready:
+Check that Stategraph is ready:
 
 ```bash
 curl -f http://localhost:8080/health/ready
 ```
 
-At start, Stategraph migrates the `stategraph` database, then serves requests. `/health/ready` returns a non-200 status until the migrations finish. `/health/live` answers as soon as the web server is up. See [Health checks](/docs/admin/operations/health-checks).
+At start, Stategraph migrates the `stategraph` and `terrateam` databases, then serves requests. `/health/ready` returns a non-200 status until the migrations finish. See [Health checks](/docs/admin/operations/health-checks). If Orchestration does not start, `docker compose logs -f server` gives the cause.
 
 ## First login
 
@@ -130,22 +60,59 @@ As on Stategraph Cloud, you can connect GitHub or GitLab, or import your state. 
 
 ### 1. Set the public URL
 
-`STATEGRAPH_UI_BASE` becomes the public URL. Replace `.env` with:
+GitHub and GitLab send webhooks to the server, and your runners call it, so the server needs a public HTTPS URL. Add the URL to `.env`:
 
 ```bash
 STATEGRAPH_UI_BASE=https://stategraph.example.com
 STATEGRAPH_OAUTH_REDIRECT_BASE=https://stategraph.example.com
 ```
 
+Your own URL comes from a reverse proxy or a load balancer that terminates TLS in front of port 8080. If the host has no public URL, for example a laptop or a server behind a firewall, use Terratunnel:
+
+1. Open [tunnel.terrateam.dev](https://tunnel.terrateam.dev), and sign in with GitHub or GitLab.
+2. Copy your tunnel URL, `https://<name>.tunnel.terrateam.dev`. It is your public URL.
+3. Click **Generate API Key**, and copy the key. The page shows it one time.
+4. Add the tunnel URL, the key, and the `tunnel` profile to `.env`:
+
+```bash
+STATEGRAPH_UI_BASE=https://<name>.tunnel.terrateam.dev
+STATEGRAPH_OAUTH_REDIRECT_BASE=https://<name>.tunnel.terrateam.dev
+TERRATUNNEL_API_KEY=<key>
+COMPOSE_PROFILES=tunnel
+```
+
+`COMPOSE_PROFILES=tunnel` makes Docker Compose start `terratunnel`, which forwards each request on your tunnel URL to the server. The tunnel URL stays the same for your account. A new key replaces the old one, so run one stack per key. Terratunnel makes the whole server public at the tunnel URL, and all requests pass through the tunnel service: for production, use your own URL.
+
 | Variable | Purpose |
 |----------|---------|
-| `STATEGRAPH_OAUTH_REDIRECT_BASE` | Base of the OAuth callback URLs, including those of the GitHub App. Default `http://localhost:<port>`, which GitHub cannot reach |
+| `STATEGRAPH_UI_BASE` | The public URL of the console. The webhook, callback, and runner URLs derive from it |
+| `STATEGRAPH_OAUTH_REDIRECT_BASE` | Base of the OAuth callback URLs, including those of the GitHub App |
 
-The webhook and runner URLs derive from `STATEGRAPH_UI_BASE`, and `TERRAT_DB_*` need no setting: Orchestration uses the `DB_*` values with the database name `terrateam`. Telemetry is on by default. To turn it off, set `TERRAT_TELEMETRY_LEVEL=disabled`. All variables are in [Environment variables](/docs/admin/operations/environment-variables).
+`TERRAT_DB_*` need no setting: Orchestration uses the `DB_*` values with the database name `terrateam`. Telemetry is on by default. To turn it off, set `TERRAT_TELEMETRY_LEVEL=disabled`. Leave optional variables unset, not empty: for some, an empty value differs from an absent one. All variables are in [Environment variables](/docs/admin/operations/environment-variables).
 
-For GitHub, nothing else goes into `.env`: you create the App from the console in step 3. For GitLab, add the application and the bot user now.
+Apply the change:
 
-#### GitLab
+```bash
+docker compose up -d
+```
+
+Then open the console at your public URL, not `localhost`: the console shows webhook URLs from the address in your browser.
+
+### 2. Create the GitHub App
+
+Skip this step for GitLab.
+
+Open **Get Started > Set up your first repository > Connect GitHub**. The first step is **Create**:
+
+1. Keep the App name the console suggests, or type your own. GitHub requires a name no other App uses. To create the App under an organization, enter its name.
+2. Click **Create on GitHub**. GitHub opens with the App filled in: webhook URL, callback URLs, permissions, and events.
+3. Create the App on GitHub. GitHub returns you to the console.
+
+The console shows "The App is created. Starting the orchestration engine." for a few seconds, then moves to the **Install** step. Nothing goes into `.env`. To bring an App that you manage outside the console instead, set the `GITHUB_*` variables: see [Enable Orchestration](/docs/admin/self-hosting/orchestration#connect-github).
+
+### 2. Add the GitLab application
+
+Skip this step for GitHub.
 
 The setup wizard tells you what to create in GitLab, and collects the values. Run it one time, on any computer with a browser:
 
@@ -153,12 +120,12 @@ The setup wizard tells you what to create in GitLab, and collects the values. Ru
 docker run --rm -p 3000:3000 ghcr.io/stategraph/orchestration-setup:latest
 ```
 
-1. Open [http://localhost:3000](http://localhost:3000). When asked how GitLab reaches your server, enter the host name of your public URL.
+1. Open [http://localhost:3000](http://localhost:3000). On the webhook access step, choose the public server option, and enter the host name of your public URL. With Terratunnel, enter the host name of your tunnel URL, and do not choose the Terratunnel option of the wizard: it generates a new key, which replaces the key in your `.env`.
 2. Create a dedicated GitLab user for Stategraph.
 3. As that user, create a personal access token with the `api` scope, and enter it with your GitLab instance URL.
 4. As the same user, in **Preferences > Applications**, add an application with the `api` scope and the redirect URI that the wizard shows, `<public-url>/api/v1/gitlab/callback`. Enter its application ID and secret.
 
-The wizard then shows the settings for `.env`:
+Add the three settings that the wizard shows to `.env`:
 
 ```bash
 GITLAB_APP_ID=<application id>
@@ -166,9 +133,7 @@ GITLAB_APP_SECRET=<application secret>
 GITLAB_ACCESS_TOKEN=<access token>
 ```
 
-When `GITLAB_APP_ID` is set, the other two are required. Each GitLab group gets its own access token and webhook secret later, when you connect it in the console. On self-managed GitLab, see [Self-managed GitLab](/docs/admin/self-hosting/orchestration#self-managed-gitlab) for the two URL variables that the wizard does not write, and the CI template to mirror.
-
-### 2. Restart
+When `GITLAB_APP_ID` is set, the other two are required. Leave out the wizard's other settings: your public URL is already in `.env`. On self-managed GitLab, see [Self-managed GitLab](/docs/admin/self-hosting/orchestration#self-managed-gitlab) for the two URL variables that the wizard does not write, and the CI template to mirror.
 
 Restart, and follow the server log:
 
@@ -177,17 +142,7 @@ docker compose up -d
 docker compose logs -f server
 ```
 
-Orchestration migrates the `terrateam` database at start. If Orchestration does not start, the log gives the cause. A missing GitLab variable logs a `CONFIG : ERROR` line that names it.
-
-### 3. Create the GitHub App
-
-Sign in to the console as the instance admin, and open **Get Started > Set up your first repository > Connect GitHub**. The first step is **Create**:
-
-1. Keep the App name the console suggests, or type your own. GitHub requires a name no other App uses. To create the App under an organization, enter its name.
-2. Click **Create on GitHub**. GitHub opens with the App filled in: webhook URL, callback URLs, permissions, and events.
-3. Create the App on GitHub. GitHub returns you to the console.
-
-The console shows "The App is created. Starting the orchestration engine." for a few seconds, then moves to the **Install** step. To bring an App that you manage outside the console instead, set the `GITHUB_*` variables: see [Enable Orchestration](/docs/admin/self-hosting/orchestration#connect-github).
+A missing GitLab variable logs a `CONFIG : ERROR` line that names it. Each GitLab group gets its own access token and webhook secret later, when you connect it in the console.
 
 ## Your first pull request
 
@@ -214,7 +169,8 @@ From here, the flow is the same as on [Stategraph Cloud](/docs/get-started/quick
 
 ## Next steps
 
-- [Self-hosting](/docs/admin/self-hosting): other deployments and upgrades.
+- [Docker Compose](/docs/admin/self-hosting/docker-compose): sign-in, cost estimation, updates, and the other settings of this Compose file.
+- [Self-hosting](/docs/admin/self-hosting): Kubernetes, Amazon ECS, and Google Cloud Run.
 - [Enable Orchestration](/docs/admin/self-hosting/orchestration): the `GITHUB_*` variables, GitLab credential rotation, self-managed GitLab, and managed PostgreSQL.
 - [Environment variables](/docs/admin/operations/environment-variables): all settings that Stategraph reads.
 - [Access control](/docs/admin/access-control): Google, OIDC, tenants, and API access tokens.

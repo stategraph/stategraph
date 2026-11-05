@@ -119,7 +119,7 @@ export function OutputSizeGuard({ content, title, downloadName, onExpand, headin
           <Download className="w-3 h-3" /> Download
         </button>
       </div>
-      <div className={state === "full" ? "" : "max-h-96 overflow-auto"}>{children(preview.text)}</div>
+      <div>{children(preview.text)}</div>
       {preview.truncated && (
         <div className="px-3 py-2 text-center border-t border-[var(--sg-border-light)]">
           <button

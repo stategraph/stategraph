@@ -172,7 +172,7 @@ For example:
 ```yaml
 services:
   server:
-    image: ghcr.io/stategraph/stategraph-server:latest
+    image: ghcr.io/stategraph/stategraph-server-oss:latest
     environment:
       DB_HOST: "db"
       DB_PORT: "5432"

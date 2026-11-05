@@ -589,31 +589,6 @@
             {
               "page": "/docs/admin/self-hosting/migrate-from-terrateam",
               "label": "Migrate from Terrateam"
-            },
-            {
-              "label": "Open Source",
-              "items": [
-                {
-                  "page": "/docs/admin/self-hosting/open-source",
-                  "label": "Overview"
-                },
-                {
-                  "page": "/docs/admin/self-hosting/open-source/kubernetes",
-                  "label": "Kubernetes"
-                },
-                {
-                  "page": "/docs/admin/self-hosting/open-source/ecs",
-                  "label": "Amazon ECS"
-                },
-                {
-                  "page": "/docs/admin/self-hosting/open-source/environment-variables",
-                  "label": "Environment variables"
-                },
-                {
-                  "page": "/docs/admin/self-hosting/open-source/observability",
-                  "label": "Observability and metrics"
-                }
-              ]
             }
           ]
         },

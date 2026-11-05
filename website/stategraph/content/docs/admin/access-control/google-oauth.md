@@ -79,7 +79,7 @@ STATEGRAPH_OAUTH_REDIRECT_BASE=https://stategraph.example.com
 ```yaml
 services:
   server:
-    image: ghcr.io/stategraph/stategraph-server:latest
+    image: ghcr.io/stategraph/stategraph-server-oss:latest
     environment:
       DB_HOST: "db"
       DB_PORT: "5432"
@@ -237,7 +237,7 @@ services:
       - stategraph
 
   server:
-    image: ghcr.io/stategraph/stategraph-server:latest
+    image: ghcr.io/stategraph/stategraph-server-oss:latest
     env_file:
       - .env
     ports:

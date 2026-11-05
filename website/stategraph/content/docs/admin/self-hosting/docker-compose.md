@@ -7,99 +7,36 @@ order: 2
 
 Run Stategraph and PostgreSQL on one host with Docker Compose, and set up sign-in and the optional features. This is the quickest path, and the reference setup for [self-hosting](/docs/admin/self-hosting), for evaluation, development, and small teams.
 
+This page uses `docker/stategraph/docker-compose.yml` of the [stategraph/stategraph](https://github.com/stategraph/stategraph) repository. It runs the Open Source image, `ghcr.io/stategraph/stategraph-server-oss`. For [Enterprise](/docs/get-started/editions), set `STATEGRAPH_IMAGE=ghcr.io/stategraph/stategraph-server:latest` in `.env`: its setup screen asks for the license key first, and it adds state cost and security scanning.
+
 ## Before you begin
 
+- Git
 - Docker Engine 20.10 or later
-- Docker Compose 2.23.1 or later
+- Docker Compose 2.24 or later
 - Port 8080 free on the host
 
 ## Quick start
 
-### 1. Create a project directory
+### 1. Get the Compose file
 
 ```bash
-mkdir stategraph && cd stategraph
+git clone --depth 1 https://github.com/stategraph/stategraph.git
+cd stategraph/docker/stategraph
 ```
 
-### 2. Create docker-compose.yml
-
-```yaml
-services:
-  db:
-    image: postgres:17-alpine
-    user: postgres
-    environment:
-      POSTGRES_PASSWORD: "stategraph"
-      POSTGRES_USER: "stategraph"
-      POSTGRES_DB: "stategraph"
-    healthcheck:
-      test: ["CMD", "pg_isready", "-h", "localhost", "-p", "5432", "-d", "stategraph", "-U", "stategraph"]
-      interval: 3s
-      timeout: 3s
-      retries: 5
-    volumes:
-      - db:/var/lib/postgresql/data/
-    configs:
-      - source: orchestration-db
-        target: /docker-entrypoint-initdb.d/orchestration.sql
-    networks:
-      - stategraph
-
-  server:
-    image: ghcr.io/stategraph/stategraph-server:latest
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      DB_HOST: "db"
-      DB_PORT: "5432"
-      DB_USER: "stategraph"
-      DB_PASS: "stategraph"
-      DB_NAME: "stategraph"
-      STATEGRAPH_UI_BASE: "http://localhost:8080"
-      STATEGRAPH_ORCHESTRATION_ENABLED: "true"
-      STATEGRAPH_FDW_PASSWORD: "stategraph_mql"
-      STATEGRAPH_FDW_PROVISIONER_PASSWORD: "stategraph_provisioner"
-    ports:
-      - "8080:8080"
-    stop_grace_period: 60s
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 120s
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - stategraph
-
-configs:
-  orchestration-db:
-    content: |
-      CREATE DATABASE terrateam;
-      CREATE ROLE stategraph_mql LOGIN PASSWORD 'stategraph_mql';
-      CREATE ROLE stategraph_provisioner LOGIN PASSWORD 'stategraph_provisioner';
-
-networks:
-  stategraph:
-
-volumes:
-  db:
-```
-
-- `STATEGRAPH_UI_BASE` is the URL that users open. Keep `http://localhost:8080` for a local trial. Otherwise, set the public HTTPS URL.
-- `STATEGRAPH_ORCHESTRATION_ENABLED` turns on Stategraph Orchestration. At the first start of a new `db` volume, the `orchestration-db` script creates the `terrateam` database of Orchestration and its two database roles. The two `STATEGRAPH_FDW_*` passwords are the passwords of these roles: change both places together.
+- `docker-compose.yml` runs PostgreSQL and the Stategraph server. Settings go in `.env`, in this directory. The Compose file reads it, and its values win over the defaults.
+- `STATEGRAPH_UI_BASE`, the URL that users open, defaults to `http://localhost:8080`. For any other host, set the public HTTPS URL in `.env`.
+- `orchestration.env` turns on Stategraph Orchestration. At the first start of a new `db` volume, the scripts in `initdb/` create the `terrateam` database of Orchestration and its two database roles. The two `STATEGRAPH_FDW_*` passwords in `orchestration.env` are the passwords of these roles.
 - `stop_grace_period: 60s` lets Stategraph finish the requests in progress when it stops.
 
-### 3. Start Stategraph
+### 2. Start Stategraph
 
 ```bash
 docker compose up -d
 ```
 
-### 4. Verify the deployment
+### 3. Verify the deployment
 
 ```bash
 docker compose ps
@@ -109,7 +46,7 @@ curl http://localhost:8080/health/ready
 
 `/health/live` answers `200` when the web server is up, and `/health/ready` when the migrations are done and the server serves requests. See [Health checks](/docs/admin/operations/health-checks).
 
-### 5. Complete the setup
+### 4. Complete the setup
 
 Open <http://localhost:8080> and create the first admin account on the setup screen. The password needs at least 8 characters. You are then signed in.
 
@@ -121,33 +58,27 @@ Local email and password sign-in is on by default. For single sign-on, set the O
 
 ### Google
 
-In the Google Cloud console, create OAuth credentials with the authorized redirect URI `https://stategraph.example.com/oauth2/google/callback`. Then add:
+In the Google Cloud console, create OAuth credentials with the authorized redirect URI `https://stategraph.example.com/oauth2/google/callback`. Then add to `.env`:
 
-```yaml
-services:
-  server:
-    environment:
-      STATEGRAPH_OAUTH_TYPE: "google"
-      STATEGRAPH_OAUTH_CLIENT_ID: "your-client-id.apps.googleusercontent.com"
-      STATEGRAPH_OAUTH_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
-      STATEGRAPH_OAUTH_REDIRECT_BASE: "https://stategraph.example.com"
-      STATEGRAPH_OAUTH_EMAIL_DOMAIN: "example.com"
+```bash
+STATEGRAPH_OAUTH_TYPE=google
+STATEGRAPH_OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
+STATEGRAPH_OAUTH_CLIENT_SECRET=<client secret>
+STATEGRAPH_OAUTH_REDIRECT_BASE=https://stategraph.example.com
+STATEGRAPH_OAUTH_EMAIL_DOMAIN=example.com
 ```
 
 ### OIDC
 
-In your provider, create an application with the redirect URI `https://stategraph.example.com/oauth2/oidc/callback`. Then add:
+In your provider, create an application with the redirect URI `https://stategraph.example.com/oauth2/oidc/callback`. Then add to `.env`:
 
-```yaml
-services:
-  server:
-    environment:
-      STATEGRAPH_OAUTH_TYPE: "oidc"
-      STATEGRAPH_OAUTH_CLIENT_ID: "your-client-id"
-      STATEGRAPH_OAUTH_CLIENT_SECRET: "${OIDC_CLIENT_SECRET}"
-      STATEGRAPH_OAUTH_OIDC_ISSUER_URL: "https://your-provider.example.com"
-      STATEGRAPH_OAUTH_REDIRECT_BASE: "https://stategraph.example.com"
-      STATEGRAPH_OAUTH_EMAIL_DOMAIN: "example.com"
+```bash
+STATEGRAPH_OAUTH_TYPE=oidc
+STATEGRAPH_OAUTH_CLIENT_ID=your-client-id
+STATEGRAPH_OAUTH_CLIENT_SECRET=<client secret>
+STATEGRAPH_OAUTH_OIDC_ISSUER_URL=https://your-provider.example.com
+STATEGRAPH_OAUTH_REDIRECT_BASE=https://stategraph.example.com
+STATEGRAPH_OAUTH_EMAIL_DOMAIN=example.com
 ```
 
 !!! warning "Restrict the email domain"
@@ -157,7 +88,7 @@ Apply the change with `docker compose up -d`. See [Access control](/docs/admin/a
 
 ## Environment file
 
-Keep secrets and per-host values out of the Compose file. Put them in `.env`, next to `docker-compose.yml`, and keep `.env` out of version control. The Compose file loads `.env` through `env_file`. To reference a secret from `.env` or your secrets manager, use `${VAR}` interpolation.
+Keep secrets and per-host values out of the Compose file. Put them in `.env`, next to `docker-compose.yml`. Git ignores `.env`, so a `git pull` keeps it.
 
 ```bash
 # .env
@@ -169,13 +100,6 @@ STATEGRAPH_OAUTH_REDIRECT_BASE=https://stategraph.example.com
 # STATEGRAPH_OAUTH_CLIENT_ID=...
 # STATEGRAPH_OAUTH_CLIENT_SECRET=...
 # STATEGRAPH_OAUTH_EMAIL_DOMAIN=example.com
-
-# External PostgreSQL
-# DB_HOST=postgres.internal.example.com
-# DB_PORT=5432
-# DB_USER=stategraph
-# DB_PASS=...
-# DB_NAME=stategraph
 ```
 
 !!! note "environment outranks env_file"
@@ -183,7 +107,7 @@ STATEGRAPH_OAUTH_REDIRECT_BASE=https://stategraph.example.com
 
 ## Enable cost estimation
 
-Cost estimation is off by default. To turn it on, set it in `.env`, and recreate the container:
+Enterprise only. Cost estimation is off by default. To turn it on, set it in `.env`, and recreate the container:
 
 ```bash
 # .env
@@ -200,7 +124,7 @@ Stategraph then loads the price book into `cloud_pricing` on the `db` volume, in
 
 Stategraph Orchestration is on from the first start. To connect your provider:
 
-1. Set `STATEGRAPH_UI_BASE` and `STATEGRAPH_OAUTH_REDIRECT_BASE` to your public URL. The webhook and callback URLs derive from them, so GitHub or GitLab must reach that URL over HTTPS.
+1. Set `STATEGRAPH_UI_BASE` and `STATEGRAPH_OAUTH_REDIRECT_BASE` to your public URL. The webhook and callback URLs derive from them, so GitHub or GitLab must reach that URL over HTTPS. If the host has no public URL, the `terratunnel` service of the Compose file gives it one: see [Set the public URL](/docs/get-started/quickstart/self-hosted-open-source#1-set-the-public-url).
 2. For GitLab, add the credentials to `.env`, and recreate the container with `docker compose up -d`:
 
 ```bash
@@ -214,9 +138,9 @@ GITLAB_ACCESS_TOKEN=...
 
 To bring a GitHub App that you manage outside the console, set the six `GITHUB_*` variables in `.env` instead. They win over an App created from the console. For self-managed GitLab, also set `GITLAB_API_BASE_URL` and `GITLAB_WEB_BASE_URL`. For the GitHub App by hand, the GitLab credentials, GitLab groups, and the two roles, see [Enable Orchestration](/docs/admin/self-hosting/orchestration).
 
-To turn Orchestration off, set `STATEGRAPH_ORCHESTRATION_ENABLED` to `"false"` in `docker-compose.yml`, and recreate the container.
+To turn Orchestration off, set `STATEGRAPH_ORCHESTRATION_ENABLED=false` in `.env`, and recreate the container.
 
-PostgreSQL runs the `orchestration-db` script only at the first start of a new `db` volume. On an existing volume, create what is missing one time, with the passwords of `docker-compose.yml`, or put the passwords of the existing roles in `docker-compose.yml`. Then recreate the container:
+PostgreSQL runs the scripts in `initdb/` only at the first start of a new `db` volume. On an existing volume, create what is missing one time, with the passwords of `orchestration.env`, or put the passwords of the existing roles in `.env`. Then recreate the container:
 
 ```bash
 docker compose exec db psql -U stategraph -d stategraph \
@@ -227,7 +151,7 @@ docker compose exec db psql -U stategraph -d stategraph \
 
 ## Enable security scanning
 
-Set `STATEGRAPH_SECURITY=1` in `.env`, and recreate the container. Nothing else is needed. See [Enable security scanning](/docs/admin/self-hosting/security-scanning).
+Enterprise only. Set `STATEGRAPH_SECURITY=1` in `.env`, and recreate the container. Nothing else is needed. See [Enable security scanning](/docs/admin/self-hosting/security-scanning).
 
 ## Production considerations
 
@@ -236,12 +160,12 @@ Set `STATEGRAPH_SECURITY=1` in `.env`, and recreate the container. Nothing else 
 
 ### Use external PostgreSQL
 
-For durability and backups, point the server at a managed PostgreSQL service, and remove the `db` service and the `configs` block:
+For durability and backups, run the server against a managed PostgreSQL service, with a Compose file of your own for the server only:
 
 ```yaml
 services:
   server:
-    image: ghcr.io/stategraph/stategraph-server:latest
+    image: ghcr.io/stategraph/stategraph-server-oss:latest
     environment:
       DB_HOST: "postgres.internal.example.com"
       DB_PORT: "5432"
@@ -259,19 +183,18 @@ Create the `stategraph` database and the two Orchestration roles before the firs
 ## Updating
 
 ```bash
+git pull
 docker compose pull
 docker compose up -d
 ```
 
-For production, pin a version, not `latest`:
+For production, pin a version, not `latest`, in `.env`:
 
-```yaml
-services:
-  server:
-    image: ghcr.io/stategraph/stategraph-server:2.5.7
+```bash
+STATEGRAPH_IMAGE=ghcr.io/stategraph/stategraph-server-oss:<version>
 ```
 
-For versions, see the [releases page](https://github.com/stategraph/releases/releases). For the start sequence and image signatures, see [Upgrades](/docs/admin/operations/upgrades).
+Use the latest release on the [releases page](https://github.com/stategraph/releases/releases). For the start sequence and image signatures, see [Upgrades](/docs/admin/operations/upgrades).
 
 ## Troubleshooting
 

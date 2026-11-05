@@ -57,12 +57,12 @@ engine:
   name: stategraph
 ```
 
-To pin the CLI version that the runner installs:
+To pin the CLI version that the runner installs, set `version` to a release from the [releases page](https://github.com/stategraph/releases/releases):
 
 ```yaml
 engine:
   name: stategraph
-  version: '2.5.7'
+  version: '<version>'
 ```
 
 Stategraph wraps `terraform` by default. To wrap OpenTofu, set `tf_cmd` and `tf_version`:

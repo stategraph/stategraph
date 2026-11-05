@@ -1,20 +1,27 @@
 ---
 title: Migrate from Terrateam
-description: Replace a self-hosted Terrateam server with the Stategraph server image and keep its database.
+description: Replace a self-hosted Terrateam server, Open Source or Enterprise, with the Stategraph server image and keep its database.
 order: 9
 ---
 
-A self-hosted Terrateam server (`ghcr.io/terrateamio/terrat-ee`) becomes a Stategraph server (`ghcr.io/stategraph/stategraph-server`) when you replace the container. The PostgreSQL server, the Terrateam database, the GitHub App, the webhook URL, the runner workflow, the run history, and the API tokens stay. The Stategraph console replaces the Terrateam console on the same URL.
+A self-hosted Terrateam server becomes a Stategraph server when you replace the container. Each Terrateam image has a Stategraph image of the same edition:
+
+| Terrateam | Stategraph |
+|---|---|
+| `ghcr.io/terrateamio/terrat-oss` | `ghcr.io/stategraph/stategraph-server-oss` |
+| `ghcr.io/terrateamio/terrat-ee` | `ghcr.io/stategraph/stategraph-server`, with a license key |
+
+The PostgreSQL server, the Terrateam database, the GitHub App, the webhook URL, the runner workflow, and the run history stay. On Enterprise, the API tokens stay too. The Stategraph console replaces the Terrateam console on the same URL. The steps are the same for both editions, except for the license key.
 
 ## What changes
 
 | | Terrateam server | Stategraph server |
 |---|---|---|
-| Image | `ghcr.io/terrateamio/terrat-ee` | `ghcr.io/stategraph/stategraph-server:<version>` |
+| Image | `terrat-oss` or `terrat-ee` | `stategraph-server-oss:<version>` or `stategraph-server:<version>` |
 | Databases | `terrateam` | `terrateam` and a new database, `stategraph`, on the same server |
 | Console | Terrateam console, GitHub sign-in | Stategraph console, local or OIDC sign-in |
 | Webhook and runner URLs | `https://<host>/api/github/v1/...` | the same |
-| License | none | `STATEGRAPH_LICENSE_KEY` |
+| License | none | Open Source: none. Enterprise: `STATEGRAPH_LICENSE_KEY` |
 | PostgreSQL | 14 or later | 15 or later |
 
 ## Before you start
@@ -23,7 +30,7 @@ A self-hosted Terrateam server (`ghcr.io/terrateamio/terrat-ee`) becomes a State
 2. Start the current Terrateam image one time and wait until its migrations are complete.
 3. Set a webhook secret on the GitHub App and in `GITHUB_WEBHOOK_SECRET`.
 4. Set `GITHUB_APP_URL` to the page of the App, for example `https://github.com/apps/<slug>`.
-5. Get a license key.
+5. For Enterprise, get a license key.
 6. Make a backup of the Terrateam database.
 7. Change API clients that call `GET /api/v1/whoami` to `GET /api/v1/terrateam/whoami`. All other API paths stay the same.
 
@@ -37,7 +44,7 @@ A self-hosted Terrateam server (`ghcr.io/terrateamio/terrat-ee`) becomes a State
 | `GITHUB_*`, `GITLAB_*`, `TERRAT_TELEMETRY_LEVEL` | Keep. |
 | | Add `STATEGRAPH_ORCHESTRATION_ENABLED=true`. |
 | | Add `STATEGRAPH_FDW_USER` and `STATEGRAPH_FDW_PROVISIONER_USER` with the value of `DB_USER`, and `STATEGRAPH_FDW_PASSWORD` and `STATEGRAPH_FDW_PROVISIONER_PASSWORD` with the value of `DB_PASS`. |
-| | Add `STATEGRAPH_LICENSE_KEY`. |
+| | Enterprise: add `STATEGRAPH_LICENSE_KEY`. |
 | | If the name of the Terrateam database is not `terrateam`, add `STATEGRAPH_FDW_DBNAME` with the same value as `TERRAT_DB_NAME`. |
 | `TERRATEAM_CLIENT_MAX_BODY_SIZE`, `TERRAT_ACCESS_LOG` | `STATEGRAPH_CLIENT_MAX_BODY_SIZE`, `STATEGRAPH_ACCESS_LOG` |
 | `CUSTOM_CA_CERT` | Not available. Build a derived image that includes the certificate. |
@@ -71,7 +78,7 @@ GRANT USAGE ON FOREIGN DATA WRAPPER postgres_fdw TO <application role>;
 1. `docker compose pull server`
 2. `docker compose stop server`
 3. `docker compose exec db psql -U terrateam -d postgres -c 'create database stategraph owner terrateam'`
-4. In the `server` service, set the Stategraph image and the environment from the table.
+4. In the `server` service, set the Stategraph image of your edition and the environment from the table.
 5. `docker compose up -d server`
 
 `/health/ready` returns 200 when the migrations are complete.
@@ -86,8 +93,13 @@ The Stategraph chart uses the database of the Terrateam release. Keep the Terrat
 
 ```yaml
 stategraph:
+  # From terrat-oss. Leave out image for terrat-ee.
+  image:
+    repository: ghcr.io/stategraph/stategraph-server-oss
+    tag: "<version>"
   ui:
     base: https://<your Terrateam URL>
+  # From terrat-ee only.
   license:
     key: <license key>
   orchestration:
@@ -115,7 +127,7 @@ postgresql:
     existingSecretKey: password
 ```
 
-`terrateam-db` and `terrateam-db-password` are the Service and the Secret of the Terrateam chart. With an external PostgreSQL, set `postgresql.host` and `existingSecret` to that server and its Secret. The GitHub Secret uses the keys `github-app-id`, `github-app-client-id`, `github-app-client-secret`, `github-app-pem`, and `github-webhook-secret`; the Terrateam chart has the same values in five Secrets.
+Replace `<version>` with the latest release on the [releases page](https://github.com/stategraph/releases/releases). `terrateam-db` and `terrateam-db-password` are the Service and the Secret of the Terrateam chart. With an external PostgreSQL, set `postgresql.host` and `existingSecret` to that server and its Secret. The GitHub Secret uses the keys `github-app-id`, `github-app-client-id`, `github-app-client-secret`, `github-app-pem`, and `github-webhook-secret`; the Terrateam chart has the same values in five Secrets.
 
 Keep `provisionDatabase` off; its init container changes the password of the bridge users, which are now the application role. If the application role does not have `CREATEROLE`, create the two roles as shown in [Database](#database).
 
@@ -141,7 +153,11 @@ module "stategraph" {
   private_subnet_ids = var.private_subnet_ids
   domain_name        = "stategraph.example.com"   # the Terrateam domain
   certificate_arn    = var.certificate_arn
-  license_key        = var.license_key
+
+  # From terrat-oss:
+  stategraph_image = "ghcr.io/stategraph/stategraph-server-oss:<version>"
+  # From terrat-ee, in place of stategraph_image:
+  # license_key    = var.license_key
 
   create_database            = false
   external_database_host     = "<terrateam RDS host>"
@@ -178,6 +194,8 @@ resource "aws_vpc_security_group_ingress_rule" "stategraph_to_terrateam_rds" {
 }
 ```
 
+Replace `<version>` with the latest release on the [releases page](https://github.com/stategraph/releases/releases).
+
 5. Move the DNS record of the Terrateam domain to the Stategraph load balancer (output `alb_dns_name`).
 6. When the migration is final, remove `aws_db_instance.this` from the Terrateam state with `terraform state rm`, then destroy the Terrateam stack.
 
@@ -185,7 +203,7 @@ To go back to Terrateam before step 6, move the DNS record back and scale the Te
 
 ## After the start
 
-1. Open the old URL and create the first instance admin in the setup screen. With Google or OIDC sign-in, the first person who signs in becomes the instance admin.
+1. Open the old URL and create the first instance admin in the setup screen. On Enterprise, the setup screen asks for the license key first, unless `STATEGRAPH_LICENSE_KEY` is set. With Google or OIDC sign-in, the first person who signs in becomes the instance admin.
 2. Open **Getting started**, then **Connect GitHub**, and link each installation to a tenant. With the API: `PUT /api/v1/tenants/{tenant_id}/vcs-installations/github/{installation_core_id}`, with the ids from `GET /api/v1/vcs-installations/github/unclaimed`. For a GitLab group, use `gitlab` as the provider and the `core_id` from the `gitlab_installations_map` table.
 3. Open **Orchestration**. It shows the runs from before the migration.
 4. Open a pull request. The plan runs with the same workflow. Pull requests that were planned before the migration keep their plans.

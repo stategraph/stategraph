@@ -7,6 +7,8 @@ order: 4
 
 Deploy [Stategraph](/docs/admin/self-hosting) on Amazon ECS Fargate with the [Stategraph ECS Terraform module](https://github.com/stategraph/terraform-aws-stategraph-ecs).
 
+The examples use the Open Source image, `ghcr.io/stategraph/stategraph-server-oss`. Replace `<version>` with the latest release on the [releases page](https://github.com/stategraph/releases/releases), and `<module version>` with the latest tag of the [module](https://github.com/stategraph/terraform-aws-stategraph-ecs/tags). For [Enterprise](/docs/get-started/editions), set `stategraph_image` to `ghcr.io/stategraph/stategraph-server:<version>`: its setup screen asks for the license key first.
+
 ## Before you begin
 
 - Terraform 1.0 or later
@@ -60,7 +62,7 @@ mkdir stategraph-ecs && cd stategraph-ecs
 ```hcl
 # main.tf
 module "stategraph" {
-  source = "github.com/stategraph/terraform-aws-stategraph-ecs?ref=v1.0.0"
+  source = "github.com/stategraph/terraform-aws-stategraph-ecs?ref=<module version>"
 
   # Network (your existing VPC)
   vpc_id             = "vpc-xxxxx"
@@ -72,7 +74,7 @@ module "stategraph" {
   certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/xxxxx"
 
   # Image
-  stategraph_image = "ghcr.io/stategraph/stategraph-server:2.5.7"
+  stategraph_image = "ghcr.io/stategraph/stategraph-server-oss:<version>"
 
   environment = "production"
 
@@ -142,7 +144,7 @@ After DNS propagates, open `https://stategraph.example.com` and create the first
 | `enable_autoscaling` | Scale on CPU and memory | `true` |
 | `database_instance_class` | RDS instance class | `db.t3.medium` |
 | `database_multi_az` | Multi-AZ RDS | `true` |
-| `stategraph_image` | Container image | `ghcr.io/stategraph/stategraph-server:latest` |
+| `stategraph_image` | Container image: `ghcr.io/stategraph/stategraph-server-oss:<version>` for Open Source | `ghcr.io/stategraph/stategraph-server:latest` |
 
 The module documentation lists every variable. Stategraph settings are [environment variables](/docs/admin/operations/environment-variables) on the server container in the task definition. Reference Secrets Manager secrets in the `secrets` list of the container definition, not in `environment`.
 
@@ -172,7 +174,7 @@ module "vpc" {
 }
 
 module "stategraph" {
-  source = "github.com/stategraph/terraform-aws-stategraph-ecs?ref=v1.0.0"
+  source = "github.com/stategraph/terraform-aws-stategraph-ecs?ref=<module version>"
 
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnets
@@ -188,7 +190,7 @@ Set `create_database = false` and pass the connection details:
 
 ```hcl
 module "stategraph" {
-  source = "github.com/stategraph/terraform-aws-stategraph-ecs?ref=v1.0.0"
+  source = "github.com/stategraph/terraform-aws-stategraph-ecs?ref=<module version>"
 
   # ... other required variables
 
@@ -209,7 +211,7 @@ Local email and password sign-in is on by default. Turn on Google or OIDC sign-i
 
 ```hcl
 module "stategraph" {
-  source = "github.com/stategraph/terraform-aws-stategraph-ecs?ref=v1.0.0"
+  source = "github.com/stategraph/terraform-aws-stategraph-ecs?ref=<module version>"
 
   # ... other required variables
 
@@ -229,7 +231,7 @@ The module runs `ecs_desired_count` tasks. Set `STATEGRAPH_OAUTH_COOKIE_SECRET` 
 
 ## Enable cost estimation
 
-Set `STATEGRAPH_COST_ENABLED=true` in the server container environment of the task definition, so that each replacement task starts with cost on:
+Enterprise only. Set `STATEGRAPH_COST_ENABLED=true` in the server container environment of the task definition, so that each replacement task starts with cost on:
 
 ```json
 "containerDefinitions": [
@@ -275,7 +277,7 @@ To tune auto scaling on CPU and memory:
 
 ```hcl
 module "stategraph" {
-  source = "github.com/stategraph/terraform-aws-stategraph-ecs?ref=v1.0.0"
+  source = "github.com/stategraph/terraform-aws-stategraph-ecs?ref=<module version>"
 
   # ... other variables
 
@@ -297,7 +299,7 @@ Change the image tag and apply. ECS does a rolling deployment, and the load bala
 ```hcl
 module "stategraph" {
   # ... other variables
-  stategraph_image = "ghcr.io/stategraph/stategraph-server:2.5.7"
+  stategraph_image = "ghcr.io/stategraph/stategraph-server-oss:<version>"
 }
 ```
 

@@ -10,7 +10,7 @@ Start with Stategraph on Stategraph Cloud, on your own server, or with an import
 ## Choose a path
 
 - [Stategraph Cloud](/docs/get-started/quickstart/cloud): the fastest start, with nothing to run. Sign up, connect GitHub or GitLab, and get a plan comment and an apply on a pull request.
-- [Self-hosted Open Source](/docs/get-started/quickstart/self-hosted-open-source): run the open-source edition of Orchestration with Docker Compose, connect GitHub or GitLab, and open the same first pull request on your own server.
+- [Self-hosted Open Source](/docs/get-started/quickstart/self-hosted-open-source): run the open-source edition with Docker Compose, log in, turn on Orchestration, and open the same first pull request on your own server.
 - [Self-hosted Enterprise](/docs/get-started/quickstart/self-hosted): run the Enterprise build with Docker Compose and a license key, log in, turn on Orchestration, and open the same first pull request on your own server.
 - [Import your state](/docs/get-started/quickstart/import-state): install the CLI, import a Terraform or OpenTofu state into Infrastructure as a Database, and run a scoped plan and apply.
 
@@ -19,13 +19,13 @@ Start with Stategraph on Stategraph Cloud, on your own server, or with an import
 | Path | You need |
 |------|----------|
 | Stategraph Cloud | On GitHub, ownership of the organization that holds the repository, or an owner who installs the app. On GitLab, a group (not a personal namespace) and the rights to create an access token, add a project webhook, and change CI/CD settings. A Terraform or OpenTofu repository, or a fork of the example, which needs no cloud credentials. |
-| Self-hosted Open Source | Docker Engine and Docker Compose v2, and port 3000 free for the setup wizard. On GitHub, organization admin rights to create and install the GitHub App. On GitLab, a GitLab user for Stategraph with a personal access token and an OAuth application. The server gets its public URL from a tunnel, so it needs none of its own. |
-| Self-hosted Enterprise | Docker Engine and Docker Compose v2, and a license key. A URL that GitHub or GitLab can reach over HTTPS, for webhooks. On GitHub, organization admin rights to create and install the GitHub App. On GitLab, a GitLab user for Stategraph with a personal access token and an OAuth application, and the GitLab rights above. |
+| Self-hosted Open Source | Docker Engine and Docker Compose v2. A URL that GitHub or GitLab can reach over HTTPS, or Terratunnel, which gives the server one. On GitHub, organization admin rights to create and install the GitHub App. On GitLab, a GitLab user for Stategraph with a personal access token and an OAuth application, and the GitLab rights above. |
+| Self-hosted Enterprise | Docker Engine and Docker Compose v2, and a license key. A URL that GitHub or GitLab can reach over HTTPS, or Terratunnel, which gives the server one. On GitHub, organization admin rights to create and install the GitHub App. On GitLab, a GitLab user for Stategraph with a personal access token and an OAuth application, and the GitLab rights above. |
 | Import your state | A Stategraph server, on Stategraph Cloud or self-hosted. A Terraform or OpenTofu project with a state file that you can pull. Terraform or OpenTofu where you run the CLI. |
 
 ## Editions
 
-On Stategraph Cloud, the Free and Pro plans include every Orchestration feature and differ by usage limits. Self-hosted Stategraph Open Source, the `terrat-oss` image, allows up to 3 active users per month per GitHub or GitLab installation, with no run limit. Self-hosted Enterprise needs a license key and has no user limit. Infrastructure as a Database starts at $25,000 per year, on an annual contract. See [Editions](/docs/get-started/editions).
+On Stategraph Cloud, the Free and Pro plans include every Orchestration feature and differ by usage limits. Self-hosted Stategraph Open Source, the `stategraph-server-oss` image, allows up to 3 active users per month per GitHub or GitLab installation, with no run limit. Self-hosted Enterprise needs a license key and has no user limit. Infrastructure as a Database starts at $25,000 per year, on an annual contract. See [Editions](/docs/get-started/editions).
 
 ## Next steps
 

@@ -9,12 +9,12 @@ To upgrade [self-hosted Stategraph](/docs/admin/self-hosting), run a newer tag o
 
 ## Pick a version
 
-The [releases page](https://github.com/stategraph/releases/releases) lists versions and notes. In production, pin a version tag, not `latest`:
+The [releases page](https://github.com/stategraph/releases/releases) lists versions and notes. Open Source and Enterprise images use the same versions. In production, pin a version tag, not `latest`, where `<version>` is the latest release:
 
 ```yaml
 services:
   server:
-    image: ghcr.io/stategraph/stategraph-server:2.5.7
+    image: ghcr.io/stategraph/stategraph-server-oss:<version>
 ```
 
 Then:
@@ -56,13 +56,13 @@ Read the release notes of the versions that you skip. These changes affect runni
 
 ## Verify an image
 
-Released images have a [Sigstore](https://www.sigstore.dev/) keyless signature and a SLSA build provenance attestation. Each per-arch image also has an SPDX SBOM attestation. The signing certificate records the repository, release workflow, and source commit. Check it with [cosign](https://docs.sigstore.dev/cosign/installation/) before you run a new tag:
+Enterprise images have a [Sigstore](https://www.sigstore.dev/) keyless signature and a SLSA build provenance attestation. Each per-arch image also has an SPDX SBOM attestation. The signing certificate records the repository, release workflow, and source commit. Check it with [cosign](https://docs.sigstore.dev/cosign/installation/) before you run a new tag:
 
 ```bash
 cosign verify \
   --certificate-identity-regexp '^https://github\.com/stategraph/mono/\.github/workflows/release\.yml@' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  ghcr.io/stategraph/stategraph-server:2.5.7
+  ghcr.io/stategraph/stategraph-server:<version>
 ```
 
 Read the provenance with the same identity:
@@ -71,7 +71,7 @@ Read the provenance with the same identity:
 cosign verify-attestation --type slsaprovenance1 \
   --certificate-identity-regexp '^https://github\.com/stategraph/mono/\.github/workflows/release\.yml@' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  ghcr.io/stategraph/stategraph-server:2.5.7 \
+  ghcr.io/stategraph/stategraph-server:<version> \
   | jq -r .payload | base64 -d | jq .predicate
 ```
 
