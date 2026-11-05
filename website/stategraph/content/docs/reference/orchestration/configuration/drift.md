@@ -9,6 +9,8 @@ order: 11
 
 A drift run is a plan operation. Your [workflows](/docs/reference/orchestration/configuration/workflows) and [hooks](/docs/reference/orchestration/configuration/hooks) run for it, and plans and applies that drift starts get `TERRATEAM_RUN_KIND=drift`. A new or changed schedule runs immediately, inside its window if it has one.
 
+Drift runs on the default branch. It also runs on a branch that an entry of [`destination_branches`](/docs/reference/orchestration/configuration/destination-branches) matches: a push to that branch registers the `drift` configuration of the branch, and its schedules plan the branch. A push to a branch that no entry matches registers no schedule and starts no run. When the branch is deleted, its schedules are removed.
+
 ## Default Configuration
 
 ```yaml
