@@ -24,7 +24,35 @@ module Cmdline = struct
     in
     { Logs.report }
 
-  let setup_log level loggers =
+  (* One JSON object per line. The message is rendered on its own formatter so that its break hints
+     do not split it across lines. *)
+  let json_reporter ppf =
+    let report src level ~over k msgf =
+      let buf = Buffer.create 256 in
+      let msg_ppf = Format.formatter_of_buffer buf in
+      Format.pp_set_geometry msg_ppf ~max_indent:490 ~margin:500;
+      let k msg_ppf =
+        Format.pp_print_flush msg_ppf ();
+        let time = ISO8601.Permissive.string_of_datetime (Unix.gettimeofday ()) in
+        let line =
+          Yojson.Safe.to_string
+            (`Assoc
+               [
+                 ("time", `String time);
+                 ("level", `String (Logs.level_to_string (Some level)));
+                 ("src", `String (Logs.Src.name src));
+                 ("msg", `String (Buffer.contents buf));
+               ])
+        in
+        Format.fprintf ppf "%s@." line;
+        over ();
+        k ()
+      in
+      msgf @@ fun ?header:_ ?tags:_ fmt -> Format.kfprintf k msg_ppf ("@[" ^^ fmt ^^ "@]")
+    in
+    { Logs.report }
+
+  let setup_log level loggers log_format =
     Format.set_geometry ~max_indent:490 ~margin:500;
     let loggers =
       CCOption.map_or
@@ -39,6 +67,11 @@ module Cmdline = struct
                 (`Remove, CCString.drop 1 logger)
             | logger -> raise (Failure (Printf.sprintf "Unknown logger: %S" logger))))
         loggers
+    in
+    let reporter =
+      match log_format with
+      | `Text -> reporter
+      | `Json -> json_reporter
     in
     Logs.set_reporter (reporter Format.err_formatter);
     Logs.set_level level;
@@ -86,9 +119,23 @@ module Cmdline = struct
     let doc = "Specify logging subsystems.  Comma separated." in
     C.Arg.(value & opt (some string) None & info [ "loggers" ] ~env ~doc)
 
+  let log_format =
+    let env =
+      let doc = "Log line format" in
+      C.Cmd.Env.info ~doc "STATEGRAPH_LOG_FORMAT"
+    in
+    let doc =
+      "Log line format: $(b,text) or $(b,json). $(b,json) writes one JSON object per line with the \
+       fields $(b,time), $(b,level), $(b,src) and $(b,msg)."
+    in
+    C.Arg.(
+      value
+      & opt (enum [ ("text", `Text); ("json", `Json) ]) `Text
+      & info [ "log-format" ] ~env ~doc ~docv:"FORMAT")
+
   let logs =
     let env_info = C.Cmd.Env.info "STATEGRAPH_LOG_LEVEL" in
-    C.Term.(const setup_log $ Logs_cli.level ~env:env_info () $ loggers)
+    C.Term.(const setup_log $ Logs_cli.level ~env:env_info () $ loggers $ log_format)
 
   let server_cmd f =
     let doc = "Run server" in

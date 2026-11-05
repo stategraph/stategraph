@@ -79,6 +79,22 @@ Costs:
 
 If the cost or security-impact preview is not ready within `--costs-wait` or `--security-wait` seconds, the plan prints a hint to use `stategraph tx costs` or `stategraph security impact`. See [Plan-time cost](/docs/infrastructure-as-a-database/cost/plan-time).
 
+### Subgraph census lines
+
+With `--verbosity=debug` (or `--verbosity=info`), the plan log carries one `PLAN_SUBGRAPH_COUNT` line per node type, plus a summary line:
+
+```text
+<tx> : PLAN_SUBGRAPH_COUNT : type=hcl   seed=11 cone=44 blast=21 total=76
+<tx> : PLAN_SUBGRAPH_COUNT : type=state seed=0  cone=0  blast=7  total=7
+<tx> : PLAN_SUBGRAPH_COUNT :            seed=14 cone=46 blast=28 total=88
+```
+
+These count the subgraph the plan handed to Terraform: `seed`, `cone`, and `blast` are the walks that collected the nodes, and the same rows are queryable through MQL as the `transaction_subgraphs` table (see [Query language](/docs/infrastructure-as-a-database/query/query)).
+
+The neighboring `PLAN_STATE_NODE_COUNT` lines count the **whole state's** resources and outputs for the touched states — the size of the state, not the size of the slice. Do not read them as plan numbers.
+
+The census goes to stderr and never affects the plan's exit code.
+
 ### Forcing resources into a plan
 
 By default, a plan includes only what your change reaches. `--force` adds more addresses:
@@ -198,6 +214,9 @@ For the dependency rules and guarantees across states, see [Multi-state transact
 | `STATEGRAPH_DIAGNOSTICS` | Default for `--diagnostics` (`tf plan` only) |
 | `STATEGRAPH_TX_BATCH_SIZE` | Default for `--batch-size` |
 | `STATEGRAPH_TX_PARALLEL_BATCHES` | Default for `--parallel-batches` |
+| `STATEGRAPH_ACTUATOR_RUN_DIR` | Directory where the CLI keeps the exact Terraform tree it planned, per run, under `preview/<timestamp>/` |
+
+> `STATEGRAPH_ACTUATOR_RUN_DIR` is an **internal debug switch** for support investigations. It is not covered by support agreements, and its layout or behaviour may change between releases.
 
 ## Next Steps
 
