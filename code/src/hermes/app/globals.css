@@ -1,0 +1,592 @@
+@import "tailwindcss";
+
+@layer base {
+  /* Local Fonts - JetBrains Mono */
+  @font-face {
+    font-family: 'JetBrains Mono';
+    src: url('/fonts/JetBrainsMono-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'JetBrains Mono';
+    src: url('/fonts/JetBrainsMono-Italic.woff2') format('woff2');
+    font-weight: 400;
+    font-style: italic;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'JetBrains Mono';
+    src: url('/fonts/JetBrainsMono-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'JetBrains Mono';
+    src: url('/fonts/JetBrainsMono-SemiBold.woff2') format('woff2');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'JetBrains Mono';
+    src: url('/fonts/JetBrainsMono-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  /* Inter for UI chrome — a clean, narrow humanist sans (variable woff2).
+     Reserved for chrome only; data/identifiers/numbers use JetBrains Mono so
+     they read as distinct from the interface. */
+  @font-face {
+    font-family: 'Inter';
+    src: url('/fonts/InterVariable.woff2') format('woff2');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'Inter';
+    src: url('/fonts/InterVariable-Italic.woff2') format('woff2');
+    font-weight: 100 900;
+    font-style: italic;
+    font-display: swap;
+  }
+}
+
+@layer theme {
+  :root {
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+    --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+}
+
+:root {
+  /* Stategraph Design Tokens - Light Mode (Default) */
+
+  /* Colors - Backgrounds (light mode: legible depth between layers) */
+  --sg-bg-0: #eaeae8;    /* Clearly recessed shell, so white surfaces read as raised */
+  --sg-bg-1: #ffffff;    /* Pure white, primary content surface */
+  --sg-bg-2: #f4f4f3;    /* Subtle inset, lighter than the shell (pressed into white) */
+
+  /* Colors - Borders (light mode: visible structure without heaviness) */
+  --sg-border: #d7d7d4;        /* Neutral border with a perceptible edge */
+  --sg-border-light: #e4e4e2;  /* Lighter border variant */
+
+  /* Colors - Text (light mode: tighter hierarchy for faster scanning) */
+  --sg-text: #1a1a1a;          /* Near-black, primary text (15.3:1 contrast) */
+  --sg-text-muted: #333333;    /* Decisively dark secondary text (12.6:1) - anchors headers/labels with confidence */
+  --sg-text-dim: #555555;      /* Mid-gray, tertiary text (7.5:1 contrast) */
+
+  /* Colors - Accent (light mode: vibrant blue for actions) */
+  --sg-accent: #2563eb;           /* Vibrant blue, same family as dark */
+  --sg-accent-bg: #2563eb15;      /* 8% opacity blue background */
+  --sg-accent-bg-active: #2563eb20; /* 12.5% opacity for active sidebar items - more decisive in light mode */
+  --sg-accent-hover: #1d4ed8;     /* Darker blue on hover */
+  --sg-accent-button: #2563eb;    /* Button background (same as accent in light) */
+  --sg-accent-button-hover: #1d4ed8; /* Button hover background */
+  --sg-accent-dim: #2563eb22;     /* 13% opacity blue */
+
+  /* Colors - Semantic (light mode: WCAG compliant) */
+  --sg-error: #dc2626;      /* Strong red, WCAG compliant */
+  --sg-error-bg: #dc262615; /* 8% opacity red background for alerts */
+  --sg-warning: #d97706;    /* Amber-orange, warm warning */
+  --sg-warning-bg: #d9770615; /* 8% opacity amber background for warnings */
+  --sg-success: #16a34a;    /* Forest green, professional */
+  --sg-success-bg: #16a34a15; /* 8% opacity green background for success */
+
+  /* Spacing */
+  --sg-space-xs: 0.5rem;
+  --sg-space-sm: 1rem;
+  --sg-space-md: 1.5rem;
+  --sg-space-lg: 2rem;
+  --sg-space-xl: 3rem;
+
+  /* Radius */
+  --sg-radius-xs: 2px;
+  --sg-radius-sm: 3px;
+  --sg-radius-md: 6px;
+  --sg-radius-lg: 8px;
+  --sg-radius-xl: 12px;
+  --sg-radius-2xl: 20px;
+
+  /* Shadows (light mode: faint but perceptible, so surfaces read as raised) */
+  --sg-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);      /* Resting lift on cards */
+  --sg-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.09);      /* Hover / popovers */
+  --sg-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);     /* Dialogs */
+  --sg-shadow-accent-sm: 0 0 20px var(--sg-accent-dim);
+  --sg-shadow-accent-md: 0 0 30px var(--sg-accent-dim);
+  --sg-shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.08);        /* Softened from 0.3 */
+  --sg-shadow-inset-subtle: inset 0 0.5px 1px rgba(0, 0, 0, 0.05); /* Softened from 0.2 */
+
+  /* Layout */
+  --sg-nav-height: 70px;
+  --sg-sidebar-width: 260px;
+  --sg-inspector-width: 380px;
+
+  /* Typography */
+  --sg-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --sg-line-height-relaxed: 1.6;
+  --sg-line-height-normal: 1.5;
+  --sg-line-height-tight: 1.4;
+
+  /* Component Tokens */
+  --sg-button-radius: 2px;
+  --sg-card-radius: 12px;
+  --sg-input-radius: 4px;
+  --sg-input-height: 40px;
+
+  /* Animation Tokens (motion is reserved for loading + genuine state change;
+     hover/press never moves or resizes layout) */
+  --sg-transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  --sg-transition-base: 160ms cubic-bezier(0.4, 0, 0.2, 1);
+  --sg-transition-slow: 240ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Status Badge Tokens (light mode: calm tinted bg + saturated text, so a
+     table of rows reads quietly and only the status color guides the eye —
+     mirrors the dark-mode treatment for a single design language) */
+  --sg-status-healthy-bg: #16a34a14;
+  --sg-status-healthy-text: #15803d;
+  --sg-status-healthy-border: #16a34a40;
+  --sg-status-drift-bg: #b4530914;
+  --sg-status-drift-text: #b45309;
+  --sg-status-drift-border: #b4530940;
+  --sg-status-locked-bg: #c2410c14;
+  --sg-status-locked-text: #c2410c;
+  --sg-status-locked-border: #c2410c40;
+  --sg-status-failed-bg: #dc262614;
+  --sg-status-failed-text: #dc2626;
+  --sg-status-failed-border: #dc262640;
+}
+
+/* Dark Mode - Pixel-Identical to Original */
+.dark {
+  /* Colors - Backgrounds (dark mode) */
+  --sg-bg-0: #0a0a0a;
+  --sg-bg-1: #111111;
+  --sg-bg-2: #1a1a1a;
+
+  /* Colors - Borders (dark mode) */
+  --sg-border: #2a2a2a;
+  --sg-border-light: #333333;
+
+  /* Colors - Text (dark mode) */
+  --sg-text: #e4e4e4;
+  --sg-text-muted: #a0a0a0;
+  --sg-text-dim: #a0a0a0;
+
+  /* Colors - Accent (dark mode) */
+  --sg-accent: #60a5fa;
+  --sg-accent-bg: #60a5fa15;
+  --sg-accent-bg-active: #60a5fa15; /* Same as accent-bg - dark mode remains unchanged */
+  --sg-accent-hover: #3b82f6;
+  --sg-accent-button: #2563eb;       /* Darker blue for button bg - white text contrast ~4.6:1 */
+  --sg-accent-button-hover: #1d4ed8; /* Even darker on hover - contrast ~5.7:1 */
+  --sg-accent-dim: #60a5fa22;
+
+  /* Colors - Semantic (dark mode) */
+  --sg-error: #ff3366;
+  --sg-error-bg: #ff336615;   /* 8% opacity red background for alerts */
+  --sg-warning: #ffaa00;
+  --sg-warning-bg: #ffaa0015; /* 8% opacity amber background for warnings */
+  --sg-success: #00ff00;
+  --sg-success-bg: #00ff0015; /* 8% opacity green background for success */
+
+  /* Status Badge Tokens (dark mode: faint bg, colored text) */
+  --sg-status-healthy-bg: rgba(34, 197, 94, 0.12);
+  --sg-status-healthy-text: #4ade80;
+  --sg-status-healthy-border: #166534;
+  --sg-status-drift-bg: rgba(234, 179, 8, 0.12);
+  --sg-status-drift-text: #facc15;
+  --sg-status-drift-border: #713f12;
+  --sg-status-locked-bg: rgba(249, 115, 22, 0.12);
+  --sg-status-locked-text: #fb923c;
+  --sg-status-locked-border: #7c2d12;
+  --sg-status-failed-bg: rgba(239, 68, 68, 0.12);
+  --sg-status-failed-text: #f87171;
+  --sg-status-failed-border: #7f1d1d;
+}
+
+@layer base {
+  * {
+    @apply border-[var(--sg-border)];
+  }
+
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    @apply bg-[var(--sg-bg-0)] text-[var(--sg-text)];
+    font-family: var(--font-sans);
+  }
+
+  /* Heading hierarchy through weight, not size */
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--sg-text);
+    line-height: var(--sg-line-height-tight);
+  }
+
+  h1 {
+    font-weight: 700; /* Bold for primary headings */
+  }
+
+  h2 {
+    font-weight: 600; /* Semibold for section headings */
+  }
+
+  h3, h4, h5, h6 {
+    font-weight: 500; /* Medium for subsections */
+  }
+
+  /* Hide scrollbars globally while preserving scroll behavior */
+  * {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+  }
+
+  *::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+}
+
+@layer utilities {
+  /* Stategraph Utility Classes */
+
+  .sg-panel {
+    @apply bg-[var(--sg-bg-2)] border border-[var(--sg-border-light)] rounded-[var(--sg-radius-xl)] p-4;
+    box-shadow: var(--sg-shadow-inset-subtle);
+  }
+
+  .sg-card {
+    @apply bg-[var(--sg-bg-1)] border border-[var(--sg-border-light)] rounded-[var(--sg-card-radius)] p-4;
+    box-shadow: var(--sg-shadow-inset-subtle);
+  }
+
+  .sg-section-header {
+    @apply text-xs font-semibold uppercase tracking-wider text-[var(--sg-text-muted)] mb-3;
+  }
+
+  .sg-toolbar {
+    @apply flex items-center gap-2 p-3 bg-[var(--sg-bg-1)] border-b border-[var(--sg-border)];
+  }
+
+  /* Typography Utilities */
+  .sg-text-muted {
+    @apply text-[var(--sg-text-muted)];
+  }
+
+  .sg-text-dim {
+    @apply text-[var(--sg-text-dim)];
+  }
+
+  .sg-accent {
+    @apply text-[var(--sg-accent)];
+  }
+
+  /* Typography Hierarchy */
+  /* sg-metadata = CHROME helper text (sentence-case hints, labels). Sans. */
+  .sg-metadata {
+    @apply text-xs text-[var(--sg-text-dim)];
+    line-height: var(--sg-line-height-normal);
+  }
+
+  /* sg-data-meta = secondary DATA (identifiers, ids, small numbers). Mono, so
+     it reads as data even at small sizes and aligns in columns. */
+  .sg-data-meta {
+    @apply text-xs text-[var(--sg-text-dim)] font-mono tabular-nums;
+    line-height: var(--sg-line-height-normal);
+  }
+
+  .sg-secondary-header {
+    @apply text-sm font-medium text-[var(--sg-text)];
+    line-height: var(--sg-line-height-tight);
+  }
+
+  .sg-card-text {
+    line-height: var(--sg-line-height-relaxed);
+  }
+
+  .sg-numeric-value {
+    line-height: 1;
+    @apply font-mono font-semibold tabular-nums;
+  }
+
+  .sg-bg-0 {
+    @apply bg-[var(--sg-bg-0)];
+  }
+
+  .sg-bg-1 {
+    @apply bg-[var(--sg-bg-1)];
+  }
+
+  .sg-bg-2 {
+    @apply bg-[var(--sg-bg-2)];
+  }
+
+  .sg-border {
+    @apply border-[var(--sg-border)];
+  }
+
+  .sg-input {
+    @apply h-[var(--sg-input-height)] rounded-[var(--sg-input-radius)] border border-[var(--sg-border)] bg-[var(--sg-bg-2)] text-[var(--sg-text)] px-3;
+    @apply focus:outline-none focus:ring-2 focus:ring-[var(--sg-accent)] focus:border-[var(--sg-accent)];
+  }
+
+  .sg-button {
+    @apply inline-flex items-center justify-center rounded-[var(--sg-button-radius)] px-4 py-2 font-medium text-sm transition-colors duration-200;
+  }
+
+  .sg-button-primary {
+    @apply inline-flex items-center justify-center rounded-[var(--sg-button-radius)] px-4 py-2 font-medium text-sm transition-colors duration-200 bg-[var(--sg-accent-button)] text-white hover:bg-[var(--sg-accent-button-hover)];
+  }
+
+  .sg-button-secondary {
+    @apply inline-flex items-center justify-center rounded-[var(--sg-button-radius)] px-4 py-2 font-medium text-sm transition-colors duration-200 bg-[var(--sg-bg-2)] text-[var(--sg-text)] border border-[var(--sg-border)] hover:bg-[var(--sg-bg-1)];
+  }
+
+  .sg-button-ghost {
+    @apply inline-flex items-center justify-center rounded-[var(--sg-button-radius)] px-4 py-2 font-medium text-sm transition-colors duration-200 text-[var(--sg-text-muted)] hover:bg-[var(--sg-bg-2)] hover:text-[var(--sg-text)];
+  }
+
+  /* Micro-interaction Utilities */
+  .sg-transition {
+    transition: all var(--sg-transition-base);
+  }
+
+  .sg-transition-fast {
+    transition: all var(--sg-transition-fast);
+  }
+
+  .sg-transition-slow {
+    transition: all var(--sg-transition-slow);
+  }
+
+  /* Hover feedback never resizes or lifts layout — only a calm, near-instant
+     border/background change. Kept as named utilities so existing call sites
+     keep working without re-introducing transforms. */
+  .sg-hover-lift {
+    @apply transition-colors duration-150;
+    @apply hover:border-[var(--sg-border)];
+  }
+
+  .sg-hover-scale {
+    @apply transition-colors duration-150;
+  }
+
+  .sg-fade-in {
+    animation: fadeIn var(--sg-transition-base) ease-out;
+  }
+
+  .sg-slide-up {
+    animation: slideUp var(--sg-transition-base) ease-out;
+  }
+
+  .sg-slide-down {
+    animation: slideDown var(--sg-transition-fast) ease-out;
+  }
+
+  /* Skeleton pulse animation */
+  .sg-skeleton {
+    @apply bg-[var(--sg-bg-2)] rounded;
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Enhanced skeleton with shimmer effect */
+  .sg-skeleton-shimmer {
+    @apply relative overflow-hidden bg-[var(--sg-bg-2)] rounded;
+  }
+
+  .sg-skeleton-shimmer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.03) 50%,
+      transparent 100%
+    );
+    animation: shimmer 2s infinite;
+  }
+
+  /* Opt-in visible scrollbars */
+  .scrollable {
+    overflow: auto;
+    /* Not `thin`: Chrome ignores the ::-webkit-scrollbar styles below once
+       scrollbar-width is set, and its native scrollbar on macOS is an overlay
+       that only shows while scrolling. */
+    scrollbar-width: auto;
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    .scrollable {
+      scrollbar-width: thin; /* Firefox - thin scrollbar */
+    }
+  }
+
+  .scrollable::-webkit-scrollbar {
+    display: block; /* Restore scrollbar visibility */
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollable::-webkit-scrollbar-track {
+    background: var(--sg-bg-1);
+  }
+
+  .scrollable::-webkit-scrollbar-thumb {
+    background: var(--sg-border);
+    border-radius: 4px;
+  }
+
+  .scrollable::-webkit-scrollbar-thumb:hover {
+    background: var(--sg-text-dim);
+  }
+}
+
+/* Animation Keyframes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Markdown step output (payload format "markdown" or "raw") */
+.output-markdown > *:first-child {
+  margin-top: 0;
+}
+
+.output-markdown > *:last-child {
+  margin-bottom: 0;
+}
+
+.output-markdown h1,
+.output-markdown h2,
+.output-markdown h3,
+.output-markdown h4 {
+  font-weight: 600;
+  margin: 1em 0 0.5em;
+  line-height: 1.3;
+}
+
+.output-markdown h1 { font-size: 1.4em; }
+.output-markdown h2 { font-size: 1.25em; }
+.output-markdown h3 { font-size: 1.1em; }
+
+.output-markdown p,
+.output-markdown blockquote,
+.output-markdown pre,
+.output-markdown table {
+  margin: 0.75em 0;
+}
+
+.output-markdown ul,
+.output-markdown ol {
+  margin: 0.75em 0;
+  padding-left: 1.5em;
+}
+
+.output-markdown ul { list-style: disc; }
+.output-markdown ol { list-style: decimal; }
+.output-markdown li { margin: 0.25em 0; }
+
+.output-markdown a {
+  color: var(--sg-accent);
+  text-decoration: underline;
+}
+
+.output-markdown code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  background: var(--sg-bg-2);
+  border-radius: 3px;
+  padding: 0.1em 0.3em;
+}
+
+.output-markdown pre {
+  background: var(--sg-bg-2);
+  border-radius: 4px;
+  padding: 0.75em;
+  overflow-x: auto;
+}
+
+.output-markdown pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.output-markdown blockquote {
+  border-left: 3px solid var(--sg-border);
+  padding-left: 0.75em;
+  color: var(--sg-text-muted);
+}
+
+.output-markdown table {
+  border-collapse: collapse;
+}
+
+.output-markdown th,
+.output-markdown td {
+  border: 1px solid var(--sg-border);
+  padding: 0.3em 0.6em;
+  text-align: left;
+}
+
+.output-markdown hr {
+  border: 0;
+  border-top: 1px solid var(--sg-border);
+  margin: 1em 0;
+}

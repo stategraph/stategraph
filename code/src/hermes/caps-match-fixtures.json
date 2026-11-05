@@ -1,0 +1,90 @@
+{
+  "$comment": "Shared behavioural fixtures for the capability allow-list matcher. Two byte-identical copies exist: code/tests/sg_caps_match/caps-match-fixtures.json, read by the OCaml suite that is the authority for the semantics, and code/src/hermes/caps-match-fixtures.json, read by code/src/hermes/lib/api/capsMatch.test.ts, the TypeScript port used for UI gating. hermes holds a copy rather than a symlink out of its tree because code/src/hermes has to be self-contained -- the image's UI stage copies that directory alone -- and .github/workflows/lint.yml fails if the two drift. Edit both. A semantic change on either side fails CI on both. Add a case here rather than to only one suite.",
+  "matches": [
+    {
+      "$comment": "The empty list denies everything. It is NOT an all-negation list, so it gains no implicit '*' -- transcribing the all-negation rule first inverts deny-all into grant-all.",
+      "patterns": [],
+      "value": "a",
+      "matches": false
+    },
+    { "patterns": ["!*"], "value": "a", "matches": false },
+    { "patterns": ["*"], "value": "a", "matches": true },
+    { "patterns": ["a"], "value": "a", "matches": true },
+    { "patterns": ["a"], "value": "b", "matches": false },
+    {
+      "$comment": "An all-negation list carries an implicit leading '*': everything except what it names.",
+      "patterns": ["!b"],
+      "value": "a",
+      "matches": true
+    },
+    { "patterns": ["!b"], "value": "b", "matches": false },
+    { "patterns": ["!a", "!b"], "value": "c", "matches": true },
+    { "patterns": ["*", "!a"], "value": "a", "matches": false },
+    { "patterns": ["*", "!a"], "value": "b", "matches": true },
+    {
+      "$comment": "A pattern is a literal prefix with an optional single trailing '*'.",
+      "patterns": ["aws_*"],
+      "value": "aws_instance",
+      "matches": true
+    },
+    { "patterns": ["aws_*"], "value": "gcp_instance", "matches": false },
+    { "patterns": ["foo*"], "value": "foobar", "matches": true },
+    { "patterns": ["foo*"], "value": "foo", "matches": true },
+    {
+      "$comment": "Matching is anchored on both ends, so a prefix glob does not match a value that merely contains it.",
+      "patterns": ["bar*"],
+      "value": "foobar",
+      "matches": false
+    },
+    {
+      "$comment": "A mid-string '*' is refused at the input boundary by is_valid_pattern and can never be stored -- but the matcher itself does not consult parse_glob, so if one were present it would act as a wildcard. Pinned so the OCaml matcher and the TypeScript port agree even on input validation would have rejected.",
+      "patterns": ["a*b"],
+      "value": "ab",
+      "matches": true
+    },
+    { "patterns": ["a*b"], "value": "axxb", "matches": true },
+    { "patterns": ["a*b"], "value": "ba", "matches": false },
+    {
+      "$comment": "Regex metacharacters are literal. '.' must not act as a wildcard.",
+      "patterns": ["a.b"],
+      "value": "axb",
+      "matches": false
+    },
+    { "patterns": ["a.b"], "value": "a.b", "matches": true },
+    {
+      "$comment": "Tenant ids are UUIDs, so escaping '-' is load-bearing rather than theoretical.",
+      "patterns": ["4dfd9283-8319-4458-b667-f6e432557dcb"],
+      "value": "4dfd9283-8319-4458-b667-f6e432557dcb",
+      "matches": true
+    },
+    {
+      "patterns": ["4dfd9283-8319-4458-b667-f6e432557dcb"],
+      "value": "05edc11a-54b2-4788-be71-63ed40a75a1d",
+      "matches": false
+    },
+    {
+      "$comment": "A negation wins over a positive that also matches.",
+      "patterns": ["a*", "!ab"],
+      "value": "ab",
+      "matches": false
+    },
+    { "patterns": ["a*", "!ab"], "value": "ac", "matches": true }
+  ],
+  "grants_all": [
+    {
+      "$comment": "Only a bare '*' with no negations grants every value.",
+      "patterns": ["*"],
+      "grants_all": true
+    },
+    { "patterns": [], "grants_all": false },
+    { "patterns": ["!*"], "grants_all": false },
+    { "patterns": ["*", "!a"], "grants_all": false },
+    { "patterns": ["a"], "grants_all": false },
+    { "patterns": ["a*"], "grants_all": false },
+    {
+      "$comment": "An all-negation list materializes '*' but keeps its negations, so it does not grant all.",
+      "patterns": ["!a"],
+      "grants_all": false
+    }
+  ]
+}
