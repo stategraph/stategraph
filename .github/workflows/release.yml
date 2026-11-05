@@ -120,7 +120,7 @@ jobs:
 
       - name: Set base image
         run: |
-          ./scripts/base_image >> $GITHUB_ENV
+          ./scripts/base_image >> "$GITHUB_ENV"
 
       - name: Build and push ${{ matrix.target }} (${{ matrix.arch }})
         uses: docker/build-push-action@v6
