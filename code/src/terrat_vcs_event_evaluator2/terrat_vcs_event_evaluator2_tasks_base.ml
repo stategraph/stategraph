@@ -226,12 +226,65 @@ struct
         else None)
       dirspaceflows
 
-  let stategraph_tx ~request_id tx =
-    match Uuidm.of_string tx with
-    | Some _ as id -> id
-    | None ->
-        Logs.warn (fun m -> m "%s : STATEGRAPH_TX_NOT_UUID : tx=%s" request_id tx);
-        None
+  (* What the two rules that order a plan against an apply are given, read from Stategraph through
+     the reader for the overlap rows of our plans beside the applies of other pull requests: when
+     the transaction of our plan of each dirspace opened, and when the transaction of each apply
+     completed, by the apply's work manifest.  A transaction the reader does not know gives neither. *)
+  let stategraph_moments_of_rows ~request_id ~installation rows =
+    let module Pat = Terrat_vcs_provider2.Parallel_apply_tx in
+    let module Sm = Terrat_vcs_provider2.Stategraph_moments in
+    let module T = Terrat_stategraph.Transaction in
+    let open Abbs_fc.Infix_result_monad in
+    let txs =
+      rows
+      |> CCList.flat_map (fun { Pat.tx; other; _ } ->
+          tx :: CCOption.map_or ~default:[] (fun { Pat.Other.tx; _ } -> [ tx ]) other)
+      |> CCList.sort_uniq ~cmp:Uuidm.compare
+    in
+    S.Stategraph.transactions ~request_id ~installation ~txs
+    >>| fun moments ->
+    let find tx = Sln_map.Uuidm.find_opt tx moments in
+    let planned_at =
+      rows
+      |> CCList.filter_map (fun { Pat.dirspace; tx; _ } ->
+          CCOption.map (fun { T.created_at; _ } -> (dirspace, created_at)) (find tx))
+      |> CCList.sort_uniq ~cmp:(fun (a, _) (b, _) -> Terrat_change.Dirspace.compare a b)
+    in
+    let committed_at =
+      rows
+      |> CCList.filter_map (fun { Pat.other; _ } ->
+          CCOption.flat_map
+            (fun { Pat.Other.work_manifest; tx; _ } ->
+              CCOption.flat_map
+                (fun { T.completed_at; _ } ->
+                  CCOption.map (fun at -> (work_manifest, at)) completed_at)
+                (find tx))
+            other)
+      |> CCList.sort_uniq ~cmp:(fun (a, _) (b, _) -> Uuidm.compare a b)
+    in
+    { Sm.planned_at; committed_at }
+
+  (* The moments of the transactions of our plans of [dirspaces] and of the applies of other pull
+     requests on them.  The reader failing is logged and leaves the rules to the bounds of the
+     runs, which are safe; a database error is an error. *)
+  let stategraph_moments ~request_id db pull_request dirspaces =
+    let module Pat = Terrat_vcs_provider2.Parallel_apply_tx in
+    let module Sm = Terrat_vcs_provider2.Stategraph_moments in
+    match dirspaces with
+    | [] -> Abbs_fc.return_ok Sm.empty
+    | dirspaces -> (
+        let open Abbs_fc.Infix_result_monad in
+        S.Db.query_parallel_apply_transactions ~request_id db pull_request dirspaces
+        >>= function
+        | [] -> Abbs_fc.return_ok Sm.empty
+        | { Pat.installation; _ } :: _ as rows -> (
+            let open Abb.Future.Infix_monad in
+            stategraph_moments_of_rows ~request_id ~installation rows
+            >>= function
+            | Ok _ as moments -> Abb.Future.return moments
+            | Error `Error ->
+                Logs.err (fun m -> m "%s : STATEGRAPH_MOMENTS_FAILED" request_id);
+                Abbs_fc.return_ok Sm.empty))
 
   (* The reservation is the work manifest's: its id is the holder.  Both are best effort, because
      the commit decides on its own without them: a failure here is logged and the apply goes on. *)
@@ -256,8 +309,7 @@ struct
                 ~txs:
                   (rows
                   |> CCList.map (fun { Pat.tx; _ } -> tx)
-                  |> Sln_list.String.sort_uniq
-                  |> CCList.filter_map (stategraph_tx ~request_id))
+                  |> CCList.sort_uniq ~cmp:Uuidm.compare)
         in
         run
         >>| function

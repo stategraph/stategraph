@@ -1,13 +1,30 @@
 (** What the orchestration asks Stategraph when it evaluates an apply, in the words of the
-    orchestration: transactions are the ids the runner reported in the [tx] key of the
-    [stategraph/plan] and [stategraph/apply] step payloads, parsed by the orchestration, and an
+    orchestration: transactions are the ids the stored plans name, read by the orchestration, and an
     installation is the core id of the VCS installation the repository belongs to.
 
     The implementation is a module argument of the VCS service. The unified server, where the
     Stategraph database is at hand, gives it Stategraph in its process; the orchestration on its own
     gives it {!Standalone}. *)
 
+(** When a transaction opened and, once it is over, when it completed, as Stategraph records them:
+    ISO 8601, UTC. *)
+module Transaction : sig
+  type t = {
+    created_at : string;
+    completed_at : string option;
+  }
+end
+
 module type S = sig
+  (** The moments of [txs], by transaction: the orchestration orders the opening of a plan's
+      transaction against the commit of another pull request's apply by them. A transaction that is
+      not of the tenants of [installation], or that an id names none, is absent. *)
+  val transactions :
+    request_id:string ->
+    installation:Uuidm.t ->
+    txs:Uuidm.t list ->
+    (Transaction.t Sln_map.Uuidm.t, [> `Error ]) result Abb.Future.t
+
   (** The transactions of [other_tx_ids] that stand against [tx], each with the addresses of the
       nodes the two share: each shares a node with [tx] that at least one of them does more than
       read, and it is applying, or it committed after [tx] opened. Those are the transactions whose

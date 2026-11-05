@@ -867,7 +867,12 @@ module Db = struct
         /% Var.(ud (text "base_ref") Api.Ref.to_string)
         /% Var.(ud (text "branch_ref") Api.Ref.to_string)
         /% Var.(str_array (text "parallel_dirs"))
-        /% Var.(str_array (text "parallel_workspaces")))
+        /% Var.(str_array (text "parallel_workspaces"))
+        /% Var.(str_array (text "planned_dirs"))
+        /% Var.(str_array (text "planned_workspaces"))
+        /% Var.(array (timestamptz "planned_at"))
+        /% Var.(str_array (uuid "committed_work_manifests"))
+        /% Var.(array (timestamptz "committed_at")))
 
     let update_abort_duplicate_work_manifests_query =
       Mql_sql.read [%blob "sql/abort_duplicate_work_manifests.sql"]
@@ -1010,7 +1015,12 @@ module Db = struct
         /% Var.(str_array (text "dirs"))
         /% Var.(str_array (text "workspaces"))
         /% Var.(str_array (text "parallel_dirs"))
-        /% Var.(str_array (text "parallel_workspaces")))
+        /% Var.(str_array (text "parallel_workspaces"))
+        /% Var.(str_array (text "planned_dirs"))
+        /% Var.(str_array (text "planned_workspaces"))
+        /% Var.(array (timestamptz "planned_at"))
+        /% Var.(str_array (uuid "committed_work_manifests"))
+        /% Var.(array (timestamptz "committed_at")))
 
     let select_parallel_apply_transactions_sql =
       Mql_sql.read [%blob "sql/select_parallel_apply_transactions.sql"]
@@ -1028,13 +1038,16 @@ module Db = struct
         (* installation *)
         Ret.uuid
         //
-        (* tx *)
+        (* our plan *)
         Ret.text
         //
         (* other pull_number *)
         Ret.(option bigint)
         //
-        (* other tx *)
+        (* other work_manifest *)
+        Ret.(option uuid)
+        //
+        (* other plan *)
         Ret.(option text)
         //
         (* other applied *)
@@ -2635,6 +2648,7 @@ module Db = struct
       ~base_ref
       ~branch_ref
       ~stategraph_parallel_apply_dirspaces
+      ~stategraph_moments
       db
       pull_request
       dirspaces =
@@ -2669,7 +2683,16 @@ module Db = struct
              stategraph_parallel_apply_dirspaces)
           (CCList.map
              (fun { Terrat_change.Dirspace.workspace; _ } -> workspace)
-             stategraph_parallel_apply_dirspaces))
+             stategraph_parallel_apply_dirspaces)
+          (CCList.map
+             (fun ({ Terrat_change.Dirspace.dir; _ }, _) -> dir)
+             stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.planned_at)
+          (CCList.map
+             (fun ({ Terrat_change.Dirspace.workspace; _ }, _) -> workspace)
+             stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.planned_at)
+          (CCList.map snd stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.planned_at)
+          (CCList.map fst stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.committed_at)
+          (CCList.map snd stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.committed_at))
     >>= function
     | Ok _ as ret -> Abb.Future.return ret
     | Error (#Pgsql_io.err as err) ->
@@ -2904,7 +2927,8 @@ module Db = struct
       db
       pull_request
       dirspaces
-      ~stategraph_parallel_apply_dirspaces =
+      ~stategraph_parallel_apply_dirspaces
+      ~stategraph_moments =
     let open Abb.Future.Infix_monad in
     Metrics.Psql_query_time.time
       (Metrics.psql_query_time "select_dirspaces_owned_by_other_pull_requests")
@@ -2956,7 +2980,16 @@ module Db = struct
              stategraph_parallel_apply_dirspaces)
           (CCList.map
              (fun { Terrat_change.Dirspace.workspace; _ } -> workspace)
-             stategraph_parallel_apply_dirspaces))
+             stategraph_parallel_apply_dirspaces)
+          (CCList.map
+             (fun ({ Terrat_change.Dirspace.dir; _ }, _) -> dir)
+             stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.planned_at)
+          (CCList.map
+             (fun ({ Terrat_change.Dirspace.workspace; _ }, _) -> workspace)
+             stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.planned_at)
+          (CCList.map snd stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.planned_at)
+          (CCList.map fst stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.committed_at)
+          (CCList.map snd stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.committed_at))
     >>= function
     | Ok _ as res -> Abb.Future.return res
     | Error (#Pgsql_io.err as err) ->
@@ -2972,30 +3005,51 @@ module Db = struct
         Pgsql_io.Prepared_stmt.fetch
           db
           (Sql.select_parallel_apply_transactions ())
-          ~f:(fun dir workspace installation tx other_pull_number other_tx other_applied ->
+          ~f:(fun
+              dir
+              workspace
+              installation
+              plan
+              other_pull_number
+              other_work_manifest
+              other_plan
+              other_applied
+            ->
             let module Pat = Terrat_vcs_provider2.Parallel_apply_tx in
-            {
-              Pat.dirspace = Terrat_change.Dirspace.{ dir; workspace };
-              installation;
-              tx;
-              other =
-                (match (other_pull_number, other_tx, other_applied) with
-                | Some pull_number, Some tx, Some applied ->
-                    Some
-                      {
-                        Pat.Other.pull_number = CCInt64.to_int pull_number;
-                        tx;
-                        state =
-                          (if applied then Pat.Other.State.Applied else Pat.Other.State.Applying);
-                      }
-                | None, _, _ | _, None, _ | _, _, None -> None);
-            })
+            let module Sp = Terrat_vcs_provider2.Stategraph_plan in
+            (* The transactions are read out of the stored plans; a plan that names none is as a
+               plan that is gone. *)
+            CCOption.map
+              (fun tx ->
+                {
+                  Pat.dirspace = Terrat_change.Dirspace.{ dir; workspace };
+                  installation;
+                  tx;
+                  other =
+                    (match
+                       ( other_pull_number,
+                         other_work_manifest,
+                         CCOption.flat_map Sp.tx_id other_plan,
+                         other_applied )
+                     with
+                    | Some pull_number, Some work_manifest, Some tx, Some applied ->
+                        Some
+                          {
+                            Pat.Other.pull_number = CCInt64.to_int pull_number;
+                            work_manifest;
+                            tx;
+                            state =
+                              (if applied then Pat.Other.State.Applied else Pat.Other.State.Applying);
+                          }
+                    | _ -> None);
+                })
+              (Sp.tx_id plan))
           (CCInt64.of_int @@ Api.Repo.id @@ Api.Pull_request.repo pull_request)
           (CCInt64.of_int @@ Api.Pull_request.id pull_request)
           (CCList.map (fun { Terrat_change.Dirspace.dir; _ } -> dir) dirspaces)
           (CCList.map (fun { Terrat_change.Dirspace.workspace; _ } -> workspace) dirspaces))
     >>= function
-    | Ok _ as res -> Abb.Future.return res
+    | Ok rows -> Abbs_fc.return_ok (CCList.filter_map CCFun.id rows)
     | Error (#Pgsql_io.err as err) ->
         Prmths.Counter.inc_one Metrics.pgsql_errors_total;
         Logs.err (fun m -> m "%s : ERROR : %a" request_id Pgsql_io.pp_err err);
@@ -3143,6 +3197,12 @@ module Db = struct
             dirspace.Terrat_dirspace.workspace)
       >>= function
       | [] -> Abbs_fc.return_ok None
+      | data :: _ when CCOption.is_some (Terrat_vcs_provider2.Stategraph_plan.tx_id data) ->
+          (* A plan of the Stategraph engine stays stored once applied: it names the transaction
+             the apply commits, which the checks of later applies of other pull requests ask
+             Stategraph about (select_parallel_apply_transactions.sql).  The cleanup of old plans
+             deletes it in its time. *)
+          Abbs_fc.return_ok (Some data)
       | data :: _ ->
           Metrics.Psql_query_time.time (Metrics.psql_query_time "delete_plan") (fun () ->
               Pgsql_io.Prepared_stmt.execute

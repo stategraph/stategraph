@@ -1,4 +1,17 @@
+module Transaction = struct
+  type t = {
+    created_at : string;
+    completed_at : string option;
+  }
+end
+
 module type S = sig
+  val transactions :
+    request_id:string ->
+    installation:Uuidm.t ->
+    txs:Uuidm.t list ->
+    (Transaction.t Sln_map.Uuidm.t, [> `Error ]) result Abb.Future.t
+
   val overlaps :
     request_id:string ->
     installation:Uuidm.t ->
@@ -19,6 +32,8 @@ end
 type t = (module S)
 
 module Standalone = struct
+  let transactions ~request_id:_ ~installation:_ ~txs:_ = Abb.Future.return (Ok Sln_map.Uuidm.empty)
+
   let overlaps ~request_id:_ ~installation:_ ~tx:_ ~other_tx_ids:_ =
     Abb.Future.return (Ok Sln_map.Uuidm.empty)
 

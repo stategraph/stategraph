@@ -1,0 +1,5 @@
+(library
+ (name sg_plan_file)
+ (libraries containers sln uuidm yojson)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving_yojson)))

@@ -91,9 +91,17 @@ module Make
     int option Terrat_change.Dirspaceflow.t list ->
     Terrat_change.Dirspace.t list
 
-  (** The Stategraph transaction a runner-reported [tx] names, if it is a UUID. One that is not
-      names no transaction: it is logged, and the callers leave it out of what they ask. *)
-  val stategraph_tx : request_id:string -> string -> Uuidm.t option
+  (** The moments, read from Stategraph, of the transactions of the pull request's latest plans of
+      [dirspaces], which apply in parallel, and of the applies of other pull requests on them: what
+      the lock and the plan validity are given to order a plan against an apply. Empty where there
+      is nothing to read, and when the reader fails, which is logged: the rules then bound the
+      moments by the runs. *)
+  val stategraph_moments :
+    request_id:string ->
+    S.Db.t ->
+    'diff S.Api.Pull_request.t ->
+    Terrat_change.Dirspace.t list ->
+    (Terrat_vcs_provider2.Stategraph_moments.t, [> `Error ]) result Abb.Future.t
 
   (** Reserve, for the apply work manifest, the Stategraph transactions of the pull request's plans
       of [dirspaces], through [S.Stategraph]: from now until the apply commits them or the work

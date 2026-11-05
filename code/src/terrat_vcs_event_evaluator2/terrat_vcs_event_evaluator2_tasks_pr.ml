@@ -173,11 +173,19 @@ struct
           (S.Api.Pull_request.Id.to_string @@ S.Api.Pull_request.id pull_request)
           time)
       (fun () ->
+        let open Abbs_fc.Infix_result_monad in
+        Tasks_base.stategraph_moments
+          ~request_id:(Builder.log_id s)
+          db
+          pull_request
+          stategraph_parallel_apply_dirspaces
+        >>= fun stategraph_moments ->
         S.Db.query_dirspaces_without_valid_plans
           ~request_id:(Builder.log_id s)
           ~base_ref
           ~branch_ref
           ~stategraph_parallel_apply_dirspaces
+          ~stategraph_moments
           db
           pull_request
           dirspaces)
@@ -344,23 +352,28 @@ struct
           (S.Api.Pull_request.Id.to_string @@ S.Api.Pull_request.id pull_request)
           time)
       (fun () ->
+        let open Abbs_fc.Infix_result_monad in
+        Tasks_base.stategraph_moments
+          ~request_id:(Builder.log_id s)
+          db
+          pull_request
+          stategraph_parallel_apply_dirspaces
+        >>= fun stategraph_moments ->
         S.Db.query_dirspaces_owned_by_other_pull_requests
           ~request_id:(Builder.log_id s)
           db
           pull_request
           dirspaces
-          ~stategraph_parallel_apply_dirspaces)
+          ~stategraph_parallel_apply_dirspaces
+          ~stategraph_moments)
 
-  (* The applies of other pull requests among the rows of a dirspace, each with its transaction
-     parsed.  A row without an apply, or whose apply reported no id, is left out. *)
-  let other_applies ~request_id rows =
+  (* The applies of other pull requests among the rows of a dirspace, each by its transaction.  A
+     row without an apply is left out. *)
+  let other_applies rows =
     let module Pat = P2.Parallel_apply_tx in
     CCList.filter_map
       (fun { Pat.other; _ } ->
-        CCOption.flat_map
-          (fun ({ Pat.Other.tx; _ } as other) ->
-            CCOption.map (fun id -> (id, other)) (Tasks_base.stategraph_tx ~request_id tx))
-          other)
+        CCOption.map (fun ({ Pat.Other.tx; _ } as other) -> (tx, other)) other)
       rows
 
   (* The question itself: the transaction of our plan of the dirspace against those of the other
@@ -427,17 +440,13 @@ struct
      reported no id, asks nothing. *)
   let stategraph_overlaps_of_dirspace s rows =
     let module Pat = P2.Parallel_apply_tx in
-    let request_id = Builder.log_id s in
-    match (rows, other_applies ~request_id rows) with
+    match (rows, other_applies rows) with
     | [], _ | _, [] -> Abbs_fc.return_ok []
-    | { Pat.dirspace; installation; tx; _ } :: _, others -> (
-        match Tasks_base.stategraph_tx ~request_id tx with
-        | None -> Abbs_fc.return_ok []
-        | Some tx ->
-            let open Abbs_fc.Infix_result_monad in
-            ask_stategraph_overlaps s ~installation ~dirspace ~tx others
-            >>| overlaps_of_shared dirspace others
-            >>| merge_overlaps_by_pull_request)
+    | { Pat.dirspace; installation; tx; _ } :: _, others ->
+        let open Abbs_fc.Infix_result_monad in
+        ask_stategraph_overlaps s ~installation ~dirspace ~tx others
+        >>| overlaps_of_shared dirspace others
+        >>| merge_overlaps_by_pull_request
 
   (* The applies of other pull requests that Stategraph would refuse our plans for, one question per
      dirspace. *)

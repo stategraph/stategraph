@@ -5,15 +5,16 @@
 -- base branch where the dirspace locks per base branch.  A dirspace with no such apply gives one row
 -- with the apply columns null, so that the plan's transaction is known for every dirspace.
 --
--- The runner reports a transaction in the 'tx' key of the stategraph/plan and stategraph/apply step
--- payloads.  The transaction of a completed apply is the one its apply step reported.  A queued or
--- running apply has no result yet, so its transaction is that of its pull request's latest completed
--- plan of the dirspace, the plan the apply commits (select_recent_plan.sql).  Our own transaction is
--- that of our latest completed plan of the dirspace, the plan our apply would commit.
+-- A transaction is read out of the stored plan that opened it, by the caller
+-- (Terrat_vcs_provider2.Stategraph_plan): the statement answers the plans, base64 as
+-- select_recent_plan.sql serves them.  The plan of an apply is the latest completed plan of its pull
+-- request on the dirspace at the time the apply was made, the plan the apply commits
+-- (select_recent_plan.sql); a Stategraph plan stays stored after its apply for this reason.  Our own
+-- plan is our latest completed plan of the dirspace, the plan our apply would commit.
 --
 -- Whether a transaction stands against ours is Stategraph's answer, asked with the two ids and the
--- installation the repository belongs to.  A plan without a reported transaction gives no row, and an
--- apply without one is left out: Stategraph then decides at commit, as it always has.
+-- installation the repository belongs to.  A dirspace whose plan is gone gives no row, and an apply
+-- whose plan is gone is left out: Stategraph then decides at commit, as it always has.
 with
 our_pr as (
     select repository, pull_number, base_branch
@@ -30,38 +31,44 @@ installation as (
         on gim.installation_id = gir.installation_id
     where gir.id = $repository
 ),
--- The latest completed plan of each pull request on each dirspace, with the transaction it
--- reported, null when it reported none.
+-- The completed plans of the repository's pull requests on the dirspaces, with their stored file.
 plans as (
-    select distinct on (gwm.pull_number, ds.dir, ds.workspace)
+    select
         gwm.pull_number,
         ds.dir,
         ds.workspace,
-        plan_step.payload->'tx'->>'id' as tx
+        gwm.created_at,
+        encode(p.data, 'base64') as plan
     from dirspaces as ds
     inner join work_manifest_results as wmr
         on wmr.path = ds.dir and wmr.workspace = ds.workspace
     inner join gitlab_work_manifests as gwm
         on gwm.id = wmr.work_manifest
-    left join workflow_step_outputs as plan_step
-        on plan_step.work_manifest = gwm.id
-           and plan_step.step = 'stategraph/plan'
-           and plan_step.scope->>'type' = 'dirspace'
-           and plan_step.scope->>'dir' = ds.dir
-           and plan_step.scope->>'workspace' = ds.workspace
+    inner join plans as p
+        on p.work_manifest = gwm.id and p.path = ds.dir and p.workspace = ds.workspace
     where gwm.repository = $repository
           and gwm.pull_number is not null
           and gwm.run_type in ('autoplan', 'plan')
           and gwm.completed_at is not null
-    order by gwm.pull_number, ds.dir, ds.workspace, gwm.created_at desc
+          and p.data is not null
+),
+our_plans as (
+    select distinct on (dir, workspace)
+        dir,
+        workspace,
+        plan
+    from plans
+    where pull_number = $pull_number
+    order by dir, workspace, created_at desc
 ),
 applies as (
     select
         ds.dir,
         ds.workspace,
         gwm.pull_number,
+        gwm.id as work_manifest,
         gwm.state = 'completed' as applied,
-        coalesce(apply_step.payload->'tx'->>'id', plans.tx) as tx
+        applied_plan.plan
     from dirspaces as ds
     inner join work_manifest_dirspaceflows as wmds
         on wmds.path = ds.dir and wmds.workspace = ds.workspace
@@ -81,16 +88,16 @@ applies as (
         on unlocks.repository = gwm.repository and unlocks.pull_number = gwm.pull_number
     left join work_manifest_results as wmr
         on wmr.work_manifest = gwm.id and wmr.path = ds.dir and wmr.workspace = ds.workspace
-    left join workflow_step_outputs as apply_step
-        on apply_step.work_manifest = gwm.id
-           and apply_step.step = 'stategraph/apply'
-           and apply_step.scope->>'type' = 'dirspace'
-           and apply_step.scope->>'dir' = ds.dir
-           and apply_step.scope->>'workspace' = ds.workspace
-    left join plans
-        on plans.pull_number = gwm.pull_number
-           and plans.dir = ds.dir
-           and plans.workspace = ds.workspace
+    left join lateral (
+        select plans.plan
+        from plans
+        where plans.pull_number = gwm.pull_number
+              and plans.dir = ds.dir
+              and plans.workspace = ds.workspace
+              and plans.created_at <= gwm.created_at
+        order by plans.created_at desc
+        limit 1
+    ) as applied_plan on true
     where gwm.pull_number <> our_pr.pull_number
           and gwm.run_type in ('autoapply', 'apply', 'unsafe-apply')
           and gpr.merged_at is null
@@ -103,18 +110,16 @@ select
     ds.dir,
     ds.workspace,
     installation.core_id,
-    our_plan.tx,
+    our_plans.plan,
     applies.pull_number,
-    applies.tx,
+    applies.work_manifest,
+    applies.plan,
     applies.applied
 from dirspaces as ds
 inner join installation
     on true
-inner join plans as our_plan
-    on our_plan.pull_number = $pull_number
-       and our_plan.dir = ds.dir
-       and our_plan.workspace = ds.workspace
+inner join our_plans
+    on our_plans.dir = ds.dir and our_plans.workspace = ds.workspace
 left join applies
-    on applies.dir = ds.dir and applies.workspace = ds.workspace and applies.tx is not null
-where our_plan.tx is not null
+    on applies.dir = ds.dir and applies.workspace = ds.workspace and applies.plan is not null
 order by ds.dir, ds.workspace, applies.pull_number
