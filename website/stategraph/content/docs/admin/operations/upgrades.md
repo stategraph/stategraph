@@ -99,3 +99,4 @@ cosign verify-attestation --type spdxjson \
 - [Releases](/docs/reference/releases): downloads, the CLI, and release notes
 - [Health checks](/docs/admin/operations/health-checks)
 - [Environment variables](/docs/admin/operations/environment-variables)
+- [Migrate from Terrateam](/docs/admin/self-hosting/migrate-from-terrateam): the container swap from a self-hosted Terrateam server

@@ -22,7 +22,7 @@ The rest of this page, and the other pages of this section, cover the Enterprise
 ## What you need
 
 - The Stategraph container, `ghcr.io/stategraph/stategraph-server`.
-- A PostgreSQL server. The Docker Compose setup runs PostgreSQL 17.
+- A PostgreSQL server, version 15 or later. The Docker Compose setup runs PostgreSQL 17.
 - A public URL for Stategraph, for example `https://stategraph.example.com`.
 - A reverse proxy, an ingress, or a load balancer that terminates TLS in front of the container.
 
@@ -95,3 +95,4 @@ Stategraph reads the Orchestration and cost estimation settings only at a start 
 - [Open Source](/docs/admin/self-hosting/open-source): self-host the open-source edition of Orchestration.
 - [Environment variables](/docs/admin/operations/environment-variables): all settings that Stategraph reads.
 - [Upgrades](/docs/admin/operations/upgrades): install a new version safely and verify the image signature.
+- [Migrate from Terrateam](/docs/admin/self-hosting/migrate-from-terrateam): replace a self-hosted Terrateam server with the Stategraph server image and keep its database.

@@ -30,7 +30,7 @@ For the variables that the container reads, see [Environment variables](/docs/ad
 
 ## Move to Enterprise
 
-Enterprise has no user limit, and adds RBAC, CODEOWNERS enforcement, approval gates, centralized configuration, and more drift schedules. It is a different server image, so you deploy it as a new server: see [Self-hosted Enterprise](/docs/get-started/quickstart/self-hosted). Your repositories and `.stategraph/config.yml` carry over. [Contact sales](https://stategraph.com/contact) for a license key.
+Enterprise has no user limit, and adds RBAC, CODEOWNERS enforcement, approval gates, centralized configuration, and more drift schedules. It is a different server image. For a new deployment, see [Self-hosted Enterprise](/docs/get-started/quickstart/self-hosted). To move an existing Orchestration server, see [Migrate from Terrateam](/docs/admin/self-hosting/migrate-from-terrateam). The migration keeps the database, the GitHub App, and the run history. Your repositories and `.stategraph/config.yml` stay as they are. [Contact sales](https://stategraph.com/contact) for a license key.
 
 ## Next steps
 
