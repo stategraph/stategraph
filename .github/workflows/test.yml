@@ -16,43 +16,11 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
-  # Required status checks and `paths-ignore` do not mix: when a workflow is
-  # skipped by a path filter its checks are never created, so a required check
-  # stays pending and the PR can never merge. That deadlocked every docs-only
-  # monorepo->OSS export PR (e.g. #1582, which touched only docs/package-lock.json).
-  #
-  # So this workflow now always runs, and the expensive jobs opt out via `if:`
-  # instead. A job skipped by `if:` still reports a check run, with conclusion
-  # "skipped", which satisfies a required status check.
   changes:
-    runs-on: ubuntu-22.04
+    uses: ./.github/workflows/changes.yml
     permissions:
       contents: read
       pull-requests: read
-    outputs:
-      code: ${{ steps.filter.outputs.code }}
-    steps:
-      - name: Determine whether anything outside docs/ changed
-        id: filter
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          set -euo pipefail
-          # Anything that is not a pull_request (e.g. workflow_dispatch) always builds.
-          if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          files=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" --jq '.[].filename')
-          if printf '%s\n' "$files" | grep -qv '^docs/'; then
-            echo "Non-docs changes present; running the full build."
-            echo "code=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Only docs/ changed; skipping format-check and build-test."
-            echo "code=false" >> "$GITHUB_OUTPUT"
-          fi
 
   format-check:
     needs: changes

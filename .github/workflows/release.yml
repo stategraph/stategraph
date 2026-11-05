@@ -175,6 +175,75 @@ jobs:
           path: ttm-linux-${{ matrix.arch }}
           retention-days: 7
 
+  # No need for environment-scoped secret, hence no `environment:`, unlike the
+  # terrat jobs; because this job publishes to this repo's package (not terrateamio).
+  build-stategraph:
+    needs: set-version-tag
+    runs-on: ${{ matrix.runs-on }}
+
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            # This cache is read by the PR workflow too
+            runs-on: ubuntu-22.04
+            cache-scope: stategraph-server-oss
+          - arch: arm64
+            runs-on: ubuntu-22.04-arm
+            cache-scope: stategraph-server-oss-arm64
+
+    env:
+      VERSION_TAG: ${{ needs.set-version-tag.outputs.version_tag }}
+      IMAGE: ghcr.io/stategraph/stategraph-server-oss:${{ needs.set-version-tag.outputs.version_tag }}-${{ matrix.arch }}
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Key is the ISO week (e.g. 2026-W45), so it changes every Monday (UTC) and packages are at most a week old.
+      - name: Set the OS refresh key
+        run: |
+          echo "OS_REFRESH=$(date -u +%G-W%V)" >> "$GITHUB_ENV"
+
+      - name: Build and push stategraph-server-oss (${{ matrix.arch }})
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/stategraph/Dockerfile
+          target: stategraph-server-oss
+          push: true
+          build-args: |
+            UID=1000
+            GID=1000
+            USERNAME=stategraph
+            DEPLOYMENT_KIND=production
+            OS_REFRESH=${{ env.OS_REFRESH }}
+          cache-from: type=gha,scope=${{ matrix.cache-scope }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.cache-scope }}
+          tags: ${{ env.IMAGE }}
+
+      # Runner arch matches matrix.arch, so this runs natively.
+      - name: Smoke-test the server binary (${{ matrix.arch }})
+        run: |
+          set -euo pipefail
+          docker pull -q "$IMAGE"
+          docker run --rm --entrypoint /usr/local/bin/stategraph-server "$IMAGE" version
+
   # The FIPS image is built from docker/terrat/Dockerfile.fips, which carries no
   # prebuilt base image, so this job compiles OpenSSL and the opam switch
   # itself. No other job takes it as a dependency: the manifest and the release
@@ -287,9 +356,14 @@ jobs:
           '
 
   create-multi-arch-manifest:
-    needs: [set-version-tag, build]
+    needs: [set-version-tag, build, build-stategraph]
     runs-on: ubuntu-22.04
     environment: ${{ github.event.inputs.environment || 'production' }}
+
+    # packages: write lets GITHUB_TOKEN push the stategraph-org manifest.
+    permissions:
+      contents: read
+      packages: write
 
     outputs:
       is_latest_version_tag: ${{ steps.is-latest-version-tag.outputs.is_latest_version_tag }}
@@ -323,6 +397,19 @@ jobs:
       - name: Create and push multi-arch manifest
         run: |
           ./scripts/create_manifest terrat-ee terrat-oss ttm
+
+      # The stategraph org takes this repository's GITHUB_TOKEN, not the terrateamio
+      # token. This login replaces the one above for ghcr.io, hence it comes last.
+      - name: Log in to GitHub Container Registry (stategraph)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest (stategraph)
+        run: |
+          ./scripts/create_manifest --org stategraph stategraph-server-oss
 
   # Runs after both builds and their checks, so an image that fails them
   # carries no signature. The version tag and `latest` share a digest, so
