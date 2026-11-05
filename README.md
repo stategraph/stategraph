@@ -54,13 +54,16 @@ Each part works without the other. You can start with Orchestration against your
 
 ## Ship from the pull request
 
+Open source, MPL-2.0 · GitHub and GitLab
+
 Orchestration plans each pull request and posts the plan as a comment. The apply runs on a `stategraph apply` comment or on merge.
 
 * **Plan on every pull request**, posted as a comment
 * **Apply from the pull request**, with approvals routed by CODEOWNERS
 * **Policy checks** with OPA/Rego, Conftest, and Checkov before an apply
 * **Cost estimates** in the pull request, with thresholds that require another approval
-* **Drift detection** on a schedule
+* **Dependency-aware runs**: layers and stacks run in dependency order, in parallel where they can
+* **Drift detection** on a schedule, scoped by a tag query, and reconciled on request
 * **Tag-based configuration** for 10 or 10,000 workspaces, in a monorepo or across repositories
 * **Terraform, OpenTofu, Terragrunt, CDKTF, and Pulumi**
 
@@ -70,7 +73,7 @@ Runs on GitHub and GitLab. Configure it in `.stategraph/config.yml`. See the [Or
 
 With a state file, every write locks the whole file. Infrastructure as a Database stores each state as a graph of resources and dependencies in PostgreSQL, and locks only the resources a change touches.
 
-**Scoped plans.** A plan reads only the subgraph your change reaches, not the whole state.
+**Dynamic state sizing.** A plan walks only the subgraph your change reaches, not the whole state. Work scales with the size of your change, not the size of your state.
 
 **Concurrent changes.** Each plan and apply is a transaction that locks the resources it changes. Changes that do not overlap apply at the same time. Changes that overlap are rejected at commit.
 
@@ -96,24 +99,47 @@ $ stategraph query "SELECT type, count(*) FROM resources GROUP BY type"
 
 Every plan and apply is recorded as a transaction, with its logs. A change that reaches several states applies as one transaction with `stategraph tf mtx`.
 
+**One graph at any size.** You never split a state to make it faster.
+
+## Built for agents
+
+Skills teach any AI agent the Stategraph workflows: query, plan and apply, import, refactor, cost, and security.
+
+```console
+$ npx skills add stategraph/skills
+```
+
+With Infrastructure as a Database, an agent's access token grants plan and apply separately, down to a single resource. Every action the agent takes is a transaction on the timeline. A model can ignore a prompt. It cannot use a capability that its token does not grant.
+
+## Terraform vs. Stategraph
+
+| | Terraform | Stategraph |
+|---|---|---|
+| Language | HCL | HCL, with the same modules and providers |
+| State | A file behind a global lock | A dependency graph in PostgreSQL, with history |
+| Plan | The whole file, every time | Only what your change touches |
+| Changes in flight | One | As many as do not overlap |
+| Across states | In sequence, by hand | One atomic transaction |
+| Questions | grep a JSON file | SQL across everything |
+| Workflow | Bring your own CI | Pull-request orchestration built in |
+| AI agents | Blanket credentials | Skills and scoped tokens |
+
 ## Get started
 
 ### Stategraph Orchestration
 
 **Hosted:** [Start free](https://app.stategraph.cloud). Connects to GitHub or GitLab; plan limits are on the [pricing](https://stategraph.com/pricing) page.
 
-**Self-hosted (Open Source):**
+**Self-hosted (Open Source):** the `ghcr.io/stategraph/stategraph-server-oss` image.
 
 ```bash
 git clone https://github.com/stategraph/stategraph
-cd stategraph/docker/terrat
-
-# Run the setup wizard
-docker compose up setup
-# then open http://localhost:3000
+cd stategraph/docker/stategraph
+docker compose up -d
+# then open http://localhost:8080 and create the first account
 ```
 
-The open-source build runs Orchestration only, for up to 3 active users a month per GitHub or GitLab installation. The full walkthrough is in the [self-hosted Open Source quickstart](https://stategraph.com/docs/get-started/quickstart/self-hosted-open-source). An open-source build of the Stategraph server is in development.
+The open-source build runs Orchestration. To connect GitHub or GitLab, with your own public URL or with Terratunnel, follow the [self-hosted Open Source quickstart](https://stategraph.com/docs/get-started/quickstart/self-hosted-open-source).
 
 ### Stategraph Infrastructure as a Database
 
@@ -174,4 +200,4 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 The code in this repository is [MPL-2.0](LICENSE) licensed.
 
-Stategraph Infrastructure as a Database is commercial software, available in the hosted service or self-hosted with a license key. Stategraph Orchestration is open source, with enterprise features (RBAC, centralized configuration, advanced approval workflows) available in the hosted service and the self-hosted Enterprise Edition. The open-source build, which the self-hosted setup above runs, allows up to 3 active users per month per GitHub or GitLab installation (an active user is anyone who triggers a plan or apply that month); runs are unlimited. The self-hosted Enterprise Edition has no user limit, and hosted plan limits are on the [pricing](https://stategraph.com/pricing) page.
+Stategraph Infrastructure as a Database is commercial software, available in the hosted service or self-hosted with a license key. Stategraph Orchestration is open source, with enterprise features (RBAC, centralized configuration, advanced approval workflows) available in the hosted service and the self-hosted Enterprise Edition. Hosted plan limits are on the [pricing](https://stategraph.com/pricing) page.

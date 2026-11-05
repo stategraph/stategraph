@@ -15,7 +15,7 @@ Deploy [Stategraph](/docs/admin/self-hosting) as a fully managed Google Cloud Ru
 - Docker, to mirror the image into Artifact Registry
 
 !!! note "Cloud Run pulls only from Artifact Registry, Container Registry, or Docker Hub"
-    Cloud Run does not deploy from `ghcr.io`. Mirror `ghcr.io/stategraph/stategraph-server` one time into an Artifact Registry repository in your project, and point the service at the `*-docker.pkg.dev` path.
+    Cloud Run does not deploy from `ghcr.io`. Mirror `ghcr.io/stategraph/stategraph-server-oss`, or `ghcr.io/stategraph/stategraph-server` for Enterprise, one time into an Artifact Registry repository in your project, and point the service at the `*-docker.pkg.dev` path.
 
 ## Architecture
 
@@ -66,9 +66,10 @@ gcloud artifacts repositories create "$AR_REPO" \
 
 gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
-export IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/stategraph-server:2.5.7"
-docker pull ghcr.io/stategraph/stategraph-server:2.5.7
-docker tag  ghcr.io/stategraph/stategraph-server:2.5.7 "$IMAGE"
+export VERSION="<version>"   # the latest release on https://github.com/stategraph/releases/releases
+export IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/stategraph-server-oss:${VERSION}"
+docker pull ghcr.io/stategraph/stategraph-server-oss:${VERSION}
+docker tag  ghcr.io/stategraph/stategraph-server-oss:${VERSION} "$IMAGE"
 docker push "$IMAGE"
 ```
 
@@ -307,7 +308,7 @@ In your provider, register `https://<your-domain>/oauth2/google/callback` or `/o
 
 ## Enable cost estimation
 
-Add `STATEGRAPH_COST_ENABLED=true` to the `server` container, and point `PRICING_DB_*` at Cloud SQL. The defaults, host `db` and password `stategraph`, cannot reach it, so with only the switch, cost never works.
+Enterprise only. Add `STATEGRAPH_COST_ENABLED=true` to the `server` container, and point `PRICING_DB_*` at Cloud SQL. The defaults, host `db` and password `stategraph`, cannot reach it, so with only the switch, cost never works.
 
 ```yaml
 - name: STATEGRAPH_COST_ENABLED
@@ -354,9 +355,10 @@ Keep `minScale` at `1` or higher: scale-to-zero stops the price-book load and th
 Mirror the new tag into Artifact Registry, update `image:` in `service.yaml`, and redeploy:
 
 ```bash
-docker pull ghcr.io/stategraph/stategraph-server:2.5.7
-docker tag  ghcr.io/stategraph/stategraph-server:2.5.7 "${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/stategraph-server:2.5.7"
-docker push "${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/stategraph-server:2.5.7"
+export VERSION="<new version>"
+docker pull ghcr.io/stategraph/stategraph-server-oss:${VERSION}
+docker tag  ghcr.io/stategraph/stategraph-server-oss:${VERSION} "${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/stategraph-server-oss:${VERSION}"
+docker push "${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/stategraph-server-oss:${VERSION}"
 
 gcloud run services replace service.yaml --region="$REGION"
 ```

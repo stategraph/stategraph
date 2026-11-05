@@ -110,12 +110,12 @@ engine:
   name: stategraph
 ```
 
-To pin the CLI version that the runner uses, set `version`:
+To pin the CLI version that the runner uses, set `version` to a release from the [releases page](https://github.com/stategraph/releases/releases):
 
 ```yaml
 engine:
   name: stategraph
-  version: '2.5.7'
+  version: '<version>'
 ```
 
 To run OpenTofu in place of Terraform, set `tf_cmd` and `tf_version`:

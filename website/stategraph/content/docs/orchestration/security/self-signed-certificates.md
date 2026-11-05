@@ -49,10 +49,10 @@ A variable can also hold several PEM blocks. The runner installs each certificat
 
 The self-hosted Stategraph server does not support the `CUSTOM_CA_CERT` environment variable. Setting it has no effect.
 
-To make the server trust a private CA, for example for GitHub Enterprise Server or a self-hosted GitLab with an internal certificate, build a derived image that adds the CA to the system trust store:
+To make the server trust a private CA, for example for GitHub Enterprise Server or a self-hosted GitLab with an internal certificate, build a derived image that adds the CA to the system trust store. For Enterprise, start `FROM ghcr.io/stategraph/stategraph-server:latest`.
 
 ```dockerfile
-FROM ghcr.io/stategraph/stategraph-server:latest
+FROM ghcr.io/stategraph/stategraph-server-oss:latest
 USER root
 COPY internal-ca.pem /usr/local/share/ca-certificates/internal-ca.crt
 RUN update-ca-certificates

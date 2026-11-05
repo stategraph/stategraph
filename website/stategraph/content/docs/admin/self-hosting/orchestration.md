@@ -35,7 +35,7 @@ At each start with Orchestration on, Stategraph migrates the Orchestration datab
 
 Orchestration stores its data in a second database, `terrateam`, on the same PostgreSQL server as `stategraph`. The console reads it through `postgres_fdw`, as the `stategraph_mql` role, and writes the GitHub App and the GitLab group connections as the `stategraph_provisioner` role. Stategraph creates the database and the roles, and keeps the grants of the roles current. You give the roles their passwords, one time.
 
-With the [Docker Compose](/docs/admin/self-hosting/docker-compose) setup, there is nothing to do: its `orchestration-db` script creates the database and the roles at the first start of a new `db` volume, with the passwords that `docker-compose.yml` sets in `STATEGRAPH_FDW_PASSWORD` and `STATEGRAPH_FDW_PROVISIONER_PASSWORD`. For an existing volume, see [Connect GitHub or GitLab](/docs/admin/self-hosting/docker-compose#connect-github-or-gitlab).
+With the [Docker Compose](/docs/admin/self-hosting/docker-compose) setup, there is nothing to do: its `initdb/` scripts create the database and the roles at the first start of a new `db` volume, with the passwords that `orchestration.env` sets in `STATEGRAPH_FDW_PASSWORD` and `STATEGRAPH_FDW_PROVISIONER_PASSWORD`. For an existing volume, see [Connect GitHub or GitLab](/docs/admin/self-hosting/docker-compose#connect-github-or-gitlab).
 
 On any other PostgreSQL, create the roles before the first start with Orchestration on. If Stategraph already created them, use `ALTER ROLE` instead.
 

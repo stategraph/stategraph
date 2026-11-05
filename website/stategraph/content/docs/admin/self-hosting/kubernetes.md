@@ -7,6 +7,8 @@ order: 3
 
 The [Stategraph Helm chart](https://github.com/stategraph/helm-charts) deploys [Stategraph](/docs/admin/self-hosting) on Kubernetes, with an ingress, health probes, and a bundled or external PostgreSQL.
 
+The examples install the Open Source image, `ghcr.io/stategraph/stategraph-server-oss`. For [Enterprise](/docs/get-started/editions), leave out the two `stategraph.image` values: the chart then installs `ghcr.io/stategraph/stategraph-server`, whose setup screen asks for the license key first.
+
 ## Before you begin
 
 - Kubernetes 1.19 or later, Helm 3, and `kubectl` configured for your cluster.
@@ -21,7 +23,9 @@ helm repo add stategraph https://stategraph.github.io/helm-charts
 helm repo update
 helm install stategraph stategraph/stategraph \
   --namespace stategraph \
-  --create-namespace
+  --create-namespace \
+  --set stategraph.image.repository=ghcr.io/stategraph/stategraph-server-oss \
+  --set stategraph.image.tag=latest
 ```
 
 For a local trial, forward the service, and create the first admin account on the setup screen at <http://localhost:8080>.
@@ -41,6 +45,8 @@ Install with HTTPS, an ingress, and a cert-manager issuer:
 helm install stategraph stategraph/stategraph \
   --namespace stategraph \
   --create-namespace \
+  --set stategraph.image.repository=ghcr.io/stategraph/stategraph-server-oss \
+  --set stategraph.image.tag="<version>" \
   --set stategraph.ui.base="https://stategraph.example.com" \
   --set stategraph.ui.oauthRedirectBase="https://stategraph.example.com" \
   --set ingress.enabled=true \
@@ -52,13 +58,16 @@ helm install stategraph stategraph/stategraph \
   --set ingress.annotations."cert-manager\.io/cluster-issuer"="letsencrypt-prod"
 ```
 
+Replace `<version>` with the latest release on the [releases page](https://github.com/stategraph/releases/releases).
+
 ## Configuration
 
 `helm show values stategraph/stategraph` lists all chart values. The common ones:
 
 | Value | Description | Default |
 |-------|-------------|---------|
-| `stategraph.image.tag` | Image version | `latest` |
+| `stategraph.image.repository` | Server image: `ghcr.io/stategraph/stategraph-server-oss` for Open Source | `ghcr.io/stategraph/stategraph-server` |
+| `stategraph.image.tag` | Image version, from the [releases page](https://github.com/stategraph/releases/releases) | the chart's `appVersion` |
 | `stategraph.replicaCount` | Number of server pods | `1` |
 | `stategraph.ui.base` | Public URL (`STATEGRAPH_UI_BASE`) | `http://localhost:8080` |
 | `stategraph.ui.oauthRedirectBase` | OAuth callback base (`STATEGRAPH_OAUTH_REDIRECT_BASE`) | unset |
@@ -119,6 +128,8 @@ Local email and password sign-in is on by default. For Google or OIDC, set the O
 helm install stategraph stategraph/stategraph \
   --namespace stategraph \
   --create-namespace \
+  --set stategraph.image.repository=ghcr.io/stategraph/stategraph-server-oss \
+  --set stategraph.image.tag="<version>" \
   --set stategraph.ui.base="https://stategraph.example.com" \
   --set stategraph.ui.oauthRedirectBase="https://stategraph.example.com" \
   --set stategraph.oauth.enabled=true \
@@ -156,7 +167,7 @@ Migrations run before the server starts, so for a large database, allow the read
 
 ## Enable cost estimation
 
-Set `STATEGRAPH_COST_ENABLED=true` in the container `env`, so that each new or rescheduled pod starts with cost estimation on:
+Enterprise only. Set `STATEGRAPH_COST_ENABLED=true` in the container `env`, so that each new or rescheduled pod starts with cost estimation on:
 
 ```yaml
 # values.yaml
@@ -273,16 +284,16 @@ After the rollout, with the `GITHUB_*` variables, set the webhook URL of your Gi
 
 ## Enable security scanning
 
-Add `STATEGRAPH_SECURITY` with the value `1` to the container `env`. See [Enable security scanning](/docs/admin/self-hosting/security-scanning).
+Enterprise only. Add `STATEGRAPH_SECURITY` with the value `1` to the container `env`. See [Enable security scanning](/docs/admin/self-hosting/security-scanning).
 
 ## Upgrading
 
 ```bash
 helm repo update
-helm upgrade stategraph stategraph/stategraph -n stategraph
+helm upgrade stategraph stategraph/stategraph -n stategraph --reuse-values
 ```
 
-For production, pin `stategraph.image.tag` to a version. See [Upgrades](/docs/admin/operations/upgrades).
+`--reuse-values` keeps the image values of the install. For production, pin `stategraph.image.tag` to a version. See [Upgrades](/docs/admin/operations/upgrades).
 
 ## Uninstalling
 

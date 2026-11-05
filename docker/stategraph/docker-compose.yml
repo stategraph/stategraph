@@ -24,11 +24,12 @@ services:
       - stategraph
 
   server:
-    # OSS users: set STATEGRAPH_IMAGE=ghcr.io/stategraph/stategraph-server-oss:latest
-    image: ${STATEGRAPH_IMAGE:-ghcr.io/stategraph/stategraph-server:latest}
+    # Enterprise: set STATEGRAPH_IMAGE=ghcr.io/stategraph/stategraph-server:latest
+    image: ${STATEGRAPH_IMAGE:-ghcr.io/stategraph/stategraph-server-oss:latest}
     env_file:
       - path: orchestration.env
-      - path: ../../.env
+      # .env next to this file: also the file Compose interpolates ${...} below from.
+      - path: .env
         required: false
     environment:
       # Database configuration
@@ -43,9 +44,9 @@ services:
       STATEGRAPH_CLIENT_MAX_BODY_SIZE: "${STATEGRAPH_CLIENT_MAX_BODY_SIZE:-512m}"
       DISABLE_IPV6: "${DISABLE_IPV6:-0}"
 
-      # STATEGRAPH_UI_BASE and STATEGRAPH_OAUTH_REDIRECT_BASE come from .env file
-      # These must be set to your public URL (e.g., https://stategraph.example.com)
-      # For local testing: http://localhost:8080
+      # For GitHub or GitLab, set STATEGRAPH_UI_BASE and STATEGRAPH_OAUTH_REDIRECT_BASE
+      # to your public URL (e.g., https://stategraph.example.com) in .env.
+      STATEGRAPH_UI_BASE: "${STATEGRAPH_UI_BASE:-http://localhost:8080}"
 
       # Cost estimation (off by default).  To enable it, set
       # STATEGRAPH_COST_ENABLED=true in your .env; it lives in your deployment
@@ -68,12 +69,9 @@ services:
       # above) sets STATEGRAPH_ORCHESTRATION_ENABLED=true, so a failure to
       # start it stops the server, and carries the FDW role passwords that
       # initdb/ creates; the console then offers to create the GitHub App.
-      # Set STATEGRAPH_ORCHESTRATION_ENABLED=false in the repo-root .env
-      # to turn it off; TERRAT_*/GITHUB_* there are overrides -- see README.md
-      # "Running with orchestration". Deliberately NOT mirrored into this
-      # environment block: `environment:` outranks env_file, and `${VAR:-}`
-      # interpolates against the shell/project-dir env (NOT env_file), so
-      # mirroring would clobber every .env value with "". TERRAT_DB_* need no
+      # Set STATEGRAPH_ORCHESTRATION_ENABLED=false in .env to turn it off;
+      # TERRAT_*/GITHUB_* there are overrides -- see README.md
+      # "Running with orchestration". TERRAT_DB_* need no
       # wiring either way: the stategraph server defaults them to the DB_* values
       # above with database name "terrateam", which this compose's Postgres
       # creates at first boot (initdb/).
@@ -104,6 +102,8 @@ services:
       #   STATEGRAPH_OAUTH_OIDC_ISSUER_URL
     ports:
       - "8080:8080"
+    # Stategraph finishes the requests in progress within 60 seconds of a stop.
+    stop_grace_period: 60s
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
       interval: 10s
@@ -112,6 +112,20 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - stategraph
+
+  # A public URL for a host without one. COMPOSE_PROFILES=tunnel in .env starts
+  # it, with TERRATUNNEL_API_KEY from https://tunnel.terrateam.dev and
+  # STATEGRAPH_UI_BASE set to the tunnel URL.
+  terratunnel:
+    image: ghcr.io/stategraph/terratunnel:latest
+    profiles: ["tunnel"]
+    command: ["client", "--local-endpoint", "http://server:8080"]
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped
     networks:
       - stategraph
 
