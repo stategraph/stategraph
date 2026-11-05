@@ -24,6 +24,7 @@ Leave optional variables unset, not empty: several Orchestration variables treat
 | `STATEGRAPH_AEGIS_API_BASE` / `STATEGRAPH_AEGIS_SERVICE_TOKEN` | unset | Aegis control plane, used only for invitation emails. Both unset: invitations are links only |
 | `STATEGRAPH_ENABLE_CORS` | `false` | Send CORS headers. Development only, with the console on another origin |
 | `STATEGRAPH_CORS_DEFAULT_ORIGIN` | `http://localhost:3000` | Origin that CORS allows |
+| `STATEGRAPH_LOG_FORMAT` | `text` | Server log format: `text` or `json`. With `json`, each line is one JSON object with the fields `time`, `level`, `src`, and `msg` |
 
 ## HTTP
 
