@@ -1,0 +1,60 @@
+; Hermes (Next.js console). Next.js keeps its own incremental cache
+; in-tree under .next/, so we run the build in the real source tree
+; (outside dune's _build/ sandbox) and then copy the static export into the
+; `ui-export` directory target. It is deliberately NOT named `out`: Next.js
+; already writes an in-tree out/, and a target sharing that name conflicts with
+; the source directory on any machine that has built before.
+;
+; The export MUST be a real dune target, not just an in-tree side effect. It
+; used to be tracked only by the build.tag stamp, which meant a restored
+; _build/ (from the Docker /dune-cache mount, or any dune cache hit) made the
+; rule look satisfied while code/src/hermes/out/ did not exist -- so
+; `dune build @code/hermes` silently skipped npm and the production image's
+; `COPY .../hermes/out/` failed. That only stayed hidden because long-lived
+; runners kept a stale out/ in their workspace; it broke on the first clean
+; checkout. docker/terrat/Dockerfile documents the same trap for iris/dist/.
+;
+; This rule produces the static export consumed by the production Docker
+; image. It does NOT run the JS test suite -- that's handled by
+; .github/workflows/hermes-ci.yml on every change to code/src/hermes/**
+; or api.json. Running `npm test` here would tax every backend-only
+; OCaml build with a JS test loop that has no relevance to OCaml diffs.
+
+(rule
+ (targets
+  build.tag
+  (dir ui-export))
+ (deps
+  package.json
+  package-lock.json
+  next.config.ts
+  tsconfig.json
+  eslint.config.mjs
+  postcss.config.mjs
+  components.json
+  api.json
+  capability-wire.json
+  capability-denied.json
+  actuator-run-result.json
+  tx_log_data.json
+  (glob_files_rec app/*)
+  (glob_files_rec components/*)
+  (glob_files_rec config/*)
+  (glob_files_rec contexts/*)
+  (glob_files_rec hooks/*)
+  (glob_files_rec lib/*)
+  (glob_files_rec public/*)
+  (glob_files_rec types/*))
+ (action
+  (progn
+   (bash
+    "cd $DUNE_SOURCEROOT/code/src/hermes && npm install && npm run generate-api-types && BUILD_STATIC=true npm run build")
+   ; dune does not pre-create directory targets (same as the `gen` targets in
+   ; code/src/pricing_api/dune), so make it before copying the export in.
+   (bash
+    "rm -rf ui-export && mkdir -p ui-export && cp -R $DUNE_SOURCEROOT/code/src/hermes/out/. ui-export/")
+   (bash "touch build.tag"))))
+
+(alias
+ (name hermes)
+ (deps build.tag))

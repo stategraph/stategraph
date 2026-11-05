@@ -314,7 +314,10 @@ ENV BASH_ENV=/home/${USERNAME}/.bashrc
 WORKDIR /tmp/mono
 ENTRYPOINT ["/bin/bash"]
 
-FROM ocaml-deps AS stategraph-pricing-code
+# The UI stages come first, ahead of the private pricing ones, so that the
+# server images can take hermes from here (stategraph-ui-production) and the
+# OSS image never reaches pricing (which is private).
+FROM ocaml-deps AS stategraph-ui-code
 
 ARG USERNAME
 
@@ -325,6 +328,41 @@ COPY --chown=${USERNAME}:${USERNAME} ./dune-project ./dune /tmp/mono/
 COPY --chown=${USERNAME}:${USERNAME} ./api_schemas /tmp/mono/api_schemas
 COPY --chown=${USERNAME}:${USERNAME} ./scripts/check_migrations_registered.sh /tmp/mono/scripts/check_migrations_registered.sh
 COPY --chown=${USERNAME}:${USERNAME} ./code/Makefile ./code/dune ./code/dune.stategraph.inc /tmp/mono/code/
+COPY --chown=${USERNAME}:${USERNAME} ./code/src/hermes /tmp/mono/code/src/hermes
+
+FROM stategraph-ui-code AS stategraph-ui-development
+
+ARG DUNE_CACHE_ID
+
+# The first dune build of the chain, so it is the one that restores dune's
+# _build/ from the BuildKit cache, onto a tree nothing has built yet. A restore
+# over a built tree fails: dune leaves its outputs read-only (hermes' ui-export
+# among them), and `cp -aT` cannot overwrite them. A restore after this build
+# would also bring back the cached hermes, which `make -C code stategraph`
+# would then build a second time. No save here: the pricing build below saves
+# the tree, hermes included. `sharing=locked` for the reason given at the
+# pricing build.
+RUN --mount=type=cache,id=${DUNE_CACHE_ID},target=/dune-cache,uid=1000,gid=1000,sharing=locked \
+    eval $(opam env) && \
+    if [ -d /dune-cache/_build ]; then \
+      mkdir -p /tmp/mono/_build && \
+      cp -aT /dune-cache/_build /tmp/mono/_build; \
+    fi && \
+    dune build @code/hermes
+
+# Both in production and development builds, we want the UI to be built
+FROM stategraph-ui-development AS stategraph-ui-production
+# In the dev container setup, however, we don't need the UI code to be built
+FROM stategraph-ui-code AS stategraph-ui-devcontainer
+
+ARG DEPLOYMENT_KIND
+FROM stategraph-ui-${DEPLOYMENT_KIND} AS stategraph-ui
+
+# Resume with the pricing code stages, layered on top of the UI build.
+FROM stategraph-ui AS stategraph-pricing-code
+
+ARG USERNAME
+
 COPY --chown=${USERNAME}:${USERNAME} ./code/src/pricing_service /tmp/mono/code/src/pricing_service
 
 FROM stategraph-pricing-code AS stategraph-pricing-development
@@ -343,8 +381,9 @@ USER ${USERNAME}
 
 # Builds the Go pricing-service so it ships in stategraph-dev (for CI cost
 # tests) as well as the production image. Mirrors the cache pattern of the
-# main `make -C code stategraph` step below: a BuildKit cache for dune's
-# _build/ plus a Go cache for module/build artifacts. `cp -aT` (not `cp -a`)
+# main `make -C code stategraph` step below: it builds on the _build/ that
+# stategraph-ui-development restored from the BuildKit cache, saves the result
+# back, and keeps a Go cache for module/build artifacts. `cp -aT` (not `cp -a`)
 # replaces the destination tree atomically -- otherwise a second build step
 # would nest into /tmp/mono/_build/_build.
 #
@@ -360,10 +399,6 @@ RUN --mount=type=cache,id=${DUNE_CACHE_ID},target=/dune-cache,uid=1000,gid=1000,
     eval $(opam env) && \
     export PATH="$PATH:$HOME/.local/bin" && \
     export GOMODCACHE=/go-cache/mod GOCACHE=/go-cache/build && \
-    if [ -d /dune-cache/_build ]; then \
-      mkdir -p /tmp/mono/_build && \
-      cp -aT /dune-cache/_build /tmp/mono/_build; \
-    fi && \
     cd /tmp/mono && \
     dune build code/src/pricing_service/pricing-service && \
     rm -rf /dune-cache/_build && \
@@ -374,35 +409,16 @@ FROM stategraph-pricing-development AS stategraph-pricing-production
 # Devcontainer skips the pricing build to keep image creation quick.
 FROM stategraph-pricing-code AS stategraph-pricing-devcontainer
 
-ARG DEPLOYMENT_KIND
-FROM stategraph-pricing-${DEPLOYMENT_KIND} AS stategraph-pricing
-
-# Resume with the UI code stages, layered on top of the pricing build.
-FROM stategraph-pricing AS stategraph-ui-code
-
-ARG USERNAME
-
-COPY --chown=${USERNAME}:${USERNAME} ./code/src/hermes /tmp/mono/code/src/hermes
-
-FROM stategraph-ui-code AS stategraph-ui-development
-
-RUN eval $(opam env) && dune build @code/hermes
-
-# Both in production and development builds, we want the UI to be built
-FROM stategraph-ui-development AS stategraph-ui-production
-# In the dev container setup, however, we don't need the UI code to be built
-FROM stategraph-ui-code AS stategraph-ui-devcontainer
-
 # Join all three kinds, restart doing things in common
 ARG DEPLOYMENT_KIND
-FROM stategraph-ui-${DEPLOYMENT_KIND} AS stategraph-ui
+FROM stategraph-pricing-${DEPLOYMENT_KIND} AS stategraph-pricing
 
 ARG USERNAME
 
 # Copy remaining source files (includes code/src/pricing_service/infracost, if it was in context)
 COPY --chown=${USERNAME}:${USERNAME} ./code /tmp/mono/code/
 
-FROM stategraph-ui AS stategraph-devcontainer
+FROM stategraph-pricing AS stategraph-devcontainer
 # dune generates merlin configuration as part of `dune build`; no
 # separate setup step is needed.
 
@@ -422,7 +438,7 @@ ARG DUNE_CACHE_ID
 # PRs only recompile the changed modules.
 #
 # We deliberately do NOT restore from /dune-cache here. The upstream
-# stategraph-pricing-development step already does the restore, and dune
+# stategraph-ui-development step already does the restore, and dune
 # marks some of its outputs read-only (.dune/configurator, generated sources,
 # ...) so a second `cp -aT` over them hits "Permission denied" trying to
 # unlink-and-recreate.
@@ -549,8 +565,8 @@ RUN --mount=type=cache,id=${DUNE_CACHE_ID},target=/dune-cache,uid=1000,gid=1000,
     cp -aT /tmp/mono/_build /dune-cache/_build
 
 # The OSS server binary. Built from public code only, so that the OSS image
-# never reaches stategraph-dev and the private stages behind it (pricing,
-# hermes). Chained on terrat-server-build for the reasons terrat-build gives
+# never reaches stategraph-dev and the private stages behind it (pricing, the
+# client). Chained on terrat-server-build for the reasons terrat-build gives
 # below: the source is there, the dune cache restored, and the libraries both
 # builds share compiled. The /go-cache mount is for hcl_native's Go shim, which
 # the server links.
@@ -568,10 +584,10 @@ RUN --mount=type=cache,id=${DUNE_CACHE_ID},target=/dune-cache,uid=1000,gid=1000,
     cp -aT /tmp/mono/_build /dune-cache/_build
 
 # Final server image, in two editions assembled from one base. The base is
-# everything edition-blind: packages, the runit tree, nginx and the
-# orchestration console (iris). Each edition layer below adds its server,
-# which runs the orchestration engine, and the tools its features shell out to;
-# the enterprise one also adds the Stategraph console (hermes) and the client.
+# everything edition-blind: packages, the runit tree, nginx, the orchestration
+# console (iris) and the Stategraph console (hermes). Each edition layer below
+# adds its server, which runs the orchestration engine, and the tools its
+# features shell out to; the enterprise one also adds the client.
 FROM base-tenv-tofu AS stategraph-server-base
 
 ARG USERNAME
@@ -622,10 +638,10 @@ COPY --chown=${USERNAME}:${USERNAME} docker/stategraph/service/pricing-service /
 # recreation. See https://stategraph.com/docs/cost/setup.
 COPY --chown=${USERNAME}:${USERNAME} docker/stategraph/nginx.conf.template /etc/nginx/nginx.conf.template
 COPY --chown=${USERNAME}:${USERNAME} docker/stategraph/events.js /etc/nginx/events.js
-# iris, served on the TERRAT_UI_BASE host. A dune directory target, like hermes
-# in stategraph-server-ee, and the same path the standalone terrat images use,
-# so the nginx template keeps one root for it.
+# iris, served on the TERRAT_UI_BASE host, at the same path the standalone
+# terrat images use, so the nginx template keeps one root for it.
 COPY --from=terrat-server-build /tmp/mono/_build/default/code/src/iris/ui-export/ /usr/local/share/terrat/ui/assets/
+COPY --from=stategraph-ui-production /tmp/mono/_build/default/code/src/hermes/ui-export/ /usr/local/share/stategraph/ui/
 
 # terrat's routes and sgs's share one origin, and sgs names its console cookie
 # "session". terrat reads this name for its own session cookie; sgs reads it to
@@ -666,14 +682,9 @@ RUN pip3 install --no-cache-dir --break-system-packages boto3 google-cloud-asset
 COPY --from=focus-etl /usr/local/bin/duckdb /usr/local/bin/duckdb
 COPY --from=focus-etl /usr/local/share/duckdb/extensions /usr/local/share/duckdb/extensions
 COPY --from=focus-etl --chown=${USERNAME}:${USERNAME} /usr/local/bin/load-focus-billing /usr/local/bin/load-focus-billing
-# The client and the Stategraph console: enterprise only (OSS users run the
-# same client, and the OSS edition ships no console for now).
+# The client: enterprise only until code/src/sgc is public (#3169). OSS users
+# run the same client.
 COPY --from=stategraph-dev /tmp/mono/_build/default/code/src/sgc/sgc.exe /usr/local/bin/stategraph
-# From _build, not the source tree: the Next.js export is now a dune directory
-# target (code/src/hermes/dune), so it travels with _build and survives the
-# /dune-cache restore. Taking it from the source tree relied on a stale out/
-# left behind by a previous build, which does not exist on a clean checkout.
-COPY --from=stategraph-dev /tmp/mono/_build/default/code/src/hermes/ui-export/ /usr/local/share/stategraph/ui/
 COPY --from=stategraph-dev /tmp/mono/_build/default/code/src/sgs_cli/sgs_cli.exe /usr/local/bin/stategraph-server
 COPY --from=stategraph-dev --chown=${USERNAME}:${USERNAME} --chmod=755 /tmp/mono/code/src/sg_gap_analysis/sg-gap-analysis /usr/local/bin/sg-gap-analysis
 COPY --from=stategraph-dev --chown=${USERNAME}:${USERNAME} --chmod=755 /tmp/mono/code/src/sg_tofu_import/sg-tofu-import /usr/local/bin/sg-tofu-import
