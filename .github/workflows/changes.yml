@@ -1,0 +1,49 @@
+name: changes
+
+# Reusable path filter for pull-request workflows
+#
+# Required status checks and `paths-ignore` do not mix: when a workflow is
+# skipped by a path filter its checks are never created, so a required check
+# stays pending and the PR can never merge.
+#
+# So the callers always run, and their expensive jobs opt out with
+# `if: needs.changes.outputs.code == 'true'` instead. A job skipped by `if:`
+# still reports a check run, with conclusion "skipped", which satisfies a
+# required status check.
+#
+# Callers must grant `contents: read` and `pull-requests: read`.
+
+on:
+  workflow_call:
+    outputs:
+      code:
+        description: "'true' when the pull request changes anything outside docs/, or when the caller is not a pull_request"
+        value: ${{ jobs.filter.outputs.code }}
+
+jobs:
+  filter:
+    runs-on: ubuntu-22.04
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - name: Determine whether anything outside docs/ changed
+        id: filter
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # Anything that is not a pull_request (e.g. workflow_dispatch) always builds.
+          if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" --jq '.[].filename')
+          if printf '%s\n' "$files" | grep -qv '^docs/'; then
+            echo "Non-docs changes present; running the build."
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Only docs/ changed; skipping the build."
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi

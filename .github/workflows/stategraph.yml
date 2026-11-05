@@ -1,10 +1,21 @@
 name: stategraph
 
 on:
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
+  changes:
+    uses: ./.github/workflows/changes.yml
+    permissions:
+      contents: read
+      pull-requests: read
+
   build-server-oss:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -13,6 +24,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # The default docker driver cannot export to the GHA cache.
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Same key as release.yml (the ISO week), so this build reuses the
+      # release's cached `apk upgrade` layer from the same week.
+      - name: Set the OS refresh key
+        run: |
+          echo "OS_REFRESH=$(date -u +%G-W%V)" >> "$GITHUB_ENV"
+
+      # Keep the build-args in sync with the build-stategraph job in release.yml,
+      # which publishes this image. Releases from main write the amd64 cache scope
+      # read here.
       - name: Build the OSS server image
         uses: docker/build-push-action@v6
         with:
@@ -24,4 +48,7 @@ jobs:
             GID=1000
             USERNAME=stategraph
             DEPLOYMENT_KIND=production
+            OS_REFRESH=${{ env.OS_REFRESH }}
+          cache-from: type=gha,scope=stategraph-server-oss
+          cache-to: type=gha,mode=max,scope=stategraph-server-oss
           push: false
