@@ -281,8 +281,7 @@ module S = struct
         match (apply_success, active, plan_success) with
         | Some true, _, _ -> St.Applied
         | Some false, _, _ -> St.Failed
-        | None, true, Some _ -> in_flight
-        | None, true, None -> if aborted then St.Failed else in_flight
+        | None, true, _ -> in_flight
         (* Nothing in flight and no plan either: the dirspace belongs to the pull request and nothing
        has run for it -- the state a run-start publish leaves every dirspace the run does not
        cover in. *)
@@ -567,6 +566,8 @@ module S = struct
 end
 
 module Publisher = Unified.Make (S)
+
+let status_of_row = S.status_of_row
 
 let mark_dirty ~request_id ~output_details db work_manifest_id =
   let open Abb.Future.Infix_monad in

@@ -52,6 +52,20 @@ let run_payload ?visible_on () =
     :: ("cmd", `List [ `String "echo" ])
     :: CCOption.map_or ~default:[] (fun v -> [ ("visible_on", `String v) ]) visible_on)
 
+module St = Terrat_vcs_comment_unified.Status
+
+let status ~active ~active_apply ~aborted () =
+  Terrat_vcs_github_comment_unified.status_of_row
+    ~plan_success:None
+    ~apply_success:None
+    ~active
+    ~active_apply
+    ~aborted
+    ~summary_state:None
+
+let assert_status ~expected actual =
+  Oth.Assert.Eq.string ~expected:(St.show expected) ~actual:(St.show actual)
+
 let test =
   Oth.parallel
     [
@@ -145,6 +159,22 @@ let test =
           in
           Oth.Assert.Eq.string ~expected:"HELLO" ~actual:(field ~name:"text" s);
           ());
+      Oth.test ~name:"a plan in flight shows as running over an aborted plan" (fun _ ->
+          assert_status
+            ~expected:St.Plan_running
+            (status ~active:true ~active_apply:false ~aborted:true ()));
+      Oth.test ~name:"an apply in flight shows as running over an aborted run" (fun _ ->
+          assert_status
+            ~expected:St.Apply_running
+            (status ~active:true ~active_apply:true ~aborted:true ()));
+      Oth.test ~name:"an aborted run with nothing in flight and no result shows as failed" (fun _ ->
+          assert_status
+            ~expected:St.Failed
+            (status ~active:false ~active_apply:false ~aborted:true ()));
+      Oth.test ~name:"a dirspace with no run shows as pending" (fun _ ->
+          assert_status
+            ~expected:St.Pending
+            (status ~active:false ~active_apply:false ~aborted:false ()));
     ]
 
 let () = Oth.run ~file:__FILE__ ~setup:(fun () -> Ok ()) ~teardown:(fun _ -> ()) (fun _ -> test)

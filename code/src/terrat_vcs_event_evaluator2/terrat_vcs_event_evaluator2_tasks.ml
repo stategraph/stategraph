@@ -3499,16 +3499,28 @@ struct
               (S.Api.Ref.to_string branch_name));
         store_disabled_drift_schedule s repo branch_name
       in
-      let eval_push_destination_gate s repo branch_name repo_config default_branch =
-        let drift = V1.drift repo_config in
+      (* [destination_branches] is a default-branch override that the raw
+         fetch already applies.  The built configuration can dispatch runner
+         work, so it is read only for a branch the gate admits. *)
+      let eval_push_destination_gate
+          s
+          repo
+          branch_name
+          repo_config_raw
+          default_branch
+          ~fetch_repo_config =
+        let open Irm in
         let valid_branches =
-          match V1.destination_branches repo_config with
+          match V1.destination_branches repo_config_raw with
           | [] -> [ Ds.make ~branch:(S.Api.Ref.to_string default_branch) () ]
           | ds -> ds
         in
         let pushed = CCString.lowercase_ascii (S.Api.Ref.to_string branch_name) in
         match eval_destination_branch_match pushed pushed valid_branches with
         | Ok () ->
+            fetch_repo_config ()
+            >>= fun repo_config ->
+            let drift = V1.drift repo_config in
             let () = log_drift_schedule_updates s repo drift in
             store_drift_schedule s repo branch_name drift
         | Error (`No_matching_dest_branch | `No_matching_source_branch) ->
@@ -3546,9 +3558,15 @@ struct
                 >>= function
                 | None -> eval_push_dead_branch s repo branch_name
                 | Some _ ->
-                    fetch Keys.repo_config
-                    >>= fun repo_config ->
-                    eval_push_destination_gate s repo branch_name repo_config default_branch)
+                    fetch Keys.repo_config_raw'
+                    >>= fun (_, repo_config_raw) ->
+                    eval_push_destination_gate
+                      s
+                      repo
+                      branch_name
+                      repo_config_raw
+                      default_branch
+                      ~fetch_repo_config:(fun () -> fetch Keys.repo_config))
           in
           fetch Keys.job >>= fun job -> H.complete_job s job @@ run)
 

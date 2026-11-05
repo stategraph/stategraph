@@ -8,6 +8,18 @@
     (posting a new one if it disappeared), and clears the dirty counter it observed. If new results
     arrived while publishing, the counter no longer matches and it retries. *)
 
+(** The state of one dirspace in the comment. [active] is a run of the dirspace in flight on the
+    head, [aborted] an aborted run of it on the head without results, and [summary_state] the state
+    stored for the head. A run in flight decides the state over any aborted run. *)
+val status_of_row :
+  plan_success:bool option ->
+  apply_success:bool option ->
+  active:bool ->
+  active_apply:bool ->
+  aborted:bool ->
+  summary_state:string option ->
+  Terrat_vcs_comment_unified.Status.t
+
 val mark_dirty :
   request_id:string ->
   output_details:bool ->
