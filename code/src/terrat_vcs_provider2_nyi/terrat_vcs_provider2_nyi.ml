@@ -85,6 +85,7 @@ module Db = struct
       ~base_ref
       ~branch_ref
       ~stategraph_parallel_apply_dirspaces:_
+      ~stategraph_moments:_
       db
       pull_request
       dirspaces =
@@ -119,7 +120,8 @@ module Db = struct
       db
       pull_request
       dirspaces
-      ~stategraph_parallel_apply_dirspaces:_ =
+      ~stategraph_parallel_apply_dirspaces:_
+      ~stategraph_moments:_ =
     raise (Failure "nyi")
 
   let query_parallel_apply_transactions ~request_id db pull_request dirspaces =

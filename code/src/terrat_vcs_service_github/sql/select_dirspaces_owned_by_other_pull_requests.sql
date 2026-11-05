@@ -14,11 +14,9 @@
 -- select_recent_plan.sql) opened its transaction before that apply committed: Stategraph then
 -- settles any overlap.  A failed apply blocks no one.
 --
--- The runner reports both moments in the 'tx' key of the stategraph/plan and stategraph/apply step
--- payloads, the {"id", "state", "created_at", "completed_at"} of the Stategraph transaction.
--- Without them (an older runner, a plan with no changes) the work manifests stand in: a plan
--- completes at or after its transaction opened, and an apply is dispatched before it commits, so
--- the answer stays safe.
+-- The moments come from Stategraph, read by the orchestration where it reaches it ($planned_at,
+-- $committed_at).  Without them the runs stand in: a plan completes at or after its transaction
+-- opened, and an apply is dispatched before it commits, so the answer stays safe.
 with
 our_pr as (
     select repository, pull_number, base_branch
@@ -30,6 +28,18 @@ dirspaces as (
 ),
 parallel_dirspaces as (
     select dir, workspace from unnest($parallel_dirs, $parallel_workspaces) as v(dir, workspace)
+),
+-- The moments the orchestration read from Stategraph, where it reaches it: when the transaction
+-- of our latest plan of a dirspace opened, and when the transaction an apply commits completed,
+-- by the apply's work manifest.  The runs bound a moment that is absent: a plan completes at or
+-- after its transaction opened, and an apply is dispatched before it commits.
+planned as (
+    select dir, workspace, at
+    from unnest($planned_dirs, $planned_workspaces, $planned_at) as v(dir, workspace, at)
+),
+committed as (
+    select work_manifest, at
+    from unnest($committed_work_manifests, $committed_at) as v(work_manifest, at)
 ),
 locks as (
     select
@@ -55,7 +65,7 @@ our_plans as (
     select distinct on (pds.dir, pds.workspace)
         pds.dir as dir,
         pds.workspace as workspace,
-        coalesce((plan_step.payload->'tx'->>'created_at')::timestamptz, gwm.completed_at) as planned_at
+        coalesce(planned.at, gwm.completed_at) as planned_at
     from parallel_dirspaces as pds
     inner join work_manifest_results as wmr
         on wmr.path = pds.dir and wmr.workspace = pds.workspace
@@ -63,12 +73,8 @@ our_plans as (
         on gwm.id = wmr.work_manifest
     inner join our_pr
         on our_pr.repository = gwm.repository and our_pr.pull_number = gwm.pull_number
-    left join workflow_step_outputs as plan_step
-        on plan_step.work_manifest = gwm.id
-           and plan_step.step = 'stategraph/plan'
-           and plan_step.scope->>'type' = 'dirspace'
-           and plan_step.scope->>'dir' = pds.dir
-           and plan_step.scope->>'workspace' = pds.workspace
+    left join planned
+        on planned.dir = pds.dir and planned.workspace = pds.workspace
     where gwm.run_type in ('autoplan', 'plan') and gwm.completed_at is not null
     order by pds.dir, pds.workspace, gwm.created_at desc
 ),
@@ -98,14 +104,10 @@ applies as (
         on unlocks.repository = gwm.repository and unlocks.pull_number = gwm.pull_number
     left join work_manifest_results as wmr
         on wmr.work_manifest = gwm.id and wmr.path = pds.dir and wmr.workspace = pds.workspace
-    left join workflow_step_outputs as apply_step
-        on apply_step.work_manifest = gwm.id
-           and apply_step.step = 'stategraph/apply'
-           and apply_step.scope->>'type' = 'dirspace'
-           and apply_step.scope->>'dir' = pds.dir
-           and apply_step.scope->>'workspace' = pds.workspace
     left join our_plans
         on our_plans.dir = pds.dir and our_plans.workspace = pds.workspace
+    left join committed
+        on committed.work_manifest = gwm.id
     where gwm.pull_number <> our_pr.pull_number
           and gwm.run_type in ('autoapply', 'apply', 'unsafe-apply')
           and gpr.merged_at is null
@@ -113,13 +115,11 @@ applies as (
                or our_pr.base_branch = gpr.base_branch)
           and (unlocks.unlocked_at is null or unlocks.unlocked_at < gwm.created_at)
           and (gwm.state = 'running' or (gwm.state = 'completed' and wmr.success))
--- A running apply has no result yet, so its dispatch time bounds from below when
--- it could have committed.  A work manifest dispatched before the column
+-- Without the commit moment, the dispatch time of the apply bounds from below
+-- when it could have committed.  A work manifest dispatched before the column
 -- existed falls back to its creation, which is earlier still.
           and (our_plans.planned_at is null
-               or our_plans.planned_at >= coalesce((apply_step.payload->'tx'->>'completed_at')::timestamptz,
-                                                   core.dispatched_at,
-                                                   gwm.created_at))
+               or our_plans.planned_at >= coalesce(committed.at, core.dispatched_at, gwm.created_at))
 )
 select
     blockers.path as path,

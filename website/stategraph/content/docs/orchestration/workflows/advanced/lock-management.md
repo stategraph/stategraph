@@ -84,7 +84,7 @@ One rule still applies. Stategraph settles an overlap only between a transaction
 2. Jane's pull request applies. John's pull request can still apply, during or after Jane's apply: his plan's transaction opened before hers committed, so Stategraph checks the two for an overlap. If they change the same resource, his apply is refused before it starts or rejected at commit, and he plans again.
 3. If John plans after Jane's apply committed, his apply is refused until Jane's pull request merges.
 
-The runner reports the transaction of each plan and apply to Orchestration. Without that report, from an older runner, Orchestration compares the times of the runs themselves instead. That is safe, but it refuses more often: a plan that overlapped another pull request's apply in time then counts as made after it.
+Orchestration reads the transaction of a plan from the plan itself, as the Stategraph engine stores it, and an apply commits the transaction of the plan it applies. For the moments a plan opened and an apply committed, Orchestration compares the times of the runs themselves. That is safe, but it refuses more often than the transactions' own moments would: a plan that overlapped another pull request's apply in time counts as made after it.
 
 A failed apply does not block other pull requests.
 

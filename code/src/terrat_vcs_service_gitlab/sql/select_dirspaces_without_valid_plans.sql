@@ -5,25 +5,33 @@ dirspaces as (
 parallel_dirspaces as (
     select path, workspace from unnest($parallel_dirs, $parallel_workspaces) as v(path, workspace)
 ),
+-- The moments the orchestration read from Stategraph, where it reaches it: when the transaction
+-- of our latest plan of a dirspace opened, and when the transaction an apply commits completed,
+-- by the apply's work manifest.  The runs bound a moment that is absent: a plan completes at or
+-- after its transaction opened, and an apply is dispatched before it commits.
+planned as (
+    select path, workspace, at
+    from unnest($planned_dirs, $planned_workspaces, $planned_at) as v(path, workspace, at)
+),
+committed as (
+    select work_manifest, at
+    from unnest($committed_work_manifests, $committed_at) as v(work_manifest, at)
+),
 -- When the Stategraph transaction of our latest completed plan of a parallel
--- dirspace opened, as the runner reported it in the 'tx' key of the
--- stategraph/plan step payload.  Null without the report.
-our_plan_txs as (
+-- dirspace opened or, without the moment, when that plan completed: the
+-- transaction opened during the run, so the run bounds the moment from above.
+our_plans as (
     select distinct on (pds.path, pds.workspace)
         pds.path,
         pds.workspace,
-        (plan_step.payload->'tx'->>'created_at')::timestamptz as tx_created_at
+        coalesce(planned.at, gwm.completed_at) as planned_at
     from parallel_dirspaces as pds
     inner join work_manifest_results as wmr
         on wmr.path = pds.path and wmr.workspace = pds.workspace
     inner join gitlab_work_manifests as gwm
         on gwm.id = wmr.work_manifest
-    left join workflow_step_outputs as plan_step
-        on plan_step.work_manifest = gwm.id
-           and plan_step.step = 'stategraph/plan'
-           and plan_step.scope->>'type' = 'dirspace'
-           and plan_step.scope->>'dir' = pds.path
-           and plan_step.scope->>'workspace' = pds.workspace
+    left join planned
+        on planned.path = pds.path and planned.workspace = pds.workspace
     where gwm.repository = $repository
           and gwm.pull_number = $pull_number
           and gwm.run_type in ('autoplan', 'plan')
@@ -72,6 +80,11 @@ latest_dirspace_work_manifests as (
         on wmr.path = ds.path and wmr.workspace = ds.workspace
     inner join gitlab_work_manifests as gwm
         on wmr.work_manifest = gwm.id
+-- The view does not carry the dispatch time, thus it comes from work_manifests.
+    inner join work_manifests as core
+        on core.id = gwm.id
+    left join committed
+        on committed.work_manifest = gwm.id
     left join gitlab_pull_requests as gpr
         on gpr.repository = gwm.repository and gpr.pull_number = gwm.pull_number
     left join latest_pull_request_merged_sha as lprms
@@ -82,28 +95,25 @@ latest_dirspace_work_manifests as (
           and (gwm.pull_number is not distinct from $pull_number
                or gwm.run_type in ('autoapply', 'apply')
                or gpr.merged_at is not null)
--- On a parallel dirspace, another pull request's eligible apply whose
--- transaction committed after our latest plan's transaction opened does not
--- invalidate that plan: Stategraph checks the two for an overlap when the plan
--- is applied.  Both moments come from the 'tx' key the runner reports in the
--- step payloads; without them the apply invalidates the plan, as it always has.
--- A merged pull request invalidates it regardless: the plan then lags behind
--- the base branch.
+-- On a parallel dirspace, another pull request's eligible apply that committed
+-- its Stategraph transaction after our latest plan's transaction opened does
+-- not invalidate that plan: Stategraph checks the two for an overlap when the
+-- plan is applied.  The moments come from Stategraph, read by the orchestration
+-- where it reaches it; without them the runs stand in: our transaction opened
+-- before our plan's run completed, and the apply committed after its run was
+-- dispatched (or, for a run dispatched before the column existed, after it was
+-- created).  An apply that may have committed before our transaction opened
+-- invalidates the plan, as it always has.  A merged pull request invalidates it
+-- regardless: the plan then lags behind the base branch.
           and not (gwm.pull_number is distinct from $pull_number
                    and gpr.merged_at is null
                    and gwm.run_type in ('autoapply', 'apply')
                    and exists (select 1
-                               from workflow_step_outputs as apply_step
-                               inner join our_plan_txs
-                                   on our_plan_txs.path = wmr.path
-                                      and our_plan_txs.workspace = wmr.workspace
-                               where apply_step.work_manifest = gwm.id
-                                     and apply_step.step = 'stategraph/apply'
-                                     and apply_step.scope->>'type' = 'dirspace'
-                                     and apply_step.scope->>'dir' = wmr.path
-                                     and apply_step.scope->>'workspace' = wmr.workspace
-                                     and (apply_step.payload->'tx'->>'completed_at')::timestamptz
-                                         > our_plan_txs.tx_created_at))
+                               from our_plans
+                               where our_plans.path = wmr.path
+                                     and our_plans.workspace = wmr.workspace
+                                     and coalesce(committed.at, core.dispatched_at, gwm.created_at)
+                                         > our_plans.planned_at))
 -- A work manifest affects the base branch when it runs or, for a merged pull
 -- request, when it is merged.  Rank by whichever happened later so that an
 -- overlapping dirspace applied or merged by another pull request after this

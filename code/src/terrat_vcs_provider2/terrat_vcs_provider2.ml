@@ -195,8 +195,62 @@ module Conflicting_work_manifests = struct
     | Maybe_stale of 'a list
 end
 
+(** The Stategraph transaction a stored plan names. A plan of the Stategraph engine is the file
+    [stategraph tf plan --out] writes ({!Sg_plan_file}), whose transaction is the one the plan
+    opened and an apply commits; the runner stores it as it is, base64 in the [data] of the
+    [terrateam] storage method, and the orchestration reads the transaction back out of its own
+    copy. *)
+module Stategraph_plan = struct
+  (* The envelope the runner stores a plan in. It has no type of its own anywhere else: the runner
+     writes it, the server keeps it opaque, and the cleanup of old plans reads it in SQL. *)
+  module Envelope = struct
+    type t = {
+      data : string;
+      method_ : string; [@key "method"]
+    }
+    [@@deriving of_yojson { strict = false }]
+  end
+
+  let json_of_string s = try Some (Yojson.Safe.from_string s) with Yojson.Json_error _ -> None
+
+  (* Postgres wraps the base64 it encodes at 76 columns, and the decoder rejects a line break. *)
+  let decode s =
+    CCResult.to_opt (Base64.decode (CCString.filter (fun c -> c <> '\n' && c <> '\r') s))
+
+  (* [data] is the stored plan as the provider serves it, base64. A plan stored any other way, or
+     a file of another engine, names no transaction. *)
+  let tx_id data =
+    let open CCOption.Infix in
+    decode data
+    >>= json_of_string
+    >>= CCFun.(Envelope.of_yojson %> CCResult.to_opt)
+    >>= function
+    | { Envelope.method_ = "terrateam"; data } ->
+        decode data
+        >>= json_of_string
+        >>= CCFun.(Sg_plan_file.of_yojson %> CCResult.to_opt)
+        >>= Sg_plan_file.tx_id
+    | _ -> None
+end
+
+(** The moments the orchestration read from Stategraph, where it reaches it, for the two rules that
+    order a plan against another pull request's apply on a dirspace that applies in parallel: when
+    the transaction of our latest plan of a dirspace opened, and when the transaction an apply
+    commits completed, by the apply's work manifest. The rules bound a moment the orchestration did
+    not read by the run itself: a plan completes after its transaction opened, and an apply is
+    dispatched before it commits. *)
+module Stategraph_moments = struct
+  type t = {
+    planned_at : (Terrat_change.Dirspace.t * string) list;
+    committed_at : (Uuidm.t * string) list;
+  }
+
+  let empty = { planned_at = []; committed_at = [] }
+end
+
 (** The Stategraph transaction of our latest plan of a dirspace that applies in parallel, beside the
-    transaction of an apply of another pull request on it, when there is one. *)
+    transaction of an apply of another pull request on it, when there is one: the transactions the
+    stored plans name ({!Stategraph_plan}). *)
 module Parallel_apply_tx = struct
   module Other = struct
     (** Where the other apply stands. A failed apply is not an [Other]: it stands against nothing.
@@ -217,7 +271,8 @@ module Parallel_apply_tx = struct
 
     type t = {
       pull_number : int;
-      tx : string;  (** The transaction of the other pull request's apply. *)
+      work_manifest : Uuidm.t;  (** The apply. *)
+      tx : Uuidm.t;  (** The transaction of the other pull request's apply. *)
       state : State.t;
     }
     [@@deriving show]
@@ -226,7 +281,7 @@ module Parallel_apply_tx = struct
   type t = {
     dirspace : Terrat_change.Dirspace.t;
     installation : Uuidm.t;  (** The core id of the installation the repository belongs to. *)
-    tx : string;  (** The transaction of our plan. *)
+    tx : Uuidm.t;  (** The transaction of our plan. *)
     other : Other.t option;
   }
   [@@deriving show]
@@ -992,6 +1047,7 @@ module type Shared = sig
       base_ref:Api.Ref.t ->
       branch_ref:Api.Ref.t ->
       stategraph_parallel_apply_dirspaces:Terrat_change.Dirspace.t list ->
+      stategraph_moments:Stategraph_moments.t ->
       t ->
       'diff Api.Pull_request.t ->
       Terrat_change.Dirspace.t list ->
@@ -1073,6 +1129,7 @@ module type Shared = sig
       'diff Api.Pull_request.t ->
       Terrat_change.Dirspace.t list ->
       stategraph_parallel_apply_dirspaces:Terrat_change.Dirspace.t list ->
+      stategraph_moments:Stategraph_moments.t ->
       ((Terrat_change.Dirspace.t * unit Api.Pull_request.t) list, [> `Error ]) result Abb.Future.t
 
     (** For each of [dirspaces], which apply in parallel, the transaction of the pull request's
