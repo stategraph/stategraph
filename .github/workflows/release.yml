@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+    # A semver tag marks the commit that holds a Stategraph release. It builds
+    # stategraph-server-oss with that version, and nothing else.
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
     paths-ignore:
       - 'docs/**'
       - 'rfds/**'
@@ -22,6 +26,7 @@ jobs:
   # nothing user-facing is just noise in the feed people subscribe to. When every PR since the
   # last release is labelled `no-release`, this job stops here.
   release-gate:
+    if: github.ref_type == 'branch'
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -179,6 +184,7 @@ jobs:
   # terrat jobs; because this job publishes to this repo's package (not terrateamio).
   build-stategraph:
     needs: set-version-tag
+    if: ${{ !cancelled() && (needs.set-version-tag.result == 'success' || github.ref_type == 'tag') }}
     runs-on: ${{ matrix.runs-on }}
 
     strategy:
@@ -194,8 +200,8 @@ jobs:
             cache-scope: stategraph-server-oss-arm64
 
     env:
-      VERSION_TAG: ${{ needs.set-version-tag.outputs.version_tag }}
-      IMAGE: ghcr.io/stategraph/stategraph-server-oss:${{ needs.set-version-tag.outputs.version_tag }}-${{ matrix.arch }}
+      VERSION_TAG: ${{ github.ref_type == 'tag' && github.ref_name || needs.set-version-tag.outputs.version_tag }}
+      IMAGE: ghcr.io/stategraph/stategraph-server-oss:${{ github.ref_type == 'tag' && github.ref_name || needs.set-version-tag.outputs.version_tag }}-${{ matrix.arch }}
 
     permissions:
       contents: read
@@ -204,6 +210,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set the release version in source
+        if: github.ref_type == 'tag'
+        run: |
+          echo "${VERSION_TAG}" > code/src/sg_version/data/version.txt
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -242,7 +253,12 @@ jobs:
         run: |
           set -euo pipefail
           docker pull -q "$IMAGE"
-          docker run --rm --entrypoint /usr/local/bin/stategraph-server "$IMAGE" version
+          version=$(docker run --rm --entrypoint /usr/local/bin/stategraph-server "$IMAGE" version)
+          echo "${version}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${version}" != "${VERSION_TAG}" ]]; then
+            echo "The server reports ${version}, not the release ${VERSION_TAG}" >&2
+            exit 1
+          fi
 
   # The FIPS image is built from docker/terrat/Dockerfile.fips, which carries no
   # prebuilt base image, so this job compiles OpenSSL and the opam switch
@@ -407,9 +423,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # `latest` of stategraph-server-oss follows the semver releases only:
+      # publish-stategraph-release moves it.
       - name: Create and push multi-arch manifest (stategraph)
         run: |
-          ./scripts/create_manifest --org stategraph stategraph-server-oss
+          IS_LATEST_VERSION_TAG=false ./scripts/create_manifest --org stategraph stategraph-server-oss
 
   # Runs after both builds and their checks, so an image that fails them
   # carries no signature. The version tag and `latest` share a digest, so
@@ -472,6 +490,85 @@ jobs:
           cosign sign --yes --recursive "${IMAGE_REF}@${DIGEST}"
           PLATFORMS=$(jq -r '.manifests[]?.digest' "${RUNNER_TEMP}/manifest.json")
           for REF in ${PLATFORMS:-${DIGEST}}; do
+            "${SYFT}" scan "registry:${IMAGE_REF}@${REF}" -o "spdx-json=${RUNNER_TEMP}/sbom.spdx.json"
+            cosign attest --yes --type spdxjson \
+              --predicate "${RUNNER_TEMP}/sbom.spdx.json" "${IMAGE_REF}@${REF}"
+          done
+
+  publish-stategraph-release:
+    needs: build-stategraph
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-22.04
+
+    permissions:
+      contents: read
+      packages: write
+      # cosign exchanges this token for a Fulcio signing certificate.
+      id-token: write
+
+    env:
+      VERSION_TAG: ${{ github.ref_name }}
+      IMAGE_REF: ghcr.io/stategraph/stategraph-server-oss
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push the multi-arch manifest
+        run: |
+          docker buildx imagetools create \
+            --tag "${IMAGE_REF}:${VERSION_TAG}" \
+            "${IMAGE_REF}:${VERSION_TAG}-amd64" \
+            "${IMAGE_REF}:${VERSION_TAG}-arm64"
+
+      # Only the highest release moves `latest`, so a patch to an older line
+      # does not take it back.
+      - name: Move latest
+        run: |
+          set -euo pipefail
+          highest=$(git ls-remote --tags origin \
+            | sed -nE 's#.*refs/tags/([0-9]+\.[0-9]+\.[0-9]+)$#\1#p' \
+            | sort -V | tail -n1)
+          if [[ "${highest}" == "${VERSION_TAG}" ]]; then
+            docker buildx imagetools create --tag "${IMAGE_REF}:latest" "${IMAGE_REF}:${VERSION_TAG}"
+          else
+            echo "${VERSION_TAG} is not the highest release (${highest}); latest stays"
+          fi
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v4.1.2
+        with:
+          cosign-release: v3.1.3
+
+      - name: Install syft
+        id: syft
+        uses: anchore/sbom-action/download-syft@v0.24.3
+        with:
+          syft-version: v1.54.1
+
+      - name: Sign stategraph-server-oss and attest its SBOMs
+        env:
+          SYFT: ${{ steps.syft.outputs.cmd }}
+          # Package-to-file relationships make up most of the SPDX document;
+          # without them the envelope stays well under Rekor v2's 4 MB request
+          # limit.
+          SYFT_RELATIONSHIPS_PACKAGE_FILE_OWNERSHIP: "false"
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "${IMAGE_REF}:${VERSION_TAG}" --format '{{json .Manifest}}' > "${RUNNER_TEMP}/manifest.json"
+          DIGEST=$(jq -r .digest "${RUNNER_TEMP}/manifest.json")
+          cosign sign --yes --recursive "${IMAGE_REF}@${DIGEST}"
+          for REF in $(jq -r '.manifests[].digest' "${RUNNER_TEMP}/manifest.json"); do
             "${SYFT}" scan "registry:${IMAGE_REF}@${REF}" -o "spdx-json=${RUNNER_TEMP}/sbom.spdx.json"
             cosign attest --yes --type spdxjson \
               --predicate "${RUNNER_TEMP}/sbom.spdx.json" "${IMAGE_REF}@${REF}"
