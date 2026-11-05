@@ -33,7 +33,9 @@ let plan_step ?success () =
        ])
 
 let assert_summary = Oth.Assert.eq ~eq:Rs.equal ~pp:Rs.pp
-let summary created updated replaced deleted = { Rs.created; updated; replaced; deleted }
+
+let summary ?(imported = None) created updated replaced deleted =
+  { Rs.created; deleted; imported; replaced; updated }
 
 (* [describe] without a summary returns the description unchanged; with one it
    appends the four counts, "-" for unreported ones, clipped at 140 chars. *)
@@ -49,6 +51,25 @@ let test_describe_full_summary =
         ~actual:
           (Rs.describe
              ~resource_summary:(summary (Some 1) (Some 0) (Some 0) (Some 0))
+             ~description:"Completed"
+             ());
+      ())
+
+(* The import count leads the counts only when it is above zero. *)
+let test_describe_imports =
+  Oth.test ~name:"describe_imports" (fun _ ->
+      Oth.Assert.Eq.string
+        ~expected:"Completed · 2 import, 1 create, 0 update, 0 replace, 0 delete"
+        ~actual:
+          (Rs.describe
+             ~resource_summary:(summary ~imported:(Some 2) (Some 1) (Some 0) (Some 0) (Some 0))
+             ~description:"Completed"
+             ());
+      Oth.Assert.Eq.string
+        ~expected:"Completed · 1 create, 0 update, 0 replace, 0 delete"
+        ~actual:
+          (Rs.describe
+             ~resource_summary:(summary ~imported:(Some 0) (Some 1) (Some 0) (Some 0) (Some 0))
              ~description:"Completed"
              ());
       ())
@@ -118,6 +139,49 @@ let test_of_steps_empty_summary_absent =
   Oth.test ~name:"of_steps_empty_summary_absent" (fun _ ->
       let s = step ~step_name:"tf/plan" (`Assoc [ ("has_changes", `Bool true) ]) in
       Oth.Assert.none_pp ~pp:Rs.pp (Rs.of_steps [ s ]);
+      ())
+
+let test_of_steps_imported =
+  Oth.test ~name:"of_steps_imported" (fun _ ->
+      let plan_step counts =
+        step
+          ~step_name:"tf/plan"
+          (`Assoc [ ("has_changes", `Bool true); ("resource_summary", `Assoc counts) ])
+      in
+      assert_summary
+        (summary ~imported:(Some 3) (Some 0) (Some 1) (Some 0) (Some 0))
+        (Oth.Assert.some
+           (Rs.of_steps
+              [
+                plan_step
+                  [
+                    ("created", `Int 0);
+                    ("updated", `Int 1);
+                    ("replaced", `Int 0);
+                    ("deleted", `Int 0);
+                    ("imported", `Int 3);
+                  ];
+              ]));
+      (* An import count alone is a reported summary. *)
+      assert_summary
+        (summary ~imported:(Some 1) None None None None)
+        (Oth.Assert.some (Rs.of_steps [ plan_step [ ("imported", `Int 1) ] ]));
+      ())
+
+let test_total_sums_imported =
+  Oth.test ~name:"total_sums_imported" (fun _ ->
+      assert_summary
+        (summary ~imported:(Some 3) (Some 1) (Some 0) (Some 0) (Some 0))
+        (Rs.total
+           [
+             summary ~imported:(Some 2) (Some 1) (Some 0) (Some 0) (Some 0);
+             summary ~imported:(Some 1) None None None None;
+             Rs.none;
+           ]);
+      (* A run whose runner reports no import count totals it as 0, like every other slot. *)
+      assert_summary
+        (summary ~imported:(Some 0) (Some 1) (Some 0) (Some 0) (Some 0))
+        (Rs.total [ summary (Some 1) (Some 0) (Some 0) (Some 0) ]);
       ())
 
 module Ds = Terrat_vcs_provider2.Dirspace_summary
@@ -228,12 +292,15 @@ let test =
       test_dirspace_summary_of_string;
       test_describe_no_summary;
       test_describe_full_summary;
+      test_describe_imports;
       test_describe_partial_summary_dashes;
       test_describe_truncates_at_140;
       test_of_steps_plan_step;
       test_of_steps_ignores_non_plan_steps;
       test_of_steps_all_none_counts_treated_as_absent;
       test_of_steps_empty_summary_absent;
+      test_of_steps_imported;
+      test_total_sums_imported;
       test_work_manifest_unlock_ids_dedupes_pull_requests;
       test_work_manifest_unlock_ids_collapses_drift;
       test_work_manifest_unlock_ids_mixed_list;

@@ -15,9 +15,11 @@ export interface RunSummary {
   totals: ResourceSummary | null;
 }
 
-/** The four resource summary slots in the runner's order, each with the
- *  column label it renders under. */
+/** The resource summary slots in the PR comment table's column order, each
+ *  with the column label it renders under. `imported` counts resources the
+ *  plan imports, whatever their action. */
 export const RESOURCE_SUMMARY_SLOTS: ReadonlyArray<readonly [keyof ResourceSummary, string]> = [
+  ['imported', 'Import'],
   ['created', 'Create'],
   ['updated', 'Update'],
   ['replaced', 'Replace'],
@@ -70,12 +72,13 @@ export function runSummary(
       ? null
       : withCounts.reduce<ResourceSummary>(
           (acc, rs) => ({
+            imported: (acc.imported ?? 0) + (rs.imported ?? 0),
             created: (acc.created ?? 0) + (rs.created ?? 0),
             updated: (acc.updated ?? 0) + (rs.updated ?? 0),
             replaced: (acc.replaced ?? 0) + (rs.replaced ?? 0),
             deleted: (acc.deleted ?? 0) + (rs.deleted ?? 0),
           }),
-          { created: 0, updated: 0, replaced: 0, deleted: 0 }
+          { imported: 0, created: 0, updated: 0, replaced: 0, deleted: 0 }
         );
   return { rows, totals };
 }

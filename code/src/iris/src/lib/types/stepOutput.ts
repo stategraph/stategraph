@@ -14,6 +14,7 @@ import type { TerraformJsonPlan } from './terraform';
  *  optional and nullable, and the UI renders such a slot as `-` (the backend
  *  `count_str` convention). */
 export interface ResourceSummary {
+  imported?: number | null;
   created?: number | null;
   updated?: number | null;
   replaced?: number | null;

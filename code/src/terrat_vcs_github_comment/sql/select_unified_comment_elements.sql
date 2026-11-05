@@ -254,6 +254,7 @@ select
     (po.payload->'resource_summary'->>'updated')::bigint as updated,
     (po.payload->'resource_summary'->>'deleted')::bigint as deleted,
     (po.payload->'resource_summary'->>'replaced')::bigint as replaced,
+    (po.payload->'resource_summary'->>'imported')::bigint as imported,
     -- Inline output details: rendered only when the run's summary config enabled them
     -- (output_details.enabled); the renderer's tier/fit machinery bounds the size.
     coalesce(po.payload->>'plan', po.payload->>'text') as plan_output,

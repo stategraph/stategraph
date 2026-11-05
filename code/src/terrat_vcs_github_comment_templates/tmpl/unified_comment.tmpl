@@ -2,12 +2,12 @@
 
 **{{ num_dirspaces }} dirspace{{ 's' if num_dirspaces != 1 else '' }}** · {{ num_failed }} failed · {{ num_stale }} stale · {{ num_planned }} planned · {{ num_plan_running }} planning · {{ num_apply_running }} applying · {{ num_pending }} pending · {{ num_applied }} applied
 
-| Directory | Workspace | Status | Create | Update | Replace | Delete |
-| --- | --- | :---: | :---: | :---: | :---: | :---: |
+| Directory | Workspace | Status | Import | Create | Update | Replace | Delete |
+| --- | --- | :---: | :---: | :---: | :---: | :---: | :---: |
 {%- for d in dirspaces %}
-| {% if d.run_url %}[`{{ d.dir }}`]({{ d.run_url }}){% else %}`{{ d.dir }}`{% endif %} | `{{ d.workspace }}` | {{ d.status }} | {{ d.created }} | {{ d.updated }} | {{ d.replaced }} | {{ d.deleted }} |
+| {% if d.run_url %}[`{{ d.dir }}`]({{ d.run_url }}){% else %}`{{ d.dir }}`{% endif %} | `{{ d.workspace }}` | {{ d.status }} | {{ d.imported }} | {{ d.created }} | {{ d.updated }} | {{ d.replaced }} | {{ d.deleted }} |
 {%- endfor %}
-| **Total** | | | **{{ totals.created }}** | **{{ totals.updated }}** | **{{ totals.replaced }}** | **{{ totals.deleted }}** |
+| **Total** | | | **{{ totals.imported }}** | **{{ totals.created }}** | **{{ totals.updated }}** | **{{ totals.replaced }}** | **{{ totals.deleted }}** |
 {%- if truncated > 0 %}
 
 … {{ truncated }} more dirspace{{ 's' if truncated != 1 else '' }} not shown{% if console_url %} — see the [Stategraph Console]({{ console_url }}){% endif %}.

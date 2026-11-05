@@ -58,18 +58,20 @@ end
 (* Resource counts reported by the runner in the plan step's [resource_summary]
    payload, computed from `terraform show -json`.  When the runner or engine
    does not emit them the fields are None (rendered as "-") rather than
-   guessed. *)
+   guessed.  [imported] counts resources the plan imports, whatever their
+   action, so an import that also updates counts in [imported] and [updated]. *)
 module Resource_summary = struct
   type t = {
     created : int option;
     deleted : int option;
+    imported : int option;
     replaced : int option;
     updated : int option;
   }
   [@@deriving eq, show]
 
   (* Nothing reported, which every count renders as "-". *)
-  let none = { created = None; deleted = None; replaced = None; updated = None }
+  let none = { created = None; deleted = None; imported = None; replaced = None; updated = None }
 
   (* The plan steps whose payload may carry a [resource_summary]. *)
   let plan_steps = [ "tf/plan"; "pulumi/plan"; "custom/plan"; "fly/plan"; "stategraph/plan" ]
@@ -83,6 +85,7 @@ module Resource_summary = struct
       type t = {
         created : int option; [@default None]
         deleted : int option; [@default None]
+        imported : int option; [@default None]
         replaced : int option; [@default None]
         updated : int option; [@default None]
       }
@@ -98,9 +101,9 @@ module Resource_summary = struct
         | { O.step; payload; success = _; ignore_errors = _; scope = _ }
           when CCList.mem ~eq:CCString.equal step plan_steps -> (
             match P.of_yojson (O.Payload.to_yojson payload) with
-            | Ok { P.resource_summary = Some { Rs.created; deleted; replaced; updated } }
-              when CCList.exists CCOption.is_some [ created; deleted; replaced; updated ] ->
-                Some { created; deleted; replaced; updated }
+            | Ok { P.resource_summary = Some { Rs.created; deleted; imported; replaced; updated } }
+              when CCList.exists CCOption.is_some [ created; deleted; imported; replaced; updated ]
+              -> Some { created; deleted; imported; replaced; updated }
             | _ -> None)
         | _ -> None)
       steps
@@ -116,31 +119,36 @@ module Resource_summary = struct
       type t = {
         created : int;
         deleted : int;
+        imported : int;
         replaced : int;
         updated : int;
         reported : bool;
       }
     end in
     let add acc n = acc + CCOption.get_or ~default:0 n in
-    let { Acc.created; deleted; replaced; updated; reported } =
+    let { Acc.created; deleted; imported; replaced; updated; reported } =
       CCList.fold_left
-        (fun { Acc.created; deleted; replaced; updated; reported } s ->
+        (fun { Acc.created; deleted; imported; replaced; updated; reported } s ->
           {
             Acc.created = add created s.created;
             deleted = add deleted s.deleted;
+            imported = add imported s.imported;
             replaced = add replaced s.replaced;
             updated = add updated s.updated;
             reported =
               reported
-              || CCList.exists CCOption.is_some [ s.created; s.deleted; s.replaced; s.updated ];
+              || CCList.exists
+                   CCOption.is_some
+                   [ s.created; s.deleted; s.imported; s.replaced; s.updated ];
           })
-        { Acc.created = 0; deleted = 0; replaced = 0; updated = 0; reported = false }
+        { Acc.created = 0; deleted = 0; imported = 0; replaced = 0; updated = 0; reported = false }
         summaries
     in
     if reported then
       {
         created = Some created;
         deleted = Some deleted;
+        imported = Some imported;
         replaced = Some replaced;
         updated = Some updated;
       }
@@ -155,18 +163,26 @@ module Resource_summary = struct
     | None -> "-"
 
   (* [description] suffixed with the counts, e.g.
-      "Completed · 2 create, 1 update, 0 replace, 0 delete".  The count words
-      are present tense, like the comment table headers.  Without a
+      "Completed · 2 create, 1 update, 0 replace, 0 delete".  The import count
+      leads only when it is above zero, e.g.
+      "Completed · 1 import, 2 create, 1 update, 0 replace, 0 delete".  The
+      count words are present tense, like the comment table headers.  Without a
       summary the description is returned unchanged; clipped defensively at
       {!description_limit}. *)
   let describe ?resource_summary ~description () =
     match resource_summary with
     | None -> description
-    | Some { created; deleted; replaced; updated } ->
+    | Some { created; deleted; imported; replaced; updated } ->
+        let imports =
+          match imported with
+          | Some n when n > 0 -> Printf.sprintf "%d import, " n
+          | Some _ | None -> ""
+        in
         let text =
           Printf.sprintf
-            "%s · %s create, %s update, %s replace, %s delete"
+            "%s · %s%s create, %s update, %s replace, %s delete"
             description
+            imports
             (count_str created)
             (count_str updated)
             (count_str replaced)

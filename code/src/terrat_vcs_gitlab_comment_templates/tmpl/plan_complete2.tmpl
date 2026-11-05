@@ -53,12 +53,12 @@
 
 **{{ dirspaces | length }} dirspace{{ 's' if dirspaces | length != 1 else '' }}** · {{ changed | length }} with changes · {{ nochange | length }} no changes · {{ failed | length }} failed
 
-| Directory | Workspace | Result | Create | Update | Replace | Delete |
-| --- | --- | :---: | :---: | :---: | :---: | :---: |
+| Directory | Workspace | Result | Import | Create | Update | Replace | Delete |
+| --- | --- | :---: | :---: | :---: | :---: | :---: | :---: |
     {%- for d in dirspaces %}
-| `{{ d.dir }}` | `{{ d.workspace }}` | {% if d.success %}:white_check_mark:{% else %}:x:{% endif %} | {{ d.created }} | {{ d.updated }} | {{ d.replaced }} | {{ d.deleted }} |
+| `{{ d.dir }}` | `{{ d.workspace }}` | {% if d.success %}:white_check_mark:{% else %}:x:{% endif %} | {{ d.imported }} | {{ d.created }} | {{ d.updated }} | {{ d.replaced }} | {{ d.deleted }} |
     {%- endfor %}
-| **Total** | | | **{{ resource_totals.created }}** | **{{ resource_totals.updated }}** | **{{ resource_totals.replaced }}** | **{{ resource_totals.deleted }}** |
+| **Total** | | | **{{ resource_totals.imported }}** | **{{ resource_totals.created }}** | **{{ resource_totals.updated }}** | **{{ resource_totals.replaced }}** | **{{ resource_totals.deleted }}** |
 
   {%- endif %}
   {%- if account_status == 'trial_ending' %}
@@ -174,12 +174,12 @@ A gate is satisfied only when all conditions are met. See [documentation](https:
 
 **{{ dirspaces | length }} dirspace{{ 's' if dirspaces | length != 1 else '' }}** · {{ changed | length }} with changes · {{ nochange | length }} no changes · {{ failed | length }} failed
 
-| Directory | Workspace | Result | Create | Update | Replace | Delete |
-| --- | --- | :---: | :---: | :---: | :---: | :---: |
+| Directory | Workspace | Result | Import | Create | Update | Replace | Delete |
+| --- | --- | :---: | :---: | :---: | :---: | :---: | :---: |
     {%- for d in dirspaces %}
-| `{{ d.dir }}` | `{{ d.workspace }}` | {% if d.success %}:white_check_mark:{% else %}:x:{% endif %} | {{ d.created }} | {{ d.updated }} | {{ d.replaced }} | {{ d.deleted }} |
+| `{{ d.dir }}` | `{{ d.workspace }}` | {% if d.success %}:white_check_mark:{% else %}:x:{% endif %} | {{ d.imported }} | {{ d.created }} | {{ d.updated }} | {{ d.replaced }} | {{ d.deleted }} |
     {%- endfor %}
-| **Total** | | | **{{ resource_totals.created }}** | **{{ resource_totals.updated }}** | **{{ resource_totals.replaced }}** | **{{ resource_totals.deleted }}** |
+| **Total** | | | **{{ resource_totals.imported }}** | **{{ resource_totals.created }}** | **{{ resource_totals.updated }}** | **{{ resource_totals.replaced }}** | **{{ resource_totals.deleted }}** |
 
   {%- endif %}
   {%- if work_manifest_url is defined %}

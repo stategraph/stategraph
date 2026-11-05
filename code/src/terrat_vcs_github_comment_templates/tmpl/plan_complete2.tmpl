@@ -58,12 +58,12 @@
 
 **{{ counts }}**
 {% endif %}
-| Directory | Workspace | Result | Create | Update | Replace | Delete |
-| --- | --- | :---: | :---: | :---: | :---: | :---: |
+| Directory | Workspace | Result | Import | Create | Update | Replace | Delete |
+| --- | --- | :---: | :---: | :---: | :---: | :---: | :---: |
     {%- for d in dirspaces %}
-| `{{ d.dir }}` | `{{ d.workspace }}` | {% if d.applied is defined and d.applied %}Applied :white_check_mark:{% elif d.success %}:white_check_mark:{% else %}:x:{% endif %} | {{ d.created }} | {{ d.updated }} | {{ d.replaced }} | {{ d.deleted }} |
+| `{{ d.dir }}` | `{{ d.workspace }}` | {% if d.applied is defined and d.applied %}Applied :white_check_mark:{% elif d.success %}:white_check_mark:{% else %}:x:{% endif %} | {{ d.imported }} | {{ d.created }} | {{ d.updated }} | {{ d.replaced }} | {{ d.deleted }} |
     {%- endfor %}
-| **Total** | | | **{{ resource_totals.created }}** | **{{ resource_totals.updated }}** | **{{ resource_totals.replaced }}** | **{{ resource_totals.deleted }}** |
+| **Total** | | | **{{ resource_totals.imported }}** | **{{ resource_totals.created }}** | **{{ resource_totals.updated }}** | **{{ resource_totals.replaced }}** | **{{ resource_totals.deleted }}** |
 {%- if summary_unified %}
 
 </details>
@@ -188,12 +188,12 @@ A gate is satisfied only when all conditions are met. See [documentation](https:
 
 **{{ counts }}**
 {% endif %}
-| Directory | Workspace | Result | Create | Update | Replace | Delete |
-| --- | --- | :---: | :---: | :---: | :---: | :---: |
+| Directory | Workspace | Result | Import | Create | Update | Replace | Delete |
+| --- | --- | :---: | :---: | :---: | :---: | :---: | :---: |
     {%- for d in dirspaces %}
-| `{{ d.dir }}` | `{{ d.workspace }}` | {% if d.applied is defined and d.applied %}Applied :white_check_mark:{% elif d.success %}:white_check_mark:{% else %}:x:{% endif %} | {{ d.created }} | {{ d.updated }} | {{ d.replaced }} | {{ d.deleted }} |
+| `{{ d.dir }}` | `{{ d.workspace }}` | {% if d.applied is defined and d.applied %}Applied :white_check_mark:{% elif d.success %}:white_check_mark:{% else %}:x:{% endif %} | {{ d.imported }} | {{ d.created }} | {{ d.updated }} | {{ d.replaced }} | {{ d.deleted }} |
     {%- endfor %}
-| **Total** | | | **{{ resource_totals.created }}** | **{{ resource_totals.updated }}** | **{{ resource_totals.replaced }}** | **{{ resource_totals.deleted }}** |
+| **Total** | | | **{{ resource_totals.imported }}** | **{{ resource_totals.created }}** | **{{ resource_totals.updated }}** | **{{ resource_totals.replaced }}** | **{{ resource_totals.deleted }}** |
 {%- if summary_unified %}
 
 </details>

@@ -162,7 +162,7 @@ engine:
   # The command to produce a human-readable diff of the plan output (optional)
   diff: ['printf', '+ added foo\n- removed bar\n~ updated bar\n']
   # The command to print the plan's resource counts as JSON (optional)
-  resource_summary: ['echo', '{"created": 1, "updated": 0, "replaced": 0, "deleted": 0}']
+  resource_summary: ['echo', '{"created": 1, "updated": 0, "replaced": 0, "deleted": 0, "imported": 0}']
   # The command to run during the apply step (optional)
   apply: ['my-custom-apply']
   # The command to run for stategraph apply-autoapprove, which has no stored plan (optional)
@@ -171,7 +171,7 @@ engine:
   outputs: ['echo', '{"foo": "bar"}']
 ```
 
-- `resource_summary` prints a JSON object with the integer keys `created`, `updated`, `replaced`, and `deleted`. It runs after a plan that reports changes, and the counts appear in the summary comment.
+- `resource_summary` prints a JSON object with the integer keys `created`, `updated`, `replaced`, `deleted`, and `imported`. It runs after a plan that reports changes, and the counts appear in the summary comment. `imported` counts the resources that the plan imports, whatever their action. A key that the program leaves out shows as `-`.
 - `unsafe_apply` runs for [`stategraph apply-autoapprove`](/docs/reference/orchestration/commands/apply-autoapprove).
 - To pass data from the plan step to the apply step, write it to the path in `TERRATEAM_PLAN_FILE`. The apply step can read it there.
 

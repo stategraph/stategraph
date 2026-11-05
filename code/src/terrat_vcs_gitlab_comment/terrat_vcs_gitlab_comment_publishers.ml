@@ -424,11 +424,12 @@ module Publisher_tools = struct
     (* Resource counts per dirspace, plus totals over the dirspaces that reported them.  All
        "-" when no dirspace's runner emitted a summary (#1929). *)
     let resource_totals =
-      let { Rs.created; deleted; replaced; updated } =
+      let { Rs.created; deleted; imported; replaced; updated } =
         Rs.total (CCList.map (fun (_, steps) -> Rs.of_steps_or_none steps) dirspaces)
       in
       `Assoc
         [
+          ("imported", `String (Rs.count_str imported));
           ("created", `String (Rs.count_str created));
           ("updated", `String (Rs.count_str updated));
           ("replaced", `String (Rs.count_str replaced));
@@ -580,6 +581,7 @@ module Publisher_tools = struct
                                  );
                                  ("has_changes", `Bool has_changes);
                                  ("run_url", run_url);
+                                 ("imported", `String (Rs.count_str rs.Rs.imported));
                                  ("created", `String (Rs.count_str rs.Rs.created));
                                  ("updated", `String (Rs.count_str rs.Rs.updated));
                                  ("replaced", `String (Rs.count_str rs.Rs.replaced));
