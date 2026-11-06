@@ -2,7 +2,6 @@ let src = Logs.Src.create "vcs_service_github_ep_installation"
 
 module Logs = (val Logs.src_log src : Logs.LOG)
 
-let terrateam_github_action_workflow_path = ".github/workflows/terrateam.yml"
 let chunk_size = 500
 
 module Sql = struct
@@ -75,12 +74,7 @@ let refresh_repos ~request_id ~config ~storage installation_id =
           _;
         }
       ->
-      Terrat_github.fetch_file
-        ~owner
-        ~repo
-        ~ref_:default_branch
-        ~path:terrateam_github_action_workflow_path
-        client
+      Terrat_github.find_known_workflow_file ~owner ~repo ~ref_:default_branch client
       >>= function
       | Ok (Some _) -> Abb.Future.return true
       | Ok None -> Abb.Future.return false

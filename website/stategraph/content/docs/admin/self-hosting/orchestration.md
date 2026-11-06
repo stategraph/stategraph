@@ -29,7 +29,7 @@ STATEGRAPH_FDW_PROVISIONER_PASSWORD=<provisioner-password>
 
 Then connect your provider: [Connect GitHub](#connect-github) or [Connect GitLab](#connect-gitlab).
 
-At each start with Orchestration on, Stategraph migrates the Orchestration database and starts Orchestration. The switch takes effect only with the default container command. Anonymous telemetry is on by default: `TERRAT_TELEMETRY_LEVEL=disabled` turns it off.
+The switch takes effect only with the default container command. Anonymous telemetry is on by default: `TERRAT_TELEMETRY_LEVEL=disabled` turns it off.
 
 ## Database
 
@@ -140,21 +140,7 @@ curl --header "PRIVATE-TOKEN: <access-token>" "https://gitlab.example.com/api/v4
 
 Earlier versions start the pipeline without the inputs that carry the work token, and the job fails when it calls back.
 
-### With the setup wizard
-
-The setup wizard collects the values and writes them to `.env`, and you create the GitLab user, token, and application yourself:
-
-1. Run the wizard, and open <http://localhost:3000>. When the wizard asks how GitLab reaches your server, enter the public host name, for example `stategraph.example.com`.
-
-```bash
-docker run --rm -p 3000:3000 ghcr.io/stategraph/orchestration-setup:latest
-```
-
-2. Create a dedicated GitLab user for Stategraph, such as `acme-stategraph-bot`. As that user, create a personal access token with the `api` scope. Enter your GitLab URL and the token.
-3. As the bot user, add an application in **Preferences > Applications** with the `api` scope and the redirect URI that the wizard shows, `https://stategraph.example.com/api/v1/gitlab/callback`. Enter its application ID and secret.
-4. Copy `GITLAB_APP_ID`, `GITLAB_APP_SECRET`, and `GITLAB_ACCESS_TOKEN` into the environment of your deployment. For self-managed GitLab, add `GITLAB_API_BASE_URL` and `GITLAB_WEB_BASE_URL` yourself: the wizard does not write them.
-
-### By hand
+### Create the GitLab application
 
 1. Create a dedicated GitLab user for Stategraph. As that user, create a personal access token with the `api` scope, and put it in `GITLAB_ACCESS_TOKEN`.
 2. As the same user, create an OAuth application with the `api` scope and the redirect URI `https://stategraph.example.com/api/v1/gitlab/callback`. Put its application ID in `GITLAB_APP_ID` and its secret in `GITLAB_APP_SECRET`.
@@ -162,7 +148,25 @@ docker run --rm -p 3000:3000 ghcr.io/stategraph/orchestration-setup:latest
 
 ### Connect a group
 
-After the restart, a tenant admin connects a GitLab group from the **Get Started** page of the console, with the group ID and an access token with the `api` scope, then adds the project webhook and the `.gitlab-ci.yml` that the wizard shows. The steps are the same as on Stategraph Cloud: see [Connect GitLab](/docs/get-started/quickstart/cloud#connect-gitlab) in the quickstart. The webhook secret shows one time only. To replace a lost secret, rotate the credentials in **Settings > Integrations**.
+After the restart, a tenant admin opens **Get Started → Set up your first repository → Connect GitLab** in the console.
+
+1. Enter the GitLab URL, the group path as it shows in URLs, and the numeric group ID (under the group name, or **Copy group ID** in the group menu).
+2. Check the group ID yourself. The wizard does not check it, and a wrong ID gives an installation that never receives webhooks.
+3. Enter the project path under the group.
+4. Create an access token with the `api` scope, and enter it. Group and project tokens need at least the Developer role.
+
+- Group access token: the narrowest choice, not tied to a person. GitLab Premium or Ultimate on gitlab.com, any tier on self-managed GitLab.
+- Project access token: one project.
+- Personal access token: any plan, but it stops working if you lose access to the group. Use the classic form, so that you can grant `api`.
+
+Stategraph stores the token write-only. Merge request comments and pipelines for the group run as the user of the token.
+
+5. Add a project webhook in GitLab with the URL and secret token that the wizard shows, and with **Push events**, **Comments**, **Merge request events**, and **Job events** on. Copy the secret before you continue: it shows one time only.
+6. Save the webhook, and run **Test → Push events** on it to activate it.
+7. In GitLab, set **Settings → CI/CD → Variables → Minimum role to use pipeline variables** to **Developer**, so that Orchestration can use pipeline variables.
+8. Push the `.gitlab-ci.yml` that the wizard shows to the repository root on the default branch.
+
+To replace a lost secret, rotate the credentials in **Settings > Integrations**.
 
 ### Self-managed GitLab
 

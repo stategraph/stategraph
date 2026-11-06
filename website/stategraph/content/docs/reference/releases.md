@@ -62,17 +62,21 @@ The apt and yum repositories resolve to the latest release, so `apt-get upgrade`
 
 ## Container Images
 
-Both images are on GitHub Container Registry.
+All images are on GitHub Container Registry.
 
 ### Server
 
-Host Stategraph yourself with this image, the Enterprise build. Orchestration is on in the [Docker Compose](/docs/admin/self-hosting/docker-compose) setup. For other deployments, see [Enable Orchestration](/docs/admin/self-hosting/orchestration).
+Host Stategraph yourself with one of these images. Open Source needs no license key, and Enterprise needs one: see [Editions](/docs/get-started/editions). Orchestration is on in the [Docker Compose](/docs/admin/self-hosting/docker-compose) setup. For other deployments, see [Enable Orchestration](/docs/admin/self-hosting/orchestration).
 
 ```bash
+# Open Source
+docker pull ghcr.io/stategraph/stategraph-server-oss:<version>
+
+# Enterprise
 docker pull ghcr.io/stategraph/stategraph-server:<version>
 ```
 
-The deployment guides start from this image:
+The deployment guides start from these images:
 
 - [Self-hosted overview](/docs/admin/self-hosting): what you need, ports, databases, and optional features
 - [Docker Compose](/docs/admin/self-hosting/docker-compose)
@@ -131,7 +135,7 @@ cosign verify-attestation --type spdxjson \
   | jq -r .payload | base64 -d | jq .predicate
 ```
 
-Only the per-architecture tags carry an SBOM. The `<version>` and `latest` tags do not. The server image has its SBOMs on the same tags.
+Only the per-architecture tags carry an SBOM. The `<version>` and `latest` tags do not. The Enterprise server image has its SBOMs on the same tags.
 
 Tags published before image signing started have no signature, and `cosign verify` fails for them. Tags published before SBOM attestations started have no SBOM, and `cosign verify-attestation --type spdxjson` fails for them.
 

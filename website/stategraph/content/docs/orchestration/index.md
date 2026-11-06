@@ -5,7 +5,7 @@ order: 1
 ---
 
 
-Stategraph Orchestration runs your infrastructure changes through pull requests on GitHub and GitLab. The Open Source edition is [free to self-host](/docs/get-started/quickstart/self-hosted-open-source). Enterprise adds governance, and Stategraph Cloud runs Orchestration for you. See [Editions and pricing](/docs/get-started/editions).
+Stategraph Orchestration runs your infrastructure changes through pull requests on GitHub and GitLab. The Open Source edition is [free to self-host](/docs/get-started/quickstart/self-hosted). Enterprise adds governance, and Stategraph Cloud runs Orchestration for you. See [Editions and pricing](/docs/get-started/editions).
 
 ## What it does
 
@@ -30,7 +30,7 @@ Plans and applies run on your GitHub Actions or GitLab CI runners, so your cloud
 
 ## Get started
 
-1. Choose where Orchestration runs: [Stategraph Cloud](/docs/get-started/quickstart/cloud), [self-hosted Open Source](/docs/get-started/quickstart/self-hosted-open-source), or [self-hosted Enterprise](/docs/get-started/quickstart/self-hosted).
+1. Choose where Orchestration runs: [Stategraph Cloud](/docs/get-started/quickstart/cloud), or [self-hosted](/docs/get-started/quickstart/self-hosted), Open Source or Enterprise.
 2. Connect GitHub or GitLab, and add the workflow file to your repository. The quickstarts show both steps.
 3. Open a pull request that changes a `.tf` file, and read the plan comment.
 

@@ -36,7 +36,7 @@ access_control:
 | Key | Type | Description |
 | --- | --- | --- |
 | `apply_require_all_dirspace_access` | boolean | `true`: to apply, the user must have access to every dirspace in the apply. Default is `true`. |
-| `ci_config_update` | array | Who can run an operation on a pull request that changes the CI configuration file: `.github/workflows/terrateam.yml` on GitHub, `.gitlab-ci.yml` on GitLab. Default is `['*']`. |
+| `ci_config_update` | array | Who can run an operation on a pull request that changes the CI configuration file: `.github/workflows/stategraph.yml` on GitHub, `.gitlab-ci.yml` on GitLab. Default is `['*']`. |
 | `enabled` | boolean | Turns on access control. Default is `true` in Enterprise and `false` in Open Source. |
 | `files` | object | A file path as the key, and as the value, who can run an operation on a pull request that changes that file. |
 | `plan_require_all_dirspace_access` | boolean | `true`: to plan, the user must have access to every dirspace in the plan. Default is `false`. |

@@ -64,7 +64,7 @@ In the Google Cloud console, create OAuth credentials with the authorized redire
 STATEGRAPH_OAUTH_TYPE=google
 STATEGRAPH_OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
 STATEGRAPH_OAUTH_CLIENT_SECRET=<client secret>
-STATEGRAPH_OAUTH_REDIRECT_BASE=https://stategraph.example.com
+STATEGRAPH_OAUTH_REDIRECT_BASE=${STATEGRAPH_PUBLIC_URL}
 STATEGRAPH_OAUTH_EMAIL_DOMAIN=example.com
 ```
 
@@ -77,7 +77,7 @@ STATEGRAPH_OAUTH_TYPE=oidc
 STATEGRAPH_OAUTH_CLIENT_ID=your-client-id
 STATEGRAPH_OAUTH_CLIENT_SECRET=<client secret>
 STATEGRAPH_OAUTH_OIDC_ISSUER_URL=https://your-provider.example.com
-STATEGRAPH_OAUTH_REDIRECT_BASE=https://stategraph.example.com
+STATEGRAPH_OAUTH_REDIRECT_BASE=${STATEGRAPH_PUBLIC_URL}
 STATEGRAPH_OAUTH_EMAIL_DOMAIN=example.com
 ```
 
@@ -92,8 +92,9 @@ Keep secrets and per-host values out of the Compose file. Put them in `.env`, ne
 
 ```bash
 # .env
-STATEGRAPH_UI_BASE=https://stategraph.example.com
-STATEGRAPH_OAUTH_REDIRECT_BASE=https://stategraph.example.com
+STATEGRAPH_PUBLIC_URL=https://stategraph.example.com
+STATEGRAPH_UI_BASE=${STATEGRAPH_PUBLIC_URL}
+STATEGRAPH_OAUTH_REDIRECT_BASE=${STATEGRAPH_PUBLIC_URL}
 
 # Single sign-on
 # STATEGRAPH_OAUTH_TYPE=google
@@ -124,7 +125,7 @@ Stategraph then loads the price book into `cloud_pricing` on the `db` volume, in
 
 Stategraph Orchestration is on from the first start. To connect your provider:
 
-1. Set `STATEGRAPH_UI_BASE` and `STATEGRAPH_OAUTH_REDIRECT_BASE` to your public URL. The webhook and callback URLs derive from them, so GitHub or GitLab must reach that URL over HTTPS. If the host has no public URL, the `terratunnel` service of the Compose file gives it one: see [Set the public URL](/docs/get-started/quickstart/self-hosted-open-source#1-set-the-public-url).
+1. Set `STATEGRAPH_UI_BASE` and `STATEGRAPH_OAUTH_REDIRECT_BASE` to your public URL. The webhook and callback URLs derive from them, so GitHub or GitLab must reach that URL over HTTPS. If the host has no public URL, the `terratunnel` service of the Compose file gives it one: see [Set the public URL](/docs/get-started/quickstart/self-hosted#1-set-the-public-url).
 2. For GitLab, add the credentials to `.env`, and recreate the container with `docker compose up -d`:
 
 ```bash

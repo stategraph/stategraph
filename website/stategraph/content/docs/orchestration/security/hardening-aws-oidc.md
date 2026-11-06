@@ -29,7 +29,7 @@ With GitHub's `job_workflow_ref` claim, only the workflow file that Orchestratio
         },
         "StringLike": {
           "token.actions.githubusercontent.com:sub": "repo:ORG/REPO:*",
-          "token.actions.githubusercontent.com:job_workflow_ref": "ORG/REPO/.github/workflows/terrateam.yml@*"
+          "token.actions.githubusercontent.com:job_workflow_ref": "ORG/REPO/.github/workflows/stategraph.yml@*"
         }
       }
     }
@@ -38,7 +38,7 @@ With GitHub's `job_workflow_ref` claim, only the workflow file that Orchestratio
 ```
 
 !!! warning "Editing the workflow still works"
-    This does not stop someone from editing `.github/workflows/terrateam.yml` to add steps. The edited workflow still matches `job_workflow_ref`. Layers 2 and 3 close that gap.
+    This does not stop someone from editing `.github/workflows/stategraph.yml` to add steps. The edited workflow still matches `job_workflow_ref`. Layers 2 and 3 close that gap.
 
 ## Layer 2: Restrict to Orchestration-dispatched runs
 
@@ -90,7 +90,7 @@ access_control:
 
 | Setting | Protects | Effect |
 | --- | --- | --- |
-| `ci_config_update` | `.github/workflows/terrateam.yml` on GitHub, `.gitlab-ci.yml` on GitLab | Blocks operations on pull requests that change the CI configuration file unless the author matches the ruleset |
+| `ci_config_update` | `.github/workflows/stategraph.yml` on GitHub, `.gitlab-ci.yml` on GitLab | Blocks operations on pull requests that change the CI configuration file unless the author matches the ruleset |
 | `terrateam_config_update` | `.stategraph/config.yml` | Blocks operations on pull requests that change the Orchestration configuration unless the author matches the ruleset |
 
 `terrateam_config_update` also covers the legacy `.terrateam/config.yml` path.

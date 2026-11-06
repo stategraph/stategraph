@@ -12,35 +12,19 @@ Centralized configuration gives Stategraph Orchestration defaults, overrides, an
 
 The central repository is in the same organization as the repositories that it configures. On GitHub, that is the organization that owns the repository. On GitLab, it is the top-level group of the project, and the access token of the GitLab connection must be able to read that project.
 
-Orchestration checks the repositories `stategraph` and `terrateam`, in that order, and selects the first one whose default branch has at least one of the files below. An empty file counts. Every repository in the organization uses the selected repository. Orchestration does not read the other one, and never merges the two.
+The central repository is named `stategraph`. Orchestration uses it when its default branch has at least one of the files below. An empty file counts.
 
 These files make up the repository configuration. Each path also works with the `.yaml` extension. When both exist, the `.yml` file takes precedence.
 
 | Name | Repository | Branch | Path |
 |--- |--- |--- |--- |
-| `global_defaults` | `stategraph` or `terrateam` | default branch | `config/defaults.yml` |
-| `global_overrides` | `stategraph` or `terrateam` | default branch | `config/overrides.yml` |
-| `repo_defaults` | `stategraph` or `terrateam` | default branch | `config/$repository_name/defaults.yml` |
-| `repo_overrides` | `stategraph` or `terrateam` | default branch | `config/$repository_name/overrides.yml` |
-| `repo_forced_config` | `stategraph` or `terrateam` | default branch | `config/$repository_name/config.yml` |
+| `global_defaults` | `stategraph` | default branch | `config/defaults.yml` |
+| `global_overrides` | `stategraph` | default branch | `config/overrides.yml` |
+| `repo_defaults` | `stategraph` | default branch | `config/$repository_name/defaults.yml` |
+| `repo_overrides` | `stategraph` | default branch | `config/$repository_name/overrides.yml` |
+| `repo_forced_config` | `stategraph` | default branch | `config/$repository_name/config.yml` |
 | `repo_default_config` | `$repository` | default branch | `.stategraph/config.yml` |
 | `repo_config` | `$repository` | feature branch | `.stategraph/config.yml` |
-
-### Brand and commit check names
-
-The brand sets the text of comments and the prefix of commit check names, for example `stategraph plan` or `terrateam plan`. These repositories take the name of the selected central repository as their brand:
-
-- A repository without its own `.stategraph/config.yml` or `.terrateam/config.yml`.
-- A repository with a `repo_forced_config`.
-
-After the brand changes, branch protection rules that require a check by name must use the new name.
-
-### Move from `terrateam` to `stategraph`
-
-Orchestration selects the `stategraph` repository at the first commit that adds one of the files above to its default branch. From that commit on, files that exist only in the `terrateam` repository have no effect. To move without a gap, do one of these:
-
-- Copy all files to a branch of the `stategraph` repository, then merge them in one pull request.
-- Rename the `terrateam` repository to `stategraph`.
 
 ## How it works
 

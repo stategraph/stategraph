@@ -58,7 +58,7 @@ Enter your repository as `owner/repo` on GitHub, or as `group/repo` or `group/su
 
 For a first plan with no cloud credentials, use the example repository `stategraph/kick-the-tires`, which uses null resources and local state.
 
-1. Fork it on [GitHub](https://github.com/stategraph/kick-the-tires/fork), into an account or organization where the GitHub App has access, or on [GitLab](https://gitlab.com/stategraph/kick-the-tires/-/forks/new) (gitlab.com only), into the group that you connected.
+1. Fork it on [GitHub](https://github.com/stategraph/kick-the-tires/fork), into an account or organization where the GitHub App has access, or on [GitLab](https://gitlab.com/terrateam-demo/kick-the-tires/-/forks/new) (gitlab.com only), into the group that you connected.
 2. Enter the path of your fork, not the upstream path.
 3. On GitHub, enable workflows in the **Actions** tab of the fork. GitHub disables them on a fork that contains workflow files, and the first plan never starts.
 
@@ -75,10 +75,10 @@ Orchestration runs plans in your CI. Put the file on the default branch before y
 
 ### GitHub
 
-Create `.github/workflows/terrateam.yml`:
+Create `.github/workflows/stategraph.yml`:
 
 ```yaml
-name: 'Terrateam Workflow'
+name: 'Stategraph'
 on:
   workflow_dispatch:
     inputs:
@@ -96,18 +96,18 @@ on:
         type: string
         default: '"ubuntu-latest"'
 jobs:
-  terrateam:
-    permissions: # Required to pass credentials to the Terrateam action
+  stategraph:
+    permissions: # Required to pass credentials to the action
       id-token: write
       contents: read
     runs-on: ${{ fromJSON(github.event.inputs.runs_on) }}
     timeout-minutes: 1440
-    name: Terrateam Action
+    name: Stategraph
     environment: '${{ github.event.inputs.environment }}'
     steps:
       - uses: actions/checkout@v4
-      - name: Run Terrateam Action
-        id: terrateam
+      - name: Run Stategraph
+        id: stategraph
         uses: terrateamio/action@v1
         with:
           work-token: '${{ github.event.inputs.work-token }}'
@@ -122,18 +122,19 @@ jobs:
 If you did not push the file from the wizard, create `.gitlab-ci.yml`. The wizard shows the same content:
 
 ```yaml
+# .gitlab-ci.yml - Stategraph pipeline
 spec:
   inputs:
     TERRATEAM_TRIGGER:
-      description: "Is this being triggered by terrateam?"
+      description: "Is this being triggered by Stategraph?"
       type: string
       default: "$TERRATEAM_TRIGGER"
     WORK_TOKEN:
-      description: "The work token from terrateam"
+      description: "The work token from Stategraph"
       type: string
       default: "$WORK_TOKEN"
     API_BASE_URL:
-      description: "The base url for the terrateam api"
+      description: "The base url for the Stategraph API"
       type: string
       default: "$API_BASE_URL"
     RUNS_ON:

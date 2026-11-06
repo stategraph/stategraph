@@ -13,8 +13,7 @@ export function WorkflowEnvHeader({ className }: { className?: string }) {
         Workflow env
         <InfoTip label="Workflow environment">
           The optional per-workflow environment set in{" "}
-          <span className="font-mono">.stategraph/config.yml</span> (legacy{" "}
-          <span className="font-mono">.terrateam/config.yml</span>) — analogous to a
+          <span className="font-mono">.stategraph/config.yml</span>, analogous to a
           GitHub/GitLab deployment environment. Shown only when a workflow sets it.
         </InfoTip>
       </span>

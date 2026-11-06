@@ -5,7 +5,7 @@ order: 1
 ---
 
 
-The `.stategraph/config.yml` file at the root of your repository configures Stategraph Orchestration: who can plan and apply, what an apply requires, which directories run, and which steps they run. Without it, Orchestration reads the older `.terrateam/config.yml`.
+The `.stategraph/config.yml` file at the root of your repository configures Stategraph Orchestration: who can plan and apply, what an apply requires, which directories run, and which steps they run.
 
 !!! note "Do you need a config file?"
     Without a config file, Orchestration uses defaults. Add one only when you need custom workflows, OIDC, policies, or other advanced settings.
