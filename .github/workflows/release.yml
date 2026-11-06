@@ -16,6 +16,10 @@ on:
         options:
           - production
           - staging
+      semver_tag:
+        description: 'Release under this existing semver tag (e.g. 1.2.3), dispatched at that tag'
+        required: false
+        type: string
 
 jobs:
   # Gate for the whole pipeline. Every push to main cuts a release, and a release that carries
@@ -44,7 +48,14 @@ jobs:
 
       - name: Decide whether to release
         id: release-gate
+        env:
+          SEMVER_TAG: ${{ inputs.semver_tag }}
         run: |
+          # A semver release was explicitly asked for, so it is always cut.
+          if [[ -n "${SEMVER_TAG}" ]]; then
+            echo "release=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
           ./scripts/release_gate
 
   set-version-tag:
@@ -69,12 +80,26 @@ jobs:
 
       - name: Set version tag
         id: set-version-tag
+        env:
+          SEMVER_TAG: ${{ inputs.semver_tag }}
         run: |
-          VERSION_TAG=$(./scripts/version_tag)
+          if [[ -n "${SEMVER_TAG}" ]]; then
+            # The tag already exists and this run is at it, so everything below builds
+            # the tagged commit.
+            if [[ "${GITHUB_REF}" != "refs/tags/${SEMVER_TAG}" ]]; then
+              echo "Error: a semver release must be dispatched at its tag (--ref ${SEMVER_TAG}), not at ${GITHUB_REF}" >&2
+              exit 1
+            fi
+            VERSION_TAG="${SEMVER_TAG}"
+          else
+            VERSION_TAG=$(./scripts/version_tag)
+          fi
           echo "VERSION_TAG=${VERSION_TAG}" >> "${GITHUB_ENV}"
           echo "version_tag=${VERSION_TAG}" >> "${GITHUB_OUTPUT}"
 
+      # Skipped for a semver release: its tag already exists (the run is at it).
       - name: Create tag
+        if: inputs.semver_tag == ''
         run: |
           ./scripts/create_tag
 
