@@ -45,7 +45,7 @@ Infrastructure as a Database includes Orchestration Pro, so its column has every
 
 ## Stategraph Orchestration Open Source
 
-Open Source is the full core of Orchestration, with unlimited runs. Enterprise and Stategraph Cloud add the Enterprise features below. The source is on [GitHub](https://github.com/stategraph/stategraph). You self-host it with Docker Compose, Kubernetes, Amazon ECS, or Google Cloud Run: see [Self-hosted Open Source](/docs/get-started/quickstart/self-hosted-open-source) and [Self-hosting](/docs/admin/self-hosting).
+Open Source is the full core of Orchestration, with unlimited runs. Enterprise and Stategraph Cloud add the Enterprise features below. The source is on [GitHub](https://github.com/stategraph/stategraph). You self-host it with Docker Compose, Kubernetes, Amazon ECS, or Google Cloud Run: see [Self-hosted](/docs/get-started/quickstart/self-hosted) and [Self-hosting](/docs/admin/self-hosting).
 
 Besides its Yes rows in the matrix, Open Source includes:
 
@@ -89,7 +89,7 @@ Enterprise is Open Source with no user limit, plus these governance features, ma
 ### How to get Enterprise
 
 - Stategraph Cloud: every plan includes all Enterprise features, on from the start. Sign up at [app.stategraph.cloud](https://app.stategraph.cloud).
-- Self-hosted: the Pro plan includes a licensed Enterprise build that you run yourself, for $12,000 per year, the same price as Pro on Stategraph Cloud. Enterprise is a different server image from Open Source, the one that Stategraph Cloud runs, on the same databases. [Contact sales](https://stategraph.com/contact) for a license, then deploy it: see [Self-hosted Enterprise](/docs/get-started/quickstart/self-hosted), or change the image of your Open Source server: see [Move to Enterprise](/docs/admin/self-hosting#move-to-enterprise). Your repositories and `.stategraph/config.yml` carry over.
+- Self-hosted: the Pro plan includes a licensed Enterprise build that you run yourself, for $12,000 per year, the same price as Pro on Stategraph Cloud. [Contact sales](https://stategraph.com/contact) for a license, then deploy it: see [Self-hosted](/docs/get-started/quickstart/self-hosted), or change the image of your Open Source server: see [Move to Enterprise](/docs/admin/self-hosting#move-to-enterprise). Your repositories and `.stategraph/config.yml` carry over.
 
 ## Infrastructure as a Database
 
@@ -115,7 +115,7 @@ Manage your subscription, payment method, and invoices in the [Stripe customer p
 
 ## Choosing an edition
 
-You can move from Open Source to Enterprise, then to Infrastructure as a Database, which includes Orchestration Pro. Each step keeps your repositories and your `.stategraph/config.yml`. Self-hosted, Open Source and Enterprise are different server images on the same databases, so the move to Enterprise is a change of image.
+You can move from Open Source to Enterprise, then to Infrastructure as a Database, which includes Orchestration Pro. Each step keeps your repositories and your `.stategraph/config.yml`. To move a self-hosted server from Open Source to Enterprise, see [Move to Enterprise](/docs/admin/self-hosting#move-to-enterprise).
 
 Choose Open Source when:
 
@@ -127,7 +127,7 @@ Choose Enterprise when:
 
 - You need any of its governance features, such as RBAC for teams that share infrastructure.
 - More than 3 users run plans or applies on one installation in a month.
-- You want a managed service with no infrastructure to operate.
+- You want Stategraph Cloud. All Stategraph Cloud plans include the Enterprise features.
 
 Choose Infrastructure as a Database when:
 
@@ -139,7 +139,6 @@ Choose Infrastructure as a Database when:
 ## Next steps
 
 - [Stategraph Cloud quickstart](/docs/get-started/quickstart/cloud): sign up and run your first plan.
-- [Self-hosted Open Source quickstart](/docs/get-started/quickstart/self-hosted-open-source): run Open Source with Docker Compose.
-- [Self-hosted Enterprise quickstart](/docs/get-started/quickstart/self-hosted): run the Enterprise build with Docker Compose and a license key.
+- [Self-hosted quickstart](/docs/get-started/quickstart/self-hosted): run Open Source or Enterprise with Docker Compose.
 - [Governance](/docs/orchestration/governance/rbac): the Enterprise governance features.
 - [Infrastructure as a Database](/docs/infrastructure-as-a-database): scoped plans, locks, transactions, and SQL.

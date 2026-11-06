@@ -30,7 +30,7 @@ when_modified:
 
 The apply uses the plan that you reviewed. If another pull request superseded that plan before the merge, the apply aborts with a **Missing Plans** comment. See [Apply runs the plan you reviewed](/docs/orchestration/workflows).
 
-On GitLab, the **Merge request events** trigger of the project webhook tells Orchestration about the merge. Orchestration starts the apply pipeline on the destination branch, so the `.gitlab-ci.yml` on that branch must contain the Orchestration pipeline from the [quickstart](/docs/get-started/quickstart/cloud).
+On GitLab, the **Merge request events** trigger of the project webhook tells Orchestration about the merge. Orchestration starts the apply pipeline on the destination branch, so the `.gitlab-ci.yml` on that branch must contain the Orchestration pipeline that the **Get Started** page of the console shows.
 
 ## Customizing apply after merge
 

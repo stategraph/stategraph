@@ -266,18 +266,18 @@ export function githubConnectedDescription(login: string): string {
   return `Installation ${login} is linked to this tenant. Its repositories appear in this console after their first pull request event.`;
 }
 
-/** Source: docs/src/content/docs/configuration/index.mdx, docs/src/content/docs/integrations/cloud-providers/aws/getting-started.mdx, docs/src/content/docs/integrations/cloud-providers/gcp/getting-started.mdx, docs/src/content/docs/integrations/cloud-providers/azure/getting-started.mdx, docs/src/content/docs/integrations/cloud-providers/other.mdx, docs/src/content/docs/troubleshooting/index.mdx, docs/src/content/docs/quickstart/cloud/first-plan-apply.mdx */
+/** Source: website/stategraph/content/docs/orchestration/configuration/index.md, website/stategraph/content/docs/orchestration/cloud-providers/aws/index.md, website/stategraph/content/docs/orchestration/cloud-providers/gcp/index.md, website/stategraph/content/docs/orchestration/cloud-providers/azure/index.md, website/stategraph/content/docs/orchestration/cloud-providers/other.md, website/stategraph/content/docs/reference/troubleshooting.md, website/stategraph/content/docs/get-started/quickstart/cloud.md */
 export const DOC_LINKS = {
-  configuration: "https://docs.terrateam.io/configuration/",
-  aws: "https://docs.terrateam.io/integrations/cloud-providers/aws/getting-started",
-  gcp: "https://docs.terrateam.io/integrations/cloud-providers/gcp/getting-started",
-  azure: "https://docs.terrateam.io/integrations/cloud-providers/azure/getting-started",
-  other: "https://docs.terrateam.io/integrations/cloud-providers/other",
-  troubleshooting: "https://docs.terrateam.io/troubleshooting/",
-  firstPlan: "https://docs.terrateam.io/quickstart/cloud/first-plan-apply",
+  configuration: "https://stategraph.com/docs/orchestration/configuration",
+  aws: "https://stategraph.com/docs/orchestration/cloud-providers/aws",
+  gcp: "https://stategraph.com/docs/orchestration/cloud-providers/gcp",
+  azure: "https://stategraph.com/docs/orchestration/cloud-providers/azure",
+  other: "https://stategraph.com/docs/orchestration/cloud-providers/other",
+  troubleshooting: "https://stategraph.com/docs/reference/troubleshooting#orchestration-issues",
+  firstPlan: "https://stategraph.com/docs/get-started/quickstart/cloud#open-a-pull-request",
 } as const;
 
-/** Source: docs/src/content/docs/integrations/cloud-providers/aws/getting-started.mdx, docs/src/content/docs/integrations/cloud-providers/gcp/getting-started.mdx, docs/src/content/docs/integrations/cloud-providers/azure/getting-started.mdx, docs/src/content/docs/integrations/cloud-providers/other.mdx */
+/** Source: website/stategraph/content/docs/orchestration/cloud-providers/aws/index.md, website/stategraph/content/docs/orchestration/cloud-providers/gcp/index.md, website/stategraph/content/docs/orchestration/cloud-providers/azure/index.md, website/stategraph/content/docs/orchestration/cloud-providers/other.md */
 export const CREDENTIAL_CARDS = [
   { id: "aws", label: "AWS", href: DOC_LINKS.aws },
   { id: "gcp", label: "GCP", href: DOC_LINKS.gcp },

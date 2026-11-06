@@ -679,21 +679,19 @@ let test_terrateam_brand_rewrite =
 
 (* #1651: the unknown-command reply is the one place a reader learns the trigger
    word, so it is stored in the shipped Stategraph wording and reaches the
-   Terrateam brand through the same rewrite as every other template.  The
-   negative needles carry a trailing space: the bare brand name still appears in
-   the docs links, which stay on terrateam.io under both brands. *)
+   Terrateam brand through the same rewrite as every other template. *)
 let test_unknown_action_brand =
   Oth.test ~tags:[ "brand" ] ~name:"Unknown action lists Stategraph commands" (fun _ ->
       let body = Tmpl.terrateam_comment_unknown_action Terrat_brand.Stategraph in
       Oth.Assert.str_contains_all
         ~haystack:body
         ~needles:[ "List of Stategraph commands:"; "`stategraph plan`"; "`stategraph apply`" ];
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"terrateam ";
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"terrateam";
       let body = Tmpl.terrateam_comment_unknown_action Terrat_brand.Terrateam in
       Oth.Assert.str_contains_all
         ~haystack:body
         ~needles:[ "List of Terrateam commands:"; "`terrateam plan`"; "`terrateam apply`" ];
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"stategraph ")
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"stategraph")
 
 (* #2038: a plan whose dirspaces all came back with no changes must not tell the
    reader to apply, and a layered run must say the next layer follows on its
@@ -1258,10 +1256,13 @@ let warning_lines body =
   |> CCList.take_while (fun line -> not (CCString.is_empty line))
 
 (* The last line of the warning links to the documentation of stale runs. *)
-let stale_docs_link brand =
-  "> [How "
-  ^ brand
-  ^ " handles commits that move during a run](https://docs.terrateam.io/workflows/stale-runs)"
+let stale_docs_link = function
+  | Terrat_brand.Stategraph ->
+      "> [How Stategraph handles commits that move during a \
+       run](https://stategraph.com/docs/orchestration/workflows/stale-runs)"
+  | Terrat_brand.Terrateam ->
+      "> [How Terrateam handles commits that move during a \
+       run](https://terrateam.io/docs/orchestration/workflows/stale-runs)"
 
 (* Every line of the warning is in the quote, else the forge shows the rest as normal text. *)
 let assert_warning ~needles body =
@@ -1269,7 +1270,7 @@ let assert_warning ~needles body =
   Oth.Assert.not_true (CCList.is_empty lines);
   Oth.Assert.true_ (CCList.for_all (CCString.prefix ~pre:">") lines);
   Oth.Assert.str_contains_all ~haystack:(CCString.concat "\n" lines) ~needles;
-  Oth.Assert.str_contains ~haystack:body ~needle:(stale_docs_link "Stategraph" ^ "\n\n")
+  Oth.Assert.str_contains ~haystack:body ~needle:(stale_docs_link Terrat_brand.Stategraph ^ "\n\n")
 
 (* A stale apply shows the warning directly under the heading of the apply comment. *)
 let test_apply_complete2_stale =
@@ -1332,8 +1333,8 @@ let test_plan_complete2_stale_failed =
       assert_warning ~needles:[ "cannot compare the files"; "This plan is stale." ] body;
       ())
 
-(* Each stale message links to the documentation of stale runs, in the name of its brand.  The
-   link has the same address for both brands. *)
+(* Each stale message links to the documentation of stale runs, in the name and on the site of its
+   brand. *)
 let test_stale_docs_link =
   Oth.test ~tags:[ "stale" ] ~name:"Stale messages link to the documentation" (fun _ ->
       let link brand = CCString.drop 2 (stale_docs_link brand) in
@@ -1344,14 +1345,14 @@ let test_stale_docs_link =
       in
       let stale_msg_kv = stale_kv [ ("tf", "default") ] in
       CCList.iter
-        (fun (brand, name) ->
+        (fun brand ->
           Oth.Assert.str_contains
             ~haystack:(render_brand brand Tmpl.apply_complete2 apply_kv)
-            ~needle:(link name);
+            ~needle:(link brand);
           Oth.Assert.str_contains
             ~haystack:(render_brand brand Tmpl.work_manifest_stale stale_msg_kv)
-            ~needle:(link name))
-        [ (Terrat_brand.Stategraph, "Stategraph"); (Terrat_brand.Terrateam, "Terrateam") ];
+            ~needle:(link brand))
+        Terrat_brand.all;
       ())
 
 (* A result that is not stale has no warning. *)

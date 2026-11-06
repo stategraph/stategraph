@@ -210,6 +210,30 @@ To go back to Terrateam before step 6, move the DNS record back and scale the Te
 
 Users of the Terrateam console must sign in again.
 
+## Repository files
+
+You do not have to rename files in your repositories.
+
+- Orchestration reads `.stategraph/config.yml`. If a repository does not have it, Orchestration reads `.terrateam/config.yml`.
+- On GitHub, Orchestration runs `.github/workflows/stategraph.yml`. If a repository does not have it, Orchestration runs `.github/workflows/terrateam.yml`.
+
+To use the new names, rename both files in one pull request, and merge it. In the workflow file, also change `name: 'Terrateam Workflow'` to `name: 'Stategraph'`.
+
+## Central configuration repository
+
+With [centralized configuration](/docs/orchestration/governance/centralized-config), Orchestration looks for a central repository named `stategraph` first, then for one named `terrateam`. It uses the first repository whose default branch has at least one configuration file. It does not merge the two.
+
+Orchestration starts to use the `stategraph` repository at the first commit that adds a configuration file to it. After that commit, files that are only in the `terrateam` repository have no effect. To move without a gap, do one of these:
+
+- Copy all files to a branch of the `stategraph` repository, and merge them in one pull request.
+- Rename the `terrateam` repository to `stategraph`.
+
+## Comment and check names
+
+Pull request comments and commit check names use a brand, for example `stategraph plan` or `terrateam plan`. A repository with `.terrateam/config.yml` uses the `terrateam` brand. A repository with no configuration file of its own uses the name of the central repository. A repository with a forced configuration in the central repository also uses that name. To set the brand on a server, use `TERRAT_BRAND`. See [Environment variables](/docs/admin/operations/environment-variables).
+
+When the brand changes, the check names change too. Update branch protection rules that require a check by its name.
+
 ## Go back to Terrateam
 
 The Terrateam image starts on the migrated database while the `migrations` table of the Terrateam database has no name that the image does not know. A Stategraph release that adds a Terrateam migration closes this window. Then restore the backup, and start the Terrateam image.

@@ -115,8 +115,7 @@ const tests: Array<{ name: string; run: () => void }> = [
     name: "documentation links use the working documentation base",
     run: () => {
       for (const url of Object.values(constants.DOC_LINKS)) {
-        assert.match(url, /^https:\/\/docs\.terrateam\.io\//);
-        assert.notEqual(url, "https://docs.terrateam.io/reference/configuration");
+        assert.match(url, /^https:\/\/stategraph\.com\/docs\//);
       }
     },
   },

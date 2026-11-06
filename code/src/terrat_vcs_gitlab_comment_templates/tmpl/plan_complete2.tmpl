@@ -41,7 +41,7 @@
 {%- endif %}
 {%- endif %}
 >
-> [How Stategraph handles commits that move during a run](https://docs.terrateam.io/workflows/stale-runs)
+> [How Stategraph handles commits that move during a run](https://stategraph.com/docs/orchestration/workflows/stale-runs)
 {%- endmacro -%}
 {% if overall_success %}
 ## Plans :thumbsup:
@@ -84,7 +84,7 @@ The plan output exceeds the size limit for pull request comments. You can view t
 <details open>
   <summary><h2>Access Control :no_entry:</h2></summary>
 
-Not all [dirspaces](https://docs.terrateam.io/getting-started/concepts/#dirspace) were run because the user did not have access.  The following dirspaces were not run:
+Not all [dirspaces](https://stategraph.com/docs/get-started/core-concepts#repository-directory-and-workspace) were run because the user did not have access.  The following dirspaces were not run:
 
 | Dir | Workspace | Policy |
 | --- | --------- | ------ |
@@ -155,7 +155,7 @@ Gatekeeper uses `all_of`, `any_of`, and `any_of_count` to define approval rules:
 - `any_of` - Lists users or groups that may approve.
 - `any_of_count` - Sets how many approvals are required from the `any_of` list.
 
-A gate is satisfied only when all conditions are met. See [documentation](https://docs.terrateam.io/advanced-workflows/gatekeeper-requirements) for details.
+A gate is satisfied only when all conditions are met. See [documentation](https://stategraph.com/docs/orchestration/governance/gatekeeper) for details.
 </details>
 
   {%- endif %}

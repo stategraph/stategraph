@@ -120,13 +120,13 @@ Orchestration sends the `runs_on` value of the matching workflow entry with each
 
 ### GitHub
 
-Orchestration passes the value as JSON in the `runs_on` input of the workflow dispatch. The standard `.github/workflows/terrateam.yml` declares that input with the default `'"ubuntu-latest"'`, and sets `runs-on: ${{ fromJSON(github.event.inputs.runs_on) }}` on the job. [GitHub reusable workflows](/docs/orchestration/workflows/advanced/github-reusable-workflows) shows the same input in a reusable workflow.
+Orchestration passes the value as JSON in the `runs_on` input of the workflow dispatch. The standard `.github/workflows/stategraph.yml` declares that input with the default `'"ubuntu-latest"'`, and sets `runs-on: ${{ fromJSON(github.event.inputs.runs_on) }}` on the job. [GitHub reusable workflows](/docs/orchestration/workflows/advanced/github-reusable-workflows) shows the same input in a reusable workflow.
 
 ### GitLab
 
 Orchestration passes the value in the `RUNS_ON` pipeline input, only when `runs_on` is set.
 
-- The `.gitlab-ci.yml` from the console declares `RUNS_ON` under `spec.inputs` as an array with an empty default. It passes the value to the included template as the runner tags. The [Stategraph Cloud quickstart](/docs/get-started/quickstart/cloud) shows the full file.
+- The `.gitlab-ci.yml` from the console declares `RUNS_ON` under `spec.inputs` as an array with an empty default. It passes the value to the included template as the runner tags. The **Get Started** page of the console shows the full file.
 - If `runs_on` is set and `.gitlab-ci.yml` does not declare `RUNS_ON`, the pipeline does not start. Orchestration then comments on the merge request with the `spec` and `include` blocks that the file needs.
 
 ## Next steps

@@ -5236,13 +5236,7 @@ module Comment = struct
     | Msg.Repo_config_err err ->
         repo_config_err ~request_id ~brand ~client ~pull_request ~title:"" err
     | Msg.Repo_config_failure err ->
-        repo_config_failure
-          ~request_id
-          ~brand
-          ~client
-          ~pull_request
-          ~title:"Terrateam repository"
-          err
+        repo_config_failure ~request_id ~brand ~client ~pull_request ~title:"repository" err
     | Msg.Repo_config_merge_err ((base, src), (key, base_value, src_value)) ->
         let base_value = Jsonu.to_yaml_string base_value in
         let src_value = Jsonu.to_yaml_string src_value in

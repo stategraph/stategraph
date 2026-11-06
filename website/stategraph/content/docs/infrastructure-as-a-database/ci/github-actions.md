@@ -135,7 +135,7 @@ Stategraph detects conflicts per resource, not per state file. Pull requests tha
 
 Stategraph Orchestration runs this flow on your GitHub Actions runners, with no hand-written workflow. It posts the plan as a comment and a commit check, enforces apply requirements, policy, and access control, and applies on a `stategraph apply` comment or on merge. See [Workflows](/docs/orchestration/workflows).
 
-To plan through Infrastructure as a Database, connect the repository as in [Stategraph Cloud](/docs/get-started/quickstart/cloud), and set `engine: stategraph` in `.stategraph/config.yml`. See [Use with Orchestration](/docs/infrastructure-as-a-database/orchestration).
+To plan through Infrastructure as a Database, connect the repository (see [Quickstart](/docs/get-started/quickstart)), and set `engine: stategraph` in `.stategraph/config.yml`. See [Use with Orchestration](/docs/infrastructure-as-a-database/orchestration).
 
 ## Next Steps
 

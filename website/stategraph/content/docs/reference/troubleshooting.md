@@ -423,18 +423,23 @@ Stategraph reports this failure as `GITLAB_INPUTS_MISSING_DEFAULTS`. GitLab refu
 - Declare all four inputs, with defaults, at the top of `.gitlab-ci.yml`:
 
 ```yaml
+# .gitlab-ci.yml - Stategraph pipeline
 spec:
   inputs:
     TERRATEAM_TRIGGER:
+      description: "Is this being triggered by Stategraph?"
       type: string
       default: "$TERRATEAM_TRIGGER"
     WORK_TOKEN:
+      description: "The work token from Stategraph"
       type: string
       default: "$WORK_TOKEN"
     API_BASE_URL:
+      description: "The base url for the Stategraph API"
       type: string
       default: "$API_BASE_URL"
     RUNS_ON:
+      description: "The tags to use for the runner"
       type: array
       default: []
 ---
