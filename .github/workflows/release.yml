@@ -133,8 +133,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-tags: true
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -520,8 +518,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-tags: true
 
       - name: Download ttm binary (amd64)
         uses: actions/download-artifact@v4
