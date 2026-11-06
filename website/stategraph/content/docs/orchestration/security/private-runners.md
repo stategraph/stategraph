@@ -23,7 +23,7 @@ By default, Orchestration jobs on GitHub run on GitHub-hosted runners.
 
 #### Running in a container
 
-Use GitHub's official [runner image](https://github.com/actions/runner/pkgs/container/actions-runner) (`ghcr.io/actions/actions-runner`), or [Actions Runner Controller](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners-with-actions-runner-controller) on Kubernetes. Register the runner with a label, and point the job at that label in `.github/workflows/terrateam.yml`:
+Use GitHub's official [runner image](https://github.com/actions/runner/pkgs/container/actions-runner) (`ghcr.io/actions/actions-runner`), or [Actions Runner Controller](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners-with-actions-runner-controller) on Kubernetes. Register the runner with a label, and point the job at that label in `.github/workflows/stategraph.yml`:
 
 ```yaml
 jobs:
@@ -43,7 +43,7 @@ jobs:
 2. Download the runner application for your operating system from the GitHub Actions releases page, and extract it.
 3. Run `config.sh` (Linux and macOS) or `config.cmd` (Windows) to register the runner, and choose whether to run it as a service.
 4. Start it with `run.sh` or `run.cmd`. The runner registers with your repository and waits for jobs.
-5. Point the job at the runner in `.github/workflows/terrateam.yml`:
+5. Point the job at the runner in `.github/workflows/stategraph.yml`:
 
 ```yaml
 jobs:

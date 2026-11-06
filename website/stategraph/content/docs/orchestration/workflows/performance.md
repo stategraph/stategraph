@@ -117,7 +117,7 @@ SIGNALS
   * cost estimation (infracost) is enabled in this run.
 ```
 
-The profiler predates the rename, so its labels say Terrateam. Read them as the Orchestration server and runner.
+The profiler labels say Terrateam. They mean the Orchestration server and runner.
 
 Read the report in this order:
 

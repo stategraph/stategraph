@@ -28,7 +28,7 @@ Releases follow [semantic versioning](https://semver.org/). For the CLI and imag
 
 ## Boot-time migrations
 
-At each start, Stategraph migrates the `stategraph` database, then serves requests. With Orchestration on, it migrates the `terrateam` database after the `stategraph` database, and before it serves.
+At each start, Stategraph migrates its databases, then serves requests.
 
 - Stategraph checks that the applied migrations are a prefix of its own list. If they differ, it exits non-zero and applies nothing on top.
 - Each migration commits by itself, so an interrupted run leaves a consistent prefix, never a partial migration.

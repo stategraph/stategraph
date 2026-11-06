@@ -94,8 +94,7 @@ Open Source and Enterprise use the same databases. To move a server to Enterpris
 
 ## Next steps
 
-- [Self-hosted Open Source quickstart](/docs/get-started/quickstart/self-hosted-open-source): from nothing to a running console, with Orchestration.
-- [Self-hosted Enterprise quickstart](/docs/get-started/quickstart/self-hosted): the same, with a license key.
+- [Self-hosted quickstart](/docs/get-started/quickstart/self-hosted): from nothing to a running console, with Orchestration, on Open Source or Enterprise.
 - [Environment variables](/docs/admin/operations/environment-variables): all settings that Stategraph reads.
 - [Upgrades](/docs/admin/operations/upgrades): install a new version safely and verify the image signature.
 - [Migrate from Terrateam](/docs/admin/self-hosting/migrate-from-terrateam): replace a self-hosted Terrateam server with the Stategraph server image and keep its database.

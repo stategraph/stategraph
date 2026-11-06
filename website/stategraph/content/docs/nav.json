@@ -47,12 +47,8 @@
               "label": "Stategraph Cloud"
             },
             {
-              "page": "/docs/get-started/quickstart/self-hosted-open-source",
-              "label": "Self-hosted Open Source"
-            },
-            {
               "page": "/docs/get-started/quickstart/self-hosted",
-              "label": "Self-hosted Enterprise"
+              "label": "Self-hosted"
             },
             {
               "page": "/docs/get-started/quickstart/import-state",

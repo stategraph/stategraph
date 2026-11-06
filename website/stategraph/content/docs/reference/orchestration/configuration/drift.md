@@ -169,7 +169,7 @@ On GitLab, set up the token before you turn on the hook:
 
 Plan: 0 to add, 1 to change, 0 to destroy.</pre></details><details><summary>Directory: backend | Workspace: default</summary><p class="docs-mock-muted">The plan output for this directory.</p></details><hr><p>Report ID: 938b9891b39e674fd252fe9f2cc6268f</p></div></div>
 </div>
-<figcaption>An issue opened by drift detection.<br> The runner writes the Terrateam name in the issue title and text.</figcaption>
+<figcaption>An issue opened by drift detection.</figcaption>
 </figure>
 
 #### Grouping

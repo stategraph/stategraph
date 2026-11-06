@@ -113,7 +113,7 @@ Stategraph detects conflicts per resource, not per state file. Merge requests th
 
 Stategraph Orchestration runs this flow on your GitLab CI runners, with no hand-written pipeline. It posts the plan as a comment and an apply commit status, enforces apply requirements, policy, and access control, and applies on a `stategraph apply` comment or on merge. See [Workflows](/docs/orchestration/workflows).
 
-To plan through Infrastructure as a Database, connect the group as in [Stategraph Cloud](/docs/get-started/quickstart/cloud), and set `engine: stategraph` in `.stategraph/config.yml`. See [Use with Orchestration](/docs/infrastructure-as-a-database/orchestration).
+To plan through Infrastructure as a Database, connect the group (see [Quickstart](/docs/get-started/quickstart)), and set `engine: stategraph` in `.stategraph/config.yml`. See [Use with Orchestration](/docs/infrastructure-as-a-database/orchestration).
 
 ## Next Steps
 

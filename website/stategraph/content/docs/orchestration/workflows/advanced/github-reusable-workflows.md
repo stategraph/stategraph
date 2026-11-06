@@ -13,7 +13,7 @@ A GitHub reusable workflow keeps the Stategraph Orchestration GitHub Actions wor
 - You enforce organization standards in one file.
 
 !!! note "Workflow updates"
-    The Orchestration workflow file changes as features are added. Start from the current standard workflow. The console shows it under **Get Started** when you set up a repository, and there is a [reference copy](https://raw.githubusercontent.com/terrateamio/terrateam-example/refs/heads/main/github/actions/workflows/default/terrateam.yml).
+    The Orchestration workflow file changes as features are added. Start from the current standard workflow. The console shows it under **Get Started** when you set up a repository, and there is a [reference copy](https://github.com/stategraph/kick-the-tires/blob/main/.github/workflows/stategraph.yml).
 
 ## Setting up a reusable workflow
 
@@ -92,7 +92,7 @@ jobs:
 
 ### 3. Create the caller workflow
 
-In each repository that runs Orchestration, create `.github/workflows/terrateam.yml`. Orchestration dispatches this exact path. The caller declares the same inputs as the standard workflow and passes them through:
+In each repository that runs Orchestration, create `.github/workflows/stategraph.yml`. Orchestration dispatches this exact path. The caller declares the same inputs as the standard workflow and passes them through:
 
 ```yaml
 name: 'Stategraph Orchestration'
