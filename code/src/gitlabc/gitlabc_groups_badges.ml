@@ -111,6 +111,11 @@ module GetApiV4GroupsIdBadgesRender = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "link_url" /? string "image_url"
+
   module Responses = struct
     module OK = struct end
 
@@ -184,6 +189,14 @@ module GetApiV4GroupsIdBadges = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option (string "name")
 
   module Responses = struct
     module OK = struct end

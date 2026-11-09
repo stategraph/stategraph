@@ -18,7 +18,12 @@ end
 module Job = struct
   module Type_ = struct
     module Kind = struct
-      type t = Drift of { reconcile : bool } [@@deriving show, eq]
+      type t =
+        | Drift of {
+            reconcile : bool;
+            restart_on_change : bool;
+          }
+      [@@deriving show, eq]
     end
 
     type t =

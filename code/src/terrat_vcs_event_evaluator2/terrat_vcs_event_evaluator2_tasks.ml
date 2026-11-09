@@ -3441,17 +3441,18 @@ struct
       let log_drift_schedule_updates s repo drift =
         let { D.enabled; schedules } = drift in
         CCList.iter
-          (fun (name, { D.Schedule.tag_query; reconcile; schedule; window }) ->
+          (fun (name, { D.Schedule.tag_query; reconcile; restart_on_change; schedule; window }) ->
             Logs.info (fun m ->
                 m
                   "%s : DRIFT : UPDATE_SCHEDULE : name=%s : enabled=%B : repo=%s : schedule=%s : \
-                   reconcile=%s : tag_query=%s : window=%s"
+                   reconcile=%s : restart_on_change=%B : tag_query=%s : window=%s"
                   (Builder.log_id s)
                   name
                   enabled
                   (S.Api.Repo.to_string repo)
                   (D.Schedule.Sched.to_string schedule)
                   (Bool.to_string reconcile)
+                  restart_on_change
                   (Terrat_tag_query.to_string tag_query)
                   (CCOption.map_or
                      ~default:""
@@ -3619,18 +3620,20 @@ struct
                 (Builder.log_id s)
                 (CCList.length schedules));
           Abbs_fc.List.iter
-            ~f:(fun (name, account, repo, reconcile, tag_query, window, branch) ->
+            ~f:(fun
+                (name, account, repo, reconcile, restart_on_change, tag_query, window, branch) ->
               let run =
                 let open Irm in
                 Logs.info (fun m ->
                     m
                       "%s : DRIFT : RUN : name=%s : account=%s : repo=%s : reconcile=%s : \
-                       tag_query=%s : window=%s : branch=%s"
+                       restart_on_change=%B : tag_query=%s : window=%s : branch=%s"
                       (Builder.log_id s)
                       name
                       (S.Api.Account.to_string account)
                       (S.Api.Repo.to_string repo)
                       (Bool.to_string reconcile)
+                      restart_on_change
                       (Terrat_tag_query.to_string tag_query)
                       (CCOption.map_or
                          ~default:""
@@ -3694,7 +3697,12 @@ struct
                               ~request_id:(Builder.log_id s)
                               db
                               (Tjc.Job.Type_.Plan
-                                 { tag_query; kind = Some Tjc.Job.Type_.Kind.(Drift { reconcile }) })
+                                 {
+                                   tag_query;
+                                   kind =
+                                     Some
+                                       Tjc.Job.Type_.Kind.(Drift { reconcile; restart_on_change });
+                                 })
                               context
                               None))
                     >>= fun job ->
@@ -3995,7 +4003,9 @@ struct
                Tjc.Job.type_ =
                  Tjc.Job.Type_.Plan
                    {
-                     kind = Some (Tjc.Job.Type_.Kind.Drift { reconcile = true }) as kind;
+                     kind =
+                       Some (Tjc.Job.Type_.Kind.Drift { reconcile = true; restart_on_change = _ })
+                       as kind;
                      tag_query;
                    };
                id = plan_job_id;

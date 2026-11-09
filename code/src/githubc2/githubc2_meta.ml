@@ -64,6 +64,11 @@ module Get_octocat = struct
     type t = { s : string option [@default None] } [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "s")
+
   module Responses = struct
     module OK = struct end
 

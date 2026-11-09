@@ -145,6 +145,29 @@ module GetApiV4GroupsIdPackages = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default false (bool "exclude_subgroups")
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option_default
+         `Created_at
+         (ud "order_by" (fun value ->
+              CCResult.to_opt (Parameters.Order_by.t_of_yojson (`String value))))
+    /? option_default
+         `Asc
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option
+         (ud "package_type" (fun value ->
+              CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value))))
+    /? option (string "package_name")
+    /? option (string "package_version")
+    /? option (bool "include_versionless")
+    /? option
+         (ud "status" (fun value -> CCResult.to_opt (Parameters.Status.t_of_yojson (`String value))))
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end

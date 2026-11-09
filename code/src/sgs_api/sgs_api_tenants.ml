@@ -363,6 +363,11 @@ module Start_github_claim = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "rd")
+
   module Responses = struct
     module Found = struct end
     module Unauthorized = struct end
@@ -611,13 +616,22 @@ module Tx_list = struct
 
     type t = {
       from : string option; [@default None]
-      limit : int option; [@default None]
+      limit : int; [@default 20]
       page : Page.t option; [@default None]
       tenant_id : string;
       to_ : string option; [@default None] [@key "to"]
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (array (string "page"))
+    /? option_default 20 (int "limit")
+    /? option (string "from")
+    /? option (string "to")
 
   module Responses = struct
     module OK = struct
@@ -661,7 +675,7 @@ module Tx_list = struct
          let open Parameters in
          [
            ("page", Var (params.page, Option (Array String)));
-           ("limit", Var (params.limit, Option Int));
+           ("limit", Var (params.limit, Int));
            ("from", Var (params.from, Option String));
            ("to", Var (params.to_, Option String));
          ])
@@ -678,6 +692,11 @@ module Summary = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "state_id")
 
   module Responses = struct
     module OK = struct
@@ -853,7 +872,7 @@ module List_states = struct
     end
 
     type t = {
-      limit : int option; [@default None]
+      limit : int; [@default 20]
       page : Page.t option; [@default None]
       q : string option; [@default None]
       tenant_id : string;
@@ -861,6 +880,15 @@ module List_states = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (array (string "page"))
+    /? option (string "q")
+    /? option (string "tz")
+    /? option_default 20 (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -899,7 +927,7 @@ module List_states = struct
            ("page", Var (params.page, Option (Array String)));
            ("q", Var (params.q, Option String));
            ("tz", Var (params.tz, Option String));
-           ("limit", Var (params.limit, Option Int));
+           ("limit", Var (params.limit, Int));
          ])
       ~url
       ~responses:Responses.t
@@ -915,6 +943,11 @@ module Security_findings_history = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "from") /? option (string "to")
 
   module Responses = struct
     module OK = struct
@@ -978,6 +1011,11 @@ module Resource_types = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "state_id")
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Tenant_resource_types.t
@@ -1030,6 +1068,11 @@ module Set_member_role = struct
     type t = Sgs_api_components.Tenant_member_set_role_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "user_id"
 
   module Responses = struct
     module OK = struct
@@ -1108,6 +1151,11 @@ module Remove_member = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "user_id"
 
   module Responses = struct
     module OK = struct
@@ -1256,13 +1304,22 @@ module List_members = struct
   module Parameters = struct
     type t = {
       cursor : string option; [@default None]
-      limit : int option; [@default None]
+      limit : int; [@default 25]
       role : string option; [@default None]
       search : string option; [@default None]
       tenant_id : string;
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "search")
+    /? option (string "role")
+    /? option (string "cursor")
+    /? option_default 25 (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -1308,7 +1365,7 @@ module List_members = struct
            ("search", Var (params.search, Option String));
            ("role", Var (params.role, Option String));
            ("cursor", Var (params.cursor, Option String));
-           ("limit", Var (params.limit, Option Int));
+           ("limit", Var (params.limit, Int));
          ])
       ~url
       ~responses:Responses.t
@@ -1323,6 +1380,11 @@ module Revoke_invitation = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "id"
 
   module Responses = struct
     module No_content = struct end
@@ -1396,6 +1458,11 @@ module Reissue_invitation = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "id"
 
   module Responses = struct
     module OK = struct
@@ -1551,11 +1618,16 @@ module List_invitations = struct
   module Parameters = struct
     type t = {
       cursor : string option; [@default None]
-      limit : int option; [@default None]
+      limit : int; [@default 25]
       tenant_id : string;
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "cursor") /? option_default 25 (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -1597,9 +1669,7 @@ module List_invitations = struct
       ~query_params:
         (let open Openapi.Request.Var in
          let open Parameters in
-         [
-           ("cursor", Var (params.cursor, Option String)); ("limit", Var (params.limit, Option Int));
-         ])
+         [ ("cursor", Var (params.cursor, Option String)); ("limit", Var (params.limit, Int)) ])
       ~url
       ~responses:Responses.t
       `Get
@@ -1665,6 +1735,11 @@ module Gaps_config = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "provider"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Gap_analysis_config_response.t
@@ -1706,13 +1781,40 @@ end
 
 module Gaps = struct
   module Parameters = struct
+    module Source = struct
+      let t_of_yojson = function
+        | `String "cache" -> Ok `Cache
+        | `String "no-cache" -> Ok `No_cache
+        | json -> Error ("Unknown value: " ^ Yojson.Safe.pretty_to_string json)
+
+      let t_to_yojson = function
+        | `Cache -> `String "cache"
+        | `No_cache -> `String "no-cache"
+
+      type t =
+        ([ `Cache
+         | `No_cache
+         ]
+        [@of_yojson t_of_yojson] [@to_yojson t_to_yojson])
+      [@@deriving show, eq]
+    end
+
     type t = {
       provider : string;
-      source : string; [@default "cache"]
+      source : Source.t; [@default `Cache]
       tenant_id : string;
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? string "provider"
+    /? option_default
+         `Cache
+         (ud "source" (fun value -> CCResult.to_opt (Parameters.Source.t_of_yojson (`String value))))
 
   module Responses = struct
     module OK = struct
@@ -1754,7 +1856,10 @@ module Gaps = struct
       ~query_params:
         (let open Openapi.Request.Var in
          let open Parameters in
-         [ ("provider", Var (params.provider, String)); ("source", Var (params.source, String)) ])
+         [
+           ("provider", Var (params.provider, String));
+           ("source", Var (params.source, Enum Source.t_to_yojson));
+         ])
       ~url
       ~responses:Responses.t
       `Get
@@ -1767,12 +1872,17 @@ module Costs_unmanaged = struct
     end
 
     type t = {
-      limit : int option; [@default None]
+      limit : int; [@default 20]
       page : Page.t option; [@default None]
       tenant_id : string;
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (array (string "page")) /? option_default 20 (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -1814,10 +1924,7 @@ module Costs_unmanaged = struct
       ~query_params:
         (let open Openapi.Request.Var in
          let open Parameters in
-         [
-           ("page", Var (params.page, Option (Array String)));
-           ("limit", Var (params.limit, Option Int));
-         ])
+         [ ("page", Var (params.page, Option (Array String))); ("limit", Var (params.limit, Int)) ])
       ~url
       ~responses:Responses.t
       `Get
@@ -1875,6 +1982,15 @@ module Costs_history = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "from")
+    /? option (string "to")
+    /? option (string "group_by")
+    /? option (string "tag_key")
 
   module Responses = struct
     module OK = struct
@@ -1976,6 +2092,11 @@ module Costs = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "tag_key")
 
   module Responses = struct
     module OK = struct

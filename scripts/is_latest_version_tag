@@ -4,6 +4,7 @@ set -euf -o pipefail
 # Validate required environment variables
 : "${VERSION_TAG:?VERSION_TAG is required}"
 
-LATEST_TAG="$(git ls-remote --tags origin | grep -oE '20[0-9]{6}-[0-9]{4}-[a-f0-9]{6,8}$' | sort | tail -n1)"
+# The latest tag of VERSION_TAG's kind
+LATEST_TAG="$("$(git rev-parse --show-toplevel)/scripts/release_tags" | tail -n1)"
 
 ([[ "${LATEST_TAG}" == "${VERSION_TAG}" ]] && echo "true") || echo "false"

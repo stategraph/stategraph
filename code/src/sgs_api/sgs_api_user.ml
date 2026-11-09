@@ -75,6 +75,11 @@ module Access_tokens_revoke = struct
     type t = { token_id : string } [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "token_id"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Access_token_revoke_response.t

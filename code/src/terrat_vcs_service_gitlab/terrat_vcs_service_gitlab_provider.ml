@@ -427,6 +427,7 @@ module Db = struct
         /% Var.bigint "repo"
         /% Var.(ud (text "schedule") Terrat_base_repo_config_v1.Drift.Schedule.Sched.to_string)
         /% Var.boolean "reconcile"
+        /% Var.boolean "restart_on_change"
         /% Var.(option (ud (text "tag_query") Terrat_tag_query.to_string))
         /% Var.text "name"
         /% Var.(option (timetz "window_start"))
@@ -1067,6 +1068,9 @@ module Db = struct
         Ret.text
         //
         (* reconcile *)
+        Ret.boolean
+        //
+        (* restart_on_change *)
         Ret.boolean
         //
         (* tag_query *)
@@ -1948,7 +1952,8 @@ module Db = struct
              branch
            >>= fun () ->
            Abbs_fc.List_result.iter
-             ~f:(fun (name, { D.Schedule.reconcile; schedule; tag_query; window }) ->
+             ~f:(fun
+                 (name, { D.Schedule.reconcile; restart_on_change; schedule; tag_query; window }) ->
                let window_start, window_end =
                  CCOption.map_or
                    ~default:(None, None)
@@ -1961,6 +1966,7 @@ module Db = struct
                  (CCInt64.of_int @@ Api.Repo.id repo)
                  schedule
                  reconcile
+                 restart_on_change
                  (Some tag_query)
                  name
                  window_start
@@ -2990,6 +2996,7 @@ module Db = struct
               owner
               name
               reconcile
+              restart_on_change
               tag_query
               window_start
               window_end
@@ -2999,6 +3006,7 @@ module Db = struct
               Api.Account.make @@ CCInt64.to_int installation_id,
               Api.Repo.make ~id:(CCInt64.to_int repository_id) ~owner ~name (),
               reconcile,
+              restart_on_change,
               CCOption.get_or ~default:Terrat_tag_query.any tag_query,
               CCOption.map2
                 (fun window_start window_end -> (window_start, window_end))
@@ -6491,14 +6499,15 @@ module Job_context = struct
         let module K = Terrat_job_context.Job.Type_.Kind in
         let module O = Terrat_job_type_kind in
         let module Kd = Terrat_job_type_kind_drift in
-        CCOption.map (function K.Drift { reconcile } ->
-            O.Kind_drift { Kd.reconcile; type_ = `Drift })
+        CCOption.map (function K.Drift { reconcile; restart_on_change } ->
+            O.Kind_drift { Kd.reconcile; restart_on_change; type_ = `Drift })
 
       let json_to_kind =
         let module K = Terrat_job_context.Job.Type_.Kind in
         let module O = Terrat_job_type_kind in
         let module Kd = Terrat_job_type_kind_drift in
-        CCOption.map (function O.Kind_drift { Kd.reconcile; type_ = _ } -> K.Drift { reconcile })
+        CCOption.map (function O.Kind_drift { Kd.reconcile; restart_on_change; type_ = _ } ->
+            K.Drift { reconcile; restart_on_change })
 
       let to_json =
         let module T = Terrat_job_context.Job.Type_ in

@@ -12,6 +12,17 @@ module GetApiV4GroupsIdUsers = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "search")
+    /? option_default false (bool "active")
+    /? option (bool "include_saml_users")
+    /? option (bool "include_service_accounts")
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end

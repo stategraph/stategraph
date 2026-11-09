@@ -58,7 +58,7 @@ module Get_work_manifest_outputs = struct
 
     type t = {
       installation_id : string;
-      limit : int option; [@default None]
+      limit : int; [@default 20]
       lite : bool; [@default false]
       page : Page.t option; [@default None]
       q : string option; [@default None]
@@ -67,6 +67,16 @@ module Get_work_manifest_outputs = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "q")
+    /? option (array (string "page"))
+    /? option (string "tz")
+    /? option_default 20 (int "limit")
+    /? option_default false (bool "lite")
 
   module Responses = struct
     module OK = struct
@@ -123,7 +133,7 @@ module Get_work_manifest_outputs = struct
            ("q", Var (params.q, Option String));
            ("page", Var (params.page, Option (Array String)));
            ("tz", Var (params.tz, Option String));
-           ("limit", Var (params.limit, Option Int));
+           ("limit", Var (params.limit, Int));
            ("lite", Var (params.lite, Bool));
          ])
       ~url
@@ -209,13 +219,23 @@ module List_work_manifests = struct
     type t = {
       d : D.t option; [@default None]
       installation_id : string;
-      limit : int option; [@default None]
+      limit : int; [@default 20]
       page : Page.t option; [@default None]
       q : string option; [@default None]
       tz : string option; [@default None]
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (array (string "page"))
+    /? option (string "q")
+    /? option (ud "d" (fun value -> CCResult.to_opt (Parameters.D.t_of_yojson (`String value))))
+    /? option (string "tz")
+    /? option_default 20 (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -267,7 +287,7 @@ module List_work_manifests = struct
            ("q", Var (params.q, Option String));
            ("d", Var (params.d, Option (Enum D.t_to_yojson)));
            ("tz", Var (params.tz, Option String));
-           ("limit", Var (params.limit, Option Int));
+           ("limit", Var (params.limit, Int));
          ])
       ~url
       ~responses:Responses.t
@@ -382,10 +402,16 @@ module List_repos = struct
 
     type t = {
       installation_id : string;
+      limit : int; [@default 20]
       page : Page.t option; [@default None]
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (array (string "page")) /? option_default 20 (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -424,7 +450,7 @@ module List_repos = struct
       ~query_params:
         (let open Openapi.Request.Var in
          let open Parameters in
-         [ ("page", Var (params.page, Option (Array String))) ])
+         [ ("page", Var (params.page, Option (Array String))); ("limit", Var (params.limit, Int)) ])
       ~url
       ~responses:Responses.t
       `Get
@@ -438,12 +464,22 @@ module List_pull_requests = struct
 
     type t = {
       installation_id : string;
+      limit : int; [@default 20]
       page : Page.t option; [@default None]
       pr : int option; [@default None]
       repo : string option; [@default None]
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (array (string "page"))
+    /? option (int "pr")
+    /? option (string "repo")
+    /? option_default 20 (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -486,6 +522,7 @@ module List_pull_requests = struct
            ("page", Var (params.page, Option (Array String)));
            ("pr", Var (params.pr, Option Int));
            ("repo", Var (params.repo, Option String));
+           ("limit", Var (params.limit, Int));
          ])
       ~url
       ~responses:Responses.t
@@ -519,13 +556,23 @@ module List_dirspaces = struct
     type t = {
       d : D.t option; [@default None]
       installation_id : string;
-      limit : int option; [@default None]
+      limit : int; [@default 20]
       page : Page.t option; [@default None]
       q : string option; [@default None]
       tz : string option; [@default None]
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (array (string "page"))
+    /? option (string "q")
+    /? option (ud "d" (fun value -> CCResult.to_opt (Parameters.D.t_of_yojson (`String value))))
+    /? option (string "tz")
+    /? option_default 20 (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -577,7 +624,7 @@ module List_dirspaces = struct
            ("q", Var (params.q, Option String));
            ("d", Var (params.d, Option (Enum D.t_to_yojson)));
            ("tz", Var (params.tz, Option String));
-           ("limit", Var (params.limit, Option Int));
+           ("limit", Var (params.limit, Int));
          ])
       ~url
       ~responses:Responses.t

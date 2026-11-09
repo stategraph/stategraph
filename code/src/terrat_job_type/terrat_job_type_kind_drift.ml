@@ -12,6 +12,7 @@ end
 
 type t = {
   reconcile : bool; [@default false]
+  restart_on_change : bool; [@default true]
   type_ : Type_.t; [@key "type"]
 }
 [@@deriving yojson { strict = true; meta = true }, make, show, eq]

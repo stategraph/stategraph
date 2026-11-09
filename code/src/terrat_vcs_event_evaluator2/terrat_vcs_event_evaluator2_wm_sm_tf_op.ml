@@ -849,8 +849,13 @@ struct
           ->
     match type_ with
     | Tjc.Job.Type_.(
-        ( Plan { tag_query; kind = Some (Kind.Drift _) as kind }
-        | Apply { tag_query; kind = Some (Kind.Drift _) as kind; force = _ } )) -> (
+        ( Plan { tag_query; kind = Some (Kind.Drift { restart_on_change; reconcile = _ }) as kind }
+        | Apply
+            {
+              tag_query;
+              kind = Some (Kind.Drift { restart_on_change; reconcile = _ }) as kind;
+              force = _;
+            } )) -> (
         Builder.run_db s ~f:(fun db ->
             S.Db.query_job_restart ~request_id:(Builder.log_id s) ~job_id db
             >>= fun restart ->
@@ -861,7 +866,11 @@ struct
         >>= function
         | `Exists -> Abbs_fc.return_ok ()
         | `Restarts restarts -> (
-            match Staleness.Drift_result.restart ~restarts with
+            match Staleness.Drift_result.restart ~restart_on_change ~restarts with
+            | Staleness.Drift_result.Disabled ->
+                Logs.info (fun m ->
+                    m "%s : DRIFT : RESTART_DISABLED : restarts=%d" (Builder.log_id s) restarts);
+                Abbs_fc.return_ok ()
             | Staleness.Drift_result.Limit_reached ->
                 Logs.info (fun m ->
                     m "%s : DRIFT : RESTART_LIMIT : restarts=%d" (Builder.log_id s) restarts);

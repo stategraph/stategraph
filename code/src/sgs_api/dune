@@ -78,6 +78,7 @@
  (name sgs_api)
  (wrapped false)
  (libraries
+  brtl
   containers
   json_schema
   openapi

@@ -34,6 +34,21 @@ module GetApiV4ProjectsIdRepositoryTree = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "ref")
+    /? option (string "path")
+    /? option_default false (bool "recursive")
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option_default
+         `Legacy
+         (ud "pagination" (fun value ->
+              CCResult.to_opt (Parameters.Pagination.t_of_yojson (`String value))))
+    /? option (string "page_token")
+
   module Responses = struct
     module OK = struct
       type t = Gitlabc_components.API_Entities_TreeObject.t list
@@ -310,6 +325,22 @@ module GetApiV4ProjectsIdRepositoryTags = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default
+         `Desc
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option_default
+         `Updated
+         (ud "order_by" (fun value ->
+              CCResult.to_opt (Parameters.Order_by.t_of_yojson (`String value))))
+    /? option (string "search")
+    /? option (string "page_token")
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -461,6 +492,11 @@ module GetApiV4ProjectsIdRepositoryMergeBase = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? array (string "refs")
+
   module Responses = struct
     module OK = struct end
 
@@ -497,6 +533,11 @@ module GetApiV4ProjectsIdRepositoryFilesFilePathRaw = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "ref") /? option_default false (bool "lfs")
 
   module Responses = struct
     module OK = struct end
@@ -535,6 +576,11 @@ module GetApiV4ProjectsIdRepositoryFilesFilePathBlame = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "ref" /? int "range[start]" /? int "range[end]"
 
   module Responses = struct
     module OK = struct end
@@ -579,6 +625,16 @@ module DeleteApiV4ProjectsIdRepositoryFilesFilePath = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? string "branch"
+    /? string "commit_message"
+    /? option (string "start_branch")
+    /? option (string "author_email")
+    /? option (string "author_name")
 
   module Responses = struct
     module No_content = struct end
@@ -700,6 +756,11 @@ module GetApiV4ProjectsIdRepositoryFilesFilePath = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "ref"
+
   module Responses = struct
     module OK = struct
       module Encoding = struct
@@ -814,6 +875,21 @@ module GetApiV4ProjectsIdRepositoryContributors = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option (string "ref")
+    /? option_default
+         `Commits
+         (ud "order_by" (fun value ->
+              CCResult.to_opt (Parameters.Order_by.t_of_yojson (`String value))))
+    /? option_default
+         `Asc
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+
   module Responses = struct
     module OK = struct end
 
@@ -858,6 +934,16 @@ module GetApiV4ProjectsIdRepositoryCompare = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? string "from"
+    /? string "to"
+    /? option (int "from_project_id")
+    /? option_default false (bool "straight")
+    /? option_default false (bool "unidiff")
 
   module Responses = struct
     module OK = struct
@@ -947,6 +1033,25 @@ module GetApiV4ProjectsIdRepositoryCommitsShaStatuses = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "ref")
+    /? option (string "stage")
+    /? option (string "name")
+    /? option (int "pipeline_id")
+    /? option_default false (bool "all")
+    /? option_default
+         `Id
+         (ud "order_by" (fun value ->
+              CCResult.to_opt (Parameters.Order_by.t_of_yojson (`String value))))
+    /? option_default
+         `Asc
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -1049,6 +1154,11 @@ module GetApiV4ProjectsIdRepositoryCommitsShaSequence = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default false (bool "first_parent")
 
   module Responses = struct
     module OK = struct end
@@ -1163,6 +1273,16 @@ module GetApiV4ProjectsIdRepositoryCommitsShaRefs = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default
+         `All
+         (ud "type" (fun value -> CCResult.to_opt (Parameters.Type.t_of_yojson (`String value))))
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -1209,6 +1329,11 @@ module GetApiV4ProjectsIdRepositoryCommitsShaMergeRequests = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -1251,6 +1376,14 @@ module GetApiV4ProjectsIdRepositoryCommitsShaDiff = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option_default false (bool "unidiff")
 
   module Responses = struct
     module OK = struct end
@@ -1347,6 +1480,11 @@ module GetApiV4ProjectsIdRepositoryCommitsShaComments = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -1436,6 +1574,11 @@ module GetApiV4ProjectsIdRepositoryCommitsSha = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default true (bool "stats")
 
   module Responses = struct
     module OK = struct end
@@ -1559,6 +1702,25 @@ module GetApiV4ProjectsIdRepositoryCommits = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "ref_name")
+    /? option (string "since")
+    /? option (string "until")
+    /? option (string "path")
+    /? option (string "author")
+    /? option (bool "all")
+    /? option (bool "with_stats")
+    /? option (bool "first_parent")
+    /? option_default
+         `Default
+         (ud "order" (fun value -> CCResult.to_opt (Parameters.Order.t_of_yojson (`String value))))
+    /? option_default false (bool "trailers")
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct
       type t = Gitlabc_components.API_Entities_Commit.t list
@@ -1665,6 +1827,17 @@ module GetApiV4ProjectsIdRepositoryChangelog = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? string "version"
+    /? option (string "from")
+    /? option (string "to")
+    /? option (string "date")
+    /? option_default "Changelog" (string "trailer")
+    /? option (string "config_file")
 
   module Responses = struct
     module OK = struct end
@@ -1936,6 +2109,18 @@ module GetApiV4ProjectsIdRepositoryBranches = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option (string "search")
+    /? option (string "regex")
+    /? option
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option (string "page_token")
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -2054,6 +2239,16 @@ module GetApiV4ProjectsIdRepositoryArchive = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "sha")
+    /? option (string "format")
+    /? option (string "path")
+    /? option_default true (bool "include_lfs_blobs")
+    /? option (array (string "exclude_paths"))
 
   module Responses = struct
     module OK = struct end

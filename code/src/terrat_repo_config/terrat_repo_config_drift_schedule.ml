@@ -32,6 +32,7 @@ end
 
 type t = {
   reconcile : bool; [@default false]
+  restart_on_change : bool; [@default true]
   schedule : Schedule.t;
   tag_query : string;
   window : Window.t option; [@default None]

@@ -9,6 +9,13 @@ module DeleteApiV4ProjectsIdMembersUserId = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default false (bool "skip_subresources")
+    /? option_default false (bool "unassign_issuables")
+
   module Responses = struct
     module No_content = struct end
 
@@ -189,6 +196,18 @@ module GetApiV4ProjectsIdMembersAll = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "query")
+    /? option (array (int "user_ids"))
+    /? option (bool "show_seat_info")
+    /? option
+         (ud "state" (fun value -> CCResult.to_opt (Parameters.State.t_of_yojson (`String value))))
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct end
 
@@ -279,6 +298,18 @@ module GetApiV4ProjectsIdMembers = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "query")
+    /? option (array (int "user_ids"))
+    /? option (array (int "skip_users"))
+    /? option (bool "show_seat_info")
+    /? option (bool "with_saml_identity")
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end

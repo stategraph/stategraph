@@ -468,6 +468,7 @@ repo_configs as not materialized (
 drift_schedules as not materialized (
   select
     ds.reconcile as reconcile,
+    ds.restart_on_change as restart_on_change,
     ds.schedule as schedule,
     ds.updated_at as updated_at,
     ds.tag_query as tag_query,
@@ -480,6 +481,7 @@ drift_schedules as not materialized (
   union all
   select
     ds.reconcile as reconcile,
+    ds.restart_on_change as restart_on_change,
     ds.schedule as schedule,
     ds.updated_at as updated_at,
     ds.tag_query as tag_query,

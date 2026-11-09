@@ -234,6 +234,11 @@ module Diff_range = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "name")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Dependency_graph_diff.t

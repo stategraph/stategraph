@@ -614,6 +614,7 @@ module Drift : sig
       tag_query : Tag_query.t;
       schedule : Sched.t;
       reconcile : bool; [@default false]
+      restart_on_change : bool; [@default true]
       window : Window.t option;
     }
     [@@deriving make, show, yojson, eq]

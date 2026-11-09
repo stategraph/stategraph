@@ -448,6 +448,316 @@ let request_param_of_op_params base_module_name components param_in params =
                Gen.tuple [ Exp.constant (Const.string p.Parameter.name); type_desc ])
            |> Gen.make_list))
 
+let exp_ident name = Ast_helper.Exp.ident (Location.mknoloc (Gen.ident name))
+let exp_apply f args = Ast_helper.Exp.apply f (CCList.map (fun arg -> (Asttypes.Nolabel, arg)) args)
+
+(* [fun <var> -> <body>] *)
+let exp_fun var body =
+  Ast_helper.Exp.function_
+    [
+      {
+        Parsetree.pparam_loc = Location.none;
+        pparam_desc =
+          Parsetree.Pparam_val (Asttypes.Nolabel, None, Ast_helper.Pat.var (Location.mknoloc var));
+      };
+    ]
+    None
+    (Parsetree.Pfunction_body body)
+
+(* [fun value -> CCResult.to_opt (<enum_module>.t_of_yojson (`String value))]: the generated enum
+   module maps each string to its variant, so the parser does not repeat the values. *)
+let enum_query_parser enum_module =
+  exp_fun
+    "value"
+    (exp_apply
+       (exp_ident [ "CCResult"; "to_opt" ])
+       [
+         exp_apply
+           (exp_ident (enum_module @ [ "t_of_yojson" ]))
+           [ Ast_helper.Exp.variant "String" (Some (exp_ident [ "value" ])) ];
+       ])
+
+let integer_enum_query_extractor
+    param_name
+    values
+    ~parse_function
+    ~parse_enum_value
+    ~to_string
+    ~to_constant
+    typ =
+  let open Ast_helper in
+  let values =
+    CCList.map parse_enum_value values
+    |> CCList.uniq ~eq:(fun a b -> CCString.equal (to_string a) (to_string b))
+  in
+  let some = Location.mknoloc (Gen.ident [ "Some" ]) in
+  let cases =
+    CCList.map
+      (fun value ->
+        let constant = to_constant value in
+        Exp.case
+          (Pat.construct some (Some ([], Pat.constant constant)))
+          (Exp.construct some (Some (Exp.constant constant))))
+      values
+  in
+  let fallback =
+    Exp.case (Pat.any ()) (Exp.construct (Location.mknoloc (Gen.ident [ "None" ])) None)
+  in
+  let parse =
+    exp_fun
+      "value"
+      (Exp.match_
+         (exp_apply (exp_ident parse_function) [ exp_ident [ "value" ] ])
+         (cases @ [ fallback ]))
+  in
+  let parse =
+    Exp.constraint_ parse (Typ.arrow Asttypes.Nolabel Gen.prim_string (Gen.option [ typ ]))
+  in
+  exp_apply (exp_ident [ "ud" ]) [ Exp.constant (Const.string param_name); parse ]
+
+(* A query string does not tell a scalar from a one element array: the client sends [V0 "a"] and
+   [V1 [ "a" ]] both as [name=a]. The alternatives are tried in the order of the schema, and a scalar
+   alternative matches only one value. Thus [name=a] gives the first scalar alternative, and
+   [name=a,b] gives the first array alternative. The values are parsed into the types of the
+   variant module of the parameter, [Parameters.<Name>.V<idx>], which the client also uses. *)
+let one_of_query_extractor base_module_name components param_name alternatives =
+  let open Ast_helper in
+  (* An expression of type [string -> 'a option]. *)
+  let scalar_parser enum_module = function
+    | { Schema.typ = Some "string"; enum = Some _; _ } -> enum_query_parser enum_module
+    | { Schema.typ = Some ("string" | "text" | "symbol" | "file"); _ } ->
+        exp_ident [ "CCOption"; "return" ]
+    | { Schema.typ = Some "integer"; format = Some "int64"; enum = None; _ } ->
+        exp_ident [ "CCInt64"; "of_string" ]
+    | { Schema.typ = Some "integer"; enum = None; _ } -> exp_ident [ "CCInt"; "of_string" ]
+    | { Schema.typ = Some "boolean"; _ } -> exp_ident [ "bool_of_string_opt" ]
+    | schema -> failwith ("Unsupported oneOf query parameter alternative: " ^ Schema.show_t_ schema)
+  in
+  let values = exp_ident [ "values" ] in
+  let alternative idx schema_value =
+    let variant = [ "Parameters"; module_name_of_string param_name; Printf.sprintf "V%d" idx ] in
+    let parsed =
+      match resolve_schema_ref components schema_value with
+      | { Schema.typ = Some "array"; items = Some items; _ } ->
+          let items_enum_module =
+            match items with
+            | Value.Ref ref_ -> module_name_of_ref base_module_name "paths" ref_
+            | Value.V _ -> variant @ [ "Items" ]
+          in
+          exp_apply
+            (exp_ident [ "CCOption"; "sequence_l" ])
+            [
+              exp_apply
+                (exp_ident [ "CCList"; "map" ])
+                [ scalar_parser items_enum_module (resolve_schema_ref components items); values ];
+            ]
+      | schema ->
+          let one_value =
+            Pat.construct
+              (Location.mknoloc (Gen.ident [ "::" ]))
+              (Some
+                 ( [],
+                   Pat.tuple
+                     [
+                       (None, Pat.var (Location.mknoloc "value"));
+                       (None, Pat.construct (Location.mknoloc (Gen.ident [ "[]" ])) None);
+                     ]
+                     Asttypes.Closed ))
+          in
+          Exp.match_
+            values
+            [
+              Exp.case
+                one_value
+                (exp_apply (scalar_parser variant schema) [ exp_ident [ "value" ] ]);
+              Exp.case (Pat.any ()) (Exp.construct (Location.mknoloc (Gen.ident [ "None" ])) None);
+            ]
+    in
+    exp_apply
+      (exp_ident [ "CCOption"; "map" ])
+      [
+        exp_fun
+          "v"
+          (Exp.construct (Location.mknoloc (Gen.ident variant)) (Some (exp_ident [ "v" ])));
+        parsed;
+      ]
+  in
+  exp_apply
+    (exp_ident [ "ud_array" ])
+    [
+      Exp.constant (Const.string param_name);
+      exp_fun
+        "values"
+        (exp_apply
+           (exp_ident [ "CCOption"; "choice" ])
+           [ Gen.make_list (CCList.mapi alternative alternatives) ]);
+    ]
+
+let rec query_extractor_of_schema
+    ?(enum_module_suffix = [])
+    base_module_name
+    components
+    param_name
+    schema_value
+    schema =
+  let open Ast_helper in
+  let query_apply name args = exp_apply (exp_ident [ name ]) args in
+  let string s = Exp.constant (Const.string s) in
+  match schema with
+  | { Schema.typ = Some "array"; items = Some items; _ } ->
+      query_apply
+        "array"
+        [
+          query_extractor_of_schema
+            base_module_name
+            components
+            param_name
+            items
+            (resolve_schema_ref components items)
+            ~enum_module_suffix:
+              (match items with
+              | Value.Ref _ -> []
+              | Value.V _ -> "Items" :: enum_module_suffix);
+        ]
+  | { Schema.typ = Some "string"; enum = Some _; _ } ->
+      let enum_module =
+        match schema_value with
+        | Value.Ref ref_ -> module_name_of_ref base_module_name "paths" ref_
+        | Value.V _ -> [ "Parameters"; module_name_of_string param_name ] @ enum_module_suffix
+      in
+      query_apply "ud" [ string param_name; enum_query_parser enum_module ]
+  | { Schema.typ = Some "string"; format = Some "uuid"; _ } ->
+      query_apply "uuid" [ string param_name ]
+  | { Schema.typ = Some ("string" | "text" | "symbol" | "file"); _ } ->
+      query_apply "string" [ string param_name ]
+  | { Schema.typ = Some "integer"; format = Some "int64"; enum = Some values; _ } ->
+      integer_enum_query_extractor
+        param_name
+        values
+        ~parse_function:[ "CCInt64"; "of_string" ]
+        ~parse_enum_value:(function
+          | `Int value -> Int64.of_int value
+          | `Intlit value -> (
+              match CCInt64.of_string value with
+              | Some value -> value
+              | None -> failwith ("Integer enum value is out of int64 range: " ^ value))
+          | value -> failwith ("Expected integer enum value, got: " ^ Yojson.Safe.to_string value))
+        ~to_string:Int64.to_string
+        ~to_constant:Const.int64
+        (Gen.qualified_type [ "int64" ])
+  | { Schema.typ = Some "integer"; format = Some "int64"; _ } ->
+      query_apply "ud" [ string param_name; exp_ident [ "CCInt64"; "of_string" ] ]
+  | { Schema.typ = Some "integer"; enum = Some values; _ } ->
+      integer_enum_query_extractor
+        param_name
+        values
+        ~parse_function:[ "CCInt"; "of_string" ]
+        ~parse_enum_value:(function
+          | `Int value -> value
+          | `Intlit value -> (
+              match CCInt.of_string value with
+              | Some value -> value
+              | None -> failwith ("Integer enum value is out of int range: " ^ value))
+          | value -> failwith ("Expected integer enum value, got: " ^ Yojson.Safe.to_string value))
+        ~to_string:string_of_int
+        ~to_constant:Const.int
+        Gen.prim_int
+  | { Schema.typ = Some "integer"; _ } -> query_apply "int" [ string param_name ]
+  | { Schema.typ = Some "boolean"; _ } -> query_apply "bool" [ string param_name ]
+  | { Schema.one_of = Some alternatives; _ } ->
+      one_of_query_extractor base_module_name components param_name alternatives
+  | schema -> failwith ("Unsupported query parameter schema: " ^ Schema.show_t_ schema)
+
+let query_default_of_schema param_name schema =
+  match schema.Schema.default with
+  | None -> None
+  | Some default -> (
+      let fail () =
+        failwith
+          (Printf.sprintf
+             "Unsupported query parameter default for %S: %s"
+             param_name
+             (Yojson.Safe.to_string default))
+      in
+      let supported =
+        match default with
+        | `String _ | `Bool _ | `Float _ | `Int _ | `List [] -> true
+        | `List values ->
+            CCList.for_all
+              (function
+                | `String _ -> true
+                | _ -> false)
+              values
+        | _ -> false
+      in
+      if not supported then fail ();
+      match field_default_of_value schema.Schema.typ schema.Schema.enum default with
+      | Some default -> Some default
+      | None -> fail ())
+
+(* Keep server route query parsing tied to the same OpenAPI parameter declarations used by the
+   generated client request. The helper is deliberately just a route transformer, so a service can
+   compose it with its hand-written path and body matchers. *)
+let route_function base_module_name components params =
+  let params =
+    params
+    |> CCList.filter_map (fun param ->
+        let param = resolve_parameter_ref components param in
+        if CCString.equal param.Parameter.in_ "query" then Some param else None)
+  in
+  match params with
+  | [] -> None
+  | params ->
+      let open Ast_helper in
+      let route = exp_ident [ "base_route" ] in
+      let route =
+        CCList.fold_left
+          (fun route param ->
+            let schema = resolve_schema_ref components param.Parameter.schema in
+            let extractor =
+              query_extractor_of_schema
+                base_module_name
+                components
+                param.Parameter.name
+                param.Parameter.schema
+                schema
+            in
+            let extractor =
+              match (param.Parameter.required, schema.Schema.nullable) with
+              | true, false -> extractor
+              | _, true -> (
+                  match query_default_of_schema param.Parameter.name schema with
+                  | Some default ->
+                      let default =
+                        Exp.construct (Location.mknoloc (Gen.ident [ "Some" ])) (Some default)
+                      in
+                      exp_apply
+                        (exp_ident [ "option_default" ])
+                        [ default; exp_apply (exp_ident [ "option" ]) [ extractor ] ]
+                  | None -> exp_apply (exp_ident [ "option" ]) [ extractor ])
+              | false, false -> (
+                  match query_default_of_schema param.Parameter.name schema with
+                  | Some default ->
+                      exp_apply (exp_ident [ "option_default" ]) [ default; extractor ]
+                  | None -> exp_apply (exp_ident [ "option" ]) [ extractor ])
+            in
+            exp_apply (exp_ident [ "/?" ]) [ route; extractor ])
+          route
+          params
+      in
+      let route =
+        Exp.struct_item
+          (Str.open_ (Opn.mk (Mod.ident (Location.mknoloc (Gen.ident [ "Brtl_rtng"; "Route" ])))))
+          route
+      in
+      let route =
+        Exp.struct_item
+          (Str.open_
+             (Opn.mk (Mod.ident (Location.mknoloc (Gen.ident [ "Brtl_rtng"; "Route"; "Query" ])))))
+          route
+      in
+      Some (Gen.make_func "route" (exp_fun "base_route" route))
+
 (* To convert an operation we need to convert the parameters, request body, and
    responses.  The resulting module will have a function to create a
    [Openapi.Request] value.
@@ -847,7 +1157,11 @@ let convert_str_operation strict_records base_module_name components uritmpl op_
       | Some (Value.Ref _) -> failwith "request body ref not supported"
       | Some (Value.V _) | None -> make_params)
   in
-  (operation_id, parameters_module @ request_body @ [ responses; url; make ])
+  ( operation_id,
+    parameters_module
+    @ request_body
+    @ CCOption.to_list (route_function base_module_name components op.Operation.parameters)
+    @ [ responses; url; make ] )
 
 let convert_str_components
     strict_records

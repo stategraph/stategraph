@@ -7,6 +7,11 @@ module Delete = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "id"
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -99,12 +104,17 @@ module List = struct
     end
 
     type t = {
-      limit : int option; [@default None]
+      limit : int; [@default 20]
       page : Page.t option; [@default None]
       vcs : string;
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 20 (int "limit") /? option (array (string "page"))
 
   module Responses = struct
     module OK = struct
@@ -138,10 +148,7 @@ module List = struct
       ~query_params:
         (let open Openapi.Request.Var in
          let open Parameters in
-         [
-           ("limit", Var (params.limit, Option Int));
-           ("page", Var (params.page, Option (Array String)));
-         ])
+         [ ("limit", Var (params.limit, Int)); ("page", Var (params.page, Option (Array String))) ])
       ~url
       ~responses:Responses.t
       `Get

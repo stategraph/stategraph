@@ -228,6 +228,13 @@ module GetApiV4GroupsIdAccessTokens = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option
+         (ud "state" (fun value -> CCResult.to_opt (Parameters.State.t_of_yojson (`String value))))
+
   module Responses = struct
     module OK = struct end
 

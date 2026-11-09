@@ -347,6 +347,11 @@ module GetApiV4UserKeys = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct end
 
@@ -493,6 +498,11 @@ module GetApiV4UserGpgKeys = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct end
 
@@ -611,6 +621,11 @@ module GetApiV4UserEmails = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct end
 
@@ -673,6 +688,14 @@ module GetApiV4UserActivities = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default "2024-09-05T09:41:43.021Z" (string "from")
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end

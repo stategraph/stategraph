@@ -3908,14 +3908,15 @@
       },
       "tenant-member": {
         "additionalProperties": false,
-        "description": "One active member of a tenant as the administration UI lists them: identity, when they joined, and how their capability grant covers this tenant. The `*_scope` fields distinguish a grant scoped exactly to this tenant from one that reaches wider, because a wider grant cannot be edited from here.",
+        "description": "One active member of a tenant as the administration UI lists them: identity, when they joined, and how their capability grant covers this tenant. The `*_scope` fields distinguish a grant scoped exactly to this tenant from one that reaches wider -- some other tenants too, or every tenant -- because a grant that reaches wider cannot be edited from here.",
         "properties": {
           "admin_scope": {
-            "description": "How the member's admin grant covers this tenant: `none` (not an admin here), `tenant` (scoped exactly to this tenant), or `wider` (reaches beyond it -- installation-wide or a broader pattern). A `wider` grant cannot be changed through the tenant membership endpoints, so the UI disables demote and remove for such a member.",
+            "description": "How the member's admin grant covers this tenant: `none` (not an admin here), `tenant` (scoped exactly to this tenant), `wider` (reaches beyond it without covering every tenant), or `instance` (an installation-wide admin). A `wider` or `instance` grant cannot be changed through the tenant membership endpoints, so the UI disables demote and remove for such a member.",
             "enum": [
               "none",
               "tenant",
-              "wider"
+              "wider",
+              "instance"
             ],
             "type": "string"
           },
@@ -3944,11 +3945,12 @@
             "type": "string"
           },
           "users_manage_scope": {
-            "description": "How the member's `users-manage` grant covers this tenant, with the same `none` / `tenant` / `wider` meaning as `admin_scope`.",
+            "description": "How the member's `users-manage` grant covers this tenant, with the same `none` / `tenant` / `wider` / `instance` meaning as `admin_scope`.",
             "enum": [
               "none",
               "tenant",
-              "wider"
+              "wider",
+              "instance"
             ],
             "type": "string"
           }
@@ -7969,6 +7971,7 @@
             "name": "limit",
             "required": false,
             "schema": {
+              "default": 20,
               "type": "integer"
             }
           }
@@ -8025,6 +8028,7 @@
             "name": "max_depth",
             "required": false,
             "schema": {
+              "default": 100,
               "type": "integer"
             }
           },
@@ -8034,6 +8038,7 @@
             "name": "limit",
             "required": false,
             "schema": {
+              "default": 1000,
               "type": "integer"
             }
           }
@@ -8092,6 +8097,7 @@
             "name": "limit",
             "required": false,
             "schema": {
+              "default": 20,
               "type": "integer"
             }
           }
@@ -9528,6 +9534,7 @@
             "name": "limit",
             "required": false,
             "schema": {
+              "default": 20,
               "type": "integer"
             }
           }
@@ -9582,6 +9589,10 @@
             "required": false,
             "schema": {
               "default": "cache",
+              "enum": [
+                "cache",
+                "no-cache"
+              ],
               "type": "string"
             }
           }
@@ -9712,6 +9723,7 @@
             "name": "limit",
             "required": false,
             "schema": {
+              "default": 25,
               "type": "integer"
             }
           }
@@ -10085,6 +10097,7 @@
             "name": "limit",
             "required": false,
             "schema": {
+              "default": 25,
               "type": "integer"
             }
           }
@@ -10426,6 +10439,7 @@
             "name": "limit",
             "required": false,
             "schema": {
+              "default": 20,
               "type": "integer"
             }
           }
@@ -10632,6 +10646,7 @@
             "name": "limit",
             "required": false,
             "schema": {
+              "default": 20,
               "type": "integer"
             }
           },
@@ -11507,6 +11522,7 @@
             "name": "limit",
             "required": false,
             "schema": {
+              "default": 20,
               "type": "integer"
             }
           }

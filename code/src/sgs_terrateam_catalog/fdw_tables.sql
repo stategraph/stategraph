@@ -18,6 +18,7 @@ create foreign table terrateam.dirspace_pull_request_locks (
 drop foreign table if exists terrateam.drift_schedules;
 create foreign table terrateam.drift_schedules (
   reconcile boolean,
+  restart_on_change boolean,
   schedule text,
   updated_at timestamptz,
   tag_query text,

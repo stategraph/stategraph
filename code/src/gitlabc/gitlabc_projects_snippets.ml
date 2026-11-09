@@ -235,6 +235,11 @@ module GetApiV4ProjectsIdSnippetsSnippetIdNotesNoteIdAwardEmoji = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -467,6 +472,11 @@ module GetApiV4ProjectsIdSnippetsSnippetIdAwardEmoji = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -692,6 +702,11 @@ module GetApiV4ProjectsIdSnippets = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end

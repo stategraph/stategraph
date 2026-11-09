@@ -7,6 +7,11 @@ module GetApiV4ProjectsIdShareLocations = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "search")
+
   module Responses = struct
     module OK = struct end
 

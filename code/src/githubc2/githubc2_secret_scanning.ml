@@ -540,6 +540,25 @@ module List_repo_custom_patterns = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option
+         (ud "state" (fun value -> CCResult.to_opt (Parameters.State.t_of_yojson (`String value))))
+    /? option
+         (ud "push_protection" (fun value ->
+              CCResult.to_opt (Parameters.Push_protection.t_of_yojson (`String value))))
+    /? option_default
+         `Created
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option (string "before")
+    /? option (string "after")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Secret_scanning_custom_pattern.t list
@@ -608,6 +627,11 @@ module List_locations_for_alert = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -878,6 +902,11 @@ module Get_alert = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default false (bool "hide_secret")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Secret_scanning_alert_with_metadata.t
@@ -1021,6 +1050,37 @@ module List_alerts_for_repo = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option
+         (ud "state" (fun value -> CCResult.to_opt (Parameters.State.t_of_yojson (`String value))))
+    /? option (string "secret_type")
+    /? option (string "exclude_secret_types")
+    /? option (string "exclude_providers")
+    /? option (string "providers")
+    /? option (string "resolution")
+    /? option (string "assignee")
+    /? option_default
+         `Created
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
+    /? option (string "before")
+    /? option (string "after")
+    /? option (string "validity")
+    /? option_default false (bool "is_publicly_leaked")
+    /? option_default false (bool "is_multi_repo")
+    /? option_default false (bool "hide_secret")
+    /? option (bool "is_bypassed")
+    /? option (string "included_metadata")
+    /? option (string "owner_email_hash")
 
   module Responses = struct
     module OK = struct
@@ -1700,6 +1760,25 @@ module List_org_custom_patterns = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option
+         (ud "state" (fun value -> CCResult.to_opt (Parameters.State.t_of_yojson (`String value))))
+    /? option
+         (ud "push_protection" (fun value ->
+              CCResult.to_opt (Parameters.Push_protection.t_of_yojson (`String value))))
+    /? option_default
+         `Created
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option (string "before")
+    /? option (string "after")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Secret_scanning_custom_pattern.t list
@@ -1838,6 +1917,37 @@ module List_alerts_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option
+         (ud "state" (fun value -> CCResult.to_opt (Parameters.State.t_of_yojson (`String value))))
+    /? option (string "secret_type")
+    /? option (string "exclude_secret_types")
+    /? option (string "exclude_providers")
+    /? option (string "providers")
+    /? option (string "resolution")
+    /? option (string "assignee")
+    /? option_default
+         `Created
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
+    /? option (string "before")
+    /? option (string "after")
+    /? option (string "validity")
+    /? option_default false (bool "is_publicly_leaked")
+    /? option_default false (bool "is_multi_repo")
+    /? option_default false (bool "hide_secret")
+    /? option (bool "is_bypassed")
+    /? option (string "included_metadata")
+    /? option (string "owner_email_hash")
 
   module Responses = struct
     module OK = struct

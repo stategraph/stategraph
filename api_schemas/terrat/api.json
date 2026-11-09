@@ -2982,6 +2982,7 @@
             "name": "limit",
             "required": false,
             "schema": {
+              "default": 20,
               "type": "integer"
             }
           }
@@ -3061,6 +3062,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -3112,6 +3122,15 @@
                 "type": "string"
               },
               "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "type": "integer"
             }
           }
         ],
@@ -3292,6 +3311,7 @@
             "name": "limit",
             "required": false,
             "schema": {
+              "default": 20,
               "type": "integer"
             }
           }
@@ -3425,6 +3445,7 @@
             "name": "limit",
             "required": false,
             "schema": {
+              "default": 20,
               "type": "integer"
             }
           },
@@ -3700,6 +3721,7 @@
             "name": "limit",
             "required": false,
             "schema": {
+              "default": 20,
               "type": "integer"
             }
           }
@@ -3762,6 +3784,15 @@
                 "type": "string"
               },
               "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "type": "integer"
             }
           }
         ],
@@ -3904,6 +3935,7 @@
             "name": "limit",
             "required": false,
             "schema": {
+              "default": 20,
               "type": "integer"
             }
           }
@@ -4037,6 +4069,7 @@
             "name": "limit",
             "required": false,
             "schema": {
+              "default": 20,
               "type": "integer"
             }
           },
@@ -4282,6 +4315,7 @@
             "name": "limit",
             "required": false,
             "schema": {
+              "default": 20,
               "type": "integer"
             }
           },

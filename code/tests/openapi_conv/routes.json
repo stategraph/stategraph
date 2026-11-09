@@ -1,0 +1,43 @@
+{
+  "paths": {
+    "/alerts": {
+      "get": {
+        "operationId": "alerts/list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "has",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                { "type": "string" },
+                { "type": "array", "items": { "type": "string", "enum": ["patch"] } }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "cwes",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                { "type": "string" },
+                { "type": "array", "items": { "type": "string" } }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "environment",
+            "required": false,
+            "schema": { "type": "string", "nullable": true, "default": "none" }
+          }
+        ],
+        "responses": {
+          "200": {}
+        }
+      }
+    }
+  },
+  "components": {}
+}

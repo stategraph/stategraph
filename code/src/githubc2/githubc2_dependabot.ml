@@ -185,6 +185,11 @@ module List_repo_secrets = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -640,6 +645,49 @@ module List_alerts_for_repo = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "classification")
+    /? option (string "state")
+    /? option (string "severity")
+    /? option (string "ecosystem")
+    /? option (string "package")
+    /? option (string "manifest")
+    /? option (string "epss_percentage")
+    /? option
+         (ud_array "has" (fun values ->
+              CCOption.choice
+                [
+                  CCOption.map
+                    (fun v -> Parameters.Has.V0 v)
+                    (match values with
+                    | value :: [] -> CCOption.return value
+                    | _ -> None);
+                  CCOption.map
+                    (fun v -> Parameters.Has.V1 v)
+                    (CCOption.sequence_l
+                       (CCList.map
+                          (fun value ->
+                            CCResult.to_opt (Parameters.Has.V1.Items.t_of_yojson (`String value)))
+                          values));
+                ]))
+    /? option (string "assignee")
+    /? option
+         (ud "scope" (fun value -> CCResult.to_opt (Parameters.Scope.t_of_yojson (`String value))))
+    /? option (string "relationship")
+    /? option_default
+         `Created
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option (string "before")
+    /? option (string "after")
+    /? option_default 30 (int "per_page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Dependabot_alert.t list
@@ -870,6 +918,11 @@ module List_selected_repos_for_org_secret = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -1133,6 +1186,11 @@ module List_org_secrets = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -1331,6 +1389,11 @@ module Repository_access_for_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Dependabot_repository_access_details.t
@@ -1495,6 +1558,51 @@ module List_alerts_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "classification")
+    /? option (string "state")
+    /? option (string "severity")
+    /? option (string "ecosystem")
+    /? option (string "package")
+    /? option (string "epss_percentage")
+    /? option (string "artifact_registry_url")
+    /? option (string "artifact_registry")
+    /? option
+         (ud_array "has" (fun values ->
+              CCOption.choice
+                [
+                  CCOption.map
+                    (fun v -> Parameters.Has.V0 v)
+                    (match values with
+                    | value :: [] -> CCOption.return value
+                    | _ -> None);
+                  CCOption.map
+                    (fun v -> Parameters.Has.V1 v)
+                    (CCOption.sequence_l
+                       (CCList.map
+                          (fun value ->
+                            CCResult.to_opt (Parameters.Has.V1.Items.t_of_yojson (`String value)))
+                          values));
+                ]))
+    /? option (string "assignee")
+    /? option (string "runtime_risk")
+    /? option
+         (ud "scope" (fun value -> CCResult.to_opt (Parameters.Scope.t_of_yojson (`String value))))
+    /? option (string "relationship")
+    /? option_default
+         `Created
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option (string "before")
+    /? option (string "after")
+    /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -1744,6 +1852,11 @@ module Repository_access_for_enterprise = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Dependabot_repository_access_details.t
@@ -1899,6 +2012,48 @@ module List_alerts_for_enterprise = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "classification")
+    /? option (string "state")
+    /? option (string "severity")
+    /? option (string "ecosystem")
+    /? option (string "package")
+    /? option (string "epss_percentage")
+    /? option
+         (ud_array "has" (fun values ->
+              CCOption.choice
+                [
+                  CCOption.map
+                    (fun v -> Parameters.Has.V0 v)
+                    (match values with
+                    | value :: [] -> CCOption.return value
+                    | _ -> None);
+                  CCOption.map
+                    (fun v -> Parameters.Has.V1 v)
+                    (CCOption.sequence_l
+                       (CCList.map
+                          (fun value ->
+                            CCResult.to_opt (Parameters.Has.V1.Items.t_of_yojson (`String value)))
+                          values));
+                ]))
+    /? option (string "assignee")
+    /? option
+         (ud "scope" (fun value -> CCResult.to_opt (Parameters.Scope.t_of_yojson (`String value))))
+    /? option (string "relationship")
+    /? option_default
+         `Created
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option (string "before")
+    /? option (string "after")
+    /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct

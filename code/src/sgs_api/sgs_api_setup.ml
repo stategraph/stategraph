@@ -224,6 +224,11 @@ module Github_app_callback = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "code") /? option (string "state")
+
   module Responses = struct
     module Found = struct end
 

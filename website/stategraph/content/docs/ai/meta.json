@@ -1,0 +1,5 @@
+{
+  "title": "AI",
+  "order": 7,
+  "description": "Drive Terraform and OpenTofu from Claude Code and other agents: real infrastructure as context, deterministic answers, and scoped access."
+}

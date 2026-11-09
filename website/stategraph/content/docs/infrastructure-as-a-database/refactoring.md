@@ -92,4 +92,4 @@ stategraph refactor abort
 
 - [Refactor commands](/docs/cli/refactor): the command reference.
 - [Setup](/docs/infrastructure-as-a-database/setup): the `stategraph tf` workflow.
-- [AI agents](/docs/infrastructure-as-a-database/ai-agents): the `stategraph-refactor` skill for agents.
+- [Refactor into modules](/docs/ai/guides/refactor): an agent drives the `stategraph-refactor` skill

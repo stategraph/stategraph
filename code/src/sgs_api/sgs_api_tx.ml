@@ -212,6 +212,11 @@ module Plan_operations = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "page") /? option (int "limit")
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Plan_operations.t
@@ -270,6 +275,11 @@ module Output = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "page") /? option (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -382,7 +392,7 @@ module Logs_list = struct
     end
 
     type t = {
-      limit : int option; [@default None]
+      limit : int; [@default 20]
       page : Page.t option; [@default None]
       q : string option; [@default None]
       tx_id : string;
@@ -390,6 +400,15 @@ module Logs_list = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (array (string "page"))
+    /? option (string "q")
+    /? option (string "tz")
+    /? option_default 20 (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -438,7 +457,7 @@ module Logs_list = struct
            ("page", Var (params.page, Option (Array String)));
            ("q", Var (params.q, Option String));
            ("tz", Var (params.tz, Option String));
-           ("limit", Var (params.limit, Option Int));
+           ("limit", Var (params.limit, Int));
          ])
       ~url
       ~responses:Responses.t
@@ -576,6 +595,15 @@ module Apply = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default
+         `Delta
+         (ud "replace" (fun value ->
+              CCResult.to_opt (Parameters.Replace.t_of_yojson (`String value))))
 
   module Responses = struct
     module OK = struct

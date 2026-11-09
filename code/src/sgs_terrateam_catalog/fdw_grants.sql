@@ -11,7 +11,7 @@
 -- test.
 
 grant select (branch_target, path, pull_request, workspace) on dirspace_pull_request_locks to stategraph_mql;
-grant select (reconcile, schedule, updated_at, tag_query, name, repo, branch, last_tried_at) on drift_schedules to stategraph_mql;
+grant select (reconcile, restart_on_change, schedule, updated_at, tag_query, name, repo, branch, last_tried_at) on drift_schedules to stategraph_mql;
 grant select (branch, work_manifest) on drift_work_manifests to stategraph_mql;
 grant select (approver, created_at, sha, pull_request, token) on gate_approvals to stategraph_mql;
 grant select (created_at, dir, gate, sha, workspace, pull_request, name, token) on gates to stategraph_mql;
