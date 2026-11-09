@@ -5,6 +5,21 @@ module Logs = (val Logs.src_log src : Logs.LOG)
 let cache_capacity_mb_in_kb = ( * ) 1024
 let kb_of_bytes b = CCInt.max 1 (b / 1024)
 let fetch_pull_request_tries = 6
+let fetch_commit_checks_tries = 4
+
+(* Whether the body of a response says the ref the call names is gone.  One
+   predicate carries the substring for the two rules that read it: the retry
+   rule below, which refuses the ref-gone verdict, and the dispatch call site,
+   which swallows it. *)
+let ref_not_found resp = CCString.mem ~sub:"No ref found for:" (Openapi.Response.value resp)
+
+type retryable_missing_response_err = [ `Missing_response of string Openapi.Response.t ]
+[@@deriving show]
+
+let retryable_missing_response = function
+  | Error (`Missing_response resp) -> not (ref_not_found resp)
+  | Ok _ | Error _ -> false
+
 let fetch_file_length_of_git_hash = CCString.length "aa2022e256fc3435d05d9d8ca0ef0ad0805e6ea5"
 
 let probably_is_git_hash =
@@ -524,6 +539,12 @@ let fetch_branch_commits ~request_id client repo ref_ =
             Terrat_github.pp_fetch_branch_commits_err
             err);
       Abbs_fc.return_err `Error
+
+type fetch_directory_err =
+  [ Terrat_vcs_api.call_err
+  | `Listing_unavailable
+  ]
+[@@deriving show]
 
 let fetch_directory ~request_id client repo ref_ path =
   let module D = Githubc2_components.Content_directory.Items in
@@ -1098,15 +1119,28 @@ let fetch_commit_checks ~request_id client repo ref_ =
   let open Abb.Future.Infix_monad in
   let owner = Repo.owner repo in
   let repo = Repo.name repo in
-  Abbs_time_it.run
-    (fun time -> Logs.info (fun m -> m "%s : LIST_COMMIT_CHECKS : %f" request_id time))
-    (fun () ->
-      Terrat_vcs_api_github_commit_check.list
-        ~log_id:request_id
-        ~owner
-        ~repo
-        ~ref_
-        client.Client.client)
+  let fetch () =
+    Abbs_time_it.run
+      (fun time -> Logs.info (fun m -> m "%s : LIST_COMMIT_CHECKS : %f" request_id time))
+      (fun () ->
+        Terrat_vcs_api_github_commit_check.list
+          ~log_id:request_id
+          ~owner
+          ~repo
+          ~ref_
+          client.Client.client)
+  in
+  (* A [Missing_response] is a transport fault of the forge, not a verdict on the checks: the
+     request reached it and the answer did not come back.  Retry it with a doubling delay before
+     the caller treats it as a failure, because a failed check read stops the job that asked for
+     it.  A rate limit and a timeout have their own answers below and are not retried here. *)
+  Abbs_fc.retry
+    ~f:fetch
+    ~while_:(Abbs_fc.finite_tries fetch_commit_checks_tries retryable_missing_response)
+    ~betwixt:
+      (Abbs_fc.series ~start:2.0 ~step:(( *. ) 1.5) (fun n _ ->
+           Logs.info (fun m -> m "%s : FETCH_COMMIT_CHECKS_RETRY : delay=%f" request_id n);
+           Abb.Sys.sleep (CCFloat.min n 8.0)))
   >>= function
   | Ok checks ->
       (* Normalize fetched titles so internal comparisons accept both brands. *)

@@ -27,6 +27,27 @@ module List_view_items_for_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option
+         (ud_array "fields" (fun values ->
+              CCOption.choice
+                [
+                  CCOption.map
+                    (fun v -> Parameters.Fields.V0 v)
+                    (match values with
+                    | value :: [] -> CCOption.return value
+                    | _ -> None);
+                  CCOption.map
+                    (fun v -> Parameters.Fields.V1 v)
+                    (CCOption.sequence_l (CCList.map CCOption.return values));
+                ]))
+    /? option (string "before")
+    /? option (string "after")
+    /? option_default 30 (int "per_page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Projects_v2_item_with_content.t list
@@ -312,6 +333,24 @@ module Get_user_item = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option
+         (ud_array "fields" (fun values ->
+              CCOption.choice
+                [
+                  CCOption.map
+                    (fun v -> Parameters.Fields.V0 v)
+                    (match values with
+                    | value :: [] -> CCOption.return value
+                    | _ -> None);
+                  CCOption.map
+                    (fun v -> Parameters.Fields.V1 v)
+                    (CCOption.sequence_l (CCList.map CCOption.return values));
+                ]))
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Projects_v2_item_with_content.t
@@ -544,6 +583,28 @@ module List_items_for_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "before")
+    /? option (string "after")
+    /? option_default 30 (int "per_page")
+    /? option (string "q")
+    /? option
+         (ud_array "fields" (fun values ->
+              CCOption.choice
+                [
+                  CCOption.map
+                    (fun v -> Parameters.Fields.V0 v)
+                    (match values with
+                    | value :: [] -> CCOption.return value
+                    | _ -> None);
+                  CCOption.map
+                    (fun v -> Parameters.Fields.V1 v)
+                    (CCOption.sequence_l (CCList.map CCOption.return values));
+                ]))
 
   module Responses = struct
     module OK = struct
@@ -869,6 +930,14 @@ module List_fields_for_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 30 (int "per_page")
+    /? option (string "before")
+    /? option (string "after")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Projects_v2_field.t list
@@ -1002,6 +1071,15 @@ module List_for_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "q")
+    /? option (string "before")
+    /? option (string "after")
+    /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -1332,6 +1410,27 @@ module List_view_items_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option
+         (ud_array "fields" (fun values ->
+              CCOption.choice
+                [
+                  CCOption.map
+                    (fun v -> Parameters.Fields.V0 v)
+                    (match values with
+                    | value :: [] -> CCOption.return value
+                    | _ -> None);
+                  CCOption.map
+                    (fun v -> Parameters.Fields.V1 v)
+                    (CCOption.sequence_l (CCList.map CCOption.return values));
+                ]))
+    /? option (string "before")
+    /? option (string "after")
+    /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -1782,6 +1881,24 @@ module Get_org_item = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option
+         (ud_array "fields" (fun values ->
+              CCOption.choice
+                [
+                  CCOption.map
+                    (fun v -> Parameters.Fields.V0 v)
+                    (match values with
+                    | value :: [] -> CCOption.return value
+                    | _ -> None);
+                  CCOption.map
+                    (fun v -> Parameters.Fields.V1 v)
+                    (CCOption.sequence_l (CCList.map CCOption.return values));
+                ]))
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Projects_v2_item_with_content.t
@@ -2011,6 +2128,28 @@ module List_items_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "q")
+    /? option
+         (ud_array "fields" (fun values ->
+              CCOption.choice
+                [
+                  CCOption.map
+                    (fun v -> Parameters.Fields.V0 v)
+                    (match values with
+                    | value :: [] -> CCOption.return value
+                    | _ -> None);
+                  CCOption.map
+                    (fun v -> Parameters.Fields.V1 v)
+                    (CCOption.sequence_l (CCList.map CCOption.return values));
+                ]))
+    /? option (string "before")
+    /? option (string "after")
+    /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -2342,6 +2481,14 @@ module List_fields_for_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 30 (int "per_page")
+    /? option (string "before")
+    /? option (string "after")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Projects_v2_field.t list
@@ -2542,6 +2689,15 @@ module List_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "q")
+    /? option (string "before")
+    /? option (string "after")
+    /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct

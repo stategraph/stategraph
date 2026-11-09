@@ -99,6 +99,10 @@ let assert_out_of_order ~expected { Ipr.Selection.to_run = _; out_of_order; appl
 let assert_applied ~expected { Ipr.Selection.to_run = _; out_of_order = _; applied } =
   Oth.Assert.Eq.string_list ~expected ~actual:(dirs_of applied)
 
+(* The answer of [without_in_progress] is the dirspaces to plan, not a selection. *)
+let assert_planned ~expected planned =
+  Oth.Assert.Eq.string_list ~expected ~actual:(dirs_of (Terrat_data.Dirspace_set.elements planned))
+
 (* -- Autoplan filtering -- *)
 
 let test_no_plan_runs =
@@ -977,6 +981,82 @@ let test_a_stale_layer_holds_back_its_dependents =
       assert_applied ~expected:[] selection;
       ())
 
+(* -- A plan that is running now -- *)
+
+(* [in_progress] pairs a dirspace with the dirspaces whose files changed since its plan started.
+   [force] is the dirspaces the tag query named: a request to run one now is not declined because
+   a plan of it is in flight. *)
+let without_in_progress ?(force = []) ~in_progress selection =
+  Ipr.without_in_progress
+    ~in_progress:(CCList.map (fun (dir, changed) -> (ds dir, dirspace_set changed)) in_progress)
+    ~force:(dirspace_set force)
+    selection
+
+let test_in_progress_plan_is_a_noop =
+  Oth.test ~name:"in progress: a dirspace a plan is planning now does not run again" (fun _ ->
+      let selection = select [ state "ds_one" ] in
+      assert_to_run ~expected:[ "ds_one" ] selection;
+      let planned_now = without_in_progress ~in_progress:[ ("ds_one", []) ] selection in
+      assert_planned ~expected:[] planned_now;
+      assert_applied ~expected:[] selection;
+      ())
+
+let test_in_progress_plan_with_a_changed_file_runs =
+  Oth.test
+    ~name:"in progress: a push that changed the files of the dirspace plans it again"
+    (fun _ ->
+      let selection = select [ state "ds_one" ] in
+      let planned_now = without_in_progress ~in_progress:[ ("ds_one", [ "ds_one" ]) ] selection in
+      assert_planned ~expected:[ "ds_one" ] planned_now;
+      ())
+
+let test_in_progress_plan_keeps_the_other_dirspaces =
+  Oth.test ~name:"in progress: only the dirspaces of the running plan are a noop" (fun _ ->
+      let selection = select [ state "ds_one"; state "ds_two" ] in
+      let planned_now = without_in_progress ~in_progress:[ ("ds_one", []) ] selection in
+      assert_planned ~expected:[ "ds_two" ] planned_now;
+      ())
+
+let test_in_progress_plan_keeps_applied =
+  Oth.test ~name:"in progress: a dirspace that counts as applied is not planned" (fun _ ->
+      let selection =
+        select
+          [
+            state
+              "ds_one"
+              ~last_apply:(run ~sha:head ~created_at:"2026-09-11T10:00:00Z" ())
+              ~last_plan:(plan ~sha:head ~created_at:"2026-09-11T09:00:00Z" ());
+          ]
+      in
+      assert_applied ~expected:[ "ds_one" ] selection;
+      let planned_now = without_in_progress ~in_progress:[ ("ds_one", []) ] selection in
+      assert_planned ~expected:[] planned_now;
+      ())
+
+let test_force_runs_an_in_progress_dirspace =
+  Oth.test ~name:"in progress: a dirspace the tag query names still runs" (fun _ ->
+      let selection = select ~force:[ "ds_one" ] [ state "ds_one" ] in
+      let planned_now =
+        without_in_progress ~force:[ "ds_one" ] ~in_progress:[ ("ds_one", []) ] selection
+      in
+      assert_planned ~expected:[ "ds_one" ] planned_now;
+      ())
+
+let test_in_progress_plan_clears_out_of_order =
+  Oth.test ~name:"in progress: a dirspace out of order is a noop while its plan runs" (fun _ ->
+      let selection =
+        select
+          ~ls:[ [ "ds_dep" ]; [ "ds_one" ] ]
+          [
+            state "ds_dep" ~last_plan:(plan ~sha:head ~created_at:"2026-09-11T11:00:00Z" ());
+            state "ds_one" ~last_plan:(plan ~sha:head ~created_at:"2026-09-11T10:00:00Z" ());
+          ]
+      in
+      assert_out_of_order ~expected:[ "ds_one" ] selection;
+      let planned_now = without_in_progress ~in_progress:[ ("ds_one", []) ] selection in
+      assert_planned ~expected:[] planned_now;
+      ())
+
 let test =
   Oth.parallel
     [
@@ -1024,6 +1104,12 @@ let test =
       test_a_merged_apply_keeps_a_later_change;
       test_a_merged_apply_is_stale_when_it_moved;
       test_a_stale_layer_holds_back_its_dependents;
+      test_in_progress_plan_is_a_noop;
+      test_in_progress_plan_with_a_changed_file_runs;
+      test_in_progress_plan_keeps_the_other_dirspaces;
+      test_in_progress_plan_keeps_applied;
+      test_force_runs_an_in_progress_dirspace;
+      test_in_progress_plan_clears_out_of_order;
     ]
 
 let () =

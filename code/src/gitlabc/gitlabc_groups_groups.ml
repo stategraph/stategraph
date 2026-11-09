@@ -82,6 +82,39 @@ module GetApiV4GroupsIdGroupsShared = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (array (int "skip_groups"))
+    /? option
+         (ud "visibility" (fun value ->
+              CCResult.to_opt (Parameters.Visibility.t_of_yojson (`String value))))
+    /? option (string "search")
+    /? option
+         (ud
+            "min_access_level"
+            (fun value ->
+               match CCInt.of_string value with
+               | Some 10 -> Some 10
+               | Some 15 -> Some 15
+               | Some 20 -> Some 20
+               | Some 30 -> Some 30
+               | Some 40 -> Some 40
+               | Some 50 -> Some 50
+               | _ -> None
+              : string -> int option))
+    /? option_default
+         `Name
+         (ud "order_by" (fun value ->
+              CCResult.to_opt (Parameters.Order_by.t_of_yojson (`String value))))
+    /? option_default
+         `Asc
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option_default false (bool "with_custom_attributes")
+
   module Responses = struct
     module OK = struct end
 

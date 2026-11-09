@@ -136,3 +136,21 @@ val select :
   depends_on:(Terrat_dirspace.t -> Terrat_data.Dirspace_set.t) ->
   Dirspace_state.t list ->
   Selection.t
+
+(** [without_in_progress ~in_progress ~force selection] is the dirspaces to plan of a second
+    [terrateam plan] on [selection]: the dirspaces of [to_run] that no plan of the pull request is
+    planning now. A second [terrateam plan] is a noop for such a dirspace: the plan that is running
+    answers for it.
+
+    [in_progress] pairs each such dirspace with the set of dirspaces whose files changed since its
+    plan started. A dirspace in that set is not removed: a push made the running plan stale, and the
+    dirspace is planned again. A dirspace of [force] is not removed either: a tag query which names
+    it is a request to run it now, which is what [Terrat_tag_query.selects_dirspaces_only] answers
+    for and what the comment which offers that command promises. Only the dirspaces to plan are
+    filtered: the caller reads the other fields of [selection] from [selection] itself, whose
+    [to_run] stays as the rules computed it. *)
+val without_in_progress :
+  in_progress:(Terrat_dirspace.t * Terrat_data.Dirspace_set.t) list ->
+  force:Terrat_data.Dirspace_set.t ->
+  Selection.t ->
+  Terrat_data.Dirspace_set.t

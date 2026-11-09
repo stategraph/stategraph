@@ -64,8 +64,12 @@ USER root
 # (the py3-none-any wheel's sha256, e.g. from `pip download` or PyPI's JSON API)
 # If you update this location, edit .github/workflows/test-macos.yml too
 ENV CHECKOV_VERSION=3.3.16
+# The venv's pip stays in the image, with the libraries it vendors, so it is
+# pinned to a release whose vendored msgpack and urllib3 carry the security fixes.
+ARG CHECKOV_PIP_VERSION=26.3
 RUN CHECKOV_SHA256="43e5383418a8b52d39747e2daaec4da4a6b7db3e2f64ab6c93f8b89c044c7665" && \
     python3 -m venv /opt/checkov-venv && \
+    /opt/checkov-venv/bin/pip install --no-cache-dir "pip==${CHECKOV_PIP_VERSION}" && \
     /opt/checkov-venv/bin/pip download --no-deps --only-binary=:all: --no-cache-dir \
       -d /tmp/checkov-dl "checkov==${CHECKOV_VERSION}" && \
     echo "${CHECKOV_SHA256}  /tmp/checkov-dl/checkov-${CHECKOV_VERSION}-py3-none-any.whl" | sha256sum -c - && \
@@ -214,7 +218,7 @@ WORKDIR /tmp
 # When this layer is reused cached, new packages may seem missing.
 # When you hit that (package published on more recent opam snapshot), bump the date here to re-run this layer.
 # Note that the date has no impact on `opam`. It's just a mean to trigger rebuilding of this layer.
-ARG OPAM_INDEX_DATE=2026-10-26
+ARG OPAM_INDEX_DATE=2026-11-09
 RUN echo "opam-repository index refreshed ${OPAM_INDEX_DATE}" && \
     opam init -ay --disable-sandboxing --bare
 # endregion:opam-init
@@ -235,7 +239,8 @@ RUN eval $(opam env) && \
 
 FROM ocaml-sandbox AS ocaml-sandbox-development-or-devcontainer
 
-# Development or devcontainer: install ocamlformat
+# Development or devcontainer: install ocamlformat. This version number is also used in
+# scripts/sg_install_ocaml_deps_macos. Update both simultaneously.
 # region:ocamlformat
 RUN eval $(opam env) && opam pin add -y ocamlformat 0.29.0
 # endregion:ocamlformat

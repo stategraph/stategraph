@@ -113,7 +113,7 @@ A Terraform state file is one JSON file per workspace, and each run locks all of
 | Changes made outside Terraform stay hidden. | Scheduled drift detection compares your infrastructure with your code, and can open an issue. See [Drift detection](/docs/orchestration/governance/drift-detection). |
 | You cannot see what you run or how it changed. | Query every state with SQL, and keep your queries in dashboards. See the blast radius, the dependency graph, the history of each change, and the cloud resources that no state manages. See [Query](/docs/infrastructure-as-a-database/query). |
 | You see what a change costs only on the bill. | Stategraph estimates the cost of each plan and shows it in the pull request. It totals the cost per state and per tenant, and attributes it by tag. See [Cost](/docs/infrastructure-as-a-database/cost). |
-| AI agents need wide access to your infrastructure. | Skills for Claude Code and other agents, tokens with limited capabilities, and a timeline of each action. See [AI agents](/docs/infrastructure-as-a-database/ai-agents). |
+| AI agents need wide access to your infrastructure. | Skills for Claude Code and other agents, tokens with limited capabilities, and a timeline of each action. See [AI agents](/docs/ai). |
 
 Adopt Stategraph in two steps:
 

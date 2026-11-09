@@ -1,5 +1,11 @@
 Unable to start workflow.  The GitLab Workflow for Stategraph **must** exist in the development branch.  Make sure the development branch is branched off the default branch and the workflow has not been modified.
 
+If this operation was a layer of a layered run, the later layers were not planned.  To plan them, comment the following:
+
+```
+stategraph plan
+```
+
 For help on configuring the GitLab CI, see the documentation:
 
 https://stategraph.com/docs/get-started/quickstart/cloud#add-the-workflow-file

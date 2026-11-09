@@ -157,11 +157,26 @@ let test_drift_restart_limit =
           ~pp:St.Drift_result.pp_restart
           name
           expected
-          (St.Drift_result.restart ~restarts)
+          (St.Drift_result.restart ~restart_on_change:true ~restarts)
       in
       check "no restart yet" St.Drift_result.Restart 0;
       check "the last restart under the limit" St.Drift_result.Restart 9;
       check "the limit stops the restarts" St.Drift_result.Limit_reached 10;
+      ())
+
+let test_drift_restart_disabled =
+  Oth.test ~name:"a drift with restart_on_change off never reconciles again" (fun _ ->
+      let check name restarts =
+        assert_eq
+          ~eq:St.Drift_result.equal_restart
+          ~pp:St.Drift_result.pp_restart
+          name
+          St.Drift_result.Disabled
+          (St.Drift_result.restart ~restart_on_change:false ~restarts)
+      in
+      check "no restart yet" 0;
+      check "under the limit" 9;
+      check "at the limit" 10;
       ())
 
 let test_union =
@@ -284,6 +299,7 @@ let test =
       test_union;
       test_pr_result_stale_dirspaces;
       test_drift_restart_limit;
+      test_drift_restart_disabled;
       test_no_change_is_not_impacted;
       test_changed_dirspaces_are_impacted;
       test_missing_tree_is_unknown;

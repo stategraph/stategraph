@@ -304,6 +304,11 @@ module GetApiV4ProjectsIdJobsJobIdArtifacts_artifactPath = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "artifact_path" /? option (string "job_token")
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -408,6 +413,11 @@ module GetApiV4ProjectsIdJobsJobIdArtifacts = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "job_token")
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -508,6 +518,11 @@ module GetApiV4ProjectsIdJobsArtifactsRefNameRaw_artifactPath = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "job" /? string "artifact_path" /? option (string "job_token")
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -566,6 +581,11 @@ module GetApiV4ProjectsIdJobsArtifactsRefNameDownload = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "job" /? option (string "job_token")
 
   module Responses = struct
     module OK = struct end
@@ -673,6 +693,17 @@ module GetApiV4ProjectsIdJobs = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option
+         (array
+            (ud "scope" (fun value ->
+                 CCResult.to_opt (Parameters.Scope.Items.t_of_yojson (`String value)))))
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end

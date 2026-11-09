@@ -60,7 +60,7 @@
  (wrapped false)
  (flags
   (:standard -w -27-67))
- (libraries containers json_schema openapi)
+ (libraries brtl containers json_schema openapi)
  (preprocess
   (pps
    ppx_deriving.eq

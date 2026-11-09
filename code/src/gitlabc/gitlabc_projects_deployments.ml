@@ -222,6 +222,65 @@ module GetApiV4ProjectsIdDeploymentsDeploymentIdMergeRequests = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option (int "author_id")
+    /? option (string "author_username")
+    /? option (int "assignee_id")
+    /? option (array (string "assignee_username"))
+    /? option (string "reviewer_username")
+    /? option (array (string "labels"))
+    /? option (string "milestone")
+    /? option (string "my_reaction_emoji")
+    /? option (int "reviewer_id")
+    /? option_default
+         `All
+         (ud "state" (fun value -> CCResult.to_opt (Parameters.State.t_of_yojson (`String value))))
+    /? option_default
+         `Created_at
+         (ud "order_by" (fun value ->
+              CCResult.to_opt (Parameters.Order_by.t_of_yojson (`String value))))
+    /? option_default
+         `Desc
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option_default false (bool "with_labels_details")
+    /? option_default false (bool "with_merge_status_recheck")
+    /? option (string "created_after")
+    /? option (string "created_before")
+    /? option (string "updated_after")
+    /? option (string "updated_before")
+    /? option
+         (ud "view" (fun value -> CCResult.to_opt (Parameters.View.t_of_yojson (`String value))))
+    /? option
+         (ud "scope" (fun value -> CCResult.to_opt (Parameters.Scope.t_of_yojson (`String value))))
+    /? option (string "source_branch")
+    /? option (int "source_project_id")
+    /? option (string "target_branch")
+    /? option (string "search")
+    /? option (string "in")
+    /? option (ud "wip" (fun value -> CCResult.to_opt (Parameters.Wip.t_of_yojson (`String value))))
+    /? option (int "not[author_id]")
+    /? option (string "not[author_username]")
+    /? option (int "not[assignee_id]")
+    /? option (array (string "not[assignee_username]"))
+    /? option (string "not[reviewer_username]")
+    /? option (array (string "not[labels]"))
+    /? option (string "not[milestone]")
+    /? option (string "not[my_reaction_emoji]")
+    /? option (int "not[reviewer_id]")
+    /? option (string "deployed_before")
+    /? option (string "deployed_after")
+    /? option (string "environment")
+    /? option
+         (ud "approved" (fun value ->
+              CCResult.to_opt (Parameters.Approved.t_of_yojson (`String value))))
+    /? option (int "merge_user_id")
+    /? option (string "merge_user_username")
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -629,6 +688,27 @@ module GetApiV4ProjectsIdDeployments = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option_default
+         `Id
+         (ud "order_by" (fun value ->
+              CCResult.to_opt (Parameters.Order_by.t_of_yojson (`String value))))
+    /? option_default
+         `Asc
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option (string "updated_after")
+    /? option (string "updated_before")
+    /? option (string "finished_after")
+    /? option (string "finished_before")
+    /? option (string "environment")
+    /? option
+         (ud "status" (fun value -> CCResult.to_opt (Parameters.Status.t_of_yojson (`String value))))
 
   module Responses = struct
     module OK = struct end

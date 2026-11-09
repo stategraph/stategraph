@@ -1223,6 +1223,14 @@ module List_for_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 30 (int "per_page")
+    /? option (string "before")
+    /? option (string "after")
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -2499,6 +2507,14 @@ module List_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 30 (int "per_page")
+    /? option (string "before")
+    /? option (string "after")
 
   module Responses = struct
     module OK = struct

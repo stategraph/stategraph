@@ -85,6 +85,10 @@
           "default": false,
           "type": "boolean"
         },
+        "restart_on_change": {
+          "default": true,
+          "type": "boolean"
+        },
         "type": {
           "const": "drift",
           "type": "string"

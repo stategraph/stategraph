@@ -870,6 +870,11 @@ module Delete_analysis = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "confirm_delete")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Code_scanning_analysis_deletion.t
@@ -1075,6 +1080,25 @@ module List_recent_analyses = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "tool_name")
+    /? option (string "tool_guid")
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
+    /? option (int "pr")
+    /? option (string "ref")
+    /? option (string "sarif_id")
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option_default
+         `Created
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Code_scanning_analysis.t list
@@ -1162,6 +1186,15 @@ module List_alert_instances = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
+    /? option (string "ref")
+    /? option (int "pr")
 
   module Responses = struct
     module OK = struct
@@ -1764,6 +1797,35 @@ module List_alerts_for_repo = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "tool_name")
+    /? option (string "tool_guid")
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
+    /? option (string "ref")
+    /? option (int "pr")
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option (string "before")
+    /? option (string "after")
+    /? option_default
+         `Created
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option
+         (ud "state" (fun value ->
+              CCResult.to_opt
+                (Githubc2_components.Code_scanning_alert_state_query.t_of_yojson (`String value))))
+    /? option
+         (ud "severity" (fun value ->
+              CCResult.to_opt
+                (Githubc2_components.Code_scanning_alert_severity.t_of_yojson (`String value))))
+    /? option (string "assignees")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Code_scanning_alert_items.t list
@@ -1906,6 +1968,33 @@ module List_alerts_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "tool_name")
+    /? option (string "tool_guid")
+    /? option (string "before")
+    /? option (string "after")
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option
+         (ud "state" (fun value ->
+              CCResult.to_opt
+                (Githubc2_components.Code_scanning_alert_state_query.t_of_yojson (`String value))))
+    /? option_default
+         `Created
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option
+         (ud "severity" (fun value ->
+              CCResult.to_opt
+                (Githubc2_components.Code_scanning_alert_severity.t_of_yojson (`String value))))
+    /? option (string "assignees")
 
   module Responses = struct
     module OK = struct

@@ -3239,13 +3239,13 @@ export interface components {
             /** @description The tenant's total number of invitations, the same on every page (independent of `cursor`). */
             total_count: number;
         };
-        /** @description One active member of a tenant as the administration UI lists them: identity, when they joined, and how their capability grant covers this tenant. The `*_scope` fields distinguish a grant scoped exactly to this tenant from one that reaches wider, because a wider grant cannot be edited from here. */
+        /** @description One active member of a tenant as the administration UI lists them: identity, when they joined, and how their capability grant covers this tenant. The `*_scope` fields distinguish a grant scoped exactly to this tenant from one that reaches wider -- some other tenants too, or every tenant -- because a grant that reaches wider cannot be edited from here. */
         "tenant-member": {
             /**
-             * @description How the member's admin grant covers this tenant: `none` (not an admin here), `tenant` (scoped exactly to this tenant), or `wider` (reaches beyond it -- installation-wide or a broader pattern). A `wider` grant cannot be changed through the tenant membership endpoints, so the UI disables demote and remove for such a member.
+             * @description How the member's admin grant covers this tenant: `none` (not an admin here), `tenant` (scoped exactly to this tenant), `wider` (reaches beyond it without covering every tenant), or `instance` (an installation-wide admin). A `wider` or `instance` grant cannot be changed through the tenant membership endpoints, so the UI disables demote and remove for such a member.
              * @enum {string}
              */
-            admin_scope: "none" | "tenant" | "wider";
+            admin_scope: "none" | "tenant" | "wider" | "instance";
             /** @description URL of the member's avatar, when set. */
             avatar_url?: string;
             /** @description The member's email address when one is on file. Absent for a user who has never had an address recorded -- it is nullable and is not re-synced after first sign-in. */
@@ -3259,10 +3259,10 @@ export interface components {
             /** @description The member's user id. */
             user_id: string;
             /**
-             * @description How the member's `users-manage` grant covers this tenant, with the same `none` / `tenant` / `wider` meaning as `admin_scope`.
+             * @description How the member's `users-manage` grant covers this tenant, with the same `none` / `tenant` / `wider` / `instance` meaning as `admin_scope`.
              * @enum {string}
              */
-            users_manage_scope: "none" | "tenant" | "wider";
+            users_manage_scope: "none" | "tenant" | "wider" | "instance";
         };
         /** @description Body of the add-member endpoint: the existing user to add to this tenant. For someone who has no account yet, send an invitation instead. */
         "tenant-member-add-request": {
@@ -7551,7 +7551,7 @@ export interface operations {
             query: {
                 provider: string;
                 /** @description Set to 'cache' to load from the cache, 'no-cache' to not. */
-                source?: string;
+                source?: "cache" | "no-cache";
             };
             header?: never;
             path: {

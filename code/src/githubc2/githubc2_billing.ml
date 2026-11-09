@@ -12,6 +12,17 @@ module Get_github_billing_usage_summary_report_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (int "year")
+    /? option (int "month")
+    /? option (int "day")
+    /? option (string "repository")
+    /? option (string "product")
+    /? option (string "sku")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Billing_usage_summary_report_user.t
@@ -110,6 +121,11 @@ module Get_github_billing_usage_report_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (int "year") /? option (int "month") /? option (int "day")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Billing_usage_report_user.t
@@ -199,6 +215,16 @@ module Get_github_billing_premium_request_usage_report_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (int "year")
+    /? option (int "month")
+    /? option (int "day")
+    /? option (string "model")
+    /? option (string "product")
 
   module Responses = struct
     module OK = struct
@@ -298,6 +324,16 @@ module Get_github_billing_ai_credit_usage_report_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (int "year")
+    /? option (int "month")
+    /? option (int "day")
+    /? option (string "model")
+    /? option (string "product")
 
   module Responses = struct
     module OK = struct
@@ -399,6 +435,17 @@ module Get_github_billing_usage_summary_report_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (int "year")
+    /? option (int "month")
+    /? option (int "day")
+    /? option (string "repository")
+    /? option (string "product")
+    /? option (string "sku")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Billing_usage_summary_report_org.t
@@ -490,6 +537,11 @@ module Get_github_billing_usage_report_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (int "year") /? option (int "month") /? option (int "day")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Billing_usage_report.t
@@ -580,6 +632,17 @@ module Get_github_billing_premium_request_usage_report_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (int "year")
+    /? option (int "month")
+    /? option (int "day")
+    /? option (string "user")
+    /? option (string "model")
+    /? option (string "product")
 
   module Responses = struct
     module OK = struct
@@ -1292,6 +1355,16 @@ module Get_all_budgets_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 1 (int "page")
+    /? option_default 10 (int "per_page")
+    /? option
+         (ud "scope" (fun value -> CCResult.to_opt (Parameters.Scope.t_of_yojson (`String value))))
+    /? option (string "user")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Get_all_budgets.t
@@ -1368,6 +1441,17 @@ module Get_github_billing_ai_credit_usage_report_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (int "year")
+    /? option (int "month")
+    /? option (int "day")
+    /? option (string "user")
+    /? option (string "model")
+    /? option (string "product")
 
   module Responses = struct
     module OK = struct

@@ -153,12 +153,14 @@ struct
           fetch Keys.applied_dirspaces
           >>| fun applied_dirspaces ->
           fun ~dirspaces ~force:_ ->
+           (* A branch run has no pull request, thus no plan of it can be in flight. *)
            Abbs_fc.return_ok
-             {
-               Terrat_intra_pr_hash.Selection.to_run = dirspaces;
-               out_of_order = [];
-               applied = applied_dirspaces;
-             })
+             ( {
+                 Terrat_intra_pr_hash.Selection.to_run = dirspaces;
+                 out_of_order = [];
+                 applied = applied_dirspaces;
+               },
+               [] ))
 
     (* A branch run prunes nothing, because it has no outputs to compare. *)
     let store_pruned_dirspaces =

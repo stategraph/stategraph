@@ -7,8 +7,9 @@ set -euf -o pipefail
 : "${GITHUB_REPOSITORY_OWNER:?GITHUB_REPOSITORY_OWNER is required}"
 : "${VERSION_TAG:?VERSION_TAG is required}"
 
-# Get the previous tag
-PREVIOUS_TAG="$(git ls-remote --tags origin | grep -oE '20[0-9]{6}-[0-9]{4}-[a-f0-9]{6,8}$' | sort | tail -n2 | head -n1)"
+# Get the previous tag: the one before VERSION_TAG among the tags of its kind
+PREVIOUS_TAG="$("$(git rev-parse --show-toplevel)/scripts/release_tags" \
+  | awk -v tag="${VERSION_TAG}" '$0 == tag { print previous } { previous = $0 }')"
 
 # Check if PREVIOUS_TAG is empty and exit with an error if so
 if [[ -z "${PREVIOUS_TAG}" ]]; then

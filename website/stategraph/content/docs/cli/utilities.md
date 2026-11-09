@@ -73,4 +73,4 @@ stategraph version server
 
 - [CLI Overview](/docs/cli): all commands and global options
 - [User Commands](/docs/cli/user): identity and tenant membership
-- [AI agents](/docs/infrastructure-as-a-database/ai-agents): give an agent the CLI
+- [AI agents](/docs/ai): give an agent the CLI

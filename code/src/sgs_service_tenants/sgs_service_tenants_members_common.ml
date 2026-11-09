@@ -11,13 +11,15 @@ let grant_to_caps tenant grant =
   | `Admin -> Sgs_user_session.Caps.admin_tenant tenant_id
   | `Users_manage -> Sgs_user_session.Caps.users_manage_tenant tenant_id
 
-(* The coverage a member's grant has over this tenant, as the API reports it.  [wider] is surfaced
-   rather than flattened into [tenant] because the UI has to disable demote and remove for those
-   members: their grant reaches beyond this tenant, so editing it from here is refused. *)
+(* The coverage a member's grant has over this tenant, as the API reports it.  [wider] and
+   [instance] are surfaced rather than flattened into [tenant] because the UI has to disable demote
+   and remove for those members: their grant reaches beyond this tenant, so editing it from here is
+   refused.  They are kept apart because only [instance] administers the whole installation. *)
 let api_scope = function
   | Scope.Not_covered -> `None
   | Scope.Exact -> `Tenant
   | Scope.Wider -> `Wider
+  | Scope.Instance -> `Instance
 
 let member_to_api member =
   let module M = Sgs_tenant.Member in
@@ -58,7 +60,7 @@ let wider_grant member =
   let module Scope = Sg_caps_ops.Tenant_scope in
   let wider grant coverage =
     match coverage with
-    | Scope.Wider -> Some grant
+    | Scope.Wider | Scope.Instance -> Some grant
     | Scope.Exact | Scope.Not_covered -> None
   in
   CCOption.or_

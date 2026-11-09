@@ -247,6 +247,14 @@ module DeleteApiV4ProjectsIdEnvironmentsReviewApps = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "before")
+    /? option_default 100 (int "limit")
+    /? option_default true (bool "dry_run")
+
   module Responses = struct
     module No_content = struct end
     module Bad_request = struct end
@@ -378,6 +386,17 @@ module GetApiV4ProjectsIdEnvironments = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option (string "name")
+    /? option (string "search")
+    /? option
+         (ud "states" (fun value -> CCResult.to_opt (Parameters.States.t_of_yojson (`String value))))
 
   module Responses = struct
     module OK = struct end

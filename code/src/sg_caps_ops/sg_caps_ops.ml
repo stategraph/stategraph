@@ -9,10 +9,12 @@ module Tenant_scope = struct
     | Not_covered
     | Exact
     | Wider
+    | Instance
   [@@deriving show, eq]
 
   let coverage scope tenant =
-    if not (Scope.mem scope tenant) then Not_covered
+    if Scope.is_full scope then Instance
+    else if not (Scope.mem scope tenant) then Not_covered
     else
       match Scope.literals scope with
       | `Literals [ only ] when CCString.equal only tenant -> Exact

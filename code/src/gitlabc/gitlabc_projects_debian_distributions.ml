@@ -70,6 +70,19 @@ module DeleteApiV4ProjectsIdDebianDistributionsCodename = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "suite")
+    /? option (string "origin")
+    /? option (string "label")
+    /? option (string "version")
+    /? option (string "description")
+    /? option (int "valid_time_duration_seconds")
+    /? option (array (string "components"))
+    /? option (array (string "architectures"))
+
   module Responses = struct
     module Accepted = struct end
     module Bad_request = struct end
@@ -306,6 +319,22 @@ module GetApiV4ProjectsIdDebianDistributions = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option (string "codename")
+    /? option (string "suite")
+    /? option (string "origin")
+    /? option (string "label")
+    /? option (string "version")
+    /? option (string "description")
+    /? option (int "valid_time_duration_seconds")
+    /? option (array (string "components"))
+    /? option (array (string "architectures"))
 
   module Responses = struct
     module OK = struct end

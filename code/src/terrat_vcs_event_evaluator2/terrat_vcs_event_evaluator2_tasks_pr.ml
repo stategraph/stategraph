@@ -671,7 +671,8 @@ struct
           let equal_pair (a_from, a_to) (b_from, b_to) =
             CCString.equal a_from b_from && CCString.equal a_to b_to
           in
-          let is_pr_head sha = CCString.equal sha (S.Api.Ref.to_string branch_ref) in
+          let branch_ref_str = S.Api.Ref.to_string branch_ref in
+          let is_pr_head sha = CCString.equal sha branch_ref_str in
           fun ~dirspaces ~force ->
             (* A layered run is a tree: a dirspace waits for the dirspaces it depends on and for
                nothing else.  The same edges the run itself is ordered by answer this. *)
@@ -721,8 +722,11 @@ struct
                       (Terrat_data.Dirspace_set.add dirspace superseded, last_run_failed)
                   | Mp.Last_run_failed ->
                       (superseded, Terrat_data.Dirspace_set.add dirspace last_run_failed)
-                  | Mp.Never_planned | Mp.Stale | Mp.Out_of_dependency_order ->
-                      (superseded, last_run_failed))
+                  (* A plan in progress is not a run verdict: it counts for
+                     neither set, so it cannot invalidate a standing plan or
+                     flip [must_run]. *)
+                  | Mp.Never_planned | Mp.Stale | Mp.Out_of_dependency_order | Mp.Plan_in_progress
+                    -> (superseded, last_run_failed))
                 missing_plans
             in
             Logs.info (fun m ->
@@ -754,15 +758,18 @@ struct
                       "%s : INTRA_PR_SELECTION : NO_REPO_TREE : branch_ref=%s"
                       (Builder.log_id s)
                       (S.Api.Ref.to_string branch_ref));
+                (* With no tree every dirspace must run, thus no dirspace is spared on account of
+                   a plan in flight either. *)
                 Abbs_fc.return_ok
-                  (Ipr.select
-                     ~changed_since:(fun _ _ -> Terrat_data.Dirspace_set.of_list dirspaces)
-                     ~changed_between:(fun _ _ -> Terrat_data.Dirspace_set.of_list dirspaces)
-                     ~force
-                     ~superseded
-                     ~last_run_failed
-                     ~depends_on
-                     states)
+                  ( Ipr.select
+                      ~changed_since:(fun _ _ -> Terrat_data.Dirspace_set.of_list dirspaces)
+                      ~changed_between:(fun _ _ -> Terrat_data.Dirspace_set.of_list dirspaces)
+                      ~force
+                      ~superseded
+                      ~last_run_failed
+                      ~depends_on
+                      states,
+                    [] )
             | true ->
                 (* [None] when a pair could not be compared.  The comparison would answer the same
                   thing -- a tree which is not there must mean "run it" -- but it would do it by
@@ -802,10 +809,21 @@ struct
                       changed_cache := (pair, changed) :: !changed_cache;
                       changed
                 in
+                (* A plan that is running now is compared with the same pair the rest of the rules
+                  compare a plan with: the commit it started on and the head it would be judged
+                  against now.  A push that changed the files of its dirspace makes it stale, and
+                  then the dirspace is planned again.  A plan that started at the head compares a
+                  commit with itself and holds no change. *)
+                let in_progress_pairs =
+                  runs
+                  |> CCList.filter_map (fun { P2.Dirspace_runs.in_progress_plan; _ } ->
+                      CCOption.bind in_progress_plan (since_pair Ipr.Kind.Plan))
+                  |> CCList.filter (fun (from_sha, to_sha) -> not (CCString.equal from_sha to_sha))
+                in
                 (* The pairs of the runs, and not the dirspaces: two dirspaces which ran together
                   share their pairs, thus one comparison of trees answers for both of them. *)
                 let pairs =
-                  states
+                  (states
                   |> CCList.flat_map
                        (fun { Ipr.Dirspace_state.dirspace = _; last_plan; last_apply } ->
                          let pairs_of kind ({ Ipr.Run.sha = _; created_at = _; during } as run) =
@@ -815,7 +833,8 @@ struct
                            ~default:[]
                            (fun { Ipr.Plan.run; has_changes = _ } -> pairs_of Ipr.Kind.Plan run)
                            last_plan
-                         @ CCOption.map_or ~default:[] (pairs_of Ipr.Kind.Apply) last_apply)
+                         @ CCOption.map_or ~default:[] (pairs_of Ipr.Kind.Apply) last_apply))
+                  @ in_progress_pairs
                   |> CCList.sort_uniq ~cmp:(fun (a_from, a_to) (b_from, b_to) ->
                       match CCString.compare a_from b_from with
                       | 0 -> CCString.compare a_to b_to
@@ -839,14 +858,39 @@ struct
                     (fun (from_sha, to_sha) -> changed_between from_sha to_sha)
                     (since_pair kind run)
                 in
-                Ipr.select
-                  ~changed_since
-                  ~changed_between
-                  ~force
-                  ~superseded
-                  ~last_run_failed
-                  ~depends_on
-                  states)
+                let selection =
+                  Ipr.select
+                    ~changed_since
+                    ~changed_between
+                    ~force
+                    ~superseded
+                    ~last_run_failed
+                    ~depends_on
+                    states
+                in
+                (* The dirspaces a plan of this pull request is planning now, each paired with the
+                  dirspaces whose files changed since that plan started.  The selection itself is
+                  returned unfiltered: a dirspace which is being planned has not run, so it keeps
+                  its place in [to_run], and that is what the reset of RFD 2108 and [revived] ask
+                  about.  The caller which decides what to plan applies
+                  {!Ipr.without_in_progress}. *)
+                let in_progress =
+                  runs
+                  |> CCList.filter_map
+                       (fun
+                         {
+                           P2.Dirspace_runs.state;
+                           plan_failed = _;
+                           apply_failed = _;
+                           in_progress_plan;
+                         }
+                       ->
+                         CCOption.map
+                           (fun run ->
+                             (state.Ipr.Dirspace_state.dirspace, changed_since Ipr.Kind.Plan run))
+                           in_progress_plan)
+                in
+                (selection, in_progress))
 
     let is_draft_pr =
       run ~name:"is_draft_pr" (fun _s { Bs.Fetcher.fetch } ->
@@ -1662,7 +1706,7 @@ struct
           intra_pr_selection
             ~dirspaces:(all_matches |> CCList.flatten |> CCList.map (fun dc -> dc.Dc.dirspace))
             ~force:Terrat_data.Dirspace_set.empty
-          >>= fun { Ipr.Selection.to_run; out_of_order; applied = _ } ->
+          >>= fun ({ Ipr.Selection.to_run; out_of_order; applied = _ }, _in_progress) ->
           let without_plan = Terrat_data.Dirspace_set.of_list to_run in
           let out_of_order = Terrat_data.Dirspace_set.of_list out_of_order in
           let queried =
@@ -1682,7 +1726,12 @@ struct
             CCList.filter
               (fun { Mp.dirspace; reason } ->
                 match reason with
-                | Mp.Invalidated_by_pull_request _ | Mp.Last_run_failed -> true
+                (* [Plan_in_progress] passes unconditionally: [without_plan] is
+                   computed from completed runs only, so a dirspace with a
+                   standing older plan plus a running new plan is not in it, and
+                   the gate must refuse anyway. *)
+                | Mp.Invalidated_by_pull_request _ | Mp.Last_run_failed | Mp.Plan_in_progress ->
+                    true
                 | Mp.Never_planned | Mp.Stale | Mp.Out_of_dependency_order ->
                     Terrat_data.Dirspace_set.mem dirspace without_plan)
               dirspaces
@@ -1731,6 +1780,8 @@ struct
                   >>= fun all_unapplied_matches ->
                   fetch Keys.already_planned_matches
                   >>= fun already_planned_matches ->
+                  fetch Keys.plan_in_progress_matches
+                  >>= fun plan_in_progress_matches ->
                   let unapplied_matching_query =
                     CCList.filter
                       (Terrat_change_match3.match_tag_query ~tag_query)
@@ -1739,6 +1790,24 @@ struct
                   let dirspaces_of =
                     CCList.map (fun { Terrat_change_match3.Dirspace_config.dirspace; _ } ->
                         dirspace)
+                  in
+                  (* [already_planned_matches] holds both the dirspaces with a plan that still
+                     stands and the dirspaces whose plan is in flight, and the two are not the
+                     same answer to the user.  [plan_in_progress_matches] is the second, so a
+                     membership test splits them back apart. *)
+                  let plan_noop_of dirspaces =
+                    let in_progress =
+                      Terrat_data.Dirspace_set.of_list (dirspaces_of plan_in_progress_matches)
+                    in
+                    CCList.map
+                      (fun { Terrat_change_match3.Dirspace_config.dirspace; _ } ->
+                        let reason =
+                          if Terrat_data.Dirspace_set.mem dirspace in_progress then
+                            P2.Plan_noop.Plan_in_progress
+                          else P2.Plan_noop.Already_planned
+                        in
+                        { P2.Plan_noop.dirspace; reason })
+                      dirspaces
                   in
                   fetch Keys.publish_comment
                   >>= fun publish_comment ->
@@ -1762,7 +1831,7 @@ struct
                            comes first: the layers and the applied state explain
                            the other cases, and neither of them explains this
                            one. *)
-                        (Msg.Plan_already_planned (dirspaces_of planned), false)
+                        (Msg.Plan_already_planned (plan_noop_of planned), false)
                     | _ :: _, _ :: _, [], [] ->
                         (* The query selected something, and all of it has already
                            been applied. *)

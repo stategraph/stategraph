@@ -47,6 +47,17 @@ module GetApiV4ProjectsIdCiLint = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "sha")
+    /? option (string "content_ref")
+    /? option_default false (bool "dry_run")
+    /? option (bool "include_jobs")
+    /? option (string "ref")
+    /? option (string "dry_run_ref")
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end

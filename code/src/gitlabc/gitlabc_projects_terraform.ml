@@ -102,6 +102,11 @@ module DeleteApiV4ProjectsIdTerraformStateNameLock = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "ID")
+
   module Responses = struct
     module No_content = struct end
     module Forbidden = struct end
@@ -309,6 +314,11 @@ module GetApiV4ProjectsIdTerraformStateName = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "ID")
 
   module Responses = struct
     module OK = struct end

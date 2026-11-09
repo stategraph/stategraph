@@ -4,16 +4,23 @@ Cannot perform apply due to missing plans for the following directory and worksp
 
 | Dir | Workspace | Reason |
 | --- | --------- | ------ |
-@#dirspaces-@
-| `@dir@` | `@workspace@` | @?never_planned-@Never planned on this ref@-/never_planned@@?invalidated-@Plan superseded by #@invalidated_by@, which applied or merged an overlapping directory afterwards@-/invalidated@@?last_run_failed-@The last run for this directory failed@-/last_run_failed@@?stale-@The commits moved while this directory was planned, plan it again@-/stale@@?out_of_order-@A directory this one depends on ran after this plan, plan it again@-/out_of_order@ |
-@/dirspaces-@
-
+{%- for d in dirspaces %}
+| `{{ d.dir }}` | `{{ d.workspace }}` | {% if d.reason == 'plan_in_progress' %}A plan for this directory is queued or running.  Wait for it to finish.{%- elif d.reason == 'invalidated' %}Plan superseded by #{{ d.invalidated_by }}, which applied or merged an overlapping directory afterwards{%- elif d.reason == 'never_planned' %}Never planned on this ref{%- elif d.reason == 'last_run_failed' %}The last run for this directory failed{%- elif d.reason == 'stale' %}The commits moved while this directory was planned, plan it again{%- elif d.reason == 'out_of_order' %}A directory this one depends on ran after this plan, plan it again{%- else %}Never planned on this ref{%- endif %} |
+{%- endfor %}
+{% if any_plan_needed %}
 Plans are necessary to perform an apply.  In order to create all plans necessary to apply this change, comment the following:
 
 ```
 stategraph plan
 ```
+{% endif %}
+{% if any_plan_in_progress %}
+Plans for this pull request are still queued or running.  Wait for them to finish, then comment the following:
 
-@?any_invalidated-@
+```
+stategraph apply
+```
+{% endif %}
+{% if any_invalidated %}
 A plan that was superseded has to be created again: the other pull request changed the state this plan was built against, so it is no longer valid to apply.
-@-/any_invalidated@
+{% endif %}

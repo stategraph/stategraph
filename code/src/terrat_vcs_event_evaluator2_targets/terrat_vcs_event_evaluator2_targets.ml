@@ -131,11 +131,20 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                defined as the first layer that does not have all of its
                dirspaces applied. *)
       already_planned_matches : Terrat_change_match3.Dirspace_config.t list;
-          (* The dirspaces this evaluation would have run, and does not run
-               because the files they use have the same hashes as they had at
-               their last plan.  Nothing else removes a dirspace from
+          (* The dirspaces this evaluation would have run, and does not run:
+               either because the files they use have the same hashes as they
+               had at their last plan, or because a plan of this pull request
+               for them is still queued or running (see
+               [plan_in_progress_matches] below, the subset of the second
+               kind).  Nothing else removes a dirspace from
                [working_set_matches], thus this is why the run is empty when it
                is empty and neither the tag query nor the layers explain it. *)
+      plan_in_progress_matches : Terrat_change_match3.Dirspace_config.t list;
+          (* The dirspaces this evaluation would have run, and does not run
+               because a plan of this pull request for them is still queued or
+               running.  A subset of [already_planned_matches], kept apart
+               because the two answer a plan command differently: one has a plan
+               to apply, the other has a plan to wait for. *)
     }
     [@@deriving show]
   end
@@ -237,6 +246,9 @@ module Make (S : Terrat_vcs_provider2.S) = struct
   let already_planned_matches : Terrat_change_match3.Dirspace_config.t list Key.t =
     Hmap.Key.create "already_planned_matches"
 
+  let plan_in_progress_matches : Terrat_change_match3.Dirspace_config.t list Key.t =
+    Hmap.Key.create "plan_in_progress_matches"
+
   let out_of_change_applies : Terrat_dirspace.t list Key.t = Hmap.Key.create "out_of_change_applies"
   let applied_dirspaces : Terrat_dirspace.t list Key.t = Hmap.Key.create "applied_dirspaces"
   let changes : Terrat_change.Diff.t list Key.t = Hmap.Key.create "changes"
@@ -245,11 +257,19 @@ module Make (S : Terrat_vcs_provider2.S) = struct
      earlier run, from the hashes of the files each dirspace uses.
 
      This is a function and not a value because the dirspaces of the run are known only inside the
-     computation of the matches, which is where the answer is needed. *)
+     computation of the matches, which is where the answer is needed.  The second component pairs
+     each dirspace that a plan of this pull request is planning now with the dirspaces whose files
+     changed since that plan started.  The selection itself stays unfiltered: a dirspace which is
+     being planned has not run, and the reset and [revived] of the matches are questions about
+     runs, not about work in flight.  A caller which decides what to plan applies
+     {!Terrat_intra_pr_hash.without_in_progress}. *)
   let intra_pr_selection :
       (dirspaces:Terrat_dirspace.t list ->
       force:Terrat_data.Dirspace_set.t ->
-      (Terrat_intra_pr_hash.Selection.t, err) result Abb.Future.t)
+      ( Terrat_intra_pr_hash.Selection.t * (Terrat_dirspace.t * Terrat_data.Dirspace_set.t) list,
+        err )
+      result
+      Abb.Future.t)
       Key.t =
     Hmap.Key.create "intra_pr_selection"
 

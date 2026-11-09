@@ -381,9 +381,32 @@ module Missing_plan = struct
     | Stale
       (* The commits of the plan moved while it ran and changed its files, or the files changed
            since, thus the plan is not valid (RFD 2356). *)
+    | Plan_in_progress
+      (* This pull request has a plan work manifest for the dirspace that is still queued or
+           running, so the gate asks the user to wait rather than to plan again. *)
     | Out_of_dependency_order
       (* A dirspace that this one depends on ran after the plan, thus the plan does not follow the
            order of the layers.  The files of the plan did not change. *)
+  [@@deriving show]
+
+  type t = {
+    dirspace : Terrat_change.Dirspace.t;
+    reason : reason;
+  }
+  [@@deriving show]
+end
+
+(* A dirspace that a plan command runs nothing for, and which of the two things the query
+   distinguishes put it there.  The two are not the same answer: one says a plan exists, the other
+   says a plan is still on its way, and a user who is told the first when the second is true waits
+   for a plan that was never made. *)
+module Plan_noop = struct
+  type reason =
+    | Already_planned
+      (* A completed plan of this pull request still stands for the files as they are now. *)
+    | Plan_in_progress
+      (* A plan of this pull request for the dirspace is still queued or running, so the command
+           runs nothing and the user waits for that plan. *)
   [@@deriving show]
 
   type t = {
@@ -402,6 +425,10 @@ module Dirspace_runs = struct
     state : Terrat_intra_pr_hash.Dirspace_state.t;
     plan_failed : bool;
     apply_failed : bool;
+    in_progress_plan : Terrat_intra_pr_hash.Run.t option;
+        (** The plan of this pull request that is running now for the dirspace, if any. A dirspace
+            that one covers needs no new plan while its files do not change, thus a second
+            [terrateam plan] is a noop for it. *)
   }
 end
 
@@ -525,7 +552,7 @@ module Msg = struct
     | Missing_plans of Missing_plan.t list
     | Operation_failed of operation_failed_reason
     | Plan_all_changes_applied
-    | Plan_already_planned of Terrat_change.Dirspace.t list
+    | Plan_already_planned of Plan_noop.t list
     | Plan_no_matching_dirspaces of Terrat_tag_query.t
     | Premium_feature_err of premium_features
     | Pull_request_not_appliable of ('pull_request * 'apply_requirements)
@@ -1166,6 +1193,7 @@ module type Shared = sig
       ( (string
         * Api.Account.t
         * Api.Repo.t
+        * bool
         * bool
         * Terrat_tag_query.t
         * (string * string) option

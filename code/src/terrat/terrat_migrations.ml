@@ -355,6 +355,8 @@ let migrations =
     ( "drop-compute-node-work-wm-state-index",
       run_sql [%blob "migrations/2026-10-23-drop-compute-node-work-wm-state-index.sql"] );
     ("add-job-continuation-of", run_sql [%blob "migrations/2026-11-04-add-job-continuation-of.sql"]);
+    ( "add-drift-schedule-restart-on-change",
+      run_sql [%blob "migrations/2026-11-06-add-drift-schedule-restart-on-change.sql"] );
   ]
 
 let run config storage = Mig.run { Migrate.config; storage; tx = () } migrations

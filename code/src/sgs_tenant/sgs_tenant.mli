@@ -28,8 +28,9 @@ type 'a t
 (** A tenant's membership row joined with the member's user row.
 
     [admin] and [users_manage] are not booleans but coverages: a grant may cover this tenant by
-    naming it exactly, or by something wider (an absent [tenants] list, a glob). Only
-    {!Sg_caps_ops.Tenant_scope.Exact} coverage can be revoked from a tenant-scoped endpoint. *)
+    naming it exactly, by reaching some other tenants too (by name, by prefix, or by excluding only
+    some), or by covering every tenant. Only {!Sg_caps_ops.Tenant_scope.Exact} coverage can be
+    revoked from a tenant-scoped endpoint. *)
 module Member : sig
   type t = {
     id : Uuidm.t;

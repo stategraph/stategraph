@@ -36,13 +36,19 @@ let coverage_examples =
   Oth.test ~name:"coverage_examples" (fun _ ->
       let coverage caps tenant = Ops.tenant_coverage caps `Admin ~tenant in
       assert_scope_eq ~expected:Ops.Tenant_scope.Exact ~actual:(coverage (admin [ "t1" ]) "t1");
-      assert_scope_eq ~expected:Ops.Tenant_scope.Wider ~actual:(coverage (admin [ "*" ]) "t1");
+      assert_scope_eq ~expected:Ops.Tenant_scope.Instance ~actual:(coverage (admin [ "*" ]) "t1");
       assert_scope_eq
         ~expected:Ops.Tenant_scope.Wider
         ~actual:(coverage (admin [ "t1"; "t2" ]) "t1");
       assert_scope_eq
         ~expected:Ops.Tenant_scope.Wider
         ~actual:(coverage (admin [ "*"; "!t2" ]) "t1");
+      (* A prefix reaches many tenants without reaching every one; only the full grant is
+         installation-wide. *)
+      assert_scope_eq ~expected:Ops.Tenant_scope.Wider ~actual:(coverage (admin [ "t*" ]) "t1");
+      assert_scope_eq
+        ~expected:Ops.Tenant_scope.Not_covered
+        ~actual:(coverage (admin [ "*"; "!t2" ]) "t2");
       assert_scope_eq
         ~expected:Ops.Tenant_scope.Not_covered
         ~actual:(coverage (admin [ "t2" ]) "t1");

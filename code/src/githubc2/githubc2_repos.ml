@@ -74,6 +74,22 @@ module List_for_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default
+         `Owner
+         (ud "type" (fun value -> CCResult.to_opt (Parameters.Type.t_of_yojson (`String value))))
+    /? option_default
+         `Full_name
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Minimal_repository.t list
@@ -233,6 +249,11 @@ module List_invitations_for_authenticated_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -582,6 +603,29 @@ module List_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default
+         `All
+         (ud "visibility" (fun value ->
+              CCResult.to_opt (Parameters.Visibility.t_of_yojson (`String value))))
+    /? option_default "owner,collaborator,organization_member" (string "affiliation")
+    /? option_default
+         `All
+         (ud "type" (fun value -> CCResult.to_opt (Parameters.Type.t_of_yojson (`String value))))
+    /? option_default
+         `Full_name
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
+    /? option (string "since")
+    /? option (string "before")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Repository.t list
@@ -654,6 +698,11 @@ module List_public = struct
   module Parameters = struct
     type t = { since : int option [@default None] } [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (int "since")
 
   module Responses = struct
     module OK = struct
@@ -974,6 +1023,14 @@ module Get_views = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default
+         `Day
+         (ud "per" (fun value -> CCResult.to_opt (Parameters.Per.t_of_yojson (`String value))))
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.View_traffic.t
@@ -1140,6 +1197,14 @@ module Get_clones = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default
+         `Day
+         (ud "per" (fun value -> CCResult.to_opt (Parameters.Per.t_of_yojson (`String value))))
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Clone_traffic.t
@@ -1264,6 +1329,11 @@ module Get_all_topics = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Topic.t
@@ -1316,6 +1386,11 @@ module List_teams = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1406,6 +1481,11 @@ module List_tags = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1840,6 +1920,11 @@ module Get_repo_ruleset_history = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Ruleset_version.t list
@@ -2084,6 +2169,11 @@ module Get_repo_ruleset = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default true (bool "includes_parents")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Repository_ruleset.t
@@ -2286,6 +2376,27 @@ module Get_repo_rule_suites = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "ref")
+    /? option_default
+         `Day
+         (ud "time_period" (fun value ->
+              CCResult.to_opt (Parameters.Time_period.t_of_yojson (`String value))))
+    /? option (string "actor_name")
+    /? option_default
+         `All
+         (ud "rule_suite_result" (fun value ->
+              CCResult.to_opt (Parameters.Rule_suite_result.t_of_yojson (`String value))))
+    /? option_default
+         `All
+         (ud "evaluate_status" (fun value ->
+              CCResult.to_opt (Parameters.Evaluate_status.t_of_yojson (`String value))))
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Rule_suites.t
@@ -2472,6 +2583,15 @@ module Get_repo_rulesets = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
+    /? option_default true (bool "includes_parents")
+    /? option (string "targets")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Repository_ruleset.t list
@@ -2540,6 +2660,11 @@ module Get_branch_rules = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Repository_rule_detailed.t list
@@ -2584,6 +2709,11 @@ module Upload_release_asset = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "name" /? option (string "label")
 
   module Responses = struct
     module Created = struct
@@ -2639,6 +2769,11 @@ module List_release_assets = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -3303,6 +3438,11 @@ module List_releases = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Release.t list
@@ -3355,6 +3495,11 @@ module Get_readme_in_directory = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "ref")
 
   module Responses = struct
     module OK = struct
@@ -3419,6 +3564,11 @@ module Get_readme = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "ref")
 
   module Responses = struct
     module OK = struct
@@ -4151,6 +4301,11 @@ module List_pages_builds = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -5427,6 +5582,11 @@ module List_deploy_keys = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Deploy_key.t list
@@ -5629,6 +5789,11 @@ module List_invitations = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -6048,6 +6213,15 @@ module List_webhook_deliveries = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 30 (int "per_page")
+    /? option (string "cursor")
+    /? option
+         (ud "status" (fun value -> CCResult.to_opt (Parameters.Status.t_of_yojson (`String value))))
 
   module Responses = struct
     module OK = struct
@@ -6496,6 +6670,11 @@ module List_webhooks = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Hook.t list
@@ -6714,6 +6893,16 @@ module List_forks = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default
+         `Newest
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Minimal_repository.t list
@@ -6854,6 +7043,11 @@ module List_custom_deployment_rule_integrations = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -7211,6 +7405,11 @@ module List_deployment_branch_policies = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -7427,6 +7626,11 @@ module Get_all_environments = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -7712,6 +7916,11 @@ module List_deployment_statuses = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -8001,6 +8210,17 @@ module List_deployments = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default "none" (string "sha")
+    /? option_default "none" (string "ref")
+    /? option_default "none" (string "task")
+    /? option_default (Some "none") (option (string "environment"))
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Deployment.t list
@@ -8048,6 +8268,14 @@ module List_contributors = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "anon")
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -8378,6 +8606,11 @@ module Get_content = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "ref")
+
   module Responses = struct
     module OK = struct
       type t =
@@ -8476,6 +8709,11 @@ module Compare_commits = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -8594,6 +8832,11 @@ module List_commit_statuses_for_ref = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Status.t list
@@ -8652,6 +8895,11 @@ module Get_combined_status_for_ref = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Combined_commit_status.t
@@ -8709,6 +8957,11 @@ module Get_commit = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -8806,6 +9059,11 @@ module List_pull_requests_associated_with_commit = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -8942,6 +9200,11 @@ module List_comments_for_commit = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Commit_comment.t list
@@ -9052,6 +9315,19 @@ module List_commits = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "sha")
+    /? option (string "path")
+    /? option (string "author")
+    /? option (string "committer")
+    /? option (string "since")
+    /? option (string "until")
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -9303,6 +9579,11 @@ module List_commit_comments_for_repo = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -9623,6 +9904,20 @@ module List_collaborators = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default
+         `All
+         (ud "affiliation" (fun value ->
+              CCResult.to_opt (Parameters.Affiliation.t_of_yojson (`String value))))
+    /? option
+         (ud "permission" (fun value ->
+              CCResult.to_opt (Parameters.Permission.t_of_yojson (`String value))))
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Collaborator.t list
@@ -9679,6 +9974,11 @@ module Codeowners_errors = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "ref")
 
   module Responses = struct
     module OK = struct
@@ -12161,6 +12461,14 @@ module List_branches = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (bool "protected")
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Short_branch.t list
@@ -12531,6 +12839,15 @@ module List_attestations = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 30 (int "per_page")
+    /? option (string "before")
+    /? option (string "after")
+    /? option (string "predicate_type")
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -12803,6 +13120,26 @@ module List_activities = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option_default 30 (int "per_page")
+    /? option (string "before")
+    /? option (string "after")
+    /? option (string "ref")
+    /? option (string "actor")
+    /? option
+         (ud "time_period" (fun value ->
+              CCResult.to_opt (Parameters.Time_period.t_of_yojson (`String value))))
+    /? option
+         (ud "activity_type" (fun value ->
+              CCResult.to_opt (Parameters.Activity_type.t_of_yojson (`String value))))
 
   module Responses = struct
     module OK = struct
@@ -13744,6 +14081,28 @@ module Get_org_rule_suites = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "ref")
+    /? option (string "repository_name")
+    /? option_default
+         `Day
+         (ud "time_period" (fun value ->
+              CCResult.to_opt (Parameters.Time_period.t_of_yojson (`String value))))
+    /? option (string "actor_name")
+    /? option_default
+         `All
+         (ud "rule_suite_result" (fun value ->
+              CCResult.to_opt (Parameters.Rule_suite_result.t_of_yojson (`String value))))
+    /? option_default
+         `All
+         (ud "evaluate_status" (fun value ->
+              CCResult.to_opt (Parameters.Evaluate_status.t_of_yojson (`String value))))
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Rule_suites.t
@@ -13927,6 +14286,14 @@ module Get_org_rulesets = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
+    /? option (string "targets")
 
   module Responses = struct
     module OK = struct
@@ -14256,6 +14623,22 @@ module List_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default
+         `All
+         (ud "type" (fun value -> CCResult.to_opt (Parameters.Type.t_of_yojson (`String value))))
+    /? option_default
+         `Created
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct

@@ -93,6 +93,23 @@ module GetApiV4RunnersIdJobs = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "system_id")
+    /? option
+         (ud "status" (fun value -> CCResult.to_opt (Parameters.Status.t_of_yojson (`String value))))
+    /? option
+         (ud "order_by" (fun value ->
+              CCResult.to_opt (Parameters.Order_by.t_of_yojson (`String value))))
+    /? option_default
+         `Desc
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option (string "cursor")
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end

@@ -307,6 +307,16 @@ module GetApiV4ProjectsIdPipelinesPipelineIdJobs = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default false (bool "include_retried")
+    /? option
+         (ud "scope" (fun value -> CCResult.to_opt (Parameters.Scope.t_of_yojson (`String value))))
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -463,6 +473,15 @@ module GetApiV4ProjectsIdPipelinesPipelineIdBridges = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option
+         (ud "scope" (fun value -> CCResult.to_opt (Parameters.Scope.t_of_yojson (`String value))))
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -600,6 +619,11 @@ module GetApiV4ProjectsIdPipelinesLatest = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "ref")
 
   module Responses = struct
     module OK = struct end
@@ -855,6 +879,33 @@ module GetApiV4ProjectsIdPipelines = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option
+         (ud "scope" (fun value -> CCResult.to_opt (Parameters.Scope.t_of_yojson (`String value))))
+    /? option
+         (ud "status" (fun value -> CCResult.to_opt (Parameters.Status.t_of_yojson (`String value))))
+    /? option (string "ref")
+    /? option (string "sha")
+    /? option (bool "yaml_errors")
+    /? option (string "username")
+    /? option (string "updated_before")
+    /? option (string "updated_after")
+    /? option_default
+         `Id
+         (ud "order_by" (fun value ->
+              CCResult.to_opt (Parameters.Order_by.t_of_yojson (`String value))))
+    /? option_default
+         `Desc
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option
+         (ud "source" (fun value -> CCResult.to_opt (Parameters.Source.t_of_yojson (`String value))))
+    /? option (string "name")
 
   module Responses = struct
     module OK = struct

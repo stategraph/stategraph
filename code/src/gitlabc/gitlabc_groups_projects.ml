@@ -123,6 +123,43 @@ module GetApiV4GroupsIdProjectsShared = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (bool "archived")
+    /? option
+         (ud "visibility" (fun value ->
+              CCResult.to_opt (Parameters.Visibility.t_of_yojson (`String value))))
+    /? option (string "search")
+    /? option_default
+         `Created_at
+         (ud "order_by" (fun value ->
+              CCResult.to_opt (Parameters.Order_by.t_of_yojson (`String value))))
+    /? option_default
+         `Desc
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option_default false (bool "simple")
+    /? option_default false (bool "starred")
+    /? option_default false (bool "with_issues_enabled")
+    /? option_default false (bool "with_merge_requests_enabled")
+    /? option
+         (ud
+            "min_access_level"
+            (fun value ->
+               match CCInt.of_string value with
+               | Some 10 -> Some 10
+               | Some 15 -> Some 15
+               | Some 20 -> Some 20
+               | Some 30 -> Some 30
+               | Some 40 -> Some 40
+               | Some 50 -> Some 50
+               | _ -> None
+              : string -> int option))
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option_default false (bool "with_custom_attributes")
+
   module Responses = struct
     module OK = struct end
 
@@ -263,6 +300,48 @@ module GetApiV4GroupsIdProjects = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (bool "archived")
+    /? option
+         (ud "visibility" (fun value ->
+              CCResult.to_opt (Parameters.Visibility.t_of_yojson (`String value))))
+    /? option (string "search")
+    /? option_default
+         `Created_at
+         (ud "order_by" (fun value ->
+              CCResult.to_opt (Parameters.Order_by.t_of_yojson (`String value))))
+    /? option_default
+         `Desc
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option_default false (bool "simple")
+    /? option_default false (bool "owned")
+    /? option_default false (bool "starred")
+    /? option_default false (bool "with_issues_enabled")
+    /? option_default false (bool "with_merge_requests_enabled")
+    /? option_default true (bool "with_shared")
+    /? option_default false (bool "include_subgroups")
+    /? option_default false (bool "include_ancestor_groups")
+    /? option
+         (ud
+            "min_access_level"
+            (fun value ->
+               match CCInt.of_string value with
+               | Some 10 -> Some 10
+               | Some 15 -> Some 15
+               | Some 20 -> Some 20
+               | Some 30 -> Some 30
+               | Some 40 -> Some 40
+               | Some 50 -> Some 50
+               | _ -> None
+              : string -> int option))
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option_default false (bool "with_custom_attributes")
+    /? option_default false (bool "with_security_reports")
 
   module Responses = struct
     module OK = struct end

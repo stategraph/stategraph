@@ -1,15 +1,14 @@
 ## Nothing to Plan :white_check_mark:
 
-Everything matching your request already has a plan for the files as they are now:
-
-| Dir | Workspace |
-| --- | --------- |
+| Dir | Workspace | Reason |
+| --- | --------- | ------ |
 {%- for d in dirspaces %}
-| `{{ d.dir }}` | `{{ d.workspace }}` |
+| `{{ d.dir }}` | `{{ d.workspace }}` | {% if d.reason == 'plan_in_progress' %}A plan for this directory is queued or running.  Wait for it to finish.{%- else %}Already has a plan for the files as they are now{%- endif %} |
 {%- endfor %}
-
+{% if any_already_planned %}
 A directory and workspace runs again when one of the files it uses changes.  To run one of these anyway, name it:
 
 ```
 stategraph plan dir:<path>
 ```
+{% endif %}

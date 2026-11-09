@@ -401,6 +401,11 @@ module Restore_package_for_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "token")
+
   module Responses = struct
     module No_content = struct end
 
@@ -684,6 +689,18 @@ module List_packages_for_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? ud "package_type" (fun value ->
+        CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /? option
+         (ud "visibility" (fun value ->
+              CCResult.to_opt (Parameters.Visibility.t_of_yojson (`String value))))
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -1112,6 +1129,16 @@ module Get_all_package_versions_for_package_owned_by_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
+    /? option_default
+         `Active
+         (ud "state" (fun value -> CCResult.to_opt (Parameters.State.t_of_yojson (`String value))))
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Package_version.t list
@@ -1214,6 +1241,11 @@ module Restore_package_for_authenticated_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "token")
 
   module Responses = struct
     module No_content = struct end
@@ -1492,6 +1524,18 @@ module List_packages_for_authenticated_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? ud "package_type" (fun value ->
+        CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /? option
+         (ud "visibility" (fun value ->
+              CCResult.to_opt (Parameters.Visibility.t_of_yojson (`String value))))
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -1886,6 +1930,16 @@ module Get_all_package_versions_for_package_owned_by_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
+    /? option_default
+         `Active
+         (ud "state" (fun value -> CCResult.to_opt (Parameters.State.t_of_yojson (`String value))))
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Package_version.t list
@@ -1990,6 +2044,11 @@ module Restore_package_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "token")
 
   module Responses = struct
     module No_content = struct end
@@ -2274,6 +2333,18 @@ module List_packages_for_organization = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? ud "package_type" (fun value ->
+        CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /? option
+         (ud "visibility" (fun value ->
+              CCResult.to_opt (Parameters.Visibility.t_of_yojson (`String value))))
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct

@@ -92,10 +92,15 @@ module Drift_result = struct
   type restart =
     | Restart
     | Limit_reached
+    | Disabled
   [@@deriving eq, show]
 
   let restart_limit = 10
-  let restart ~restarts = if restarts < restart_limit then Restart else Limit_reached
+
+  let restart ~restart_on_change ~restarts =
+    if not restart_on_change then Disabled
+    else if restarts < restart_limit then Restart
+    else Limit_reached
 end
 
 module Summary = struct

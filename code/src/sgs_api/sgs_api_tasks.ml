@@ -62,6 +62,11 @@ module Result = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (int "idx")
+
   module Responses = struct
     module OK = struct
       type t = Yojson.Safe.t [@@deriving yojson { strict = false; meta = false }, show, eq]

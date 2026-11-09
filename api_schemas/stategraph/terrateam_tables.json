@@ -29,6 +29,10 @@
           "type": "boolean"
         },
         {
+          "name": "restart_on_change",
+          "type": "boolean"
+        },
+        {
           "name": "schedule",
           "type": "text"
         },

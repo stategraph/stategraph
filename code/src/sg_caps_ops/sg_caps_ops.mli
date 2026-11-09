@@ -6,16 +6,18 @@
 *)
 
 module Tenant_scope : sig
-  (** How much of a tenant a grant covers. [Wider] is a grant that reaches the tenant and more,
-      which is what separates administering one tenant from administering an installation. *)
+  (** How much of a tenant a grant covers. [Instance] is the grant that covers every tenant, and
+      [Wider] one that reaches this tenant and more without covering every tenant. *)
   type coverage =
     | Not_covered
     | Exact
     | Wider
+    | Instance
   [@@deriving show, eq]
 
-  (** [coverage scope tenant] is [Exact] when [scope] reaches that tenant and no other, [Wider] when
-      it reaches more, and [Not_covered] when it does not reach it. *)
+  (** [coverage scope tenant] is [Exact] when [scope] reaches that tenant and no other, [Instance]
+      when it reaches every tenant, [Wider] when it reaches that tenant and some but not all others,
+      and [Not_covered] when it does not reach it. *)
   val coverage : Sg_caps_trie_scope.t -> string -> coverage
 end
 

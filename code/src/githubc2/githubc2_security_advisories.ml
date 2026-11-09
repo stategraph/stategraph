@@ -500,6 +500,23 @@ module List_repository_advisories = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option_default
+         `Created
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option (string "before")
+    /? option (string "after")
+    /? option_default 30 (int "per_page")
+    /? option
+         (ud "state" (fun value -> CCResult.to_opt (Parameters.State.t_of_yojson (`String value))))
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Repository_advisory.t list
@@ -632,6 +649,23 @@ module List_org_repository_advisories = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option_default
+         `Created
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option (string "before")
+    /? option (string "after")
+    /? option_default 30 (int "per_page")
+    /? option
+         (ud "state" (fun value -> CCResult.to_opt (Parameters.State.t_of_yojson (`String value))))
 
   module Responses = struct
     module OK = struct
@@ -877,6 +911,65 @@ module List_global_advisories = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "ghsa_id")
+    /? option_default
+         `Reviewed
+         (ud "type" (fun value -> CCResult.to_opt (Parameters.Type.t_of_yojson (`String value))))
+    /? option (string "cve_id")
+    /? option
+         (ud "ecosystem" (fun value ->
+              CCResult.to_opt
+                (Githubc2_components.Security_advisory_ecosystems.t_of_yojson (`String value))))
+    /? option
+         (ud "severity" (fun value ->
+              CCResult.to_opt (Parameters.Severity.t_of_yojson (`String value))))
+    /? option
+         (ud_array "cwes" (fun values ->
+              CCOption.choice
+                [
+                  CCOption.map
+                    (fun v -> Parameters.Cwes.V0 v)
+                    (match values with
+                    | value :: [] -> CCOption.return value
+                    | _ -> None);
+                  CCOption.map
+                    (fun v -> Parameters.Cwes.V1 v)
+                    (CCOption.sequence_l (CCList.map CCOption.return values));
+                ]))
+    /? option (bool "is_withdrawn")
+    /? option
+         (ud_array "affects" (fun values ->
+              CCOption.choice
+                [
+                  CCOption.map
+                    (fun v -> Parameters.Affects.V0 v)
+                    (match values with
+                    | value :: [] -> CCOption.return value
+                    | _ -> None);
+                  CCOption.map
+                    (fun v -> Parameters.Affects.V1 v)
+                    (CCOption.sequence_l (CCList.map CCOption.return values));
+                ]))
+    /? option (string "published")
+    /? option (string "updated")
+    /? option (string "modified")
+    /? option (string "epss_percentage")
+    /? option (string "epss_percentile")
+    /? option (string "before")
+    /? option (string "after")
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option_default 30 (int "per_page")
+    /? option_default
+         `Published
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
 
   module Responses = struct
     module OK = struct

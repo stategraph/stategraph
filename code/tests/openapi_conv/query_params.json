@@ -1,0 +1,56 @@
+{
+  "paths": {
+    "/params": {
+      "get": {
+        "operationId": "params/list",
+        "parameters": [
+          { "in": "query", "name": "id", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "in": "query", "name": "name", "required": false, "schema": { "type": "string" } },
+          { "in": "query", "name": "cursor", "required": false, "schema": { "type": "string", "nullable": true } },
+          { "in": "query", "name": "environment", "required": false, "schema": { "type": "string", "nullable": true, "default": "none" } },
+          { "in": "query", "name": "count", "required": false, "schema": { "type": "integer", "default": 10 } },
+          { "in": "query", "name": "big", "required": false, "schema": { "type": "integer", "format": "int64" } },
+          { "in": "query", "name": "level", "required": false, "schema": { "type": "integer", "enum": [1, 2] } },
+          { "in": "query", "name": "big_level", "required": false, "schema": { "type": "integer", "format": "int64", "enum": [10000000000, 20000000000] } },
+          { "in": "query", "name": "flag", "required": false, "schema": { "type": "boolean", "default": false } },
+          { "in": "query", "name": "color", "required": false, "schema": { "type": "string", "enum": ["red", "green"], "default": "red" } },
+          { "in": "query", "name": "shade", "required": false, "schema": { "$ref": "#/components/schemas/Shade" } },
+          { "in": "query", "name": "tags", "required": false, "schema": { "type": "array", "items": { "type": "string" }, "default": ["a"] } },
+          { "in": "query", "name": "colors", "required": false, "schema": { "type": "array", "items": { "type": "string", "enum": ["red", "green"] } } },
+          { "in": "query", "name": "shades", "required": false, "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Shade" } } },
+          {
+            "in": "query",
+            "name": "has",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                { "type": "string" },
+                { "type": "array", "items": { "type": "string", "enum": ["patch"] } }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "pick",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                { "type": "integer" },
+                { "type": "boolean" },
+                { "type": "array", "items": { "$ref": "#/components/schemas/Shade" } }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {}
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Shade": { "type": "string", "enum": ["light", "dark"] }
+    }
+  }
+}

@@ -3,6 +3,11 @@ module Preview = struct
     type t = { token : string } [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "token"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Invitation_preview_response.t

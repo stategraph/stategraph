@@ -116,6 +116,16 @@ module DeleteApiV4ProjectsIdRegistryRepositoriesRepositoryIdTags = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "name_regex_delete")
+    /? option (string "name_regex")
+    /? option (string "name_regex_keep")
+    /? option (int "keep_n")
+    /? option (string "older_than")
+
   module Responses = struct
     module No_content = struct end
     module Bad_request = struct end
@@ -173,6 +183,11 @@ module GetApiV4ProjectsIdRegistryRepositoriesRepositoryIdTags = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -270,6 +285,15 @@ module GetApiV4ProjectsIdRegistryRepositories = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option_default false (bool "tags")
+    /? option_default false (bool "tags_count")
 
   module Responses = struct
     module OK = struct end

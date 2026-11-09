@@ -1122,6 +1122,23 @@ module List_tasks = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
+    /? option_default
+         `Updated_at
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option (string "state")
+    /? option_default false (bool "is_archived")
+    /? option (string "since")
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -3319,6 +3336,24 @@ module List_tasks_for_repo = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
+    /? option_default
+         `Updated_at
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option (string "state")
+    /? option_default false (bool "is_archived")
+    /? option (string "since")
+    /? option (array (int "creator_id"))
 
   module Responses = struct
     module OK = struct

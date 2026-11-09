@@ -6,7 +6,7 @@ order: 3
 
 An AI integration sends the results of a Stategraph Orchestration plan or apply to an LLM, and posts the response on the pull request. The response can be a change summary, risk flags, or an error diagnosis. Run it from a [hook](/docs/reference/orchestration/configuration/hooks) or a [workflow](/docs/reference/orchestration/configuration/workflows) step, with any LLM API. The examples use Anthropic, OpenAI, and Google.
 
-For AI agents that use Infrastructure as a Database, with skills for queries, plans, imports, refactors, and cost, see [AI agents](/docs/infrastructure-as-a-database/ai-agents).
+For AI agents that use Infrastructure as a Database, with skills for queries, plans, imports, refactors, and cost, see [AI agents](/docs/ai).
 
 ## How it works
 
@@ -185,6 +185,6 @@ GitLab passes protected variables only to pipelines on protected branches. Orche
 
 ## Next Steps
 
-- [AI agents](/docs/infrastructure-as-a-database/ai-agents): use Infrastructure as a Database from an AI agent
+- [AI agents](/docs/ai): use Infrastructure as a Database from an AI agent
 - [hooks reference](/docs/reference/orchestration/configuration/hooks): the `run` hook keys
 - [Environment variables](/docs/orchestration/configuration/environment-variables): the shape of the results file

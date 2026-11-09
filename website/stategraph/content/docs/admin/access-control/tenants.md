@@ -68,7 +68,7 @@ Removing a member (`DELETE /api/v1/tenants/{tenant_id}/members?user_id=<user-id>
 
 A member whose admin or `users-manage` grant reaches wider than this tenant, such as an instance admin, cannot be demoted or removed here (`409`).
 
-`GET /api/v1/tenants/{tenant_id}/members` lists the members. Each member has an `admin_scope` and a `users_manage_scope`: `none`, `tenant`, or `wider`.
+`GET /api/v1/tenants/{tenant_id}/members` lists the members. Each member has an `admin_scope` and a `users_manage_scope`: `none`, `tenant`, `wider` (the grant also reaches other tenants, but not all of them), or `instance` (the grant covers every tenant).
 
 ## Creating a tenant
 

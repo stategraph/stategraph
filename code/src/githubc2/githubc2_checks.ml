@@ -12,6 +12,15 @@ module List_suites_for_ref = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (int "app_id")
+    /? option (string "check_name")
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -116,6 +125,20 @@ module List_for_ref = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "check_name")
+    /? option
+         (ud "status" (fun value -> CCResult.to_opt (Parameters.Status.t_of_yojson (`String value))))
+    /? option_default
+         `Latest
+         (ud "filter" (fun value -> CCResult.to_opt (Parameters.Filter.t_of_yojson (`String value))))
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
+    /? option (int "app_id")
 
   module Responses = struct
     module OK = struct
@@ -262,6 +285,19 @@ module List_for_suite = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "check_name")
+    /? option
+         (ud "status" (fun value -> CCResult.to_opt (Parameters.Status.t_of_yojson (`String value))))
+    /? option_default
+         `Latest
+         (ud "filter" (fun value -> CCResult.to_opt (Parameters.Filter.t_of_yojson (`String value))))
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -554,6 +590,11 @@ module List_annotations = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct

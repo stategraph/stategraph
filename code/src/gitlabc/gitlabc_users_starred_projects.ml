@@ -129,6 +129,62 @@ module GetApiV4UsersUserIdStarredProjects = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default
+         `Created_at
+         (ud "order_by" (fun value ->
+              CCResult.to_opt (Parameters.Order_by.t_of_yojson (`String value))))
+    /? option_default
+         `Desc
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option (bool "archived")
+    /? option
+         (ud "visibility" (fun value ->
+              CCResult.to_opt (Parameters.Visibility.t_of_yojson (`String value))))
+    /? option (string "search")
+    /? option (bool "search_namespaces")
+    /? option_default false (bool "owned")
+    /? option_default false (bool "starred")
+    /? option_default false (bool "imported")
+    /? option_default false (bool "membership")
+    /? option_default false (bool "with_issues_enabled")
+    /? option_default false (bool "with_merge_requests_enabled")
+    /? option (string "with_programming_language")
+    /? option
+         (ud
+            "min_access_level"
+            (fun value ->
+               match CCInt.of_string value with
+               | Some 10 -> Some 10
+               | Some 15 -> Some 15
+               | Some 20 -> Some 20
+               | Some 30 -> Some 30
+               | Some 40 -> Some 40
+               | Some 50 -> Some 50
+               | _ -> None
+              : string -> int option))
+    /? option (int "id_after")
+    /? option (int "id_before")
+    /? option (string "last_activity_after")
+    /? option (string "last_activity_before")
+    /? option (string "repository_storage")
+    /? option (array (string "topic"))
+    /? option (int "topic_id")
+    /? option (string "updated_before")
+    /? option (string "updated_after")
+    /? option (bool "include_pending_delete")
+    /? option_default false (bool "wiki_checksum_failed")
+    /? option_default false (bool "repository_checksum_failed")
+    /? option_default false (bool "include_hidden")
+    /? option (string "marked_for_deletion_on")
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option_default false (bool "simple")
+    /? option_default false (bool "statistics")
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end

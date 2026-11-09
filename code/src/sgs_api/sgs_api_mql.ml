@@ -55,6 +55,11 @@ module Get = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (array (string "page")) /? option (string "tz") /? string "q"
+
   module Responses = struct
     module OK = struct
       module Items = struct
