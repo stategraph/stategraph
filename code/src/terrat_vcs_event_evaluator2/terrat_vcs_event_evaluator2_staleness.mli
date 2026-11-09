@@ -83,16 +83,20 @@ module Drift_result : sig
   val decide : t -> decision
 
   (** Whether a drift that must reconcile again gets a new job. [Limit_reached] stops a branch that
-      keeps moving, because each move can make the reconcile stale again. *)
+      keeps moving, because each move can make the reconcile stale again. [Disabled] is a drift
+      whose schedule sets [restart_on_change: false]. *)
   type restart =
     | Restart
     | Limit_reached
+    | Disabled
   [@@deriving eq, show]
 
-  (** [restart ~restarts] is the restart decision for a drift that already reconciled again
-      [restarts] times. A drift reconciles again at most 10 times: [restart ~restarts:9] is
-      [Restart], and [restart ~restarts:10] is [Limit_reached]. *)
-  val restart : restarts:int -> restart
+  (** [restart ~restart_on_change ~restarts] is the restart decision for a drift that already
+      reconciled again [restarts] times. A drift reconciles again at most 10 times:
+      [restart ~restart_on_change:true ~restarts:9] is [Restart], and
+      [restart ~restart_on_change:true ~restarts:10] is [Limit_reached]. With
+      [~restart_on_change:false] it is always [Disabled]. *)
+  val restart : restart_on_change:bool -> restarts:int -> restart
 end
 
 (** The state of a dirspace of a pull request at its head, which the unified summary comment shows.

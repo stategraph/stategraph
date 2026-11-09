@@ -466,6 +466,23 @@ module List_org_campaigns = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option
+         (ud "state" (fun value ->
+              CCResult.to_opt (Githubc2_components.Campaign_state.t_of_yojson (`String value))))
+    /? option_default
+         `Created
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Campaign_summary.t list

@@ -7,6 +7,11 @@ module List_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Team_full.t list
@@ -66,6 +71,11 @@ module List_child_legacy = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -313,6 +323,11 @@ module List_repos_legacy = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -684,6 +699,16 @@ module List_members_legacy = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default
+         `All
+         (ud "role" (fun value -> CCResult.to_opt (Parameters.Role.t_of_yojson (`String value))))
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Team_member.t list
@@ -739,6 +764,11 @@ module List_pending_invitations_legacy = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1015,6 +1045,11 @@ module List_child_in_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Team.t list
@@ -1198,6 +1233,11 @@ module List_repos_in_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1434,6 +1474,16 @@ module List_members_in_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default
+         `All
+         (ud "role" (fun value -> CCResult.to_opt (Parameters.Role.t_of_yojson (`String value))))
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Team_member.t list
@@ -1477,6 +1527,11 @@ module List_pending_invitations_in_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1914,6 +1969,17 @@ module List = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
+    /? option_default
+         `All
+         (ud "team_type" (fun value ->
+              CCResult.to_opt (Parameters.Team_type.t_of_yojson (`String value))))
 
   module Responses = struct
     module OK = struct

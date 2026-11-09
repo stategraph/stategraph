@@ -7,6 +7,11 @@ module GetApiV4ProjectsProjectIdPackagesNugetV2Packages____ = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "$filter"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -51,6 +56,11 @@ module GetApiV4ProjectsProjectIdPackagesNugetV2Findpackagesbyid____ = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "id"
 
   module Responses = struct
     module OK = struct end
@@ -99,6 +109,14 @@ module GetApiV4ProjectsIdPackagesPackageIdPipelines = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option (string "cursor")
 
   module Responses = struct
     module OK = struct end
@@ -204,6 +222,11 @@ module GetApiV4ProjectsIdPackagesPackageIdPackageFiles = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -450,6 +473,15 @@ module GetApiV4ProjectsIdPackagesTerraformModulesModuleNameModuleSystem_moduleVe
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? string "module_version"
+    /? option
+         (ud "terraform-get" (fun value ->
+              CCResult.to_opt (Parameters.Terraform_get.t_of_yojson (`String value))))
+
   module Responses = struct
     module No_content = struct end
     module Unauthorized = struct end
@@ -520,6 +552,14 @@ module GetApiV4ProjectsIdPackagesTerraformModulesModuleNameModuleSystem = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option
+         (ud "terraform-get" (fun value ->
+              CCResult.to_opt (Parameters.Terraform_get.t_of_yojson (`String value))))
 
   module Responses = struct
     module No_content = struct end
@@ -798,6 +838,11 @@ module GetApiV4ProjectsIdPackagesRubygemsApiV1Dependencies = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (array (string "gems"))
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -847,6 +892,11 @@ module GetApiV4ProjectsIdPackagesRpmRepodata_fileName = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "file_name"
 
   module Responses = struct
     module OK = struct end
@@ -941,6 +991,11 @@ module GetApiV4ProjectsIdPackagesRpm_packageFileId_fileName = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? int "package_file_id" /? string "file_name"
 
   module Responses = struct
     module OK = struct end
@@ -1041,6 +1096,11 @@ module GetApiV4ProjectsIdPackagesPypiSimple_packageName = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "package_name"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -1134,6 +1194,11 @@ module GetApiV4ProjectsIdPackagesPypiFilesSha256_fileIdentifier = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "file_identifier"
 
   module Responses = struct
     module OK = struct end
@@ -1755,6 +1820,11 @@ module GetApiV4ProjectsIdPackagesNugetSymbolfiles_fileName_signature_sameFileNam
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "file_name" /? string "signature" /? string "same_file_name"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -1812,6 +1882,15 @@ module GetApiV4ProjectsIdPackagesNugetQuery = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "q")
+    /? option_default 0 (int "skip")
+    /? option_default 20 (int "take")
+    /? option_default true (bool "prerelease")
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -1867,6 +1946,11 @@ module GetApiV4ProjectsIdPackagesNugetMetadata_packageNameIndex = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "package_name"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -1917,6 +2001,11 @@ module GetApiV4ProjectsIdPackagesNugetMetadata_packageName_packageVersion = stru
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "package_name" /? string "package_version"
 
   module Responses = struct
     module OK = struct end
@@ -2004,6 +2093,11 @@ module GetApiV4ProjectsIdPackagesNugetDownload_packageNameIndex = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "package_name"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -2055,6 +2149,11 @@ module GetApiV4ProjectsIdPackagesNugetDownload_packageName_packageVersion_packag
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "package_name" /? string "package_version" /? string "package_filename"
 
   module Responses = struct
     module OK = struct end
@@ -2154,6 +2253,11 @@ module DeleteApiV4ProjectsIdPackagesNuget_packageName_packageVersion = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "package_name" /? string "package_version"
 
   module Responses = struct
     module No_content = struct end
@@ -2319,6 +2423,11 @@ module DeleteApiV4ProjectsIdPackagesNpmPackage_packageNameDistTagsTag = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "package_name"
+
   module Responses = struct
     module No_content = struct end
     module Bad_request = struct end
@@ -2428,6 +2537,11 @@ module GetApiV4ProjectsIdPackagesNpmPackage_packageNameDistTags = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "package_name"
 
   module Responses = struct
     module OK = struct end
@@ -2575,6 +2689,11 @@ module GetApiV4ProjectsIdPackagesNpm_packageName__fileName = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "package_name" /? string "file_name"
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -2620,6 +2739,11 @@ module GetApiV4ProjectsIdPackagesNpm_packageName = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "package_name"
 
   module Responses = struct
     module OK = struct end
@@ -2794,6 +2918,11 @@ module GetApiV4ProjectsIdPackagesMaven_pathFileName = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "path"
 
   module Responses = struct
     module OK = struct end
@@ -3044,6 +3173,11 @@ module GetApiV4ProjectsIdPackagesGo_moduleName_vModuleVersionZip = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "module_name"
+
   module Responses = struct
     module OK = struct end
 
@@ -3081,6 +3215,11 @@ module GetApiV4ProjectsIdPackagesGo_moduleName_vModuleVersionMod = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "module_name"
 
   module Responses = struct
     module OK = struct end
@@ -3120,6 +3259,11 @@ module GetApiV4ProjectsIdPackagesGo_moduleName_vModuleVersionInfo = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "module_name"
+
   module Responses = struct
     module OK = struct end
 
@@ -3156,6 +3300,11 @@ module GetApiV4ProjectsIdPackagesGo_moduleName_vList = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "module_name"
 
   module Responses = struct
     module OK = struct end
@@ -3369,6 +3518,11 @@ struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "distribution"
+
   module Responses = struct
     module OK = struct end
     module Accepted = struct end
@@ -3431,6 +3585,11 @@ module GetApiV4ProjectsIdPackagesDebianDists_distributionComponentSourceSources 
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "distribution"
+
   module Responses = struct
     module OK = struct end
     module Accepted = struct end
@@ -3491,6 +3650,11 @@ struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -3558,6 +3722,11 @@ struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "distribution"
+
   module Responses = struct
     module OK = struct end
     module Accepted = struct end
@@ -3624,6 +3793,11 @@ struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "distribution"
+
   module Responses = struct
     module OK = struct end
     module Accepted = struct end
@@ -3689,6 +3863,11 @@ struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "distribution"
+
   module Responses = struct
     module OK = struct end
     module Accepted = struct end
@@ -3750,6 +3929,11 @@ module GetApiV4ProjectsIdPackagesDebianDists_distributionReleaseGpg = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "distribution"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -3803,6 +3987,11 @@ module GetApiV4ProjectsIdPackagesDebianDists_distributionRelease = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "distribution"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -3855,6 +4044,11 @@ module GetApiV4ProjectsIdPackagesDebianDists_distributionInrelease = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -4042,6 +4236,11 @@ module GetApiV4ProjectsIdPackagesConanV2ConansSearch = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "q"
 
   module Responses = struct
     module OK = struct end
@@ -5330,6 +5529,11 @@ module GetApiV4ProjectsIdPackagesConanV1ConansSearch = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "q"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -5375,6 +5579,11 @@ module GetApiV4ProjectsIdPackagesComposerArchives_packageName = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "sha" /? string "package_name"
 
   module Responses = struct
     module OK = struct end
@@ -5612,6 +5821,28 @@ module GetApiV4ProjectsIdPackages = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option_default
+         `Created_at
+         (ud "order_by" (fun value ->
+              CCResult.to_opt (Parameters.Order_by.t_of_yojson (`String value))))
+    /? option_default
+         `Asc
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option
+         (ud "package_type" (fun value ->
+              CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value))))
+    /? option (string "package_name")
+    /? option (string "package_version")
+    /? option (bool "include_versionless")
+    /? option
+         (ud "status" (fun value -> CCResult.to_opt (Parameters.Status.t_of_yojson (`String value))))
 
   module Responses = struct
     module OK = struct end

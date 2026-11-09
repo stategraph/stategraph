@@ -55,8 +55,7 @@ let run' ~except_login_session storage tenant user target_id body =
                 Scope.(
                   match member.Sgs_tenant.Member.admin with
                   | Not_covered -> false
-                  | Exact -> true
-                  | Wider -> true)
+                  | Exact | Wider | Instance -> true)
               in
               let demoting =
                 if is_admin then
@@ -84,7 +83,7 @@ let run' ~except_login_session storage tenant user target_id body =
                           | `Users_manage -> member.Sgs_tenant.Member.users_manage
                         in
                         match coverage with
-                        | Scope.Wider -> true
+                        | Scope.Wider | Scope.Instance -> true
                         | Scope.Exact | Scope.Not_covered -> false)
                     | `Noop | `Grant -> false)
                   [ `Admin; `Users_manage ]

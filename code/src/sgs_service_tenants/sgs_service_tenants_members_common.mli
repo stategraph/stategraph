@@ -2,9 +2,10 @@
     projection, and the failure vocabulary they answer with. *)
 
 (** [wider_grant member] is a grant of [member] that covers more than the tenant it was read for, if
-    there is one. Such a grant is not a tenant-scoped endpoint's to change: narrowing it would
-    rewrite authority the caller does not own, and an installation-wide [admin] grant would be
-    demoted without the guard that keeps the last administrator of the installation. *)
+    there is one — whether it also reaches some other tenants or covers every tenant. Such a grant
+    is not a tenant-scoped endpoint's to change: narrowing it would rewrite authority the caller
+    does not own, and an installation-wide [admin] grant would be demoted without the guard that
+    keeps the last administrator of the installation. *)
 val wider_grant : Sgs_tenant.Member.t -> Sg_caps_ops.tenant_grant option
 
 (** A refusal that is specific to membership management, as opposed to a capability denial (which
@@ -31,7 +32,8 @@ val grant_to_caps : 'a Sgs_tenant.t -> Sg_caps_ops.tenant_grant -> Sgs_user_sess
 
 (** Project a member onto the API type. Carries no status of its own — see {!respond_member}. The
     coverage of each grant is reported as-is rather than flattened to a boolean, so the UI can
-    disable demote and remove for a member whose grant reaches beyond this tenant. *)
+    disable demote and remove for a member whose grant reaches beyond this tenant, and can tell an
+    installation-wide grant from one that reaches only some other tenants. *)
 val member_to_api : Sgs_tenant.Member.t -> Sgs_api_components_tenant_member.t
 
 (** Answer with a member: {!member_to_api}, serialised, at [status] -- [`Created] ([201]) when an

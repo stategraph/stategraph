@@ -134,6 +134,16 @@ let retry_wait ~max_wait default_wait res =
       | `Fail _ | `No_wait -> Abb.Future.return default_wait)
     (rate_limit_headers res)
 
+(* Whether a failed call to the forge is a transport fault worth trying again.  A
+   [`Missing_response] is a status the generated client has no binding for.  A 4xx among them is a
+   verdict on the request and not a fault -- trying it again cannot change it.  GitLab answers a
+   ref that is gone with a bound [Bad_request] or [Not_found], which arrives as [Ok]; the unbound
+   4xx of an endpoint without those bindings deserves the same answer.  A 5xx is the forge
+   failing while it answers, which a retry can change. *)
+let retryable_missing_response = function
+  | Error (`Missing_response resp) -> Openapi.Response.status resp >= 500
+  | Ok _ | Error _ -> false
+
 let call ?(tries = 3) t req =
   let max_wait = CCOption.get_or ~default:thirty_seconds (Openapic_abb.call_timeout t) in
   Abbs_fc.retry

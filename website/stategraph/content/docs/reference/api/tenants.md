@@ -78,7 +78,7 @@ Response:
 }
 ```
 
-`admin_scope` and `users_manage_scope` are each `none`, `tenant`, or `wider` (the grant reaches beyond this tenant, for example for an instance admin).
+`admin_scope` and `users_manage_scope` are each `none`, `tenant`, `wider` (the grant also reaches other tenants, but not all of them), or `instance` (the grant covers every tenant, for example for an instance admin).
 
 ### Add member
 

@@ -1,5 +1,5 @@
 {
   "title": "IaC tools",
   "order": 4,
-  "description": "Run Terraform, OpenTofu, Terragrunt, Pulumi, or CDKTF with Stategraph Orchestration, and move existing workspaces off Terraform Cloud."
+  "description": "Run Terraform, OpenTofu, Terragrunt, Pulumi, or CDKTF with Stategraph Orchestration."
 }

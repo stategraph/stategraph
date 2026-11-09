@@ -10,6 +10,11 @@ module Size = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (bool "committed") /? option (int "idx")
+
   module Responses = struct
     module OK = struct
       type t = Terrat_api_components.Kv_size.t
@@ -69,6 +74,11 @@ module Delete = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (int "idx") /? option (int "version")
 
   module Responses = struct
     module OK = struct
@@ -185,6 +195,14 @@ module Get = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (bool "committed")
+    /? option (int "idx")
+    /? option (array (string "select"))
+
   module Responses = struct
     module OK = struct
       type t = Terrat_api_components.Kv_record.t
@@ -256,6 +274,18 @@ module Iter = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (bool "committed")
+    /? option (int "idx")
+    /? option (int "limit")
+    /? option (bool "include_data")
+    /? option (bool "inclusive")
+    /? option (bool "prefix")
+    /? option (array (string "select"))
+
   module Responses = struct
     module OK = struct
       type t = Terrat_api_components.Kv_record_list.t
@@ -316,6 +346,11 @@ module Count = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (bool "committed")
 
   module Responses = struct
     module OK = struct

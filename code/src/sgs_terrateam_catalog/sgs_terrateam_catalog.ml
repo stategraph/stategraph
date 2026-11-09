@@ -18,6 +18,7 @@ let tables =
         Column.
           [
             make ~name:"reconcile" ~type_:Type_.Bool ();
+            make ~name:"restart_on_change" ~type_:Type_.Bool ();
             make ~name:"schedule" ~type_:Type_.Text ();
             make ~name:"updated_at" ~type_:Type_.Timestamptz ();
             make ~name:"tag_query" ~type_:Type_.Text ();

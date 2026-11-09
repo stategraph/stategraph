@@ -28,6 +28,23 @@ val rate_limit_decision :
   max_wait:float ->
   [ `Fail of float | `Wait of float | `No_wait ]
 
+(** Whether a failed call to the forge is a transport fault worth trying again. [`Missing_response]
+    is the answer the client has no binding for: the request reached the forge and the status it
+    answered with is not one the API declares. A rate limit and a timeout have their own answers at
+    the call sites and are not retried here. A 4xx among them is a verdict on the work, not a fault,
+    and trying it again cannot change it; a 5xx is the forge failing while it answers. *)
+val retryable_missing_response :
+  ('a, [> `Missing_response of string Openapi.Response.t ]) result -> bool
+
+(** The retrying call every request to the forge goes through: it tries again while the forge still
+    answers with a fault or a 5xx, backs off between tries, and waits out a rate limit within the
+    budget the caller's timeout gives it. *)
+val call :
+  ?tries:int ->
+  Openapic_abb.t ->
+  'a Openapi.Request.t ->
+  ('a Openapi.Response.t, [> Openapic_abb.call_err ]) result Abb.Future.t
+
 (** Whether a merge request can merge, from the [detailed_merge_status] and [has_conflicts] of the
     GitLab merge request API. Only a conflict makes it unmergeable. Approvals, discussions, draft
     state and pipelines do not. [None] while GitLab still computes the merge, or when it does not

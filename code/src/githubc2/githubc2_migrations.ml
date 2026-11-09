@@ -8,6 +8,11 @@ module List_repos_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Minimal_repository.t list
@@ -237,6 +242,11 @@ module Get_status_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (array (string "exclude"))
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Migration.t
@@ -404,6 +414,11 @@ module List_for_authenticated_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -675,6 +690,11 @@ module Get_commit_authors = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (int "since")
 
   module Responses = struct
     module OK = struct
@@ -1028,6 +1048,11 @@ module List_repos_for_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Minimal_repository.t list
@@ -1236,6 +1261,15 @@ module Get_status_for_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option
+         (array
+            (ud "exclude" (fun value ->
+                 CCResult.to_opt (Parameters.Exclude.Items.t_of_yojson (`String value)))))
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Migration.t
@@ -1397,6 +1431,17 @@ module List_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
+    /? option
+         (array
+            (ud "exclude" (fun value ->
+                 CCResult.to_opt (Parameters.Exclude.Items.t_of_yojson (`String value)))))
 
   module Responses = struct
     module OK = struct

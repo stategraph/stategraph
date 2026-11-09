@@ -1,0 +1,68 @@
+; The APIs of the [routes.json] and [query_params.json] fixtures, generated at build time so that
+; the tests run them and the compiler checks them. The [query_params.json] API is formatted because
+; the golden test compares it with [query_params.expected].
+
+(rule
+ (targets routes_api_alerts.ml routes_api_components.ml)
+ (deps routes.json)
+ (action
+  (run
+   %{exe:../../src/openapi_cli/openapi_cli.exe}
+   convert
+   --non-strict-records
+   --input
+   routes.json
+   --name
+   routes_api
+   --output-dir
+   .)))
+
+(rule
+ (targets
+  query_params_api_components.ml
+  query_params_api_components_shade.ml
+  query_params_api_params.ml)
+ (deps ../../.ocamlformat query_params.json)
+ (action
+  (progn
+   (run
+    %{exe:../../src/openapi_cli/openapi_cli.exe}
+    convert
+    --non-strict-records
+    --input
+    query_params.json
+    --name
+    query_params_api
+    --output-dir
+    .)
+   (run ocamlformat -i query_params_api_params.ml))))
+
+(library
+ (name fixture_apis)
+ (wrapped false)
+ (modules
+  query_params_api_components
+  query_params_api_components_shade
+  query_params_api_params
+  routes_api_alerts
+  routes_api_components)
+ (flags
+  (:standard -w -27-67))
+ (libraries brtl containers openapi)
+ (preprocess
+  (pps
+   ppx_deriving.eq
+   ppx_deriving.make
+   ppx_deriving.show
+   ppx_deriving_yojson)))
+
+(test
+ (name test)
+ (modules test)
+ (libraries brtl containers fixture_apis openapi_conv oth unix uri)
+ (deps
+  integer_enum.json
+  query_params.expected
+  query_params_api_params.ml
+  required_array_default.json
+  unsupported_array_default.json))

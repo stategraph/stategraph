@@ -21,7 +21,7 @@ let run' storage tenant user target_id =
                 Sg_caps_ops.Tenant_scope.(
                   match member.Sgs_tenant.Member.admin with
                   | Not_covered -> false
-                  | Exact | Wider -> true)
+                  | Exact | Wider | Instance -> true)
               in
               (* Removing the only administrator would leave the tenant with nobody able to invite a
                  replacement, so it is refused even for a caller who holds installation-wide admin --

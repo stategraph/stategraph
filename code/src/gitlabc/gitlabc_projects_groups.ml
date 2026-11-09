@@ -17,6 +17,30 @@ module GetApiV4ProjectsIdGroups = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "search")
+    /? option (array (int "skip_groups"))
+    /? option_default false (bool "with_shared")
+    /? option_default false (bool "shared_visible_only")
+    /? option
+         (ud
+            "shared_min_access_level"
+            (fun value ->
+               match CCInt.of_string value with
+               | Some 10 -> Some 10
+               | Some 15 -> Some 15
+               | Some 20 -> Some 20
+               | Some 30 -> Some 30
+               | Some 40 -> Some 40
+               | Some 50 -> Some 50
+               | _ -> None
+              : string -> int option))
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end

@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euf -o pipefail
+
+# Print the release tags of the same kind as VERSION_TAG, oldest first, VERSION_TAG included.
+#
+# A release is tagged either by date (YYYYMMDD-HHMM-<short sha>, from scripts/version_tag)
+# or by semver (1.2.3, 1.2.3-rc.1). Each kind is its own sequence: a semver release follows
+# the previous semver release, whatever date releases came in between, and a date release
+# follows the previous date release. The two kinds often tag the same commit, so one
+# ordering across both would make a release follow a tag on its own commit.
+
+: "${VERSION_TAG:?VERSION_TAG is required}"
+
+DATE_TAG='20[0-9]{6}-[0-9]{4}-[a-f0-9]{6,8}'
+SEMVER_TAG='[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?'
+
+if [[ "${VERSION_TAG}" =~ ^${DATE_TAG}$ ]]; then
+  KIND="${DATE_TAG}"
+  # Fixed-width date and time first, so the name order is the release order.
+  sort_tags() { sort -u; }
+elif [[ "${VERSION_TAG}" =~ ^${SEMVER_TAG}$ ]]; then
+  KIND="${SEMVER_TAG}"
+  # sort -V puts 1.2.3 before 1.2.3-rc.1, while semver puts a prerelease before its
+  # release. sort -V puts ~ before anything, so the prerelease dash is a ~ while sorting.
+  sort_tags() { sed 's/-/~/' | sort -uV | sed 's/~/-/'; }
+else
+  echo "Error: ${VERSION_TAG} is neither a date tag nor a semver tag" >&2
+  exit 1
+fi
+
+{
+  git ls-remote --tags --refs origin | sed 's|^.*refs/tags/||'
+  echo "${VERSION_TAG}"
+} | grep -xE "${KIND}" | sort_tags

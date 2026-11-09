@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useCallback, useEffect, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import {
   InvitationCreateResponse,
   TenantInvitation,
@@ -39,10 +39,23 @@ import { useUrlSyncedNullable } from '@/hooks';
 import { UserDetailCard } from '@/components/users';
 import { InviteMemberDialog } from './InviteMemberDialog';
 import { invitationLinkMessage } from './invitation-copy';
+import { lockedReason, removeLockedReason, scopeReach } from './grant-scope';
 import { track } from '@/lib/analytics';
 
 /** Query parameter holding the member whose details box is open (#2665). */
 const USER_PARAM = 'user';
+
+/**
+ * Hover text for a menu item that may be disabled. A disabled `DropdownMenuItem` ignores the pointer
+ * (`pointer-events-none`), so a `title` on the item itself never shows; on this wrapper it does.
+ */
+function HoverReason({ reason, children }: { reason: string | undefined; children: ReactNode }) {
+  return (
+    <span title={reason} className="block">
+      {children}
+    </span>
+  );
+}
 
 /**
  * Tenant membership management: the members of one tenant and its invitations,
@@ -51,8 +64,8 @@ const USER_PARAM = 'user';
  * or tenant users-manage; NOT installation admin).
  *
  * A member whose grant covers more than this tenant (`admin_scope`/`users_manage_scope`
- * = "wider") cannot be edited from here: the server refuses it and the controls
- * are disabled with an explanation, per the API's own guidance.
+ * = "wider" or "instance") cannot be edited from here: the server refuses it and the
+ * controls are disabled with an explanation, per the API's own guidance.
  */
 export function MembersPanel({
   tenantId,
@@ -217,15 +230,9 @@ export function MembersPanel({
 
   const renderRole = (member: TenantMember) => (
     <div className="flex flex-wrap items-center gap-1">
-      {member.admin_scope !== 'none' && (
-        <Badge>{member.admin_scope === 'wider' ? 'Admin (installation-wide)' : 'Admin (tenant)'}</Badge>
-      )}
+      {member.admin_scope !== 'none' && <Badge>Admin ({scopeReach(member.admin_scope)})</Badge>}
       {member.admin_scope === 'none' && member.users_manage_scope !== 'none' && (
-        <Badge variant="secondary">
-          {member.users_manage_scope === 'wider'
-            ? 'Manages members (installation-wide)'
-            : 'Manages members (tenant)'}
-        </Badge>
+        <Badge variant="secondary">Manages members ({scopeReach(member.users_manage_scope)})</Badge>
       )}
       {member.admin_scope === 'none' && member.users_manage_scope === 'none' && (
         <Badge variant="outline">Member</Badge>
@@ -235,9 +242,9 @@ export function MembersPanel({
 
   const renderMemberActions = (member: TenantMember) => {
     const isSelf = currentUserId != null && member.user_id === currentUserId;
-    const adminWider = member.admin_scope === 'wider';
-    const manageWider = member.users_manage_scope === 'wider';
-    const widerHint = 'This grant is installation-wide and cannot be changed from here';
+    const adminLocked = lockedReason(member.admin_scope);
+    const manageLocked = lockedReason(member.users_manage_scope);
+    const removeLocked = removeLockedReason(member);
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -270,21 +277,22 @@ export function MembersPanel({
               </DropdownMenuItem>
             )
           ) : (
-            <DropdownMenuItem
-              disabled={adminWider || isSelf}
-              title={adminWider ? widerHint : isSelf ? 'You cannot revoke your own admin' : undefined}
-              onClick={() =>
-                runAction(member.user_id, () =>
-                  setTenantMemberRole(tenantId, member.user_id, { tenant_admin: false }),
-                  'member_role_changed',
-                  { change: 'tenant_admin', value: false },
-                  () => setRightsNotice('revoked')
-                )
-              }
-            >
-              <ShieldOff className="mr-2 h-4 w-4" />
-              Remove tenant admin
-            </DropdownMenuItem>
+            <HoverReason reason={adminLocked ?? (isSelf ? 'You cannot revoke your own admin' : undefined)}>
+              <DropdownMenuItem
+                disabled={adminLocked !== null || isSelf}
+                onClick={() =>
+                  runAction(member.user_id, () =>
+                    setTenantMemberRole(tenantId, member.user_id, { tenant_admin: false }),
+                    'member_role_changed',
+                    { change: 'tenant_admin', value: false },
+                    () => setRightsNotice('revoked')
+                  )
+                }
+              >
+                <ShieldOff className="mr-2 h-4 w-4" />
+                Remove tenant admin
+              </DropdownMenuItem>
+            </HoverReason>
           )}
           {member.users_manage_scope === 'none' ? (
             <DropdownMenuItem
@@ -301,31 +309,33 @@ export function MembersPanel({
               Allow managing members
             </DropdownMenuItem>
           ) : (
-            <DropdownMenuItem
-              disabled={manageWider}
-              title={manageWider ? widerHint : undefined}
-              onClick={() =>
-                runAction(member.user_id, () =>
-                  setTenantMemberRole(tenantId, member.user_id, { can_manage_users: false }),
-                  'member_role_changed',
-                  { change: 'can_manage_users', value: false },
-                  () => setRightsNotice('revoked')
-                )
-              }
-            >
-              <ShieldOff className="mr-2 h-4 w-4" />
-              Disallow managing members
-            </DropdownMenuItem>
+            <HoverReason reason={manageLocked ?? undefined}>
+              <DropdownMenuItem
+                disabled={manageLocked !== null}
+                onClick={() =>
+                  runAction(member.user_id, () =>
+                    setTenantMemberRole(tenantId, member.user_id, { can_manage_users: false }),
+                    'member_role_changed',
+                    { change: 'can_manage_users', value: false },
+                    () => setRightsNotice('revoked')
+                  )
+                }
+              >
+                <ShieldOff className="mr-2 h-4 w-4" />
+                Disallow managing members
+              </DropdownMenuItem>
+            </HoverReason>
           )}
-          <DropdownMenuItem
-            disabled={adminWider || isSelf}
-            title={adminWider ? widerHint : isSelf ? 'You cannot remove yourself' : undefined}
-            className="text-red-500"
-            onClick={() => setRemoving(member)}
-          >
-            <UserX className="mr-2 h-4 w-4" />
-            Remove from tenant
-          </DropdownMenuItem>
+          <HoverReason reason={removeLocked ?? (isSelf ? 'You cannot remove yourself' : undefined)}>
+            <DropdownMenuItem
+              disabled={removeLocked !== null || isSelf}
+              className="text-red-500"
+              onClick={() => setRemoving(member)}
+            >
+              <UserX className="mr-2 h-4 w-4" />
+              Remove from tenant
+            </DropdownMenuItem>
+          </HoverReason>
         </DropdownMenuContent>
       </DropdownMenu>
     );

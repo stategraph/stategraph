@@ -186,6 +186,11 @@ module List_repo_variables = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 10 (int "per_page") /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -414,6 +419,11 @@ module List_repo_secrets = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -466,6 +476,11 @@ module List_repo_organization_variables = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 10 (int "per_page") /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -517,6 +532,11 @@ module List_repo_organization_secrets = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -705,6 +725,11 @@ module List_selected_repos_for_org_variable = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -978,6 +1003,11 @@ module List_org_variables = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 10 (int "per_page") /? option_default 1 (int "page")
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -1160,6 +1190,11 @@ module List_selected_repos_for_org_secret = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -1395,6 +1430,11 @@ module List_org_secrets = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct

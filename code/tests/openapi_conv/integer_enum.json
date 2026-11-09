@@ -1,0 +1,34 @@
+{
+  "paths": {
+    "/enum": {
+      "get": {
+        "operationId": "enum/list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "enum": [1, 4]
+            }
+          },
+          {
+            "in": "query",
+            "name": "large_code",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "enum": [10000000000, 20000000000]
+            }
+          }
+        ],
+        "responses": {
+          "200": {}
+        }
+      }
+    }
+  },
+  "components": {}
+}

@@ -2,4 +2,10 @@ Stategraph reached a state it does not know how to continue from (`{{ tag }}`) a
 
 Running the command again sometimes clears it, because a few of these states come from a race between two operations.
 
+If this operation was a layer of a layered run, the later layers were not planned.  To plan them, comment the following:
+
+```
+stategraph plan
+```
+
 Request id `{{ request_id }}`.  If it happens again, send that request id to support@stategraph.com or ping us on [Slack](https://stategraph.com/slack).

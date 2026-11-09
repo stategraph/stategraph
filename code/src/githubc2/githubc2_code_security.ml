@@ -73,6 +73,15 @@ module Get_repositories_for_configuration = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 30 (int "per_page")
+    /? option (string "before")
+    /? option (string "after")
+    /? option_default "all" (string "status")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Code_security_configuration_repositories.t list
@@ -1773,6 +1782,18 @@ module Get_configurations_for_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default
+         `All
+         (ud "target_type" (fun value ->
+              CCResult.to_opt (Parameters.Target_type.t_of_yojson (`String value))))
+    /? option_default 30 (int "per_page")
+    /? option (string "before")
+    /? option (string "after")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Code_security_configuration.t list
@@ -1839,6 +1860,15 @@ module Get_repositories_for_enterprise_configuration = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 30 (int "per_page")
+    /? option (string "before")
+    /? option (string "after")
+    /? option_default "all" (string "status")
 
   module Responses = struct
     module OK = struct
@@ -3260,6 +3290,14 @@ module Get_configurations_for_enterprise = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 30 (int "per_page")
+    /? option (string "before")
+    /? option (string "after")
 
   module Responses = struct
     module OK = struct

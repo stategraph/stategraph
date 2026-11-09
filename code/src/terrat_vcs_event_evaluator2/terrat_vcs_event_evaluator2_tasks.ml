@@ -619,7 +619,8 @@ struct
               all_matches |> CCList.flatten |> CCList.map (fun dc -> dc.Dc.dirspace)
             in
             intra_pr_selection ~dirspaces ~force
-            >>= fun { Terrat_intra_pr_hash.Selection.to_run; out_of_order = _; applied } ->
+            >>= fun (selection, in_progress) ->
+            let { Terrat_intra_pr_hash.Selection.to_run; out_of_order = _; applied } = selection in
             (* RFD 2108: a plain [terrateam plan] which found nothing to run resets the pull
                request.  [to_run] is empty on an empty [force] only when every dirspace of the run
                counts as applied or has a plan that still stands, which is the condition of the
@@ -642,7 +643,7 @@ struct
               | Tjc.Job.Type_.Unlock _
               | Tjc.Job.Type_.Push -> false
             in
-            let to_run, applied = if reset then (dirspaces, []) else (to_run, applied) in
+            let to_run_list, applied = if reset then (dirspaces, []) else (to_run, applied) in
             (* The files of a dirspace decide whether it is still applied, and no longer the sha of
                the work manifest.  Thus a push which does not touch a dirspace keeps it applied and
                the evaluation stays at the layer it reached. *)
@@ -654,7 +655,7 @@ struct
               |> CCList.map dirspace_of
               |> Terrat_data.Dirspace_set.of_list
             in
-            let to_run = Terrat_data.Dirspace_set.of_list to_run in
+            let to_run = Terrat_data.Dirspace_set.of_list to_run_list in
             (* A dirspace of the run that is not in [to_run] has a good plan or counts as applied,
                thus it ran in this pull request.  With the dirspaces that an explicit plan names, these
                are what the user brought back into the run. *)
@@ -735,12 +736,42 @@ struct
             (* A dirspace whose files did not change since its last good plan needs no new plan.
                An apply is not filtered this way: it runs what was planned, and not what
                changed. *)
-            let working_set_matches, already_planned_matches =
+            let working_set_matches, already_planned_matches, plan_in_progress_matches =
               match job.Tjc.Job.type_ with
               | Tjc.Job.Type_.(Autoplan | Plan _) ->
-                  CCList.partition
-                    (fun { Dc.dirspace; _ } -> Terrat_data.Dirspace_set.mem dirspace to_run)
-                    working_set_matches
+                  (* A dirspace that a plan of this pull request is planning now needs no work
+                     from this job: the new plan neither plans it again nor aborts the plan it
+                     would be planning, which is what makes a repeated [terrateam plan] a noop
+                     instead of a restart.  Only the work of this job moves: [to_run] itself stays
+                     as the rules computed it, so the reset of RFD 2108 and [revived] still see a
+                     dirspace as unrun while its plan runs.  A dirspace the tag query names is not
+                     spared, which is what the comment which offers that command promises. *)
+                  let planned_now =
+                    Terrat_intra_pr_hash.without_in_progress
+                      ~in_progress
+                      ~force
+                      { selection with Terrat_intra_pr_hash.Selection.to_run = to_run_list }
+                  in
+                  let runs, spared =
+                    CCList.partition
+                      (fun { Dc.dirspace; _ } ->
+                        Terrat_data.Dirspace_set.mem dirspace to_run
+                        && Terrat_data.Dirspace_set.mem dirspace planned_now)
+                      working_set_matches
+                  in
+                  (* A spared dirspace is one of two things, and the two answer a plan command
+                     differently.  [to_run] holds the dirspaces with no plan that still stands,
+                     thus a spared dirspace in [to_run] is one whose plan is in flight, and a
+                     spared dirspace outside it is one whose plan is complete.  Both are
+                     [already_planned_matches]: the caller splits them apart by membership in
+                     [plan_in_progress_matches], so a dirspace whose plan is in flight has to be
+                     in both lists. *)
+                  let in_flight =
+                    CCList.filter
+                      (fun { Dc.dirspace; _ } -> Terrat_data.Dirspace_set.mem dirspace to_run)
+                      spared
+                  in
+                  (runs, spared, in_flight)
               | Tjc.Job.Type_.Apply _
               | Tjc.Job.Type_.Autoapply
               | Tjc.Job.Type_.Gate_approval _
@@ -748,7 +779,7 @@ struct
               | Tjc.Job.Type_.Index
               | Tjc.Job.Type_.Repo_config
               | Tjc.Job.Type_.Unlock _
-              | Tjc.Job.Type_.Push -> (working_set_matches, [])
+              | Tjc.Job.Type_.Push -> (working_set_matches, [], [])
             in
             let all_tag_query_matches =
               CCList.map
@@ -760,7 +791,8 @@ struct
               all_tag_query_matches,
               all_unapplied_matches,
               working_layer,
-              already_planned_matches )
+              already_planned_matches,
+              plan_in_progress_matches )
           in
           let go () =
             let module Tjc = Terrat_job_context in
@@ -815,7 +847,8 @@ struct
                       all_tag_query_matches,
                       all_unapplied_matches,
                       working_layer,
-                      already_planned_matches )
+                      already_planned_matches,
+                      plan_in_progress_matches )
                   ->
             let module T = Tjc.Job.Type_ in
             match job.Tjc.Job.type_ with
@@ -851,6 +884,7 @@ struct
                     all_unapplied_matches;
                     working_layer;
                     already_planned_matches;
+                    plan_in_progress_matches;
                   }
             | T.Autoapply ->
                 let module V1 = Terrat_base_repo_config_v1 in
@@ -876,6 +910,7 @@ struct
                     all_unapplied_matches;
                     working_layer;
                     already_planned_matches;
+                    plan_in_progress_matches;
                   }
             | T.Apply _ | T.Plan _ ->
                 Abbs_fc.return_ok
@@ -886,6 +921,7 @@ struct
                     all_unapplied_matches;
                     working_layer;
                     already_planned_matches;
+                    plan_in_progress_matches;
                   }
             | T.Gate_approval _ | T.Help | T.Index | T.Repo_config | T.Unlock _ | T.Push ->
                 assert false
@@ -900,6 +936,7 @@ struct
                      all_tag_query_matches;
                      working_layer;
                      already_planned_matches;
+                     plan_in_progress_matches;
                    } as matches)
                 ->
           let sum_layers = CCListLabels.fold_left ~init:0 ~f:(fun acc v -> acc + CCList.length v) in
@@ -929,6 +966,11 @@ struct
                 "%s : MATCHES : already_planned_matches=%d"
                 (Builder.log_id s)
                 (CCList.length already_planned_matches));
+          Logs.info (fun m ->
+              m
+                "%s : MATCHES : plan_in_progress_matches=%d"
+                (Builder.log_id s)
+                (CCList.length plan_in_progress_matches));
           matches)
 
     let working_set_matches =
@@ -1004,6 +1046,12 @@ struct
           let open Irm in
           fetch Keys.matches
           >>| fun { Keys.Matches.already_planned_matches; _ } -> already_planned_matches)
+
+    let plan_in_progress_matches =
+      run ~name:"plan_in_progress_matches" (fun _s { Bs.Fetcher.fetch } ->
+          let open Irm in
+          fetch Keys.matches
+          >>| fun { Keys.Matches.plan_in_progress_matches; _ } -> plan_in_progress_matches)
 
     let repo_tree_branch_wm_completed =
       run ~name:"repo_tree_branch_wm_completed" (fun s ({ Bs.Fetcher.fetch } as fetcher) ->
@@ -3441,17 +3489,18 @@ struct
       let log_drift_schedule_updates s repo drift =
         let { D.enabled; schedules } = drift in
         CCList.iter
-          (fun (name, { D.Schedule.tag_query; reconcile; schedule; window }) ->
+          (fun (name, { D.Schedule.tag_query; reconcile; restart_on_change; schedule; window }) ->
             Logs.info (fun m ->
                 m
                   "%s : DRIFT : UPDATE_SCHEDULE : name=%s : enabled=%B : repo=%s : schedule=%s : \
-                   reconcile=%s : tag_query=%s : window=%s"
+                   reconcile=%s : restart_on_change=%B : tag_query=%s : window=%s"
                   (Builder.log_id s)
                   name
                   enabled
                   (S.Api.Repo.to_string repo)
                   (D.Schedule.Sched.to_string schedule)
                   (Bool.to_string reconcile)
+                  restart_on_change
                   (Terrat_tag_query.to_string tag_query)
                   (CCOption.map_or
                      ~default:""
@@ -3619,18 +3668,20 @@ struct
                 (Builder.log_id s)
                 (CCList.length schedules));
           Abbs_fc.List.iter
-            ~f:(fun (name, account, repo, reconcile, tag_query, window, branch) ->
+            ~f:(fun
+                (name, account, repo, reconcile, restart_on_change, tag_query, window, branch) ->
               let run =
                 let open Irm in
                 Logs.info (fun m ->
                     m
                       "%s : DRIFT : RUN : name=%s : account=%s : repo=%s : reconcile=%s : \
-                       tag_query=%s : window=%s : branch=%s"
+                       restart_on_change=%B : tag_query=%s : window=%s : branch=%s"
                       (Builder.log_id s)
                       name
                       (S.Api.Account.to_string account)
                       (S.Api.Repo.to_string repo)
                       (Bool.to_string reconcile)
+                      restart_on_change
                       (Terrat_tag_query.to_string tag_query)
                       (CCOption.map_or
                          ~default:""
@@ -3694,7 +3745,12 @@ struct
                               ~request_id:(Builder.log_id s)
                               db
                               (Tjc.Job.Type_.Plan
-                                 { tag_query; kind = Some Tjc.Job.Type_.Kind.(Drift { reconcile }) })
+                                 {
+                                   tag_query;
+                                   kind =
+                                     Some
+                                       Tjc.Job.Type_.Kind.(Drift { reconcile; restart_on_change });
+                                 })
                               context
                               None))
                     >>= fun job ->
@@ -3995,7 +4051,9 @@ struct
                Tjc.Job.type_ =
                  Tjc.Job.Type_.Plan
                    {
-                     kind = Some (Tjc.Job.Type_.Kind.Drift { reconcile = true }) as kind;
+                     kind =
+                       Some (Tjc.Job.Type_.Kind.Drift { reconcile = true; restart_on_change = _ })
+                       as kind;
                      tag_query;
                    };
                id = plan_job_id;
@@ -4320,6 +4378,7 @@ struct
                   >>= fun {
                             Keys.Matches.all_matches;
                             already_planned_matches;
+                            plan_in_progress_matches;
                             all_unapplied_matches;
                             _;
                           }
@@ -4341,12 +4400,21 @@ struct
                       (fun dirspace -> not (Terrat_data.Dirspace_set.mem dirspace unapplied))
                       kept
                   in
+                  (* A dirspace whose plan is in flight lands in [kept_planned] too: this
+                     evaluation serves a noop job that made no work manifest, so [job_dirspaces]
+                     is empty and [not_in_job] keeps every [already_planned_matches] dirspace.
+                     That is what keeps the dirspace reported as planned while its plan runs, in
+                     the summaries below.  The plan arm of [checks_of] holds the dirspace's own
+                     check back until that plan says what it found. *)
                   let kept_planned =
                     already_planned_matches
                     |> dirspaces_of
                     |> CCList.filter not_in_job
                     |> CCList.append kept_applied
                     |> CCList.sort_uniq ~cmp:Terrat_dirspace.compare
+                  in
+                  let plan_in_flight =
+                    plan_in_progress_matches |> dirspaces_of |> Terrat_data.Dirspace_set.of_list
                   in
                   (* [kept] is a subset of the matched dirspaces, thus their runs come from the
                      shared read of all matched dirspaces, filtered to [kept]. *)
@@ -4458,6 +4526,10 @@ struct
                         dirspaces
                     else []
                   in
+                  (* [needed] reads only the forge's live check list, never the database.  The
+                     plan arm holds back the dirspaces whose plan is still queued or running, so
+                     a kept dirspace whose plan is in flight waits for that plan's own verdict
+                     even when this read runs before the plan's [Queued] check is visible. *)
                   let needed { Terrat_commit_check.title; status; details_url = _; description = _ }
                       =
                     CCOption.for_all
@@ -4492,7 +4564,10 @@ struct
                          ~step:Wm.Step.Plan
                          ~failed:failed_plans
                          ~completed:(CCFun.const "Completed")
-                         kept_planned
+                         (CCList.filter
+                            (fun dirspace ->
+                              not (Terrat_data.Dirspace_set.mem dirspace plan_in_flight))
+                            kept_planned)
                       @ checks_of
                           ~run:`Apply
                           ~step:Wm.Step.Apply
@@ -4544,6 +4619,7 @@ struct
     |> Hmap.add (coerce Keys.matched_dirspace_runs) Tasks.matched_dirspace_runs
     |> Hmap.add (coerce Keys.run_plan_changes) Tasks.run_plan_changes
     |> Hmap.add (coerce Keys.already_planned_matches) Tasks.already_planned_matches
+    |> Hmap.add (coerce Keys.plan_in_progress_matches) Tasks.plan_in_progress_matches
     |> Hmap.add (coerce Keys.applied_dirspaces) Tasks.applied_dirspaces
     |> Hmap.add (coerce Keys.branch_dirspaces) Tasks.branch_dirspaces
     |> Hmap.add (coerce Keys.built_repo_config_branch) Tasks.built_repo_config_branch

@@ -65,7 +65,7 @@ stategraph plan dir:network
 
 ### Drift
 
-When the files of a drift reconcile change while it runs, Orchestration stores the result and reconciles again at the new head. A drift reconciles again at most 10 times.
+When the files of a drift reconcile change while it runs, Orchestration stores the result and reconciles again at the new head. A drift reconciles again at most 10 times. To turn this off for a schedule, set [`restart_on_change: false`](/docs/reference/orchestration/configuration/drift#schedule).
 
 ## Status checks after a push
 

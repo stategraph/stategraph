@@ -96,6 +96,23 @@ let test_apply_complete2_details_few_dirspaces_compact_view =
     ~compact_view:true
     ~num_dirspaces:3
 
+let test_operation_failed_internal_err =
+  Oth.test ~name:"Operation failed internal err" (fun _ ->
+      let body =
+        render
+          Tmpl.operation_failed_internal_err
+          (`Assoc [ ("request_id", `String "req-123"); ("tag", `String "EXPECTED_REPO_TREE") ])
+      in
+      Oth.Assert.str_contains_all
+        ~haystack:body
+        ~needles:
+          [
+            "req-123"; "EXPECTED_REPO_TREE"; "the later layers were not planned"; "stategraph plan";
+          ];
+      (* Every tag this template renders names a database or in-process state failure, not a forge
+         call, so the comment must not claim a retry happened. *)
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"tried this call again")
+
 (* A call the VCS never answered is a separate comment from a call that failed,
    so that the reader is told GitLab is unresponsive rather than that Stategraph
    broke. *)
@@ -677,6 +694,19 @@ let render_snabela template kv =
   | Ok body -> body
   | Error (#Snabela.err as err) -> failwith (Snabela.show_err err)
 
+(* A workflow that never started stops any layered run it belonged to: the body names the later
+   layers and the command that plans them. *)
+let test_failed_to_start_workflow =
+  Oth.test ~name:"Failed to start workflow" (fun _ ->
+      let body = render_snabela Tmpl.failed_to_start_workflow Snabela.Kv.Map.empty in
+      Oth.Assert.str_contains_all
+        ~haystack:body
+        ~needles:
+          [ "Unable to start workflow."; "the later layers were not planned"; "stategraph plan" ];
+      (* A workflow start can fail without a retry, for example a first-attempt rate limit, so the
+         comment must not claim one happened. *)
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"tried this call again")
+
 (* The [work_manifests] table rows both providers build for every message that lists work
    manifests, see [work_manifests_kv] in the service providers. *)
 let work_manifests_rows rows =
@@ -808,6 +838,164 @@ let test_conflicting_work_manifests_unlock_key =
         ~needle:"| #123 | Apply | Queued | 2026-8-21 9:12 UTC |";
       ())
 
+(* The payload the providers build for [Msg.Missing_plans]: one reason string
+   per row, with [invalidated_by] null unless the reason names the pull request
+   that superseded the plan. *)
+let missing_plans_kv rows =
+  `Assoc
+    [
+      ( "dirspaces",
+        `List
+          (CCList.map
+             (fun (dir, workspace, reason, invalidated_by) ->
+               `Assoc
+                 [
+                   ("dir", `String dir);
+                   ("workspace", `String workspace);
+                   ("reason", `String reason);
+                   ( "invalidated_by",
+                     match invalidated_by with
+                     | Some n -> `Int n
+                     | None -> `Null );
+                 ])
+             rows) );
+      ( "any_invalidated",
+        `Bool (CCList.exists (fun (_, _, _, invalidated_by) -> invalidated_by <> None) rows) );
+      ( "any_plan_in_progress",
+        `Bool (CCList.exists (fun (_, _, reason, _) -> String.equal reason "plan_in_progress") rows)
+      );
+      ( "any_plan_needed",
+        `Bool
+          (CCList.exists
+             (fun (_, _, reason, _) -> not (String.equal reason "plan_in_progress"))
+             rows) );
+    ]
+
+let render_missing_plans rows = render Tmpl.missing_plans (missing_plans_kv rows)
+
+let test_missing_plans_never_planned =
+  Oth.test ~name:"Missing plans: never planned" (fun _ ->
+      let body = render_missing_plans [ ("foo", "default", "never_planned", None) ] in
+      Oth.Assert.str_contains ~haystack:body ~needle:"Never planned on this ref";
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"superseded")
+
+let test_missing_plans_invalidated =
+  Oth.test ~name:"Missing plans: invalidated names the merge request" (fun _ ->
+      let body = render_missing_plans [ ("foo", "default", "invalidated", Some 849) ] in
+      Oth.Assert.str_contains ~haystack:body ~needle:"Plan superseded by #849";
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"Never planned")
+
+let test_missing_plans_last_run_failed =
+  Oth.test ~name:"Missing plans: last run failed" (fun _ ->
+      let body = render_missing_plans [ ("foo", "default", "last_run_failed", None) ] in
+      Oth.Assert.str_contains ~haystack:body ~needle:"The last run for this directory failed";
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"superseded")
+
+let test_missing_plans_stale =
+  Oth.test ~name:"Missing plans: a stale plan" (fun _ ->
+      let body = render_missing_plans [ ("foo", "default", "stale", None) ] in
+      Oth.Assert.str_contains
+        ~haystack:body
+        ~needle:"The commits moved while this directory was planned, plan it again";
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"Never planned")
+
+let test_missing_plans_out_of_order =
+  Oth.test ~name:"Missing plans: a plan older than a run of its dependency" (fun _ ->
+      let body = render_missing_plans [ ("foo", "default", "out_of_order", None) ] in
+      Oth.Assert.str_contains
+        ~haystack:body
+        ~needle:"A directory this one depends on ran after this plan, plan it again";
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"The commits moved")
+
+let test_missing_plans_mixed_reasons =
+  Oth.test ~name:"Missing plans: every reason renders in one table" (fun _ ->
+      let body =
+        render_missing_plans
+          [
+            ("a", "default", "never_planned", None);
+            ("b", "default", "invalidated", Some 12);
+            ("c", "default", "last_run_failed", None);
+          ]
+      in
+      Oth.Assert.str_contains ~haystack:body ~needle:"Never planned on this ref";
+      Oth.Assert.str_contains ~haystack:body ~needle:"Plan superseded by #12";
+      Oth.Assert.str_contains ~haystack:body ~needle:"The last run for this directory failed")
+
+let test_missing_plans_plan_in_progress =
+  Oth.test ~name:"Missing plans: a plan in progress tells the user to wait" (fun _ ->
+      let body = render_missing_plans [ ("foo", "default", "plan_in_progress", None) ] in
+      Oth.Assert.str_contains ~haystack:body ~needle:"queued or running";
+      Oth.Assert.str_contains ~haystack:body ~needle:"stategraph apply";
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"stategraph plan")
+
+let test_missing_plans_plan_in_progress_mixed =
+  Oth.test
+    ~name:"Missing plans: a mixed table shows both the plan and the apply instruction"
+    (fun _ ->
+      let body =
+        render_missing_plans
+          [ ("a", "default", "plan_in_progress", None); ("b", "default", "never_planned", None) ]
+      in
+      Oth.Assert.str_contains ~haystack:body ~needle:"Never planned on this ref";
+      Oth.Assert.str_contains ~haystack:body ~needle:"stategraph plan";
+      Oth.Assert.str_contains ~haystack:body ~needle:"stategraph apply")
+
+(* The payload the providers build for [Msg.Plan_already_planned]: one reason
+   string per row.  The two reasons are not the same answer, so each one has to
+   reach the table on its own. *)
+let plan_already_planned_kv rows =
+  `Assoc
+    [
+      ( "dirspaces",
+        `List
+          (CCList.map
+             (fun (dir, workspace, reason) ->
+               `Assoc
+                 [
+                   ("dir", `String dir); ("workspace", `String workspace); ("reason", `String reason);
+                 ])
+             rows) );
+      ( "any_already_planned",
+        `Bool (CCList.exists (fun (_, _, reason) -> String.equal reason "already_planned") rows) );
+    ]
+
+let render_plan_already_planned rows =
+  render Tmpl.plan_already_planned (plan_already_planned_kv rows)
+
+let test_plan_already_planned_standing =
+  Oth.test ~name:"Plan already planned: a standing plan says so" (fun _ ->
+      let body = render_plan_already_planned [ ("foo", "default", "already_planned") ] in
+      Oth.Assert.str_contains
+        ~haystack:body
+        ~needle:"Already has a plan for the files as they are now";
+      Oth.Assert.str_contains ~haystack:body ~needle:"stategraph plan dir:<path>";
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"queued or running")
+
+let test_plan_already_planned_in_progress =
+  Oth.test ~name:"Plan already planned: a plan in flight tells the user to wait" (fun _ ->
+      let body = render_plan_already_planned [ ("foo", "default", "plan_in_progress") ] in
+      Oth.Assert.str_contains
+        ~haystack:body
+        ~needle:"A plan for this directory is queued or running";
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"Already has a plan";
+      (* Nothing is waiting on a file change, so the force-a-plan hint would answer a question
+         the user did not ask. *)
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"stategraph plan dir:<path>")
+
+let test_plan_already_planned_mixed =
+  Oth.test ~name:"Plan already planned: both reasons render in one table" (fun _ ->
+      let body =
+        render_plan_already_planned
+          [ ("a", "default", "already_planned"); ("b", "default", "plan_in_progress") ]
+      in
+      Oth.Assert.str_contains
+        ~haystack:body
+        ~needle:"Already has a plan for the files as they are now";
+      Oth.Assert.str_contains
+        ~haystack:body
+        ~needle:"A plan for this directory is queued or running";
+      Oth.Assert.str_contains ~haystack:body ~needle:"stategraph plan dir:<path>")
+
 let test =
   Oth.parallel
     [
@@ -832,8 +1020,10 @@ let test =
       test_plan_complete2_resource_summary_missing;
       test_plan_complete2_changes_keep_apply;
       test_plan_complete2_mixed_keeps_apply;
+      test_operation_failed_internal_err;
       test_operation_failed_vcs_api_rate_limit_err;
       test_operation_failed_vcs_api_timeout_err;
+      test_failed_to_start_workflow;
       test_apply_complete2_details_many_dirspaces;
       test_apply_complete2_details_few_dirspaces;
       test_apply_complete2_details_few_dirspaces_compact_view;
@@ -845,6 +1035,17 @@ let test =
       test_conflicting_work_manifests_title;
       test_maybe_stale_work_manifests_unlock_key;
       test_conflicting_work_manifests_unlock_key;
+      test_missing_plans_never_planned;
+      test_missing_plans_invalidated;
+      test_missing_plans_last_run_failed;
+      test_missing_plans_stale;
+      test_missing_plans_out_of_order;
+      test_missing_plans_mixed_reasons;
+      test_missing_plans_plan_in_progress;
+      test_missing_plans_plan_in_progress_mixed;
+      test_plan_already_planned_standing;
+      test_plan_already_planned_in_progress;
+      test_plan_already_planned_mixed;
     ]
 
 let () =

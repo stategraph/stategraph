@@ -35,6 +35,7 @@ drift:
 | --- | --- | --- |
 | `schedule` | string | How often drift runs: `hourly`, `daily`, `weekly`, or `monthly`. Required, with no default. |
 | `reconcile` | boolean | `true`: when drift detection finds changes, an apply of the generated plan runs automatically. Default is `false`. |
+| `restart_on_change` | boolean | `true`: when a push changes the files of a drift run while it runs, the drift runs again at the new head, at most 10 times. `false`: the drift does not run again, and the next scheduled run detects the change. Default is `true`. |
 | `tag_query` | string | The directories and workspaces of the schedule. See [tag queries](/docs/reference/orchestration/configuration/tag-queries). Required. Use `''` to match everything. |
 | `window` | object | The window in which the schedule can run. Optional. When set, both `start` and `end` are required. |
 
@@ -57,7 +58,7 @@ For valid time zone abbreviations, see [this list](https://en.wikipedia.org/wiki
 
 ### Legacy Single Schedule Form
 
-You can also write one schedule directly under `drift`, with the `schedule`, `reconcile`, and `tag_query` keys. It is the same as a `schedules` entry named `default`, without `window`.
+You can also write one schedule directly under `drift`, with the `schedule`, `reconcile`, and `tag_query` keys. It is the same as a `schedules` entry named `default`, without `window` and `restart_on_change`.
 
 | Key | Type | Description |
 | --- | --- | --- |
@@ -96,6 +97,20 @@ drift:
       tag_query: ''
       schedule: weekly
       reconcile: true
+```
+
+### Not Running Again After a Push
+
+A push during a drift run can change the files of the run. This schedule does not run again for it. The next daily run detects the change:
+
+```yaml
+drift:
+  enabled: true
+  schedules:
+    default:
+      tag_query: ''
+      schedule: daily
+      restart_on_change: false
 ```
 
 ### Using Tag Queries to Limit Scope

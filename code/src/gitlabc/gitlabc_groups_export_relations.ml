@@ -7,6 +7,11 @@ module GetApiV4GroupsIdExportRelationsStatus = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "relation")
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -61,6 +66,11 @@ module GetApiV4GroupsIdExportRelationsDownload = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "relation" /? option (bool "batched") /? option (int "batch_number")
 
   module Responses = struct
     module OK = struct end

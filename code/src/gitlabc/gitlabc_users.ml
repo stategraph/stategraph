@@ -7,6 +7,11 @@ module DeleteApiV4UsersId = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (bool "hard_delete")
+
   module Responses = struct
     module OK = struct end
 
@@ -76,6 +81,11 @@ module GetApiV4UsersId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default false (bool "with_custom_attributes")
 
   module Responses = struct
     module OK = struct end
@@ -210,6 +220,40 @@ module GetApiV4Users = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "username")
+    /? option (string "extern_uid")
+    /? option (string "provider")
+    /? option (string "search")
+    /? option_default false (bool "active")
+    /? option_default false (bool "humans")
+    /? option_default false (bool "external")
+    /? option_default false (bool "blocked")
+    /? option (string "created_after")
+    /? option (string "created_before")
+    /? option_default false (bool "without_projects")
+    /? option_default false (bool "without_project_bots")
+    /? option_default false (bool "admins")
+    /? option (string "two_factor")
+    /? option_default false (bool "exclude_active")
+    /? option_default false (bool "exclude_external")
+    /? option_default false (bool "exclude_humans")
+    /? option_default false (bool "exclude_internal")
+    /? option
+         (ud "order_by" (fun value ->
+              CCResult.to_opt (Parameters.Order_by.t_of_yojson (`String value))))
+    /? option
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option_default false (bool "with_custom_attributes")
+    /? option_default false (bool "skip_ldap")
+    /? option (int "saml_provider_id")
+    /? option_default false (bool "auditors")
 
   module Responses = struct
     module OK = struct

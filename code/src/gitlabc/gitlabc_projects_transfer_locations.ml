@@ -9,6 +9,14 @@ module GetApiV4ProjectsIdTransferLocations = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "search")
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end

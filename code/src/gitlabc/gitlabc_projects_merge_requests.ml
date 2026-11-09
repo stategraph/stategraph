@@ -9,6 +9,11 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidVersionsVersionId = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default false (bool "unidiff")
+
   module Responses = struct
     module OK = struct end
 
@@ -49,6 +54,11 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidVersions = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -422,6 +432,11 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidRelatedIssues = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -805,6 +820,11 @@ module PostApiV4ProjectsIdMergeRequestsMergeRequestIidNotesNoteIdAwardEmoji = st
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "name"
+
   module Responses = struct
     module Created = struct
       type t = Gitlabc_components.API_Entities_AwardEmoji.t
@@ -862,6 +882,11 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidNotesNoteIdAwardEmoji = str
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -950,6 +975,11 @@ module PutApiV4ProjectsIdMergeRequestsMergeRequestIidNotesNotesId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "body"
 
   module Responses = struct
     module OK = struct end
@@ -1181,6 +1211,16 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidMergeRef = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option
+         (ud "order_by" (fun value ->
+              CCResult.to_opt (Parameters.Order_by.t_of_yojson (`String value))))
 
   module Responses = struct
     module OK = struct end
@@ -1659,6 +1699,14 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidDiffs = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option_default false (bool "unidiff")
+
   module Responses = struct
     module OK = struct
       type t = Gitlabc_components.API_Entities_Diff.t list
@@ -1721,6 +1769,11 @@ module DeleteApiV4ProjectsIdMergeRequestsMergeRequestIidContextCommits = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? array (string "commits")
 
   module Responses = struct
     module No_content = struct end
@@ -1871,6 +1924,11 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidCommits = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -1915,6 +1973,11 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidClosesIssues = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -1962,6 +2025,11 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidChanges = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default false (bool "unidiff")
 
   module Responses = struct
     module OK = struct end
@@ -2205,6 +2273,11 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidAwardEmoji = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -2592,6 +2665,14 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIid = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (bool "render_html")
+    /? option (bool "include_diverged_commits_count")
+    /? option (bool "include_rebase_in_progress")
+
   module Responses = struct
     module OK = struct
       type t = Gitlabc_components.API_Entities_MergeRequest.t
@@ -2691,6 +2772,11 @@ module GetApiV4ProjectsIdMergeRequestsEventableIdResourceMilestoneEvents = struc
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -3004,6 +3090,69 @@ module GetApiV4ProjectsIdMergeRequests = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (int "author_id")
+    /? option (string "author_username")
+    /? option (int "assignee_id")
+    /? option (array (string "assignee_username"))
+    /? option (string "reviewer_username")
+    /? option (array (string "labels"))
+    /? option (string "milestone")
+    /? option (string "my_reaction_emoji")
+    /? option (int "reviewer_id")
+    /? option_default
+         `All
+         (ud "state" (fun value -> CCResult.to_opt (Parameters.State.t_of_yojson (`String value))))
+    /? option_default
+         `Created_at
+         (ud "order_by" (fun value ->
+              CCResult.to_opt (Parameters.Order_by.t_of_yojson (`String value))))
+    /? option_default
+         `Desc
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option_default false (bool "with_labels_details")
+    /? option_default false (bool "with_merge_status_recheck")
+    /? option (string "created_after")
+    /? option (string "created_before")
+    /? option (string "updated_after")
+    /? option (string "updated_before")
+    /? option
+         (ud "view" (fun value -> CCResult.to_opt (Parameters.View.t_of_yojson (`String value))))
+    /? option
+         (ud "scope" (fun value -> CCResult.to_opt (Parameters.Scope.t_of_yojson (`String value))))
+    /? option (string "source_branch")
+    /? option (int "source_project_id")
+    /? option (string "target_branch")
+    /? option (string "search")
+    /? option (string "in")
+    /? option (ud "wip" (fun value -> CCResult.to_opt (Parameters.Wip.t_of_yojson (`String value))))
+    /? option (int "not[author_id]")
+    /? option (string "not[author_username]")
+    /? option (int "not[assignee_id]")
+    /? option (array (string "not[assignee_username]"))
+    /? option (string "not[reviewer_username]")
+    /? option (array (string "not[labels]"))
+    /? option (string "not[milestone]")
+    /? option (string "not[my_reaction_emoji]")
+    /? option (int "not[reviewer_id]")
+    /? option (string "deployed_before")
+    /? option (string "deployed_after")
+    /? option (string "environment")
+    /? option
+         (ud "approved" (fun value ->
+              CCResult.to_opt (Parameters.Approved.t_of_yojson (`String value))))
+    /? option (int "merge_user_id")
+    /? option (string "merge_user_username")
+    /? option (string "approver_ids")
+    /? option (string "approved_by_ids")
+    /? option (string "approved_by_usernames")
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option (array (int "iids"))
 
   module Responses = struct
     module OK = struct end

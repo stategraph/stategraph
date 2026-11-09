@@ -9,6 +9,11 @@ module Get_tree = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "recursive")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Git_tree.t

@@ -267,10 +267,6 @@
                 {
                   "page": "/docs/orchestration/iac-tools/cdktf",
                   "label": "CDKTF"
-                },
-                {
-                  "page": "/docs/orchestration/iac-tools/terraform-cloud-migration",
-                  "label": "Migrate from Terraform Cloud"
                 }
               ]
             },
@@ -365,6 +361,31 @@
                   "label": "Branch configuration overrides"
                 }
               ]
+            }
+          ]
+        },
+        {
+          "title": "Migration",
+          "items": [
+            {
+              "page": "/docs/orchestration/migration/terraform-cloud",
+              "label": "From Terraform Cloud"
+            },
+            {
+              "page": "/docs/orchestration/migration/digger",
+              "label": "From Digger (OpenTaco)"
+            },
+            {
+              "page": "/docs/orchestration/migration/atlantis",
+              "label": "From Atlantis"
+            },
+            {
+              "page": "/docs/orchestration/migration/spacelift",
+              "label": "From Spacelift"
+            },
+            {
+              "page": "/docs/orchestration/migration/env0",
+              "label": "From env0"
             }
           ]
         }
@@ -531,13 +552,77 @@
               "label": "Spacelift"
             }
           ]
-        },
+        }
+      ]
+    },
+    {
+      "title": "AI",
+      "root": "/docs/ai",
+      "groups": [
         {
-          "title": "AI agents",
+          "title": "Start here",
           "items": [
             {
-              "page": "/docs/infrastructure-as-a-database/ai-agents",
-              "label": "AI agents"
+              "page": "/docs/ai",
+              "label": "Overview"
+            },
+            {
+              "page": "/docs/ai/quickstart",
+              "label": "Set up your agent"
+            },
+            {
+              "page": "/docs/ai/guardrails",
+              "label": "Guardrails"
+            },
+            {
+              "page": "/docs/ai/skills",
+              "label": "Skills"
+            }
+          ]
+        },
+        {
+          "title": "How-to guides",
+          "items": [
+            {
+              "page": "/docs/ai/guides/inventory",
+              "label": "Inventory your infrastructure"
+            },
+            {
+              "page": "/docs/ai/guides/impact-of-a-change",
+              "label": "Check the impact of a change"
+            },
+            {
+              "page": "/docs/ai/guides/compliance-audit",
+              "label": "Audit compliance and secrets"
+            },
+            {
+              "page": "/docs/ai/guides/cost",
+              "label": "Answer cost questions"
+            },
+            {
+              "page": "/docs/ai/guides/plan-a-change",
+              "label": "Make a change with a plan-only agent"
+            },
+            {
+              "page": "/docs/ai/guides/refactor",
+              "label": "Refactor into modules"
+            },
+            {
+              "page": "/docs/ai/guides/what-changed",
+              "label": "Review what changed"
+            },
+            {
+              "page": "/docs/ai/guides/unattended",
+              "label": "Run an agent on a schedule"
+            }
+          ]
+        },
+        {
+          "title": "Reference",
+          "items": [
+            {
+              "page": "/docs/ai/docs-for-agents",
+              "label": "Docs for agents"
             }
           ]
         }

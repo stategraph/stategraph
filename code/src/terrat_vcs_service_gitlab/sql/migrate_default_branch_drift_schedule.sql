@@ -6,10 +6,11 @@
 with
 new_row as (
     insert into drift_schedules
-      (schedule, reconcile, tag_query, updated_at, name, window_start, window_end, branch, last_tried_at, repo)
+      (schedule, reconcile, restart_on_change, tag_query, updated_at, name, window_start, window_end, branch, last_tried_at, repo)
     select
         ds.schedule,
         ds.reconcile,
+        ds.restart_on_change,
         ds.tag_query,
         ds.updated_at,
         ds.name,

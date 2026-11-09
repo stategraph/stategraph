@@ -186,3 +186,15 @@ let select ~changed_since ~changed_between ~force ~superseded ~last_run_failed ~
     out_of_order = dirspaces_of (CCList.filter out_of_order states);
     applied = dirspaces_of (CCList.filter is_applied states);
   }
+
+let without_in_progress ~in_progress ~force selection =
+  let keep dirspace =
+    Dirspace_set.mem dirspace force
+    || not
+         (CCList.exists
+            (fun (in_progress_dirspace, changed) ->
+              Terrat_dirspace.equal in_progress_dirspace dirspace
+              && not (Dirspace_set.mem dirspace changed))
+            in_progress)
+  in
+  Dirspace_set.of_list (CCList.filter keep selection.Selection.to_run)

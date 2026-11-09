@@ -1,0 +1,25 @@
+{
+  "paths": {
+    "/array": {
+      "get": {
+        "operationId": "array/list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "codes",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": { "type": "integer" },
+              "default": [1, 2]
+            }
+          }
+        ],
+        "responses": {
+          "200": {}
+        }
+      }
+    }
+  },
+  "components": {}
+}

@@ -94,6 +94,14 @@ module GetApiV4ProjectsId = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default false (bool "statistics")
+    /? option_default false (bool "with_custom_attributes")
+    /? option_default false (bool "license")
+
   module Responses = struct
     module OK = struct
       type t = Gitlabc_components.API_Entities_ProjectWithAccess.t

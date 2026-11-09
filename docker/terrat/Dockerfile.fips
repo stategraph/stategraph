@@ -276,7 +276,7 @@ ENV PATH="${SSL_PREFIX}/bin:${PATH}"
 WORKDIR /tmp
 # The opam-repository index is fetched once here. Bump the date to force the
 # layer to run again when a package published on a newer snapshot is missing.
-ARG OPAM_INDEX_DATE=2026-10-26
+ARG OPAM_INDEX_DATE=2026-11-09
 RUN echo "opam-repository index refreshed ${OPAM_INDEX_DATE}" && \
     opam init -ay --disable-sandboxing --bare
 # Only the dependency manifests reach this layer, so a source change does not

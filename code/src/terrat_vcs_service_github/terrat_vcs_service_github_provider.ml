@@ -10,6 +10,9 @@ module Ui = Terrat_vcs_github_comment_ui.Ui
 let not_a_bad_chunk_size = 500
 let replace_nul_byte = CCString.replace ~which:`All ~sub:"\x00" ~by:"\\0"
 
+(* How many times a workflow dispatch is tried when the forge answers with a transport fault. *)
+let dispatch_tries = 4
+
 let rec replace_nul_byte_json = function
   | `List l -> `List (CCList.map replace_nul_byte_json l)
   | `Assoc assoc ->
@@ -427,6 +430,7 @@ module Db = struct
         /% Var.bigint "repo"
         /% Var.(ud (text "schedule") Terrat_base_repo_config_v1.Drift.Schedule.Sched.to_string)
         /% Var.boolean "reconcile"
+        /% Var.boolean "restart_on_change"
         /% Var.(option (ud (text "tag_query") Terrat_tag_query.to_string))
         /% Var.text "name"
         /% Var.(option (timetz "window_start"))
@@ -598,6 +602,12 @@ module Db = struct
         //
         (* whether the most recent apply failed *)
         Ret.boolean
+        //
+        (* the commit the plan of this pull request that is running now started on *)
+        Ret.(option text)
+        //
+        (* the time of that plan's work manifest *)
+        Ret.(option text)
         /^ select_dirspace_runs_for_context_sql
         /% Var.uuid "context_id"
         /% Var.(str_array (text "dirs"))
@@ -1081,6 +1091,9 @@ module Db = struct
         Ret.text
         //
         (* reconcile *)
+        Ret.boolean
+        //
+        (* restart_on_change *)
         Ret.boolean
         //
         (* tag_query *)
@@ -2005,7 +2018,8 @@ module Db = struct
              branch
            >>= fun () ->
            Abbs_fc.List_result.iter
-             ~f:(fun (name, { D.Schedule.reconcile; schedule; tag_query; window }) ->
+             ~f:(fun
+                 (name, { D.Schedule.reconcile; restart_on_change; schedule; tag_query; window }) ->
                let window_start, window_end =
                  CCOption.map_or
                    ~default:(None, None)
@@ -2018,6 +2032,7 @@ module Db = struct
                  (CCInt64.of_int @@ Api.Repo.id repo)
                  schedule
                  reconcile
+                 restart_on_change
                  (Some tag_query)
                  name
                  window_start
@@ -2259,11 +2274,23 @@ module Db = struct
               apply_result_dest_sha
               plan_failed
               apply_failed
+              in_progress_sha
+              in_progress_created_at
             ->
             let module Dr = Terrat_vcs_provider2.Dirspace_runs in
             {
               Dr.plan_failed;
               apply_failed;
+              (* A plan that is running has no result yet, thus it carries no pair of heads that
+                 moved while it operated. *)
+              in_progress_plan =
+                run
+                  in_progress_sha
+                  in_progress_created_at
+                  ~start_sha:None
+                  ~result_sha:None
+                  ~start_dest_sha:None
+                  ~result_dest_sha:None;
               state =
                 {
                   Ipr.Dirspace_state.dirspace = { Terrat_dirspace.dir; workspace };
@@ -2665,6 +2692,10 @@ module Db = struct
               | "invalidated", Some pull_number ->
                   Mp.Invalidated_by_pull_request (CCInt64.to_int pull_number)
               | "last_run_failed", _ -> Mp.Last_run_failed
+              (* An explicit arm above the wildcard: a reason that fell through
+                 to [Never_planned] silently drops out of the gate, which is
+                 the failure this match exists to prevent. *)
+              | "plan_in_progress", _ -> Mp.Plan_in_progress
               (* [never_planned], and [invalidated] with no pull number to name,
                  which the query should not produce but which must not be a
                  crash if it ever does. *)
@@ -3070,6 +3101,7 @@ module Db = struct
               owner
               name
               reconcile
+              restart_on_change
               tag_query
               window_start
               window_end
@@ -3079,6 +3111,7 @@ module Db = struct
               Api.Account.make @@ CCInt64.to_int installation_id,
               Api.Repo.make ~id:(CCInt64.to_int repository_id) ~owner ~name (),
               reconcile,
+              restart_on_change,
               CCOption.get_or ~default:Terrat_tag_query.any tag_query,
               CCOption.map2
                 (fun window_start window_end -> (window_start, window_end))
@@ -5084,53 +5117,75 @@ module Comment = struct
              kv
     | Msg.Missing_plans dirspaces ->
         let module Mp = Terrat_vcs_provider2.Missing_plan in
+        (* One reason string per row and the template pivots it into the reason
+           text.  The match stays exhaustive with no wildcard so a new reason
+           fails to compile here: Minijinja renders an unknown string as a
+           silent blank, so this match is the only thing standing between a
+           missed arm and an empty table cell.  [invalidated_by] is carried on
+           every row and is null unless the reason names the pull request that
+           superseded the plan. *)
+        let row reason =
+          match reason with
+          | Mp.Never_planned -> ("never_planned", `Null)
+          | Mp.Invalidated_by_pull_request pull_number -> ("invalidated", `Int pull_number)
+          | Mp.Last_run_failed -> ("last_run_failed", `Null)
+          | Mp.Stale -> ("stale", `Null)
+          | Mp.Out_of_dependency_order -> ("out_of_order", `Null)
+          | Mp.Plan_in_progress -> ("plan_in_progress", `Null)
+        in
         let kv =
-          Snabela.Kv.(
-            Map.of_list
-              [
-                ( "dirspaces",
-                  list
-                    (CCList.map
-                       (fun { Mp.dirspace = Terrat_change.Dirspace.{ dir; workspace }; reason } ->
-                         (* Every row carries all three flags because the
-                            template tests each one, and a key missing from the
-                            map is an error rather than a false. *)
-                         let never_planned, last_run_failed, stale, out_of_order, invalidated_by =
-                           match reason with
-                           | Mp.Never_planned -> (true, false, false, false, None)
-                           | Mp.Last_run_failed -> (false, true, false, false, None)
-                           | Mp.Stale -> (false, false, true, false, None)
-                           | Mp.Out_of_dependency_order -> (false, false, false, true, None)
-                           | Mp.Invalidated_by_pull_request pull_number ->
-                               (false, false, false, false, Some pull_number)
-                         in
-                         Map.of_list
-                           [
-                             ("dir", string dir);
-                             ("workspace", string workspace);
-                             ("never_planned", bool never_planned);
-                             ("last_run_failed", bool last_run_failed);
-                             ("stale", bool stale);
-                             ("out_of_order", bool out_of_order);
-                             ("invalidated", bool (CCOption.is_some invalidated_by));
-                             ("invalidated_by", int (CCOption.get_or ~default:0 invalidated_by));
-                           ])
-                       dirspaces) );
-                ( "any_invalidated",
-                  bool
-                    (CCList.exists
-                       (function
-                         | { Mp.reason = Mp.Invalidated_by_pull_request _; _ } -> true
-                         | {
-                             Mp.reason =
-                               ( Mp.Never_planned
-                               | Mp.Last_run_failed
-                               | Mp.Stale
-                               | Mp.Out_of_dependency_order );
-                             _;
-                           } -> false)
-                       dirspaces) );
-              ])
+          `Assoc
+            [
+              ( "dirspaces",
+                `List
+                  (CCList.map
+                     (fun { Mp.dirspace = Terrat_change.Dirspace.{ dir; workspace }; reason } ->
+                       let reason, invalidated_by = row reason in
+                       `Assoc
+                         [
+                           ("dir", `String dir);
+                           ("workspace", `String workspace);
+                           ("reason", `String reason);
+                           ("invalidated_by", invalidated_by);
+                         ])
+                     dirspaces) );
+              ( "any_invalidated",
+                `Bool
+                  (CCList.exists
+                     (fun { Mp.reason; _ } ->
+                       match reason with
+                       | Mp.Invalidated_by_pull_request _ -> true
+                       | Mp.Never_planned
+                       | Mp.Last_run_failed
+                       | Mp.Stale
+                       | Mp.Plan_in_progress
+                       | Mp.Out_of_dependency_order -> false)
+                     dirspaces) );
+              ( "any_plan_in_progress",
+                `Bool
+                  (CCList.exists
+                     (fun { Mp.reason; _ } ->
+                       match reason with
+                       | Mp.Plan_in_progress -> true
+                       | Mp.Never_planned
+                       | Mp.Invalidated_by_pull_request _
+                       | Mp.Last_run_failed
+                       | Mp.Stale
+                       | Mp.Out_of_dependency_order -> false)
+                     dirspaces) );
+              ( "any_plan_needed",
+                `Bool
+                  (CCList.exists
+                     (fun { Mp.reason; _ } ->
+                       match reason with
+                       | Mp.Plan_in_progress -> false
+                       | Mp.Never_planned
+                       | Mp.Invalidated_by_pull_request _
+                       | Mp.Last_run_failed
+                       | Mp.Stale
+                       | Mp.Out_of_dependency_order -> true)
+                     dirspaces) );
+            ]
         in
         CCList.iter
           (fun { Mp.dirspace = Terrat_change.Dirspace.{ dir; workspace }; reason } ->
@@ -5143,7 +5198,7 @@ module Comment = struct
                   (Mp.show_reason reason)))
           dirspaces;
         Abbs_fc.Result.ignore
-        @@ Gcm_api.apply_template_and_publish
+        @@ Gcm_api.apply_template_and_publish_jinja
              ~request_id
              client
              pull_request
@@ -5250,14 +5305,37 @@ module Comment = struct
              (Tmpl.matches_in_later_layer brand)
              kv
     | Msg.Plan_already_planned dirspaces ->
+        let module Pn = Terrat_vcs_provider2.Plan_noop in
+        (* One reason string per row and the template pivots it into the reason text.  The match
+           stays exhaustive with no wildcard so a new reason fails to compile here: Minijinja
+           renders an unknown string as a silent blank, so this match is the only thing standing
+           between a missed arm and an empty table cell. *)
+        let row reason =
+          match reason with
+          | Pn.Already_planned -> "already_planned"
+          | Pn.Plan_in_progress -> "plan_in_progress"
+        in
         let kv =
           `Assoc
             [
               ( "dirspaces",
                 `List
                   (CCList.map
-                     (fun { Terrat_dirspace.dir; workspace } ->
-                       `Assoc [ ("dir", `String dir); ("workspace", `String workspace) ])
+                     (fun { Pn.dirspace = Terrat_dirspace.{ dir; workspace }; reason } ->
+                       `Assoc
+                         [
+                           ("dir", `String dir);
+                           ("workspace", `String workspace);
+                           ("reason", `String (row reason));
+                         ])
+                     dirspaces) );
+              ( "any_already_planned",
+                `Bool
+                  (CCList.exists
+                     (fun { Pn.reason; _ } ->
+                       match reason with
+                       | Pn.Already_planned -> true
+                       | Pn.Plan_in_progress -> false)
                      dirspaces) );
             ]
         in
@@ -6190,93 +6268,108 @@ module Work_manifest = struct
       >>= function
       | Some workflow_id -> (
           let open Abb.Future.Infix_monad in
-          Terrat_github.call
-            (Api.Client.to_native client)
-            Githubc2_actions.Create_workflow_dispatch.(
-              make
-                ~body:
-                  Request_body.
-                    {
-                      primary =
-                        Primary.
-                          {
-                            ref_ = branch;
-                            (* Terrateam does not read the run this starts. *)
-                            return_run_details = None;
-                            inputs =
-                              Some
-                                (let dynamic_title_items =
-                                   Terrat_config.Github.action_dynamic_title github_config
-                                 in
-                                 let dynamic_inputs =
-                                   CCList.filter_map
-                                     (function
-                                       | `Run_kind ->
-                                           let kind =
+          let dispatch () =
+            Terrat_github.call
+              (Api.Client.to_native client)
+              Githubc2_actions.Create_workflow_dispatch.(
+                make
+                  ~body:
+                    Request_body.
+                      {
+                        primary =
+                          Primary.
+                            {
+                              ref_ = branch;
+                              (* Terrateam does not read the run this starts. *)
+                              return_run_details = None;
+                              inputs =
+                                Some
+                                  (let dynamic_title_items =
+                                     Terrat_config.Github.action_dynamic_title github_config
+                                   in
+                                   let dynamic_inputs =
+                                     CCList.filter_map
+                                       (function
+                                         | `Run_kind ->
+                                             let kind =
+                                               match work_manifest.Wm.target with
+                                               | Terrat_vcs_provider2.Target.Pr _ -> "pr"
+                                               | Terrat_vcs_provider2.Target.Drift _ -> "drift"
+                                             in
+                                             Some ("run-kind", `String kind)
+                                         | `Run_type -> (
+                                             match CCList.last_opt work_manifest.Wm.steps with
+                                             | Some step ->
+                                                 Some ("run-type", `String (Wm.Step.to_string step))
+                                             | None -> assert false)
+                                         | `Pr_title -> (
                                              match work_manifest.Wm.target with
-                                             | Terrat_vcs_provider2.Target.Pr _ -> "pr"
-                                             | Terrat_vcs_provider2.Target.Drift _ -> "drift"
-                                           in
-                                           Some ("run-kind", `String kind)
-                                       | `Run_type -> (
-                                           match CCList.last_opt work_manifest.Wm.steps with
-                                           | Some step ->
-                                               Some ("run-type", `String (Wm.Step.to_string step))
-                                           | None -> assert false)
-                                       | `Pr_title -> (
-                                           match work_manifest.Wm.target with
-                                           | Terrat_vcs_provider2.Target.Pr pr -> (
-                                               match Api.Pull_request.title pr with
-                                               | Some title -> Some ("pr-title", `String title)
-                                               | None -> None)
-                                           | Terrat_vcs_provider2.Target.Drift _ -> None)
-                                       | `Pr_number -> (
-                                           match work_manifest.Wm.target with
-                                           | Terrat_vcs_provider2.Target.Pr pr ->
-                                               Some
-                                                 ( "pr-number",
-                                                   `String (Int.to_string (Api.Pull_request.id pr))
-                                                 )
-                                           | Terrat_vcs_provider2.Target.Drift _ -> None))
-                                     dynamic_title_items
-                                 in
-                                 Inputs.
-                                   {
-                                     primary = Json_schema.Empty_obj.t;
-                                     additional =
-                                       Sln_map.String.of_list
-                                         ([
-                                            (* The action asks its compute node
-                                               for work, and a node can perform
-                                               more than one work manifest.  The
-                                               response of each poll names the
-                                               work manifest of that step. *)
-                                            ("work-token", `String (Ouuid.to_string compute_node_id));
-                                            ( "api-base-url",
-                                              `String
-                                                (Terrat_config.api_base (Api.Config.config config)
-                                                ^ "/github") );
-                                          ]
-                                         @ dynamic_inputs
-                                         @ (match work_manifest.Wm.environment with
-                                           | Some env -> [ ("environment", `String env) ]
-                                           | None -> [])
-                                         @
-                                         match work_manifest.Wm.runs_on with
-                                         | Some runs_on ->
-                                             [
-                                               ("runs_on", `String (Yojson.Safe.to_string runs_on));
-                                             ]
-                                         | None -> []);
-                                   });
-                          };
-                      additional = Sln_map.String.empty;
-                    }
-                Parameters.(
-                  make
-                    ~owner:(Api.Repo.owner repo)
-                    ~repo:(Api.Repo.name repo)
-                    ~workflow_id:(Workflow_id.V0 workflow_id)))
+                                             | Terrat_vcs_provider2.Target.Pr pr -> (
+                                                 match Api.Pull_request.title pr with
+                                                 | Some title -> Some ("pr-title", `String title)
+                                                 | None -> None)
+                                             | Terrat_vcs_provider2.Target.Drift _ -> None)
+                                         | `Pr_number -> (
+                                             match work_manifest.Wm.target with
+                                             | Terrat_vcs_provider2.Target.Pr pr ->
+                                                 Some
+                                                   ( "pr-number",
+                                                     `String
+                                                       (Int.to_string (Api.Pull_request.id pr)) )
+                                             | Terrat_vcs_provider2.Target.Drift _ -> None))
+                                       dynamic_title_items
+                                   in
+                                   Inputs.
+                                     {
+                                       primary = Json_schema.Empty_obj.t;
+                                       additional =
+                                         Sln_map.String.of_list
+                                           ([
+                                              (* The action asks its compute node
+                                                 for work, and a node can perform
+                                                 more than one work manifest.  The
+                                                 response of each poll names the
+                                                 work manifest of that step. *)
+                                              ( "work-token",
+                                                `String (Ouuid.to_string compute_node_id) );
+                                              ( "api-base-url",
+                                                `String
+                                                  (Terrat_config.api_base (Api.Config.config config)
+                                                  ^ "/github") );
+                                            ]
+                                           @ dynamic_inputs
+                                           @ (match work_manifest.Wm.environment with
+                                             | Some env -> [ ("environment", `String env) ]
+                                             | None -> [])
+                                           @
+                                           match work_manifest.Wm.runs_on with
+                                           | Some runs_on ->
+                                               [
+                                                 ("runs_on", `String (Yojson.Safe.to_string runs_on));
+                                               ]
+                                           | None -> []);
+                                     });
+                            };
+                        additional = Sln_map.String.empty;
+                      }
+                  Parameters.(
+                    make
+                      ~owner:(Api.Repo.owner repo)
+                      ~repo:(Api.Repo.name repo)
+                      ~workflow_id:(Workflow_id.V0 workflow_id)))
+          in
+          (* A [Missing_response] is a transport fault of the forge, not a verdict on the work:
+             the dispatch reached it and the answer did not come back.  Retry it with a doubling
+             delay before the job fails, because a failed dispatch stops the layered flow until
+             the user comments [plan] again.  The ref-deleted answer below is a verdict and is
+             not retried. *)
+          Abbs_fc.retry
+            ~f:dispatch
+            ~while_:(Abbs_fc.finite_tries dispatch_tries Api.retryable_missing_response)
+            ~betwixt:
+              (Abbs_fc.series ~start:2.0 ~step:(( *. ) 1.5) (fun n _ ->
+                   Logs.info (fun m -> m "%s : DISPATCH_RETRY : delay=%f" request_id n);
+                   Abb.Sys.sleep (CCFloat.min n 8.0)))
           >>= function
           | Ok _ -> (
               match CCList.last_opt work_manifest.Wm.steps with
@@ -6286,8 +6379,7 @@ module Work_manifest = struct
                     (make_run_telemetry config step repo)
                   >>= fun () -> Abbs_fc.return_ok ()
               | None -> Abbs_fc.return_ok ())
-          | Error (`Missing_response resp as err)
-            when CCString.mem ~sub:"No ref found for:" (Openapi.Response.value resp) ->
+          | Error (`Missing_response resp as err) when Api.ref_not_found resp ->
               (* If the ref has been deleted while we are looking up the
                  workflow, just ignore and move on. *)
               Logs.info (fun m ->
@@ -6999,14 +7091,15 @@ module Job_context = struct
         let module K = Terrat_job_context.Job.Type_.Kind in
         let module O = Terrat_job_type_kind in
         let module Kd = Terrat_job_type_kind_drift in
-        CCOption.map (function K.Drift { reconcile } ->
-            O.Kind_drift { Kd.reconcile; type_ = `Drift })
+        CCOption.map (function K.Drift { reconcile; restart_on_change } ->
+            O.Kind_drift { Kd.reconcile; restart_on_change; type_ = `Drift })
 
       let json_to_kind =
         let module K = Terrat_job_context.Job.Type_.Kind in
         let module O = Terrat_job_type_kind in
         let module Kd = Terrat_job_type_kind_drift in
-        CCOption.map (function O.Kind_drift { Kd.reconcile; type_ = _ } -> K.Drift { reconcile })
+        CCOption.map (function O.Kind_drift { Kd.reconcile; restart_on_change; type_ = _ } ->
+            K.Drift { reconcile; restart_on_change })
 
       let to_json =
         let module T = Terrat_job_context.Job.Type_ in

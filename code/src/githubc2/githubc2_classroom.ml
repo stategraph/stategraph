@@ -8,6 +8,11 @@ module List_assignments_for_a_classroom = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Simple_classroom_assignment.t list
@@ -110,6 +115,11 @@ module List_classrooms = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Simple_classroom.t list
@@ -209,6 +219,11 @@ module List_accepted_assignments_for_an_assignment = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct

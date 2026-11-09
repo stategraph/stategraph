@@ -88,6 +88,49 @@ let test_headers_are_case_insensitive =
       assert_wait ~expected:5.0 (decision [ ("Retry-After", "5") ]);
       ())
 
+(** The retry rule of the dispatch. A [Missing_response] whose status is a 5xx is the forge failing
+    while it answers, and the dispatch tries it again; a 4xx among them is a verdict on the work,
+    and a rate limit, a timeout and a successful call are not faults at all. *)
+
+module Api = Terrat_vcs_api_gitlab
+
+let missing ?(status = 502) body =
+  Error
+    (`Missing_response
+       (Openapi.Response.make
+          ~headers:[]
+          ~request_uri:(Uri.of_string "https://gitlab.com/api/v4/projects/1/pipeline")
+          ~status
+          body))
+
+let assert_retryable expected actual =
+  Oth.Assert.eq ~eq:Bool.equal ~pp:Format.pp_print_bool expected actual
+
+let test_unbound_5xx_is_retryable =
+  Oth.test ~name:"a 5xx the client has no binding for is retried" (fun _ ->
+      assert_retryable true (Api.retryable_missing_response (missing "gateway"));
+      ())
+
+let test_unbound_4xx_is_a_verdict =
+  Oth.test ~name:"a 4xx the client has no binding for is not retried" (fun _ ->
+      assert_retryable false (Api.retryable_missing_response (missing ~status:422 "nope"));
+      ())
+
+let test_timeout_is_not_retryable =
+  Oth.test ~name:"a timeout is not retried" (fun _ ->
+      assert_retryable false (Api.retryable_missing_response (Error `Timeout));
+      ())
+
+let test_rate_limit_is_not_retryable =
+  Oth.test ~name:"a rate limit is not retried" (fun _ ->
+      assert_retryable false (Api.retryable_missing_response (Error `Rate_limit_err));
+      ())
+
+let test_success_is_not_retryable =
+  Oth.test ~name:"a successful call is not retried" (fun _ ->
+      assert_retryable false (Api.retryable_missing_response (Ok ()));
+      ())
+
 let mergeable ?(has_conflicts = Some false) detailed_merge_status =
   Terrat_vcs_api_gitlab.mergeable_of_status ~detailed_merge_status ~has_conflicts
 
@@ -165,4 +208,9 @@ let () =
           test_policy_statuses_are_mergeable;
           test_merge_in_progress_has_no_verdict;
           test_missing_fields_have_no_verdict;
+          test_unbound_5xx_is_retryable;
+          test_unbound_4xx_is_a_verdict;
+          test_timeout_is_not_retryable;
+          test_rate_limit_is_not_retryable;
+          test_success_is_not_retryable;
         ])

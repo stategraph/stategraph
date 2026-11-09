@@ -254,6 +254,11 @@ module DeleteApiV4RunnersManagers = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "token" /? string "system_id"
+
   module Responses = struct
     module No_content = struct end
     module Bad_request = struct end
@@ -407,6 +412,22 @@ module GetApiV4RunnersAll = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option
+         (ud "scope" (fun value -> CCResult.to_opt (Parameters.Scope.t_of_yojson (`String value))))
+    /? option
+         (ud "type" (fun value -> CCResult.to_opt (Parameters.Type.t_of_yojson (`String value))))
+    /? option (bool "paused")
+    /? option
+         (ud "status" (fun value -> CCResult.to_opt (Parameters.Status.t_of_yojson (`String value))))
+    /? option (array (string "tag_list"))
+    /? option (string "version_prefix")
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -455,6 +476,11 @@ module DeleteApiV4Runners = struct
   module Parameters = struct
     type t = { token : string } [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "token"
 
   module Responses = struct
     module No_content = struct end
@@ -643,6 +669,22 @@ module GetApiV4Runners = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option
+         (ud "scope" (fun value -> CCResult.to_opt (Parameters.Scope.t_of_yojson (`String value))))
+    /? option
+         (ud "type" (fun value -> CCResult.to_opt (Parameters.Type.t_of_yojson (`String value))))
+    /? option (bool "paused")
+    /? option
+         (ud "status" (fun value -> CCResult.to_opt (Parameters.Status.t_of_yojson (`String value))))
+    /? option (array (string "tag_list"))
+    /? option (string "version_prefix")
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end

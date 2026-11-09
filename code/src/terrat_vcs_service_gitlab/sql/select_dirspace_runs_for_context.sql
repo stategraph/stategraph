@@ -66,6 +66,39 @@ wm as (
 dirspaces as (
     select path, workspace from unnest($dirs, $workspaces) as v(path, workspace)
 ),
+-- The plan work manifest of this pull request that is running now, per dirspace.  A dirspace that
+-- one covers needs no new plan while its files do not change, thus the second [terrateam plan] is
+-- a noop for it.  The commit the plan started on is the one its files are compared from; a plan
+-- that has not recorded a start is compared from the commit of its work manifest.
+in_progress_plans as (
+  select distinct on (wmdf.path, wmdf.workspace)
+      wmdf.path as path,
+      wmdf.workspace as workspace,
+      coalesce(refs.start_sha, wm.sha) as sha,
+      wm.created_at as created_at
+  from gitlab_work_manifests as wm
+  inner join work_manifests as refs
+    on refs.id = wm.id
+  inner join work_manifest_dirspaceflows as wmdf
+    on wmdf.work_manifest = wm.id
+-- The context join is the only repository and pull request scoping in this CTE.  Without it, a
+-- running plan of another pull request or repository on the same dirspace would be reported as
+-- this pull request's in-flight plan.
+  inner join context as c
+    on c.repo = wm.repository
+  inner join dirspaces as ds
+    on ds.path = wmdf.path and ds.workspace = wmdf.workspace
+-- An unlocked plan is one that a push superseded: it is still queued or running, but its answer
+-- is for a commit the pull request has left, thus it does not stand for the dirspace.  Queued
+-- plans count too, so the plan selection and the apply gate agree on what counts as in progress.
+  left join gitlab_pull_request_latest_unlocks as unlocks
+    on unlocks.repository = wm.repository and unlocks.pull_number = wm.pull_number
+  where c.pull_number is not distinct from wm.pull_number
+        and (unlocks.unlocked_at is null or unlocks.unlocked_at < wm.created_at)
+        and wm.run_type in ('autoplan', 'plan')
+        and wm.state in ('queued', 'running')
+  order by wmdf.path, wmdf.workspace, wm.created_at desc
+),
 -- A plan which found no changes has nothing to apply, thus the caller needs to know whether the
 -- plan found changes.  A run with no plan row counts as a run with changes, which keeps the
 -- dirspace unapplied.
@@ -116,7 +149,9 @@ select
   newest_apply.success is false
     and not coalesce(
       newest_plan.success and newest_plan.created_at > newest_apply.created_at,
-      false)
+      false),
+  in_progress_plans.sha,
+  to_char(in_progress_plans.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
 from dirspaces as ds
 left join runs as last_plan
   on last_plan.path = ds.path
@@ -140,3 +175,6 @@ left join runs as newest_apply
      and newest_apply.workspace = ds.workspace
      and newest_apply.run_type = 'apply'
      and newest_apply.newest = 1
+left join in_progress_plans
+  on in_progress_plans.path = ds.path
+     and in_progress_plans.workspace = ds.workspace

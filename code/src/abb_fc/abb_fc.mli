@@ -152,7 +152,8 @@ module Make (Fut : Abb_intf.Future.S) : sig
       This is {!while_} with no state to thread. *)
   val retry : f:(unit -> 'a Fut.t) -> while_:('a -> bool) -> betwixt:('a -> unit Fut.t) -> 'a Fut.t
 
-  (** Try, at most, the number of [tries] given. If there are remaining tries, call the test
+  (** Call [f] once, then, at most, the number of [tries] given more times while [while_] holds:
+      with [tries = n] and [while_] always true, [f] runs [n + 1] times. Each call runs the test
       function which corresponds to the [while_] in the {!retry} function. *)
   val finite_tries : int -> ('a -> bool) -> 'a -> bool
 

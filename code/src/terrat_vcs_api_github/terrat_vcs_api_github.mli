@@ -24,6 +24,12 @@ module Directory_entry : sig
   val size : t -> int
 end
 
+type fetch_directory_err =
+  [ Terrat_vcs_api.call_err
+  | `Listing_unavailable
+  ]
+[@@deriving show]
+
 (** List the entries of one directory. A path that does not exist, or that holds a file, a symlink
     or a submodule, holds no entries and reads as [None].
 
@@ -36,5 +42,19 @@ val fetch_directory :
   Repo.t ->
   Ref.t ->
   string ->
-  (Directory_entry.t list option, [> Terrat_vcs_api.call_err | `Listing_unavailable ]) result
-  Abb.Future.t
+  (Directory_entry.t list option, [> fetch_directory_err ]) result Abb.Future.t
+
+type retryable_missing_response_err = [ `Missing_response of string Openapi.Response.t ]
+[@@deriving show]
+
+(** Whether a failed call to the forge is a transport fault worth trying again. [`Missing_response]
+    is the answer that did not come back: the request reached the forge and the reply was lost. A
+    rate limit and a timeout have their own answers at the call sites and are not retried here. A
+    [`Missing_response] whose body says the ref is gone is a verdict on the work, not a fault, and
+    trying it again cannot change it. *)
+val retryable_missing_response : ('a, [> retryable_missing_response_err ]) result -> bool
+
+(** Whether the body of a response says the ref the call names is gone. The retry rule
+    {!retryable_missing_response} refuses such a response and the dispatch call site treats it as
+    success; this one predicate keeps the substring the two rules read from drifting apart. *)
+val ref_not_found : string Openapi.Response.t -> bool

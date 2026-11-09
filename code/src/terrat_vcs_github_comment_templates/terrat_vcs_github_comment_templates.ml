@@ -63,7 +63,10 @@ module Tmpl = struct
 
   let apply_requirements_validation_err = read [%blob "tmpl/apply_requirements_validation_err.tmpl"]
   let mismatched_refs = read [%blob "tmpl/mismatched_refs.tmpl"]
-  let missing_plans = read [%blob "tmpl/missing_plans.tmpl"]
+
+  (* A Jinja template: rendered through [apply_template_and_publish_jinja], so it is not
+     Snabela-parsed at startup and validates at first render instead. *)
+  let missing_plans = jinja [%blob "tmpl/missing_plans.tmpl"]
 
   let dirspaces_owned_by_other_pull_requests =
     read [%blob "tmpl/dirspaces_owned_by_other_pull_requests.tmpl"]

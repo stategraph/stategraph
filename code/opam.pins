@@ -14,7 +14,7 @@ ctypes.0.24.0
 ctypes-foreign.0.24.0
 curl.0.10.1
 decompress.1.6.1
-dns-client.10.2.6
+dns-client.10.2.7
 domainslib.0.5.2
 duration.0.3.1
 dynamic_gc.0.2.0

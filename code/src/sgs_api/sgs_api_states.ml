@@ -52,6 +52,11 @@ module Security_scans = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "page") /? option (int "limit")
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Security_scans_response.t
@@ -253,6 +258,11 @@ module Security_findings = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "page") /? option (string "severity") /? option (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -583,12 +593,17 @@ module Modules_list = struct
     end
 
     type t = {
-      limit : int option; [@default None]
+      limit : int; [@default 20]
       page : Page.t option; [@default None]
       state_id : string;
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (array (string "page")) /? option_default 20 (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -626,10 +641,7 @@ module Modules_list = struct
       ~query_params:
         (let open Openapi.Request.Var in
          let open Parameters in
-         [
-           ("page", Var (params.page, Option (Array String)));
-           ("limit", Var (params.limit, Option Int));
-         ])
+         [ ("page", Var (params.page, Option (Array String))); ("limit", Var (params.limit, Int)) ])
       ~url
       ~responses:Responses.t
       `Get
@@ -639,12 +651,17 @@ module Instance_blast_radius = struct
   module Parameters = struct
     type t = {
       instance_address : string;
-      limit : int option; [@default None]
-      max_depth : int option; [@default None]
+      limit : int; [@default 1000]
+      max_depth : int; [@default 100]
       state_id : string;
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 100 (int "max_depth") /? option_default 1000 (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -692,10 +709,7 @@ module Instance_blast_radius = struct
       ~query_params:
         (let open Openapi.Request.Var in
          let open Parameters in
-         [
-           ("max_depth", Var (params.max_depth, Option Int));
-           ("limit", Var (params.limit, Option Int));
-         ])
+         [ ("max_depth", Var (params.max_depth, Int)); ("limit", Var (params.limit, Int)) ])
       ~url
       ~responses:Responses.t
       `Get
@@ -708,7 +722,7 @@ module Instances_list = struct
     end
 
     type t = {
-      limit : int option; [@default None]
+      limit : int; [@default 20]
       page : Page.t option; [@default None]
       q : string option; [@default None]
       state_id : string;
@@ -716,6 +730,15 @@ module Instances_list = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (array (string "page"))
+    /? option (string "q")
+    /? option (string "tz")
+    /? option_default 20 (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -764,7 +787,7 @@ module Instances_list = struct
            ("page", Var (params.page, Option (Array String)));
            ("q", Var (params.q, Option String));
            ("tz", Var (params.tz, Option String));
-           ("limit", Var (params.limit, Option Int));
+           ("limit", Var (params.limit, Int));
          ])
       ~url
       ~responses:Responses.t

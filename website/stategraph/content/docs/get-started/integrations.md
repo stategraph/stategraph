@@ -26,7 +26,14 @@ Orchestration runs Terraform by default. To run OpenTofu, the `stategraph` CLI, 
 - [Terragrunt](/docs/orchestration/iac-tools/terragrunt): the `terragrunt` engine
 - [Pulumi](/docs/orchestration/iac-tools/pulumi): the `pulumi` engine
 - [CDKTF](/docs/orchestration/iac-tools/cdktf): the `cdktf` engine
-- [Migrate from Terraform Cloud](/docs/orchestration/iac-tools/terraform-cloud-migration): move to Orchestration
+
+## Migration
+
+- [From Terraform Cloud](/docs/orchestration/migration/terraform-cloud): move workspaces, state, secrets, and workflows
+- [From Digger](/docs/orchestration/migration/digger): convert `digger.yml` to `.stategraph/config.yml`
+- [From Atlantis](/docs/orchestration/migration/atlantis): convert `atlantis.yaml` and `repos.yaml` to `.stategraph/config.yml`
+- [From Spacelift](/docs/orchestration/migration/spacelift): move stacks, contexts, state, and secrets
+- [From env0](/docs/orchestration/migration/env0): move environments, variables, custom flows, and state
 
 ## CI and orchestrators
 

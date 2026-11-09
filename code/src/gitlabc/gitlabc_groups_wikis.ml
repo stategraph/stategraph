@@ -107,6 +107,11 @@ module GetApiV4GroupsIdWikisSlug = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (string "version") /? option_default false (bool "render_html")
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -239,6 +244,11 @@ module GetApiV4GroupsIdWikis = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default false (bool "with_content")
 
   module Responses = struct
     module OK = struct end

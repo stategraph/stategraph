@@ -8,6 +8,11 @@ module Update = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? uuid "user_id"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.User_update_response.t
@@ -89,6 +94,11 @@ module Set_instance_admin = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? uuid "user_id"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.User_set_instance_admin_response.t
@@ -165,6 +175,11 @@ module Detail = struct
     type t = { user_id : string } [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? uuid "user_id"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.User_detail_response.t
@@ -238,6 +253,11 @@ module Delete = struct
   module Parameters = struct
     type t = { user_id : string } [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? uuid "user_id"
 
   module Responses = struct
     module OK = struct
@@ -317,6 +337,11 @@ module Change_password = struct
     type t = Sgs_api_components.User_change_password_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? uuid "user_id"
 
   module Responses = struct
     module OK = struct
@@ -468,6 +493,15 @@ module List = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option (string "type")
+    /? option (string "search")
+    /? option (string "cursor")
+    /? option_default 25 (int "limit")
 
   module Responses = struct
     module OK = struct

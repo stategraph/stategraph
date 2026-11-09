@@ -17,6 +17,55 @@ committed as (
     select work_manifest, at
     from unnest($committed_work_manifests, $committed_at) as v(work_manifest, at)
 ),
+-- The requested dirspaces whose plan work manifest of this pull request is
+-- still queued or running.  The completed-run ranking below reads
+-- work_manifest_results only, and a plan that has not finished has no row
+-- there, so this is the join that reaches one.  Scoped to this pull request so
+-- that a plan of another pull request on the same dirspace keeps its own
+-- reason.
+in_progress_plans as (
+    select distinct ds.path, ds.workspace
+    from dirspaces as ds
+    inner join work_manifest_dirspaceflows as wmdf
+        on wmdf.path = ds.path and wmdf.workspace = ds.workspace
+    inner join github_work_manifests as gwm
+        on gwm.id = wmdf.work_manifest
+-- An unlocked plan is one that a push superseded: it is still queued or running, but its answer
+-- is for a commit the pull request has left, thus it does not stand for the dirspace.  This is
+-- the same predicate the plan selection uses, so the apply gate and the plan selection agree on
+-- what counts as in progress.
+    left join github_pull_request_latest_unlocks as unlocks
+        on unlocks.repository = gwm.repository and unlocks.pull_number = gwm.pull_number
+    where gwm.repository = $repository
+          and gwm.pull_number = $pull_number
+          and gwm.run_type in ('autoplan', 'plan')
+          and gwm.state in ('queued', 'running')
+          and (unlocks.unlocked_at is null or unlocks.unlocked_at < gwm.created_at)
+),
+-- The requested dirspaces that this pull request has a completed plan run for.
+-- The ranking below is over every pull request, so a dirspace that another pull
+-- request ran and this one never did is reported as never planned here, not as
+-- superseded: there is no plan of this pull request to supersede.  The scoping
+-- is the one [our_plans] uses, over every requested dirspace rather than the
+-- parallel ones.  A failed plan is still a plan of this pull request -- the
+-- predicate reads completed_at and not success -- so a dirspace whose plan
+-- failed, and whose directory another pull request applied afterwards, is
+-- reported as superseded, not as last run failed.  A parallel dirspace answers
+-- differently on purpose: the moment guard can hold the other pull request's
+-- apply out of the ranking, the newest run left is this pull request's failed
+-- plan, and the reason is last run failed.
+our_runs as (
+    select distinct ds.path, ds.workspace
+    from dirspaces as ds
+    inner join work_manifest_results as wmr
+        on wmr.path = ds.path and wmr.workspace = ds.workspace
+    inner join github_work_manifests as gwm
+        on gwm.id = wmr.work_manifest
+    where gwm.repository = $repository
+          and gwm.pull_number = $pull_number
+          and gwm.run_type in ('autoplan', 'plan')
+          and gwm.completed_at is not null
+),
 -- When the Stategraph transaction of our latest completed plan of a parallel
 -- dirspace opened or, without the moment, when that plan completed: the
 -- transaction opened during the run, so the run bounds the moment from above.
@@ -124,27 +173,55 @@ latest_dirspace_work_manifests as (
 select
     ds.path,
     ds.workspace,
--- The four arms below are the four arms of the where clause, in the same order,
--- so the reason reported is the one that actually excluded the row.  The last
--- arm is a successful run of this pull request whose refs moved: a plan exists,
--- but not for the commit the pull request points at now.  That is the only arm
--- the intra-PR hash rule can clear, and the caller is what applies it.
+-- The arms below are the arms of the where clause, in the same order, so the
+-- reason reported is the one that actually excluded the row.  A plan work
+-- manifest of this pull request that is still queued or running outranks every
+-- completed-run reason: the answer to the user is to wait, not to plan again.
+-- The two arms of the other-pull-request test split it: a plan of this pull
+-- request is superseded only when this pull request has a run of the dirspace
+-- for the other run to outrank, and a dirspace this pull request never ran is
+-- never planned.  The last arm is a successful run of this pull request whose
+-- refs moved: a plan exists, but not for the commit the pull request points at
+-- now.  That is the only arm the intra-PR hash rule can clear, and the caller
+-- is what applies it.  The two split arms share the one
+-- [pull_number is distinct from $pull_number] arm of the where clause, because
+-- both ask the same question of the row, whether the newest run is of another
+-- pull request, and differ only in whether this pull request ran the dirspace.
     case
+        when ipp.path is not null then 'plan_in_progress'
         when ldswm.id is null then 'never_planned'
-        when ldswm.pull_number is distinct from $pull_number then 'invalidated'
+        when ldswm.pull_number is distinct from $pull_number
+             and our_runs.path is not null then 'invalidated'
+        when ldswm.pull_number is distinct from $pull_number then 'never_planned'
         when not ldswm.success then 'last_run_failed'
         else 'never_planned'
     end,
-    ldswm.pull_number
+-- The pull request that superseded the plan, and nothing for the other
+-- reasons: the caller names it only in the [invalidated] text.  The
+-- [ipp.path is null] guard keeps the number out of a row the reason case reads
+-- as plan_in_progress: the where clause is a disjunction, so such a row can
+-- satisfy this arm too.
+    case
+        when ipp.path is null
+             and ldswm.pull_number is distinct from $pull_number
+             and our_runs.path is not null then ldswm.pull_number
+    end
 from dirspaces as ds
 left join latest_dirspace_work_manifests as ldswm
     on ldswm.path = ds.path
        and ldswm.workspace = ds.workspace
+left join in_progress_plans as ipp
+    on ipp.path = ds.path
+       and ipp.workspace = ds.workspace
+left join our_runs
+    on our_runs.path = ds.path
+       and our_runs.workspace = ds.workspace
 left join plans
     on plans.work_manifest = ldswm.id
        and plans.path = ds.path
        and plans.workspace = ds.workspace
-where ldswm.id is null
+where ipp.path is not null
+      or ldswm.id is null
       or ldswm.pull_number is distinct from $pull_number
       or not ldswm.success
       or not ldswm.refs_match

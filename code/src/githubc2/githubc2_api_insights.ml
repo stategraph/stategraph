@@ -63,6 +63,24 @@ module Get_user_stats = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? string "min_timestamp"
+    /? option (string "max_timestamp")
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option
+         (array
+            (ud "sort" (fun value ->
+                 CCResult.to_opt (Parameters.Sort.Items.t_of_yojson (`String value)))))
+    /? option (string "actor_name_substring")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Api_insights_user_stats.t
@@ -140,6 +158,14 @@ module Get_time_stats_by_actor = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? string "min_timestamp"
+    /? option (string "max_timestamp")
+    /? string "timestamp_increment"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Api_insights_time_stats.t
@@ -189,6 +215,14 @@ module Get_time_stats_by_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? string "min_timestamp"
+    /? option (string "max_timestamp")
+    /? string "timestamp_increment"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Api_insights_time_stats.t
@@ -232,6 +266,14 @@ module Get_time_stats = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? string "min_timestamp"
+    /? option (string "max_timestamp")
+    /? string "timestamp_increment"
 
   module Responses = struct
     module OK = struct
@@ -305,6 +347,11 @@ module Get_summary_stats_by_actor = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "min_timestamp" /? option (string "max_timestamp")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Api_insights_summary_stats.t
@@ -352,6 +399,11 @@ module Get_summary_stats_by_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "min_timestamp" /? option (string "max_timestamp")
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Api_insights_summary_stats.t
@@ -393,6 +445,11 @@ module Get_summary_stats = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "min_timestamp" /? option (string "max_timestamp")
 
   module Responses = struct
     module OK = struct
@@ -489,6 +546,24 @@ module Get_subject_stats = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? string "min_timestamp"
+    /? option (string "max_timestamp")
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option
+         (array
+            (ud "sort" (fun value ->
+                 CCResult.to_opt (Parameters.Sort.Items.t_of_yojson (`String value)))))
+    /? option (string "subject_name_substring")
 
   module Responses = struct
     module OK = struct
@@ -622,6 +697,24 @@ module Get_route_stats_by_actor = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? string "min_timestamp"
+    /? option (string "max_timestamp")
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
+    /? option_default
+         `Desc
+         (ud "direction" (fun value ->
+              CCResult.to_opt (Parameters.Direction.t_of_yojson (`String value))))
+    /? option
+         (array
+            (ud "sort" (fun value ->
+                 CCResult.to_opt (Parameters.Sort.Items.t_of_yojson (`String value)))))
+    /? option (string "api_route_substring")
 
   module Responses = struct
     module OK = struct

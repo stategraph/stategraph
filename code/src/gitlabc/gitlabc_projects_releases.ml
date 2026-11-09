@@ -52,6 +52,11 @@ module GetApiV4ProjectsIdReleasesTagNameDownloads_directAssetPath = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "direct_asset_path"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -295,6 +300,11 @@ module GetApiV4ProjectsIdReleasesTagNameAssetsLinks = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -448,6 +458,11 @@ module GetApiV4ProjectsIdReleasesTagName = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option (bool "include_html_description")
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -593,6 +608,23 @@ module GetApiV4ProjectsIdReleases = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
+    /? option_default
+         `Released_at
+         (ud "order_by" (fun value ->
+              CCResult.to_opt (Parameters.Order_by.t_of_yojson (`String value))))
+    /? option_default
+         `Desc
+         (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
+    /? option (bool "include_html_description")
+    /? option (string "updated_before")
+    /? option (string "updated_after")
 
   module Responses = struct
     module OK = struct end

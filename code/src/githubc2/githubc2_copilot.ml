@@ -248,6 +248,11 @@ module Copilot_organization_users_one_day_usage_metrics = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "day"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Copilot_usage_metrics_1_day_report.t
@@ -319,6 +324,11 @@ module Copilot_organization_user_teams_one_day_report = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "day"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Copilot_usage_metrics_1_day_report.t
@@ -389,6 +399,11 @@ module Copilot_organization_repos_one_day_report = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "day"
 
   module Responses = struct
     module OK = struct
@@ -520,6 +535,11 @@ module Copilot_organization_one_day_usage_metrics = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "day"
 
   module Responses = struct
     module OK = struct
@@ -1062,6 +1082,11 @@ module List_copilot_coding_agent_selected_repositories_for_organization = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1716,6 +1741,11 @@ module List_copilot_seats = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? option_default 1 (int "page") /? option_default 50 (int "per_page")
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -2167,6 +2197,11 @@ module Copilot_users_one_day_usage_metrics = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "day"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Copilot_usage_metrics_1_day_report.t
@@ -2234,6 +2269,11 @@ module Copilot_enterprise_user_teams_one_day_report = struct
     [@@deriving make, show, eq]
   end
 
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "day"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Copilot_usage_metrics_1_day_report.t
@@ -2300,6 +2340,11 @@ module Copilot_enterprise_repos_one_day_report = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "day"
 
   module Responses = struct
     module OK = struct
@@ -2431,6 +2476,11 @@ module Copilot_enterprise_one_day_usage_metrics = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route base_route =
+    let open Brtl_rtng.Route.Query in
+    let open Brtl_rtng.Route in
+    base_route /? string "day"
 
   module Responses = struct
     module OK = struct
