@@ -16,29 +16,31 @@ jobs:
   build-server-oss:
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-22.04
+    runs-on: depot-ubuntu-24.04
     permissions:
       contents: read
+      # depot/build-push-action authenticates to Depot over OIDC
+      id-token: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # The default docker driver cannot export to the GHA cache.
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Set up Depot CLI
+        uses: depot/setup-action@v1
 
-      # Key is the ISO week, so a cached `apk upgrade` layer is at most a week old.
+      # Key is the ISO week, so the cached `apk upgrade` layer is at most a week old.
       - name: Set the OS refresh key
         run: |
           echo "OS_REFRESH=$(date -u +%G-W%V)" >> "$GITHUB_ENV"
 
       # Keep the build-args in sync with the build-stategraph job in release.yml,
-      # which publishes this image. The cache read here is this PR's own: releases
-      # keep no cache (see release.yml).
+      # which publishes this image. Built on Depot's builders, in the repository's
+      # own Depot project, whose layer cache persists across runs.
       - name: Build the OSS server image
-        uses: docker/build-push-action@v6
+        uses: depot/build-push-action@v1
         with:
+          project: ${{ vars.DEPOT_PROJECT_ID }}
           context: .
           file: docker/stategraph/Dockerfile
           target: stategraph-server-oss
@@ -48,6 +50,4 @@ jobs:
             USERNAME=stategraph
             DEPLOYMENT_KIND=production
             OS_REFRESH=${{ env.OS_REFRESH }}
-          cache-from: type=gha,scope=stategraph-server-oss
-          cache-to: type=gha,mode=max,scope=stategraph-server-oss
           push: false
