@@ -1,12 +1,12 @@
 name: release
 
+# Dispatched only. The monorepo release dispatches it at the semver tag it puts
+# on the export merge commit. Dispatched by hand without semver_tag, it is a terrat-only release.
+#
+# stategraph-server-oss is tagged by semver. The terrat images (terrat-ee, terrat-oss, ttm,
+# terrat-ee-fips) are tagged with the date tag of the commit and, on a semver release, the
+# semver tag too.
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - 'docs/**'
-      - 'rfds/**'
   workflow_dispatch:
     inputs:
       environment:
@@ -17,57 +17,21 @@ on:
           - production
           - staging
       semver_tag:
-        description: 'Release under this existing semver tag (e.g. 1.2.3), dispatched at that tag'
+        description: 'Release under this existing semver tag (e.g. 1.2.3), dispatched at that tag. Leave empty for a terrat-only release'
         required: false
         type: string
 
 jobs:
-  # Gate for the whole pipeline. Every push to main cuts a release, and a release that carries
-  # nothing user-facing is just noise in the feed people subscribe to. When every PR since the
-  # last release is labelled `no-release`, this job stops here.
-  release-gate:
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: read
-      pull-requests: read
-
-    outputs:
-      release: ${{ steps.release-gate.outputs.release }}
-
-    env:
-      GITHUB_REPOSITORY: ${{ github.repository }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          # Full history + tags: the gate walks main back to the previous release tag.
-          fetch-depth: 0
-          fetch-tags: true
-
-      - name: Decide whether to release
-        id: release-gate
-        env:
-          SEMVER_TAG: ${{ inputs.semver_tag }}
-        run: |
-          # A semver release was explicitly asked for, so it is always cut.
-          if [[ -n "${SEMVER_TAG}" ]]; then
-            echo "release=true" >> "${GITHUB_OUTPUT}"
-            exit 0
-          fi
-          ./scripts/release_gate
-
   set-version-tag:
-    needs: release-gate
-    if: needs.release-gate.outputs.release == 'true'
     runs-on: ubuntu-22.04
     environment: ${{ github.event.inputs.environment || 'production' }}
     permissions:
       contents: write
 
     outputs:
-      version_tag: ${{ steps.set-version-tag.outputs.version_tag }}
+      date_tag: ${{ steps.set-version-tag.outputs.date_tag }}
+      semver_tag: ${{ steps.set-version-tag.outputs.semver_tag }}
+      on_main: ${{ steps.on-main.outputs.on_main }}
 
     env:
       GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
@@ -78,28 +42,38 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set version tag
+      - name: Set version tags
         id: set-version-tag
         env:
           SEMVER_TAG: ${{ inputs.semver_tag }}
         run: |
-          if [[ -n "${SEMVER_TAG}" ]]; then
-            # The tag already exists and this run is at it, so everything below builds
-            # the tagged commit.
-            if [[ "${GITHUB_REF}" != "refs/tags/${SEMVER_TAG}" ]]; then
-              echo "Error: a semver release must be dispatched at its tag (--ref ${SEMVER_TAG}), not at ${GITHUB_REF}" >&2
-              exit 1
-            fi
-            VERSION_TAG="${SEMVER_TAG}"
-          else
-            VERSION_TAG=$(./scripts/version_tag)
+          # The semver tag already exists and this run is at it, so everything below builds
+          # the tagged commit.
+          if [[ -n "${SEMVER_TAG}" && "${GITHUB_REF}" != "refs/tags/${SEMVER_TAG}" ]]; then
+            echo "Error: a semver release must be dispatched at its tag (--ref ${SEMVER_TAG}), not at ${GITHUB_REF}" >&2
+            exit 1
           fi
-          echo "VERSION_TAG=${VERSION_TAG}" >> "${GITHUB_ENV}"
-          echo "version_tag=${VERSION_TAG}" >> "${GITHUB_OUTPUT}"
+          DATE_TAG=$(./scripts/version_tag)
+          echo "date_tag=${DATE_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "semver_tag=${SEMVER_TAG}" >> "${GITHUB_OUTPUT}"
 
-      # Skipped for a semver release: its tag already exists (the run is at it).
-      - name: Create tag
-        if: inputs.semver_tag == ''
+      # A release runs at a tag (or any branch), not at main, so check that the released
+      # commit is in main's history: main is that commit ("identical") or contains it plus
+      # newer commits ("ahead"). Only then may `latest` move.
+      - name: Check whether the commit is on main
+        id: on-main
+        run: |
+          status="$(gh api "repos/${GITHUB_REPOSITORY}/compare/$(git rev-parse HEAD)...main" --jq '.status')"
+          on_main=false
+          if [[ "${status}" == "ahead" || "${status}" == "identical" ]]; then
+            on_main=true
+          fi
+          echo "on_main=${on_main}" >> "${GITHUB_OUTPUT}"
+
+      # The date tag is the commit's, so a re-run finds it already there.
+      - name: Create date tag
+        env:
+          VERSION_TAG: ${{ steps.set-version-tag.outputs.date_tag }}
         run: |
           ./scripts/create_tag
 
@@ -119,7 +93,7 @@ jobs:
             runs-on: ubuntu-22.04-arm
 
     env:
-      VERSION_TAG: ${{ needs.set-version-tag.outputs.version_tag }}
+      VERSION_TAG: ${{ needs.set-version-tag.outputs.date_tag }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       TERRAT_UI_ANALYTICS: ${{ github.event.inputs.environment == 'production' && vars.TERRATEAM_POSTHOG_TOKEN || 'false' }}
       TERRATEAM_ENVIRONMENT: ${{ github.event.inputs.environment || 'production' }}
@@ -155,7 +129,10 @@ jobs:
           build-args: |
             BASE_IMAGE=${{ env.BASE_IMAGE }}
             GIT_SHA=${{ github.sha }}
-          tags: ghcr.io/terrateamio/${{ matrix.target }}:${{ env.VERSION_TAG }}-${{ matrix.arch }}
+          # The second line is empty on a terrat-only release; the action skips empty lines.
+          tags: |
+            ghcr.io/terrateamio/${{ matrix.target }}:${{ env.VERSION_TAG }}-${{ matrix.arch }}
+            ${{ needs.set-version-tag.outputs.semver_tag && format('ghcr.io/terrateamio/{0}:{1}-{2}', matrix.target, needs.set-version-tag.outputs.semver_tag, matrix.arch) || '' }}
 
       - name: Verify the shipped binary was built from this commit
         if: matrix.target == 'terrat-oss' || matrix.target == 'terrat-ee'
@@ -200,8 +177,13 @@ jobs:
 
   # No need for environment-scoped secret, hence no `environment:`, unlike the
   # terrat jobs; because this job publishes to this repo's package (not terrateamio).
+  # Skipped on a terrat-only release, which has no semver tag.
+  #
+  # No layer cache: a release runs at its tag, and a cache saved from a tag can only be
+  # restored by that same tag, so no later run could read it.
   build-stategraph:
     needs: set-version-tag
+    if: needs.set-version-tag.outputs.semver_tag != ''
     runs-on: ${{ matrix.runs-on }}
 
     strategy:
@@ -209,16 +191,12 @@ jobs:
         arch: [amd64, arm64]
         include:
           - arch: amd64
-            # This cache is read by the PR workflow too
             runs-on: ubuntu-22.04
-            cache-scope: stategraph-server-oss
           - arch: arm64
             runs-on: ubuntu-22.04-arm
-            cache-scope: stategraph-server-oss-arm64
 
     env:
-      VERSION_TAG: ${{ needs.set-version-tag.outputs.version_tag }}
-      IMAGE: ghcr.io/stategraph/stategraph-server-oss:${{ needs.set-version-tag.outputs.version_tag }}-${{ matrix.arch }}
+      IMAGE: ghcr.io/stategraph/stategraph-server-oss:${{ needs.set-version-tag.outputs.semver_tag }}-${{ matrix.arch }}
 
     permissions:
       contents: read
@@ -256,8 +234,6 @@ jobs:
             USERNAME=stategraph
             DEPLOYMENT_KIND=production
             OS_REFRESH=${{ env.OS_REFRESH }}
-          cache-from: type=gha,scope=${{ matrix.cache-scope }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.cache-scope }}
           tags: ${{ env.IMAGE }}
 
       # Runner arch matches matrix.arch, so this runs natively.
@@ -278,9 +254,12 @@ jobs:
     timeout-minutes: 240
 
     env:
-      VERSION_TAG: ${{ needs.set-version-tag.outputs.version_tag }}
-      IMAGE: ghcr.io/terrateamio/terrat-ee-fips:${{ needs.set-version-tag.outputs.version_tag }}
+      VERSION_TAG: ${{ needs.set-version-tag.outputs.date_tag }}
+      IMAGE: ghcr.io/terrateamio/terrat-ee-fips:${{ needs.set-version-tag.outputs.date_tag }}
+      SEMVER_TAG: ${{ needs.set-version-tag.outputs.semver_tag }}
+      SEMVER_IMAGE: ghcr.io/terrateamio/terrat-ee-fips:${{ needs.set-version-tag.outputs.semver_tag }}
       LATEST_IMAGE: ghcr.io/terrateamio/terrat-ee-fips:latest
+      ON_MAIN: ${{ needs.set-version-tag.outputs.on_main }}
       TERRATEAM_ENVIRONMENT: ${{ github.event.inputs.environment || 'production' }}
 
     permissions:
@@ -308,8 +287,11 @@ jobs:
         run: |
           set -euo pipefail
           tags=("${IMAGE}")
+          if [[ -n "${SEMVER_TAG}" ]]; then
+              tags+=("${SEMVER_IMAGE}")
+          fi
           if [[ "$(./scripts/is_latest_version_tag)" == "true" &&
-                "${GITHUB_REF}" == "refs/heads/main" &&
+                "${ON_MAIN}" == "true" &&
                 "${TERRATEAM_ENVIRONMENT}" == "production" ]]; then
               tags+=("${LATEST_IMAGE}")
           fi
@@ -328,8 +310,10 @@ jobs:
           target: terrat-ee-fips
           push: true
           provenance: false
-          cache-from: type=gha,scope=terrat-fips
-          cache-to: type=gha,mode=max,scope=terrat-fips
+          # A registry cache, not the GHA one: a release runs at its tag, and a GHA cache saved
+          # there could only be restored by that same tag.
+          cache-from: type=registry,ref=ghcr.io/terrateamio/terrat-ee-fips:buildcache
+          cache-to: type=registry,ref=ghcr.io/terrateamio/terrat-ee-fips:buildcache,mode=max,ignore-error=true
           build-args: |
             GIT_SHA=${{ github.sha }}
           tags: ${{ steps.tags.outputs.tags }}
@@ -380,6 +364,8 @@ jobs:
 
   create-multi-arch-manifest:
     needs: [set-version-tag, build, build-stategraph]
+    # Also runs on a terrat-only release, where build-stategraph is skipped.
+    if: ${{ !cancelled() && needs.build.result == 'success' && contains(fromJSON('["success", "skipped"]'), needs.build-stategraph.result) }}
     runs-on: ubuntu-22.04
     environment: ${{ github.event.inputs.environment || 'production' }}
 
@@ -388,24 +374,14 @@ jobs:
       contents: read
       packages: write
 
-    outputs:
-      is_latest_version_tag: ${{ steps.is-latest-version-tag.outputs.is_latest_version_tag }}
-
     env:
-      VERSION_TAG: ${{ needs.set-version-tag.outputs.version_tag }}
-      GITHUB_REF: ${{ github.ref }}
+      # Only a commit on main moves `latest`
+      PUSH_LATEST: ${{ needs.set-version-tag.outputs.on_main }}
       TERRATEAM_ENVIRONMENT: ${{ github.event.inputs.environment || 'production' }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Set is latest version tag
-        id: is-latest-version-tag
-        run: |
-          is_latest_version_tag="$(./scripts/is_latest_version_tag)"
-          echo "IS_LATEST_VERSION_TAG=${is_latest_version_tag}" >> "${GITHUB_ENV}"
-          echo "is_latest_version_tag=${is_latest_version_tag}" >> "${GITHUB_OUTPUT}"
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
@@ -417,13 +393,25 @@ jobs:
           username: x-access-token
           password: ${{ secrets.TERRATEAMIO_PACKAGES_TOKEN }}
 
+      # Under the date tag, then the semver tag. Both are built from the same per-arch images,
+      # so they share a digest. Only the date tag decides `latest`.
       - name: Create and push multi-arch manifest
+        env:
+          VERSION_TAG: ${{ needs.set-version-tag.outputs.date_tag }}
+          SEMVER_TAG: ${{ needs.set-version-tag.outputs.semver_tag }}
         run: |
+          IS_LATEST_VERSION_TAG="$(./scripts/is_latest_version_tag)"
+          export IS_LATEST_VERSION_TAG
           ./scripts/create_manifest terrat-ee terrat-oss ttm
+          if [[ -n "${SEMVER_TAG}" ]]; then
+            VERSION_TAG="${SEMVER_TAG}" IS_LATEST_VERSION_TAG=false \
+              ./scripts/create_manifest terrat-ee terrat-oss ttm
+          fi
 
       # The stategraph org takes this repository's GITHUB_TOKEN, not the terrateamio
       # token. This login replaces the one above for ghcr.io, hence it comes last.
       - name: Log in to GitHub Container Registry (stategraph)
+        if: needs.set-version-tag.outputs.semver_tag != ''
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -431,14 +419,23 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create and push multi-arch manifest (stategraph)
+        if: needs.set-version-tag.outputs.semver_tag != ''
+        env:
+          VERSION_TAG: ${{ needs.set-version-tag.outputs.semver_tag }}
         run: |
+          IS_LATEST_VERSION_TAG="$(./scripts/is_latest_version_tag)"
+          export IS_LATEST_VERSION_TAG
           ./scripts/create_manifest --org stategraph stategraph-server-oss
 
   # Runs after both builds and their checks, so an image that fails them
-  # carries no signature. The version tag and `latest` share a digest, so
-  # both verify.
+  # carries no signature. The date tag, the semver tag and `latest` share a
+  # digest, so all of them verify.
   sign-images:
     needs: [set-version-tag, create-multi-arch-manifest, build-fips]
+    # The explicit condition is for a terrat-only release: build-stategraph is skipped there,
+    # and a skipped job skips every job downstream of it unless the job's condition says
+    # otherwise.
+    if: ${{ !cancelled() && needs.create-multi-arch-manifest.result == 'success' && needs.build-fips.result == 'success' }}
     runs-on: ubuntu-22.04
     environment: ${{ github.event.inputs.environment || 'production' }}
 
@@ -453,7 +450,7 @@ jobs:
       id-token: write
 
     env:
-      VERSION_TAG: ${{ needs.set-version-tag.outputs.version_tag }}
+      VERSION_TAG: ${{ needs.set-version-tag.outputs.date_tag }}
       IMAGE_REF: ghcr.io/terrateamio/${{ matrix.image }}
 
     steps:
@@ -500,15 +497,19 @@ jobs:
               --predicate "${RUNNER_TEMP}/sbom.spdx.json" "${IMAGE_REF}@${REF}"
           done
 
+  # One GitHub release per run: under the semver tag, or under the date tag for a terrat-only release.
   release-notify:
     needs: [set-version-tag, create-multi-arch-manifest]
+    # Explicit for a terrat-only release, as on sign-images.
+    if: ${{ !cancelled() && needs.create-multi-arch-manifest.result == 'success' }}
     runs-on: ubuntu-22.04
     environment: ${{ github.event.inputs.environment || 'production' }}
     permissions:
       contents: write
 
     env:
-      VERSION_TAG: ${{ needs.set-version-tag.outputs.version_tag }}
+      VERSION_TAG: ${{ needs.set-version-tag.outputs.semver_tag || needs.set-version-tag.outputs.date_tag }}
+      TERRAT_IMAGE_TAG: ${{ needs.set-version-tag.outputs.date_tag }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       TERRATEAM_ENVIRONMENT: ${{ github.event.inputs.environment || 'production' }}

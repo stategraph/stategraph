@@ -28,15 +28,14 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Same key as release.yml (the ISO week), so this build reuses the
-      # release's cached `apk upgrade` layer from the same week.
+      # Key is the ISO week, so a cached `apk upgrade` layer is at most a week old.
       - name: Set the OS refresh key
         run: |
           echo "OS_REFRESH=$(date -u +%G-W%V)" >> "$GITHUB_ENV"
 
       # Keep the build-args in sync with the build-stategraph job in release.yml,
-      # which publishes this image. Releases from main write the amd64 cache scope
-      # read here.
+      # which publishes this image. The cache read here is this PR's own: releases
+      # keep no cache (see release.yml).
       - name: Build the OSS server image
         uses: docker/build-push-action@v6
         with:
