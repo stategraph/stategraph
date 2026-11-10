@@ -5,12 +5,6 @@ on:
     branches:
       - "main"
   workflow_dispatch:
-    inputs:
-      build_base_image:
-        description: 'Build base image'
-        required: false
-        default: false
-        type: boolean
 
 env:
   REGISTRY: ghcr.io
@@ -25,7 +19,7 @@ jobs:
   format-check:
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-22.04
+    runs-on: depot-ubuntu-24.04
     permissions:
       contents: read
       packages: read
@@ -63,12 +57,16 @@ jobs:
   # contexts the ruleset requires, which leaves the PR blocked just as the old
   # `paths-ignore` did. So the job runs and each step opts out instead; the
   # six checks are reported and pass in seconds for docs-only changes.
+  #
+  # The image is built on a Depot builder of its platform, not on the runner, so
+  # both arches run on the same (amd64) runner.
   build-test:
     needs: changes
-    runs-on: ${{ matrix.runs-on }}
+    runs-on: depot-ubuntu-24.04
     permissions:
       contents: read
       packages: write
+      id-token: write
     strategy:
       matrix:
         target:
@@ -80,10 +78,8 @@ jobs:
           - arm64
         include:
           - arch: amd64
-            runs-on: ubuntu-22.04
             platform: linux/amd64
           - arch: arm64
-            runs-on: ubuntu-22.04-arm
             platform: linux/arm64
 
     steps:
@@ -118,32 +114,32 @@ jobs:
           fi
           echo "branch=${BRANCH_NAME}-${SHORT_SHA}" >> $GITHUB_OUTPUT
 
-      - name: Set base image
-        if: ${{ needs.changes.outputs.code == 'true' && ! inputs.build_base_image }}
-        run: |
-          ./scripts/base_image >> $GITHUB_ENV
+      - name: Set up Depot CLI
+        if: needs.changes.outputs.code == 'true'
+        uses: depot/setup-action@v1
 
-      - name: Build and push ${{ matrix.target }} with BASE_IMAGE
-        if: ${{ needs.changes.outputs.code == 'true' && ! inputs.build_base_image }}
-        uses: docker/build-push-action@v6
+      # Built from docker/stategraph/Dockerfile, the source of truth for the terrat images,
+      # on Depot's builders, in the repository's own Depot project.
+      # The Dockerfile builds its own opam switch, and
+      # the builders keep the layer cache and its dune cache mount between runs, so
+      # no prebuilt base image is needed. Build args as in stategraph.yml; GIT_SHA
+      # stamps the terrat binaries. provenance: false keeps the image a plain
+      # manifest, as before.
+      - name: Build and push ${{ matrix.target }}
+        if: needs.changes.outputs.code == 'true'
+        uses: depot/build-push-action@v1
         with:
+          project: ${{ vars.DEPOT_PROJECT_ID }}
+          provenance: false
           context: .
-          file: docker/terrat/Dockerfile
+          file: docker/stategraph/Dockerfile
           target: ${{ matrix.target }}
           build-args: |
-            BASE_IMAGE=${{ env.BASE_IMAGE }}
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.target }}-dev:${{ steps.date.outputs.date }}-${{ steps.branch.outputs.branch }}-${{ matrix.arch }}
-          platforms: ${{ matrix.platform }}
-
-      - name: Build and push ${{ matrix.target }} without BASE_IMAGE
-        if: ${{ needs.changes.outputs.code == 'true' && inputs.build_base_image }}
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/terrat/Dockerfile
-          target: ${{ matrix.target }}
+            UID=1000
+            GID=1000
+            USERNAME=stategraph
+            DEPLOYMENT_KIND=production
+            GIT_SHA=${{ github.sha }}
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.target }}-dev:${{ steps.date.outputs.date }}-${{ steps.branch.outputs.branch }}-${{ matrix.arch }}
