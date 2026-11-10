@@ -18,10 +18,13 @@ jobs:
 
   # NOTE: this job must always RUN, never be skipped with a job-level `if:`.
   # A matrix job skipped by `if:` is not expanded — GitHub reports a single
-  # check named "build-test" instead of the six "build-test (target, arch)"
+  # check named "build-test" instead of the eight "build-test (target, arch)"
   # contexts the ruleset requires, which leaves the PR blocked just as the old
   # `paths-ignore` did. So the job runs and each step opts out instead; the
-  # six checks are reported and pass in seconds for docs-only changes.
+  # eight checks are reported and pass in seconds for docs-only changes.
+  #
+  # The targets are the images release.yml publishes, so a PR builds each of them
+  # on both arches before a release does.
   #
   # The image is built on a Depot builder of its platform, not on the runner, so
   # both arches run on the same (amd64) runner.
@@ -38,6 +41,7 @@ jobs:
           - terrat-ee
           - terrat-oss
           - ttm
+          - stategraph-server-oss
         arch:
           - amd64
           - arm64
@@ -83,13 +87,21 @@ jobs:
         if: needs.changes.outputs.code == 'true'
         uses: depot/setup-action@v1
 
+      # Same key as the build job of release.yml (the ISO week), so that a release
+      # reuses the runtime stages' `apk upgrade` layer the PR builds of its week left
+      # in the shared Depot cache.
+      - name: Set the OS refresh key
+        if: needs.changes.outputs.code == 'true'
+        run: |
+          echo "OS_REFRESH=$(date -u +%G-W%V)" >> "$GITHUB_ENV"
+
       # Built from docker/stategraph/Dockerfile, the source of truth for the terrat images,
       # on Depot's builders, in the repository's own Depot project.
       # The Dockerfile builds its own opam switch, and
       # the builders keep the layer cache and its dune cache mount between runs, so
-      # no prebuilt base image is needed. Build args as in stategraph.yml; GIT_SHA
-      # stamps the terrat binaries. provenance: false keeps the image a plain
-      # manifest, as before.
+      # no prebuilt base image is needed. Keep the build args in sync with the build
+      # job of release.yml, which publishes these images; GIT_SHA stamps the terrat
+      # binaries. provenance: false keeps the image a plain manifest, as before.
       - name: Build and push ${{ matrix.target }}
         if: needs.changes.outputs.code == 'true'
         uses: depot/build-push-action@v1
@@ -104,6 +116,7 @@ jobs:
             GID=1000
             USERNAME=stategraph
             DEPLOYMENT_KIND=production
+            OS_REFRESH=${{ env.OS_REFRESH }}
             GIT_SHA=${{ github.sha }}
           push: true
           tags: |
