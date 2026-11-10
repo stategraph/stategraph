@@ -34,7 +34,7 @@ jobs:
         run: |
           echo "OS_REFRESH=$(date -u +%G-W%V)" >> "$GITHUB_ENV"
 
-      # Keep the build-args in sync with the build-stategraph job in release.yml,
+      # Keep the build-args in sync with the build job in release.yml,
       # which publishes this image. Built on Depot's builders, in the repository's
       # own Depot project, whose layer cache persists across runs.
       - name: Build the OSS server image
