@@ -196,3 +196,68 @@ begin
     return data;
 end
 $$;
+
+-- Whether an hcl [data] array is a [variable] block that declares
+-- [sensitive = true].
+create or replace function pg_temp.hcl_variable_is_sensitive(data jsonb)
+returns boolean
+language plpgsql
+immutable
+as $$
+declare
+    attr jsonb;
+begin
+    if coalesce(jsonb_typeof(data), '') <> 'array'
+       or coalesce(data -> 0 ->> 'type', '') <> 'variable'
+       or coalesce(jsonb_typeof(data -> 0 -> 'attrs'), '') <> 'array' then
+        return false;
+    end if;
+    for attr in select * from jsonb_array_elements(data -> 0 -> 'attrs') loop
+        if attr -> 'sensitive' = 'true'::jsonb then
+            return true;
+        end if;
+    end loop;
+    return false;
+end
+$$;
+
+-- Replace the [default] of a sensitive [variable] block in an hcl [data] array
+-- with '__SENSITIVE__'.  Every other block passes through untouched.
+create or replace function pg_temp.mask_hcl_variable_default(data jsonb)
+returns jsonb
+language plpgsql
+immutable
+as $$
+declare
+    attrs jsonb := '[]'::jsonb;
+    attr jsonb;
+begin
+    if not pg_temp.hcl_variable_is_sensitive(data) then
+        return data;
+    end if;
+    for attr in select * from jsonb_array_elements(data -> 0 -> 'attrs') loop
+        if attr ? 'default' then
+            attrs := attrs || jsonb_build_array(jsonb_build_object('default', '__SENSITIVE__'));
+        else
+            attrs := attrs || jsonb_build_array(attr);
+        end if;
+    end loop;
+    return jsonb_set(data, '{0,attrs}', attrs, false);
+end
+$$;
+
+-- Mask the [default] of a sensitive [variable] block in the [data] of an
+-- [hcl_set] transaction_logs row.
+create or replace function pg_temp.mask_hcl_set_data(data jsonb)
+returns jsonb
+language plpgsql
+immutable
+as $$
+begin
+    if data is null or jsonb_typeof(data) <> 'object'
+       or not pg_temp.hcl_variable_is_sensitive(data -> 'data') then
+        return data;
+    end if;
+    return jsonb_set(data, '{data}', pg_temp.mask_hcl_variable_default(data -> 'data'), false);
+end
+$$;

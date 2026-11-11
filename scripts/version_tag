@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euf -o pipefail
 
-VERSION_TAG=$(date +'%Y%m%d-%H%M')-$(git rev-parse --short HEAD)
+# The commit time (UTC), not the current time, so the same commit always gets the same tag
+# and re-running a release finds its tag already there.
+COMMIT_TIME=$(TZ=UTC git show -s --format=%cd --date=format-local:'%Y%m%d-%H%M' HEAD)
+VERSION_TAG=${COMMIT_TIME}-$(git rev-parse --short HEAD)
 
 echo "${VERSION_TAG}"

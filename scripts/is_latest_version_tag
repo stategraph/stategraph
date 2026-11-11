@@ -4,7 +4,16 @@ set -euf -o pipefail
 # Validate required environment variables
 : "${VERSION_TAG:?VERSION_TAG is required}"
 
+# A semver prerelease (1.2.3-rc.1) is never the latest, and does not keep a later stable
+# release from being it. Date tags (YYYYMMDD-HHMM-<sha>) do not match: no dots.
+PRERELEASE='^[0-9]+\.[0-9]+\.[0-9]+-'
+
+if [[ "${VERSION_TAG}" =~ ${PRERELEASE} ]]; then
+  echo "false"
+  exit 0
+fi
+
 # The latest tag of VERSION_TAG's kind
-LATEST_TAG="$("$(git rev-parse --show-toplevel)/scripts/release_tags" | tail -n1)"
+LATEST_TAG="$("$(git rev-parse --show-toplevel)/scripts/release_tags" | { grep -vE "${PRERELEASE}" || true; } | tail -n1)"
 
 ([[ "${LATEST_TAG}" == "${VERSION_TAG}" ]] && echo "true") || echo "false"

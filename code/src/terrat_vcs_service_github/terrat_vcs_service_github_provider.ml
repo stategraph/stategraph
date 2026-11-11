@@ -6238,6 +6238,24 @@ module Work_manifest = struct
         repo = Api.Repo.name repo;
       }
 
+  (* The title inputs the workflow file declares on the branch the dispatch runs.  A file that
+     cannot be read or parsed declares none, so the dispatch carries no title input. *)
+  let declared_dispatch_inputs ~request_id client repo branch path =
+    let open Abb.Future.Infix_monad in
+    Api.fetch_file ~request_id client repo (Api.Ref.of_string branch) path
+    >>| function
+    | Ok (Some content) -> (
+        match Jsonu.of_yaml_string content with
+        | Ok json -> Terrat_github.Dispatch_inputs.declared json
+        | Error (`Yaml_decode_err err) ->
+            Logs.info (fun m ->
+                m "%s : DISPATCH_INPUTS : YAML_DECODE_ERR : path=%s : %s" request_id path err);
+            [])
+    | Ok None -> []
+    | Error _ ->
+        Logs.info (fun m -> m "%s : DISPATCH_INPUTS : FETCH_ERR : path=%s" request_id path);
+        []
+
   let run ~request_id ~compute_node_id config client work_manifest =
     let module Wm = Terrat_work_manifest3 in
     let get_repo = function
@@ -6266,8 +6284,10 @@ module Work_manifest = struct
         ~repo:(Api.Repo.name repo)
         (Api.Client.to_native client)
       >>= function
-      | Some workflow_id -> (
+      | Some (workflow_id, workflow_path) -> (
           let open Abb.Future.Infix_monad in
+          declared_dispatch_inputs ~request_id client repo branch workflow_path
+          >>= fun dispatch_inputs ->
           let dispatch () =
             Terrat_github.call
               (Api.Client.to_native client)
@@ -6284,12 +6304,17 @@ module Work_manifest = struct
                               return_run_details = None;
                               inputs =
                                 Some
-                                  (let dynamic_title_items =
-                                     Terrat_config.Github.action_dynamic_title github_config
-                                   in
-                                   let dynamic_inputs =
+                                  (let dynamic_inputs =
                                      CCList.filter_map
                                        (function
+                                         | `Dirspaces ->
+                                             Some
+                                               ( "dirspaces",
+                                                 `String
+                                                   (Terrat_github.Dispatch_inputs.dirspaces
+                                                      (CCList.map
+                                                         Terrat_change.Dirspaceflow.to_dirspace
+                                                         work_manifest.Wm.changes)) )
                                          | `Run_kind ->
                                              let kind =
                                                match work_manifest.Wm.target with
@@ -6317,7 +6342,7 @@ module Work_manifest = struct
                                                      `String
                                                        (Int.to_string (Api.Pull_request.id pr)) )
                                              | Terrat_vcs_provider2.Target.Drift _ -> None))
-                                       dynamic_title_items
+                                       dispatch_inputs
                                    in
                                    Inputs.
                                      {

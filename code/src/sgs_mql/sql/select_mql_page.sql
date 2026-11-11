@@ -232,6 +232,31 @@ transaction_logs as not materialized (
       then pg_temp.mask_tx_log_data(txl.object_type, txl.data)
       when txl.action = 'tfvar_ephemeral'
       then pg_temp.mask_tfvar_ephemeral_data(txl.data)
+      -- SECURITY: the value of a root variable declared [sensitive = true], by
+      -- its committed declaration or by one staged in the same transaction.
+      when txl.action = 'tfvar_set'
+           and (
+             exists (
+               select 1
+               from hcl as hv
+               where hv.state_id = txl.state_id
+                 and hv.module_address = ''
+                 and hv.fq_address = txl.data ->> 'var_address'
+                 and pg_temp.hcl_variable_is_sensitive(hv.data)
+             )
+             or exists (
+               select 1
+               from transaction_logs as hl
+               where hl.tx_id = txl.tx_id
+                 and hl.action = 'hcl_set'
+                 and hl.data ->> 'module' = ''
+                 and hl.data ->> 'fq_address' = txl.data ->> 'var_address'
+                 and pg_temp.hcl_variable_is_sensitive(hl.data -> 'data')
+             )
+           )
+      then pg_temp.mask_tfvar_ephemeral_data(txl.data)
+      when txl.action = 'hcl_set' and txl.data -> 'data' -> 0 ->> 'type' = 'variable'
+      then pg_temp.mask_hcl_set_data(txl.data)
       else txl.data
     end as data,
     txl.id as id,
@@ -247,7 +272,12 @@ hcl as not materialized (
   select
     h.fq_address as fq_address,
     h.created_at as created_at,
-    h.data as data,
+    -- SECURITY: the default of a variable declared [sensitive = true].
+    case
+      when h.data -> 0 ->> 'type' = 'variable'
+      then pg_temp.mask_hcl_variable_default(h.data)
+      else h.data
+    end as data,
     h.file_refs as file_refs,
     hh.expanded as hints,
     h.id as id,
@@ -320,7 +350,12 @@ tf_module_hcl as not materialized (
     tmh.version as version,
     tmh.id as id,
     tmh.fq_address as fq_address,
-    tmh.data as data,
+    -- SECURITY: the default of a variable declared [sensitive = true].
+    case
+      when tmh.data -> 0 ->> 'type' = 'variable'
+      then pg_temp.mask_hcl_variable_default(tmh.data)
+      else tmh.data
+    end as data,
     tmh.refs as refs,
     tmh.path_attrs as path_attrs,
     tmh.created_at as created_at,
@@ -480,7 +515,20 @@ tfvars as not materialized (
     tv.id as id,
     tv.var_address as var_address,
     tv.file as file,
-    tv.data as data
+    -- SECURITY: the value of a variable declared [sensitive = true]. [hcl] is
+    -- the scoped CTE above, whose [data] keeps the [sensitive] attribute.
+    case
+      when exists (
+        select 1
+        from hcl as hv
+        where hv.state_id = tv.state_id
+          and hv.module_address = ''
+          and hv.fq_address = tv.var_address
+          and pg_temp.hcl_variable_is_sensitive(hv.data)
+      )
+      then to_jsonb('__SENSITIVE__'::text)
+      else tv.data
+    end as data
   from tfvars as tv
   inner join states as s
     on s.id = tv.state_id

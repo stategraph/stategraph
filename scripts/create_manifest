@@ -25,10 +25,9 @@ if [[ $# -lt 1 ]]; then
   exit 1
 fi
 
-# Check if the current GitHub ref and environment allow pushing the "latest" tag
-PUSH_LATEST=false
-if [[ "${GITHUB_REF}" == "refs/heads/main" && "${TERRATEAM_ENVIRONMENT}" == "production" ]]; then
-  PUSH_LATEST=true
+# "latest" is pushed only when the caller asks for it (PUSH_LATEST), and only for production.
+if [[ "${PUSH_LATEST:-false}" != "true" || "${TERRATEAM_ENVIRONMENT}" != "production" ]]; then
+  PUSH_LATEST=false
 fi
 
 # Iterate over each image name provided as an argument
@@ -43,7 +42,7 @@ for IMAGE_NAME in "$@"; do
     "${IMAGE}:${VERSION_TAG}-arm64"
 
   # Optionally create and push the "latest" tag if conditions are met
-  if [[ "${IS_LATEST_VERSION_TAG:-false}" == "true" && "${PUSH_LATEST}" == "true" && "${IMAGE_NAME}" != "terrat-base" ]]; then
+  if [[ "${IS_LATEST_VERSION_TAG:-false}" == "true" && "${PUSH_LATEST}" == "true" ]]; then
     echo "Creating and pushing the 'latest' multi-architecture tag for ${IMAGE}..."
     docker buildx imagetools create \
       --tag "${IMAGE}:latest" \

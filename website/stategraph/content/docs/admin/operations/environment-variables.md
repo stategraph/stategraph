@@ -106,7 +106,6 @@ A missing or invalid sign-in variable stops the server at start, with the reason
 | `TERRAT_DEFAULT_TIER` | `unlimited` | Default tier of a new installation |
 | `TERRAT_EVENT_EVALUATOR_SLOTS` | `20` | Concurrent event evaluations |
 | `TERRAT_STATEMENT_TIMEOUT` | `5s` | Statement timeout for the Orchestration database |
-| `GITHUB_ACTION_DYNAMIC_TITLE` | unset | Comma-separated fields for the dynamic title of Orchestration GitHub Actions runs: `pr_title`, `pr_number`, `run_kind`, `run_type` |
 | `GITHUB_WORKFLOW_PATH_OVERRIDE` | unset | Path of the GitHub Actions workflow file that Orchestration dispatches, in place of the default |
 | `TERRATUNNEL_API_ENDPOINT` | unset | Development only: `TERRAT_API_BASE` comes from a tunnel |
 | `INFRACOST_PRICING_API_ENDPOINT` / `SELF_HOSTED_INFRACOST_API_KEY` | empty | Infracost pricing API endpoint and key, for cost estimation in pull requests. See [Cost estimation in pull requests](/docs/orchestration/external-tools/infracost) |

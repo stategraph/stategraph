@@ -1,15 +1,6 @@
 module Github : sig
-  type action_dynamic_title_item =
-    [ `Pr_title
-    | `Pr_number
-    | `Run_kind
-    | `Run_type
-    ]
-  [@@deriving show]
-
   type t [@@deriving show]
 
-  val action_dynamic_title : t -> action_dynamic_title_item list
   val api_base_url : t -> Uri.t
   val app_client_id : t -> string
   val app_client_secret : t -> string

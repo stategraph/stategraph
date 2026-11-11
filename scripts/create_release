@@ -53,6 +53,12 @@ if [[ "$HTTP_STATUS" -eq 404 ]]; then
     exit 1
   fi
 
+  # The terrat images of a semver release also carry the commit's date tag
+  if [[ -n "${TERRAT_IMAGE_TAG:-}" && "${TERRAT_IMAGE_TAG}" != "${VERSION_TAG}" ]]; then
+    printf "\n**Terrateam images** (terrat-oss, terrat-ee, terrat-ee-fips, ttm) are also tagged \`%s\`\n" \
+      "${TERRAT_IMAGE_TAG}" >> "${NOTES_FILE}"
+  fi
+
   if ! gh release create "${VERSION_TAG}" \
     --title "Release ${VERSION_TAG}" \
     --notes-file "${NOTES_FILE}" \

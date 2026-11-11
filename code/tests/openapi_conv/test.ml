@@ -12,19 +12,19 @@ let with_output_dir f =
   Unix.mkdir dir 0o700;
   Fun.protect ~finally:(fun () -> remove_dir dir) (fun () -> f dir)
 
-let convert ~input_file ~output_dir =
+let convert ~input_file ~output_name ~output_dir =
   Openapi_conv.convert
     ~strict_records:false
     ~search_path:[]
     ~file_link:[]
     ~input_file
-    ~output_name:"enum_api"
+    ~output_name
     ~output_dir
 
 let test_integer_query_enums =
   Oth.test ~name:"Integer query enums are constrained" (fun _ ->
       with_output_dir (fun dir ->
-          convert ~input_file:"integer_enum.json" ~output_dir:dir;
+          convert ~input_file:"integer_enum.json" ~output_name:"enum_api" ~output_dir:dir;
           let generated = read_file (Filename.concat dir "enum_api_enum.ml") CCIO.read_all in
           Oth.Assert.str_contains_all
             ~haystack:generated
@@ -45,7 +45,10 @@ let test_unsupported_default_fails_generation =
       with_output_dir (fun dir ->
           let failure =
             try
-              convert ~input_file:"unsupported_array_default.json" ~output_dir:dir;
+              convert
+                ~input_file:"unsupported_array_default.json"
+                ~output_name:"enum_api"
+                ~output_dir:dir;
               None
             with Failure message -> Some message
           in
@@ -56,7 +59,7 @@ let test_unsupported_default_fails_generation =
 let test_required_param_default_is_not_generated =
   Oth.test ~name:"The default of a required query parameter is not generated" (fun _ ->
       with_output_dir (fun dir ->
-          convert ~input_file:"required_array_default.json" ~output_dir:dir;
+          convert ~input_file:"required_array_default.json" ~output_name:"enum_api" ~output_dir:dir;
           let generated = read_file (Filename.concat dir "enum_api_array.ml") CCIO.read_all in
           Oth.Assert.str_contains
             ~haystack:generated
@@ -108,22 +111,50 @@ let test_nullable_query_param_default =
         ~actual:(environment "/alerts?environment=prod"))
 
 (* The test runs in _build/default/code/tests/openapi_conv, five directories below the root of the
-   repository, so [query_params.expected] is reached in the source tree. Regenerate it after an
-   intended change to the generator with:
-
-     OTH_CREATE_EXPECTED_FILES=1 dune test code/tests/openapi_conv *)
-let expected_query_params =
+   repository, so [file] is reached in the source tree. *)
+let source_file file =
   CCList.fold_left
     Filename.concat
     (Filename.dirname Sys.executable_name)
-    [ ".."; ".."; ".."; ".."; ".."; "code"; "tests"; "openapi_conv"; "query_params.expected" ]
+    [ ".."; ".."; ".."; ".."; ".."; "code"; "tests"; "openapi_conv"; file ]
+
+(* The converter generates, from [input_file], exactly the committed fixture API [files]. Regenerate
+   them after an intended change to the converter with:
+
+     OTH_CREATE_EXPECTED_FILES=1 dune test code/tests/openapi_conv *)
+let test_fixture_api_golden ~name ~input_file ~output_name ~files =
+  Oth.test ~name (fun _ ->
+      with_output_dir (fun dir ->
+          convert ~input_file ~output_name ~output_dir:dir;
+          Oth.Assert.Eq.string_list
+            ~expected:files
+            ~actual:(CCList.sort CCString.compare (CCArray.to_list (Sys.readdir dir)));
+          CCList.iter
+            (fun file ->
+              Oth.Diff.check
+                ~tmp_dir_name:"openapi_conv"
+                ~expected_file_path:(source_file file)
+                ~actual_content:(read_file (Filename.concat dir file) CCIO.read_all))
+            files))
+
+let test_routes_golden =
+  test_fixture_api_golden
+    ~name:"The generated code of the routes is unchanged"
+    ~input_file:"routes.json"
+    ~output_name:"routes_api"
+    ~files:[ "routes_api_alerts.ml"; "routes_api_components.ml" ]
 
 let test_query_params_golden =
-  Oth.test ~name:"The generated code of each query parameter shape is unchanged" (fun _ ->
-      Oth.Diff.check
-        ~tmp_dir_name:"openapi_conv"
-        ~expected_file_path:expected_query_params
-        ~actual_content:(read_file "query_params_api_params.ml" CCIO.read_all))
+  test_fixture_api_golden
+    ~name:"The generated code of each query parameter shape is unchanged"
+    ~input_file:"query_params.json"
+    ~output_name:"query_params_api"
+    ~files:
+      [
+        "query_params_api_components.ml";
+        "query_params_api_components_shade.ml";
+        "query_params_api_params.ml";
+      ]
 
 let () =
   Oth.run
@@ -138,5 +169,6 @@ let () =
           test_required_param_default_is_not_generated;
           test_one_of_query_params;
           test_nullable_query_param_default;
+          test_routes_golden;
           test_query_params_golden;
         ])

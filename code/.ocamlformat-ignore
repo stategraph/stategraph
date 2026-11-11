@@ -1,2 +1,4 @@
 # cppo-preprocessed files ocamlformat cannot parse
 src/abb_fut/abb_fut.ml
+# Committed converter output, compared byte for byte by the golden tests of code/tests/openapi_conv
+tests/openapi_conv/*_api_*.ml

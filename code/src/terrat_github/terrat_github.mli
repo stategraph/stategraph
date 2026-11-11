@@ -343,6 +343,30 @@ module Workflow : sig
   val select : ?override_path:string -> ('a * string * string) list -> ('a * string * string) option
 end
 
+(** The optional inputs of a dispatch, which a workflow uses in its [run-name] to say what a run
+    does. GitHub refuses a dispatch that carries an input the workflow does not declare, thus a
+    field goes out only when the workflow declares it. *)
+module Dispatch_inputs : sig
+  type field =
+    [ `Dirspaces
+    | `Pr_number
+    | `Pr_title
+    | `Run_kind
+    | `Run_type
+    ]
+
+  (** The input name of [field]. *)
+  val name : field -> string
+
+  (** The fields a workflow file, decoded from YAML, declares under [on.workflow_dispatch.inputs].
+      Empty when it declares none of them. *)
+  val declared : Yojson.Safe.t -> field list
+
+  (** The [dirspaces] value: each directory, with [:workspace] after it when the workspace is not
+      [default], joined by [", "]. Past [limit] dirspaces the rest is counted as [" +N more"]. *)
+  val dirspaces : ?limit:int -> Terrat_dirspace.t list -> string
+end
+
 (** The path of the first [Workflow.known] file present on [ref_], fetched in [known] order. *)
 val find_known_workflow_file :
   owner:string ->
@@ -357,12 +381,13 @@ val find_workflow_file :
   Githubc2_abb.t ->
   (string option, [> get_installation_access_token_err ]) result Abb.Future.t
 
+(** The id and the path of the workflow the engine dispatches. *)
 val load_workflow :
   ?override_path:string ->
   owner:string ->
   repo:string ->
   Githubc2_abb.t ->
-  (int option, [> get_installation_access_token_err ]) result Abb.Future.t
+  ((int * string) option, [> get_installation_access_token_err ]) result Abb.Future.t
 
 val list_workflows :
   owner:string ->

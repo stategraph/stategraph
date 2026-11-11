@@ -159,6 +159,78 @@ let test_workflow_override_path =
         (selected ~override_path:".github/workflows/custom.yml" [ stategraph; terrateam ]);
       ())
 
+module Di = Terrat_github.Dispatch_inputs
+
+let declared_of_yaml yaml =
+  match Jsonu.of_yaml_string yaml with
+  | Ok json -> CCList.map Di.name (Di.declared json)
+  | Error (`Yaml_decode_err err) -> Oth.Assert.false_ ("yaml did not decode: " ^ err)
+
+let assert_names ~expected actual =
+  Oth.Assert.true_
+    ~fail_msg:(Printf.sprintf "got [%s]" (CCString.concat "; " actual))
+    (CCList.equal CCString.equal expected actual)
+
+let workflow_with_inputs =
+  {|name: 'Terrateam Workflow'
+run-name: '${{ inputs.run-type }} ${{ inputs.dirspaces }}'
+on:
+  workflow_dispatch:
+    inputs:
+      work-token:
+        required: true
+      api-base-url:
+        description: 'API Base URL'
+      run-type:
+        default: ''
+      dirspaces:
+        default: ''
+jobs:
+  terrateam:
+    runs-on: ubuntu-latest
+    steps: []
+|}
+
+let test_declared_reads_dispatch_inputs =
+  Oth.test ~name:"declared reads the title inputs of workflow_dispatch" (fun _ ->
+      assert_names ~expected:[ "run-type"; "dirspaces" ] (declared_of_yaml workflow_with_inputs);
+      ())
+
+let test_declared_without_inputs =
+  Oth.test ~name:"declared is empty without workflow_dispatch inputs" (fun _ ->
+      assert_names ~expected:[] (declared_of_yaml "on: workflow_dispatch\njobs: {}\n");
+      assert_names ~expected:[] (declared_of_yaml "on: [push, workflow_dispatch]\njobs: {}\n");
+      assert_names ~expected:[] (declared_of_yaml "on:\n  workflow_dispatch:\njobs: {}\n");
+      assert_names ~expected:[] (declared_of_yaml "name: x\njobs: {}\n");
+      ())
+
+let test_declared_ignores_other_inputs =
+  Oth.test ~name:"declared ignores inputs that are not title inputs" (fun _ ->
+      assert_names
+        ~expected:[]
+        (declared_of_yaml
+           "on:\n\
+           \  workflow_dispatch:\n\
+           \    inputs:\n\
+           \      work-token:\n\
+           \      environment:\n\
+            jobs: {}\n");
+      ())
+
+let dirspace ?(workspace = "default") dir = { Terrat_dirspace.dir; workspace }
+
+let test_dirspaces_format =
+  Oth.test ~name:"dirspaces names dirs, non-default workspaces and the rest" (fun _ ->
+      assert_names ~expected:[ "" ] [ Di.dirspaces [] ];
+      assert_names
+        ~expected:[ "dev/app, prod/app:blue" ]
+        [ Di.dirspaces [ dirspace "dev/app"; dirspace ~workspace:"blue" "prod/app" ] ];
+      assert_names
+        ~expected:[ "a, b, c +2 more" ]
+        [ Di.dirspaces (CCList.map dirspace [ "a"; "b"; "c"; "d"; "e" ]) ];
+      assert_names ~expected:[ "a, b, c" ] [ Di.dirspaces (CCList.map dirspace [ "a"; "b"; "c" ]) ];
+      ())
+
 let () =
   Oth.run
     ~file:__FILE__
@@ -185,4 +257,8 @@ let () =
           test_remaining_above_zero_is_not_a_rate_limit;
           test_headers_are_case_insensitive;
           test_retry_after_takes_precedence;
+          test_declared_reads_dispatch_inputs;
+          test_declared_without_inputs;
+          test_declared_ignores_other_inputs;
+          test_dirspaces_format;
         ])

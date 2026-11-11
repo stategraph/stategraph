@@ -93,13 +93,10 @@ The Stategraph chart uses the database of the Terrateam release. Keep the Terrat
 
 ```yaml
 stategraph:
-  # From terrat-oss. Leave out image for terrat-ee.
-  image:
-    repository: ghcr.io/stategraph/stategraph-server-oss
-    tag: "<version>"
   ui:
     base: https://<your Terrateam URL>
   # From terrat-ee only.
+  edition: enterprise
   license:
     key: <license key>
   orchestration:
@@ -127,7 +124,7 @@ postgresql:
     existingSecretKey: password
 ```
 
-Replace `<version>` with the latest release on the [releases page](https://github.com/stategraph/releases/releases). `terrateam-db` and `terrateam-db-password` are the Service and the Secret of the Terrateam chart. With an external PostgreSQL, set `postgresql.host` and `existingSecret` to that server and its Secret. The GitHub Secret uses the keys `github-app-id`, `github-app-client-id`, `github-app-client-secret`, `github-app-pem`, and `github-webhook-secret`; the Terrateam chart has the same values in five Secrets.
+`terrateam-db` and `terrateam-db-password` are the Service and the Secret of the Terrateam chart. With an external PostgreSQL, set `postgresql.host` and `existingSecret` to that server and its Secret. The GitHub Secret uses the keys `github-app-id`, `github-app-client-id`, `github-app-client-secret`, `github-app-pem`, and `github-webhook-secret`; the Terrateam chart has the same values in five Secrets.
 
 Keep `provisionDatabase` off; its init container changes the password of the bridge users, which are now the application role. If the application role does not have `CREATEROLE`, create the two roles as shown in [Database](#database).
 
@@ -154,10 +151,9 @@ module "stategraph" {
   domain_name        = "stategraph.example.com"   # the Terrateam domain
   certificate_arn    = var.certificate_arn
 
-  # From terrat-oss:
-  stategraph_image = "ghcr.io/stategraph/stategraph-server-oss:<version>"
-  # From terrat-ee, in place of stategraph_image:
-  # license_key    = var.license_key
+  # From terrat-ee only.
+  # edition     = "enterprise"
+  # license_key = var.license_key
 
   create_database            = false
   external_database_host     = "<terrateam RDS host>"
@@ -194,7 +190,6 @@ resource "aws_vpc_security_group_ingress_rule" "stategraph_to_terrateam_rds" {
 }
 ```
 
-Replace `<version>` with the latest release on the [releases page](https://github.com/stategraph/releases/releases).
 
 5. Move the DNS record of the Terrateam domain to the Stategraph load balancer (output `alb_dns_name`).
 6. When the migration is final, remove `aws_db_instance.this` from the Terrateam state with `terraform state rm`, then destroy the Terrateam stack.

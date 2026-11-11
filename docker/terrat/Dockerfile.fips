@@ -7,8 +7,33 @@
 # packages lose symbols when the swap happens. A package that links OpenSSL 4
 # is outside the swap, and the runtime stage refuses it.
 #
-# docker/terrat/Dockerfile remains the non-FIPS build. This file shares no cog
-# regions with it and docker/terrat/render.sh does not generate it.
+# docker/terrat/Dockerfile remains the non-FIPS build.
+#
+# GENERATED in part: the cog-managed sections below (the opam switch and the
+# GIT_SHA stamp) are pulled from docker/stategraph/Dockerfile (the source of
+# truth) by docker/terrat/render.sh. Do not hand-edit the generated content
+# between the cog / end markers. After changing a shared `# region:NAME` block
+# in docker/stategraph/Dockerfile, run `docker/terrat/render.sh`;
+# `docker/terrat/render.sh --check` gates staleness in CI.
+
+# emit(NAME) copies the lines between `# region:NAME` and `# endregion:NAME` in
+# docker/stategraph/Dockerfile into the generated blocks below.
+# [[[cog
+# import pathlib
+# _src = pathlib.Path(cog.inFile).resolve().parent.parent / "stategraph" / "Dockerfile"
+# _lines = _src.read_text().splitlines()
+# def emit(region):
+#     def find(kind):
+#         marker = f"# {kind}:{region}"
+#         for i, line in enumerate(_lines):
+#             s = line.strip()
+#             if s == marker or s.startswith(marker + " "):
+#                 return i
+#         raise SystemExit(f"cog: {kind}:{region} not found in {_src}")
+#     for line in _lines[find("region") + 1 : find("endregion")]:
+#         cog.outl(line)
+# ]]]
+# [[[end]]]
 
 # ---------------------------------------------------------------------------
 # OpenSSL with the FIPS provider, and libtls and libcurl built against it.
@@ -273,26 +298,34 @@ ENV PKG_CONFIG_PATH="${SSL_PREFIX}/lib/pkgconfig"
 ENV OPENSSL_DIR="${SSL_PREFIX}"
 ENV PATH="${SSL_PREFIX}/bin:${PATH}"
 
+# [[[cog emit("opam-init") ]]]
 WORKDIR /tmp
-# The opam-repository index is fetched once here. Bump the date to force the
-# layer to run again when a package published on a newer snapshot is missing.
+# The opam-repository index is fetched once here.
+# When this layer is reused cached, new packages may seem missing.
+# When you hit that (package published on more recent opam snapshot), bump the date here to re-run this layer.
+# Note that the date has no impact on `opam`. It's just a mean to trigger rebuilding of this layer.
 ARG OPAM_INDEX_DATE=2026-11-09
 RUN echo "opam-repository index refreshed ${OPAM_INDEX_DATE}" && \
     opam init -ay --disable-sandboxing --bare
+# [[[end]]]
 # Only the dependency manifests reach this layer, so a source change does not
 # rebuild the switch.
 COPY opam /tmp/mono/opam
 COPY vendor /tmp/mono/vendor
 COPY code/opam.pins /tmp/mono/code/
+# [[[cog emit("opam-switch") ]]]
 RUN eval $(opam env) && \
     opam switch create -y 5.5.1 && \
     eval $(opam env) && \
     opam repository add opam-acsl mono/opam && \
     opam pin add -n ISO8601 mono/vendor/ISO8601 --no-depexts && \
     opam pin add -n cohttp mono/vendor/cohttp --no-depexts
+# [[[end]]]
+# [[[cog emit("opam-install") ]]]
 RUN eval $(opam env) && cd mono/code && \
     opam install -j$(nproc --all) -y --no-depexts dune.3.24.2 menhir && \
     cat opam.pins | xargs opam install -j$(nproc --all) -y --no-depexts
+# [[[end]]]
 
 # ---------------------------------------------------------------------------
 # The iris UI assets.
@@ -327,14 +360,16 @@ RUN cd code/src/iris && \
 # on the base image's tree and reusing its _build produces binaries that mix
 # object files from two tree states.
 FROM build-base AS terrat-build
-ARG GIT_SHA=""
 RUN rm -rf /tmp/mono
 COPY ./ /tmp/mono
 WORKDIR /tmp/mono
+# [[[cog emit("git-sha") ]]]
+ARG GIT_SHA=""
 RUN if [ -n "$GIT_SHA" ]; then \
       printf 'let sha = "%s"\n' "$GIT_SHA" > code/src/terrat_build_info/terrat_build_info.ml; \
-    fi && \
-    eval $(opam env) && \
+    fi
+# [[[end]]]
+RUN eval $(opam env) && \
     make -C code terrat_ee
 
 # ---------------------------------------------------------------------------
