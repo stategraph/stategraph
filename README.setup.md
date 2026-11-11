@@ -1,8 +1,9 @@
 ## Installation
 
 This project uses [opam](https://opam.ocaml.org/) and [dune](https://dune.build/). If these
-instructions go stale, [docker/terrat/Dockerfile](./docker/terrat/Dockerfile) is the canonical
-reference — its `build-base` stage runs the same setup and is exercised by CI on every push.
+instructions go stale, [docker/stategraph/Dockerfile](./docker/stategraph/Dockerfile) is the canonical
+reference — its `base`, `ocaml-sandbox` and `ocaml-deps` stages run the same setup, and CI builds
+them on every pull request.
 
 Create a local opam switch from the repository's root:
 

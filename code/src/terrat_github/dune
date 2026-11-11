@@ -9,6 +9,9 @@
   jwt
   openapi
   prmths
-  terrat_config)
+  sln
+  terrat_config
+  terrat_dirspace
+  yojson)
  (preprocess
   (pps ppx_deriving.show ppx_deriving_yojson)))

@@ -54,10 +54,24 @@ workflows:
 
 ## What changes
 
-- Atlantis still handles `atlantis plan` and `atlantis apply` comments, posts results on the pull request, and tracks which pull request holds which project.
+- Atlantis still handles `atlantis plan` and `atlantis apply` comments and posts results on the pull request.
 - Refresh, plan, and apply cover only the subgraph that your change touches.
-- The global state lock is gone. Pull requests that touch different resources do not wait for each other's state lock. A real overlap fails per resource at commit, with the conflicting transaction ID.
-- Atlantis working-directory locks stay per project. They stop two pull requests from planning the same project directory at once, for workspace hygiene, not for state.
+- The global state lock is gone. A real overlap fails per resource at commit, with the conflicting transaction ID.
+- Atlantis still locks a project when a pull request plans it, so a second pull request on that project waits. See [Run pull requests on one project in parallel](#run-pull-requests-on-one-project-in-parallel).
+
+## Run pull requests on one project in parallel
+
+Atlantis locks a project from the first plan until the pull request merges or closes. Set `repo_locks` to `disabled` in `repos.yaml` to let several pull requests plan and apply the same project at once:
+
+```yaml
+repos:
+  - id: github.com/acme/infra
+    workflow: stategraph
+    repo_locks:
+      mode: disabled
+```
+
+Each pull request plans in its own working directory. Stategraph commits two applies on one state side by side when their changes share no resource. When they do, it rejects the later commit, and that pull request plans again.
 
 ## Limitations
 

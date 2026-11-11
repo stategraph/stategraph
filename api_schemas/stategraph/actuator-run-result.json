@@ -313,7 +313,7 @@
     },
     "reason-state-schema-behind": {
       "additionalProperties": false,
-      "description": "One or more states pulled into the transaction's subgraph store their configuration in an older Stategraph representation than this server understands, so the run was refused before terraform ran. The client upgrades the states it is planning against, but a state reached through a cross-state reference (a terraform_remote_state data source) lives in a checkout this client does not have, so only its own operator can upgrade it. \"states\" names the offending states so the operator knows which; \"server_schema_version\" is what they must reach.",
+      "description": "One or more states pulled into the transaction's subgraph store their configuration in an older Stategraph representation than this server understands, so the run was refused before terraform ran. The client upgrades every state this reason names, from the configuration the state stored, and previews again in a fresh transaction, so the refusal is not terminal for the CLI. \"states\" names the offending states so the operator knows which; \"server_schema_version\" is what they must reach.",
       "properties": {
         "kind": {
           "const": "state_schema_behind",

@@ -25,6 +25,56 @@ module Workflow = struct
     | None -> CCList.find_map (fun known -> CCList.find_opt (matches known) workflows) known
 end
 
+module Dispatch_inputs = struct
+  type field =
+    [ `Dirspaces
+    | `Pr_number
+    | `Pr_title
+    | `Run_kind
+    | `Run_type
+    ]
+
+  let name = function
+    | `Run_kind -> "run-kind"
+    | `Run_type -> "run-type"
+    | `Pr_number -> "pr-number"
+    | `Pr_title -> "pr-title"
+    | `Dirspaces -> "dirspaces"
+
+  let of_name = function
+    | "run-kind" -> Some `Run_kind
+    | "run-type" -> Some `Run_type
+    | "pr-number" -> Some `Pr_number
+    | "pr-title" -> Some `Pr_title
+    | "dirspaces" -> Some `Dirspaces
+    | _ -> None
+
+  (* YAML 1.2, which [Jsonu.of_yaml_string] reads, keeps the [on] key a string. *)
+  let declared json =
+    let member key = function
+      | `Assoc fields -> Sln_list.String.assoc_opt key fields
+      | _ -> None
+    in
+    match
+      CCOption.flat_map
+        (member "inputs")
+        (CCOption.flat_map (member "workflow_dispatch") (member "on" json))
+    with
+    | Some (`Assoc inputs) -> CCList.filter_map (fun (input, _) -> of_name input) inputs
+    | Some _ | None -> []
+
+  let dirspaces ?(limit = 3) dirspaces =
+    let to_string { Terrat_dirspace.dir; workspace } =
+      match workspace with
+      | "default" -> dir
+      | workspace -> dir ^ ":" ^ workspace
+    in
+    let shown = CCList.map to_string (CCList.take limit dirspaces) in
+    match CCList.length dirspaces - limit with
+    | rest when rest > 0 -> CCString.concat ", " shown ^ Printf.sprintf " +%d more" rest
+    | _ -> CCString.concat ", " shown
+end
+
 module Metrics = struct
   module Call_retry_wait_histograph = Prmths.Histogram (struct
     let spec = Prmths.Histogram_spec.of_exponential ~start:30.0 ~factor:1.2 ~count:20
@@ -559,7 +609,7 @@ let load_workflow ?override_path ~owner ~repo client =
       let open Abbs_fc.Infix_result_monad in
       list_workflows ~owner ~repo client
       >>| fun workflows ->
-      CCOption.map (fun (id, _, _) -> id) (Workflow.select ?override_path workflows))
+      CCOption.map (fun (id, _, path) -> (id, path)) (Workflow.select ?override_path workflows))
     ~while_:
       (Abbs_fc.finite_tries 3 (function
         | Ok (Some _) -> false

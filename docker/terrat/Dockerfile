@@ -23,10 +23,6 @@
 # ]]]
 # [[[end]]]
 
-# Define an argument for the base image
-ARG BASE_IMAGE
-
-# Optional base setup stage if BASE_IMAGE is not provided
 FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS build-base
 
 # [[[cog emit("apk-base") ]]]
@@ -119,10 +115,9 @@ RUN eval $(opam env) && cd /tmp/mono && \
     OTH_EXCLUDE_TAGS=HCL_AST_TESTS_NEEDING_TOFU make -C code test-terrat terrat && \
     mv _build /build-cache
 
-# Use provided BASE_IMAGE if specified, otherwise use the build-base stage
-FROM ${BASE_IMAGE:-build-base} AS build-setup
+FROM build-base AS build-setup
 
-# Refresh source files on top of the (possibly prebuilt) base image.  The tree
+# Refresh source files on top of build-base.  The tree
 # is wiped first: overlaying sources on the base's tree and reusing its _build
 # produced hybrid binaries mixing object files from different tree states
 # (#1733).  The base still pays for what it is good for -- the opam switch and
@@ -144,17 +139,24 @@ RUN if [ -n "$GIT_SHA" ]; then \
     make -C code terrat
 
 # [[[cog emit("terrat-images") ]]]
+# What is copied from terrat-build is chowned to root: COPY --from keeps the
+# owner of the build stage, which docker/stategraph/Dockerfile runs as its
+# build user (UID), and the images ship these files read-only, as root's.
 # Final ttm image
 FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS ttm
 # The minirootfs lags its own package branch, so upgrade what it pre-installed.
+# OS_REFRESH keys the layer cache, as in stategraph-server-base.
+ARG OS_REFRESH
 RUN apk upgrade --no-cache
-COPY --from=terrat-build /tmp/mono/_build/default/code/src/ttm/ttm.exe /usr/local/bin/ttm
+COPY --from=terrat-build --chown=root:root /tmp/mono/_build/default/code/src/ttm/ttm.exe /usr/local/bin/ttm
 WORKDIR /mnt
 ENTRYPOINT ["/usr/local/bin/ttm"]
 
 # Shared runtime base for the terrat-ee / terrat-oss server images
 FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS terrat-final-base
 # The minirootfs lags its own package branch, so upgrade what it pre-installed.
+# OS_REFRESH keys the layer cache, as in stategraph-server-base.
+ARG OS_REFRESH
 RUN apk upgrade --no-cache
 # These are the Terrateam-branded images, so a repository whose configuration
 # names no brand gets Terrateam comments and check names. The unified
@@ -198,16 +200,16 @@ COPY docker/terrat/service/nginx /etc/service/nginx/run
 COPY --chmod=755 docker/terrat/runit-init /usr/local/bin/runit-init
 COPY --chmod=755 docker/terrat/service/nginx-control-t /etc/service/nginx/control/t
 COPY docker/terrat/nginx.conf.template /etc/nginx/nginx.conf.template
-COPY --from=terrat-build /tmp/mono/_build/default/code/src/iris/ui-export/ /usr/local/share/terrat/ui/assets/
+COPY --from=terrat-build --chown=root:root /tmp/mono/_build/default/code/src/iris/ui-export/ /usr/local/share/terrat/ui/assets/
 USER terrat
 EXPOSE 8080
 CMD ["/usr/local/bin/runit-init"]
 
 # Final terrat-ee image
 FROM terrat-final-base AS terrat-ee
-COPY --from=terrat-build /tmp/mono/_build/default/code/src/terrat_ee/terrat_ee.exe /usr/local/bin/terrat
+COPY --from=terrat-build --chown=root:root /tmp/mono/_build/default/code/src/terrat_ee/terrat_ee.exe /usr/local/bin/terrat
 
 # Final terrat-oss image
 FROM terrat-final-base AS terrat-oss
-COPY --from=terrat-build /tmp/mono/_build/default/code/src/terrat_oss/terrat_oss.exe /usr/local/bin/terrat
+COPY --from=terrat-build --chown=root:root /tmp/mono/_build/default/code/src/terrat_oss/terrat_oss.exe /usr/local/bin/terrat
 # [[[end]]]

@@ -1,0 +1,1 @@
+module Shade = Query_params_api_components_shade

@@ -7,7 +7,7 @@ order: 4
 
 Deploy [Stategraph](/docs/admin/self-hosting) on Amazon ECS Fargate with the [Stategraph ECS Terraform module](https://github.com/stategraph/terraform-aws-stategraph-ecs).
 
-The examples use the Open Source image, `ghcr.io/stategraph/stategraph-server-oss`. Replace `<version>` with the latest release on the [releases page](https://github.com/stategraph/releases/releases), and `<module version>` with the latest tag of the [module](https://github.com/stategraph/terraform-aws-stategraph-ecs/tags). For [Enterprise](/docs/get-started/editions), set `stategraph_image` to `ghcr.io/stategraph/stategraph-server:<version>`: its setup screen asks for the license key first.
+The module runs the Open Source image, `ghcr.io/stategraph/stategraph-server-oss`. For [Enterprise](/docs/get-started/editions), set `edition = "enterprise"`: the module then runs `ghcr.io/stategraph/stategraph-server`. Enterprise needs a license key, in `license_key` or entered on the setup screen. Replace `<module version>` with the latest tag of the [module](https://github.com/stategraph/terraform-aws-stategraph-ecs/tags).
 
 ## Before you begin
 
@@ -72,9 +72,6 @@ module "stategraph" {
   # Domain and certificate
   domain_name     = "stategraph.example.com"
   certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/xxxxx"
-
-  # Image
-  stategraph_image = "ghcr.io/stategraph/stategraph-server-oss:<version>"
 
   environment = "production"
 
@@ -144,7 +141,9 @@ After DNS propagates, open `https://stategraph.example.com` and create the first
 | `enable_autoscaling` | Scale on CPU and memory | `true` |
 | `database_instance_class` | RDS instance class | `db.t3.medium` |
 | `database_multi_az` | Multi-AZ RDS | `true` |
-| `stategraph_image` | Container image: `ghcr.io/stategraph/stategraph-server-oss:<version>` for Open Source | `ghcr.io/stategraph/stategraph-server:latest` |
+| `edition` | `oss` or `enterprise`: the server image | `oss` |
+| `stategraph_version` | Server release of the image | the release of the module version |
+| `stategraph_image` | Server image. Overrides `edition` and `stategraph_version` | `null` |
 
 The module documentation lists every variable. Stategraph settings are [environment variables](/docs/admin/operations/environment-variables) on the server container in the task definition. Reference Secrets Manager secrets in the `secrets` list of the container definition, not in `environment`.
 
@@ -294,12 +293,12 @@ For a fixed count, set `enable_autoscaling = false` and `ecs_desired_count`. For
 
 ## Upgrading
 
-Change the image tag and apply. ECS does a rolling deployment, and the load balancer routes only to tasks that pass the health check:
+Set `stategraph_version` to a release from the [releases page](https://github.com/stategraph/releases/releases) and apply. ECS does a rolling deployment, and the load balancer routes only to tasks that pass the health check:
 
 ```hcl
 module "stategraph" {
   # ... other variables
-  stategraph_image = "ghcr.io/stategraph/stategraph-server-oss:<version>"
+  stategraph_version = "<version>"
 }
 ```
 

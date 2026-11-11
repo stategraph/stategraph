@@ -7,7 +7,7 @@ order: 3
 
 The [Stategraph Helm chart](https://github.com/stategraph/helm-charts) deploys [Stategraph](/docs/admin/self-hosting) on Kubernetes, with an ingress, health probes, and a bundled or external PostgreSQL.
 
-The examples install the Open Source image, `ghcr.io/stategraph/stategraph-server-oss`. For [Enterprise](/docs/get-started/editions), leave out the two `stategraph.image` values: the chart then installs `ghcr.io/stategraph/stategraph-server`, whose setup screen asks for the license key first.
+The chart installs the Open Source image, `ghcr.io/stategraph/stategraph-server-oss`. For [Enterprise](/docs/get-started/editions), set `stategraph.edition=enterprise`: the chart then installs `ghcr.io/stategraph/stategraph-server`. Enterprise needs a license key, in `stategraph.license.key` or `stategraph.license.existingSecret`, or entered on the setup screen. Each chart version pins a server release, and `stategraph.image.tag` overrides it.
 
 ## Before you begin
 
@@ -23,9 +23,7 @@ helm repo add stategraph https://stategraph.github.io/helm-charts
 helm repo update
 helm install stategraph stategraph/stategraph \
   --namespace stategraph \
-  --create-namespace \
-  --set stategraph.image.repository=ghcr.io/stategraph/stategraph-server-oss \
-  --set stategraph.image.tag=latest
+  --create-namespace
 ```
 
 For a local trial, forward the service, and create the first admin account on the setup screen at <http://localhost:8080>.
@@ -45,8 +43,6 @@ Install with HTTPS, an ingress, and a cert-manager issuer:
 helm install stategraph stategraph/stategraph \
   --namespace stategraph \
   --create-namespace \
-  --set stategraph.image.repository=ghcr.io/stategraph/stategraph-server-oss \
-  --set stategraph.image.tag="<version>" \
   --set stategraph.ui.base="https://stategraph.example.com" \
   --set stategraph.ui.oauthRedirectBase="https://stategraph.example.com" \
   --set ingress.enabled=true \
@@ -58,15 +54,14 @@ helm install stategraph stategraph/stategraph \
   --set ingress.annotations."cert-manager\.io/cluster-issuer"="letsencrypt-prod"
 ```
 
-Replace `<version>` with the latest release on the [releases page](https://github.com/stategraph/releases/releases).
-
 ## Configuration
 
 `helm show values stategraph/stategraph` lists all chart values. The common ones:
 
 | Value | Description | Default |
 |-------|-------------|---------|
-| `stategraph.image.repository` | Server image: `ghcr.io/stategraph/stategraph-server-oss` for Open Source | `ghcr.io/stategraph/stategraph-server` |
+| `stategraph.edition` | `oss` or `enterprise`: the server image | `oss` |
+| `stategraph.image.repository` | Server image. Empty: the image of the edition | empty |
 | `stategraph.image.tag` | Image version, from the [releases page](https://github.com/stategraph/releases/releases) | the chart's `appVersion` |
 | `stategraph.replicaCount` | Number of server pods | `1` |
 | `stategraph.ui.base` | Public URL (`STATEGRAPH_UI_BASE`) | `http://localhost:8080` |
@@ -128,8 +123,6 @@ Local email and password sign-in is on by default. For Google or OIDC, set the O
 helm install stategraph stategraph/stategraph \
   --namespace stategraph \
   --create-namespace \
-  --set stategraph.image.repository=ghcr.io/stategraph/stategraph-server-oss \
-  --set stategraph.image.tag="<version>" \
   --set stategraph.ui.base="https://stategraph.example.com" \
   --set stategraph.ui.oauthRedirectBase="https://stategraph.example.com" \
   --set stategraph.oauth.enabled=true \
@@ -293,7 +286,7 @@ helm repo update
 helm upgrade stategraph stategraph/stategraph -n stategraph --reuse-values
 ```
 
-`--reuse-values` keeps the image values of the install. For production, pin `stategraph.image.tag` to a version. See [Upgrades](/docs/admin/operations/upgrades).
+`--reuse-values` keeps the values of the install, the image included. Each chart version pins a server release; to run another one, set `stategraph.image.tag`. From chart 0.2.x, an Enterprise deployment adds `--set stategraph.edition=enterprise`. See [Upgrades](/docs/admin/operations/upgrades).
 
 ## Uninstalling
 

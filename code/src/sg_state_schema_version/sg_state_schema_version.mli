@@ -225,8 +225,9 @@
     evaluation of an upgrade failed, and a file with no reads is not connected to the blocks that
     read it. The upgrade computes the reads again, thus it repairs such a file. An upgrade now fails
     on a strict evaluation error, thus a state whose stored configuration is not consistent fails
-    this upgrade, and needs [stategraph import tf --hcl --overwrite] from the code of the deployed
-    infrastructure.
+    this upgrade. The upgrade reads the stored data only, so the operator repairs that data with
+    [stategraph import tf --hcl --overwrite] from the code of the deployed infrastructure, and the
+    next run upgrades the state.
 
     Version 18: a reference to an [action] block, [action.<type>.<name>], which only the [actions]
     list of an [action_trigger] can hold. {!Sg_tf_references.address_tokens_of_reference} gave it

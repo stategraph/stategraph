@@ -16,16 +16,7 @@ module Github = struct
   let default_github_app_url = Uri.of_string "https://github.com/apps/terrateam-action"
   let default_github_web_base_url = Uri.of_string "https://github.com"
 
-  type action_dynamic_title_item =
-    [ `Pr_title
-    | `Pr_number
-    | `Run_kind
-    | `Run_type
-    ]
-  [@@deriving show]
-
   type t = {
-    action_dynamic_title : action_dynamic_title_item list;
     api_base_url : Uri.t;
     app_client_id : string;
     app_client_secret : (string[@opaque]);
@@ -39,7 +30,6 @@ module Github = struct
   }
   [@@deriving show]
 
-  let action_dynamic_title t = t.action_dynamic_title
   let api_base_url t = t.api_base_url
   let app_client_id t = t.app_client_id
   let app_client_secret t = t.app_client_secret
@@ -249,26 +239,9 @@ let github_of_parts
   vcs_call_timeout ~getenv
   >>= fun call_timeout ->
   let workflow_path_override = getenv "GITHUB_WORKFLOW_PATH_OVERRIDE" in
-  let action_dynamic_title =
-    CCOption.map_or
-      ~default:[]
-      (fun s ->
-        s
-        |> CCString.split_on_char ','
-        |> Sln_list.String.sort_uniq
-        |> CCList.filter_map (function
-          | "pr_title" -> Some `Pr_title
-          | "pr_number" -> Some `Pr_number
-          | "run_kind" -> Some `Run_kind
-          | "run_type" -> Some `Run_type
-          | "" -> None
-          | _ -> None))
-      (getenv "GITHUB_ACTION_DYNAMIC_TITLE")
-  in
   Ok
     {
-      Github.action_dynamic_title;
-      api_base_url;
+      Github.api_base_url;
       app_client_id;
       app_client_secret;
       app_id;
