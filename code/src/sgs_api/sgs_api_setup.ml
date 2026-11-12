@@ -1,6 +1,10 @@
 module Status = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "setup" / "status"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Setup_status_response.t
@@ -41,6 +45,10 @@ module Magic_claim = struct
     type t = Sgs_api_components.Setup_magic_claim_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "setup" / "magic-claim"
 
   module Responses = struct
     module Created = struct
@@ -93,6 +101,10 @@ module Github_app_manifest = struct
     type t = Sgs_api_components.Github_app_manifest_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "setup" / "github-app" / "manifest"
 
   module Responses = struct
     module OK = struct
@@ -157,6 +169,10 @@ module Github_app_set_credentials = struct
     type t = Sgs_api_components.Github_app_credentials_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "setup" / "github-app" / "credentials"
 
   module Responses = struct
     module No_content = struct end
@@ -224,10 +240,17 @@ module Github_app_callback = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "code") /? option (string "state")
+    rel
+    / "api"
+    / "v1"
+    / "setup"
+    / "github-app"
+    / "callback"
+    /? option (string "code")
+    /? option (string "state")
 
   module Responses = struct
     module Found = struct end
@@ -261,6 +284,10 @@ module Github_app_delete = struct
     type t = Sgs_api_components.Github_app_delete_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "setup" / "github-app"
 
   module Responses = struct
     module No_content = struct end
@@ -322,6 +349,10 @@ end
 module Github_app_get = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "setup" / "github-app"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Github_app_response.t
@@ -369,6 +400,10 @@ module Admin = struct
     type t = Sgs_api_components.Setup_admin_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "setup" / "admin"
 
   module Responses = struct
     module Created = struct

@@ -7,6 +7,10 @@ module Get_configuration_for_repository = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "code-security-configuration"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Code_security_configuration_for_repository.t
@@ -73,10 +77,16 @@ module Get_repositories_for_configuration = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "code-security"
+    / "configurations"
+    /% Path.int
+    / "repositories"
     /? option_default 30 (int "per_page")
     /? option (string "before")
     /? option (string "after")
@@ -180,6 +190,10 @@ module Set_configuration_as_default = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "code-security" / "configurations" /% Path.int / "defaults"
 
   module Responses = struct
     module OK = struct
@@ -310,6 +324,10 @@ module Attach_configuration = struct
     }
     [@@deriving make, yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "code-security" / "configurations" /% Path.int / "attach"
 
   module Responses = struct
     module Accepted = struct
@@ -885,6 +903,10 @@ module Update_configuration = struct
     [@@deriving make, yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "code-security" / "configurations" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Code_security_configuration.t
@@ -933,6 +955,10 @@ module Delete_configuration = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "code-security" / "configurations" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -1003,6 +1029,10 @@ module Get_configuration = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "code-security" / "configurations" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Code_security_configuration.t
@@ -1070,6 +1100,10 @@ module Detach_configuration = struct
     [@@deriving make, yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "code-security" / "configurations" / "detach"
+
   module Responses = struct
     module No_content = struct end
 
@@ -1133,6 +1167,10 @@ module Get_default_configurations = struct
   module Parameters = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "code-security" / "configurations" / "defaults"
 
   module Responses = struct
     module OK = struct
@@ -1724,6 +1762,10 @@ module Create_configuration = struct
     [@@deriving make, yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "code-security" / "configurations"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Code_security_configuration.t
@@ -1782,10 +1824,14 @@ module Get_configurations_for_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "code-security"
+    / "configurations"
     /? option_default
          `All
          (ud "target_type" (fun value ->
@@ -1861,10 +1907,16 @@ module Get_repositories_for_enterprise_configuration = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "enterprises"
+    /% Path.string
+    / "code-security"
+    / "configurations"
+    /% Path.int
+    / "repositories"
     /? option_default 30 (int "per_page")
     /? option (string "before")
     /? option (string "after")
@@ -1968,6 +2020,10 @@ module Set_configuration_as_default_for_enterprise = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "code-security" / "configurations" /% Path.int / "defaults"
 
   module Responses = struct
     module OK = struct
@@ -2081,6 +2137,10 @@ module Attach_enterprise_configuration = struct
 
     type t = { scope : Scope.t } [@@deriving make, yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "code-security" / "configurations" /% Path.int / "attach"
 
   module Responses = struct
     module Accepted = struct
@@ -2572,6 +2632,10 @@ module Update_enterprise_configuration = struct
     [@@deriving make, yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "code-security" / "configurations" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Code_security_configuration.t
@@ -2643,6 +2707,10 @@ module Delete_configuration_for_enterprise = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "code-security" / "configurations" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -2712,6 +2780,10 @@ module Get_single_configuration_for_enterprise = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "code-security" / "configurations" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Code_security_configuration.t
@@ -2769,6 +2841,10 @@ module Get_default_configurations_for_enterprise = struct
   module Parameters = struct
     type t = { enterprise : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "code-security" / "configurations" / "defaults"
 
   module Responses = struct
     module OK = struct
@@ -3225,6 +3301,10 @@ module Create_configuration_for_enterprise = struct
     [@@deriving make, yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "code-security" / "configurations"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Code_security_configuration.t
@@ -3291,10 +3371,14 @@ module Get_configurations_for_enterprise = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "enterprises"
+    /% Path.string
+    / "code-security"
+    / "configurations"
     /? option_default 30 (int "per_page")
     /? option (string "before")
     /? option (string "after")

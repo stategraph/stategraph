@@ -7,6 +7,10 @@ module PostApiV4ProjectsIdImportProjectMembersProjectId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "import_project_members" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end

@@ -12,6 +12,10 @@ module Create_repository_snapshot = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "dependency-graph" / "snapshots"
+
   module Responses = struct
     module Created = struct
       module Primary = struct
@@ -57,6 +61,10 @@ module Generate_sbom_report = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "dependency-graph" / "sbom" / "generate-report"
 
   module Responses = struct
     module Created = struct
@@ -118,6 +126,17 @@ module Fetch_sbom_report = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "dependency-graph"
+    / "sbom"
+    / "fetch-report"
+    /% Path.string
+
   module Responses = struct
     module Accepted = struct end
     module Found = struct end
@@ -177,6 +196,10 @@ module Export_sbom = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "dependency-graph" / "sbom"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Dependency_graph_spdx_sbom.t
@@ -234,10 +257,17 @@ module Diff_range = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "name")
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "dependency-graph"
+    / "compare"
+    /% Path.string
+    /? option (string "name")
 
   module Responses = struct
     module OK = struct

@@ -12,6 +12,10 @@ module PutApiV4GroupsIdAccessRequestsUserIdApprove = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "access_requests" /% Path.int / "approve"
+
   module Responses = struct
     module OK = struct end
 
@@ -46,6 +50,10 @@ module DeleteApiV4GroupsIdAccessRequestsUserId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "access_requests" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -73,6 +81,10 @@ module PostApiV4GroupsIdAccessRequests = struct
   module Parameters = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "access_requests"
 
   module Responses = struct
     module OK = struct end
@@ -107,10 +119,17 @@ module GetApiV4GroupsIdAccessRequests = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "access_requests"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end

@@ -10,10 +10,20 @@ module Size = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (bool "committed") /? option (int "idx")
+    rel
+    / "api"
+    / "v1"
+    /% Path.string
+    / "kv"
+    /% Path.string
+    / "size"
+    / "key"
+    /% Path.string
+    /? option (bool "committed")
+    /? option (int "idx")
 
   module Responses = struct
     module OK = struct
@@ -75,10 +85,19 @@ module Delete = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (int "idx") /? option (int "version")
+    rel
+    / "api"
+    / "v1"
+    /% Path.string
+    / "kv"
+    /% Path.string
+    / "key"
+    /% Path.string
+    /? option (int "idx")
+    /? option (int "version")
 
   module Responses = struct
     module OK = struct
@@ -136,6 +155,10 @@ module Set = struct
     type t = Terrat_api_components.Kv_set.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" /% Path.string / "kv" /% Path.string / "key" /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -195,10 +218,17 @@ module Get = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v1"
+    /% Path.string
+    / "kv"
+    /% Path.string
+    / "key"
+    /% Path.string
     /? option (bool "committed")
     /? option (int "idx")
     /? option (array (string "select"))
@@ -274,10 +304,17 @@ module Iter = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v1"
+    /% Path.string
+    / "kv"
+    /% Path.string
+    / "iter"
+    /% Path.string
     /? option (bool "committed")
     /? option (int "idx")
     /? option (int "limit")
@@ -347,10 +384,19 @@ module Count = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (bool "committed")
+    rel
+    / "api"
+    / "v1"
+    /% Path.string
+    / "kv"
+    /% Path.string
+    / "count"
+    / "key"
+    /% Path.string
+    /? option (bool "committed")
 
   module Responses = struct
     module OK = struct
@@ -412,6 +458,10 @@ module Commit = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" /% Path.string / "kv" /% Path.string / "commit"
+
   module Responses = struct
     module OK = struct
       type t = Terrat_api_components.Kv_commit_result.t
@@ -466,6 +516,10 @@ module Cas = struct
     type t = Terrat_api_components.Kv_cas.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" /% Path.string / "kv" /% Path.string / "cas" / "key" /% Path.string
 
   module Responses = struct
     module OK = struct

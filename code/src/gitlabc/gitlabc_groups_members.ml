@@ -12,6 +12,10 @@ module PutApiV4GroupsIdMembersUserIdState = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "members" /% Path.int / "state"
+
   module Responses = struct
     module OK = struct end
 
@@ -46,6 +50,10 @@ module DeleteApiV4GroupsIdMembersUserIdOverride = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "members" /% Path.int / "override"
+
   module Responses = struct
     module OK = struct end
 
@@ -77,6 +85,10 @@ module PostApiV4GroupsIdMembersUserIdOverride = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "members" /% Path.int / "override"
 
   module Responses = struct
     module Created = struct end
@@ -112,10 +124,16 @@ module DeleteApiV4GroupsIdMembersUserId = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "members"
+    /% Path.int
     /? option_default false (bool "skip_subresources")
     /? option_default false (bool "unassign_issuables")
 
@@ -162,6 +180,10 @@ module PutApiV4GroupsIdMembersUserId = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "members" /% Path.int
+
   module Responses = struct
     module OK = struct end
 
@@ -195,6 +217,10 @@ module GetApiV4GroupsIdMembersUserId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "members" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -240,6 +266,10 @@ module PutApiV4GroupsIdMembersMemberIdApprove = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "members" /% Path.int / "approve"
+
   module Responses = struct
     module OK = struct end
 
@@ -267,6 +297,10 @@ module PostApiV4GroupsIdMembersApproveAll = struct
   module Parameters = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "members" / "approve_all"
 
   module Responses = struct
     module Created = struct end
@@ -299,6 +333,10 @@ module GetApiV4GroupsIdMembersAllUserId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "members" / "all" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -371,10 +409,16 @@ module GetApiV4GroupsIdMembersAll = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "members"
+    / "all"
     /? option (string "query")
     /? option (array (int "user_ids"))
     /? option (bool "show_seat_info")
@@ -426,6 +470,10 @@ module PostApiV4GroupsIdMembers = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "members"
+
   module Responses = struct
     module Created = struct end
 
@@ -474,10 +522,15 @@ module GetApiV4GroupsIdMembers = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "members"
     /? option (string "query")
     /? option (array (int "user_ids"))
     /? option (array (int "skip_users"))

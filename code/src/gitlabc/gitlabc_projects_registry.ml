@@ -8,6 +8,19 @@ module DeleteApiV4ProjectsIdRegistryRepositoriesRepositoryIdTagsTagName = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "registry"
+    / "repositories"
+    /% Path.int
+    / "tags"
+    /% Path.string
+
   module Responses = struct
     module No_content = struct end
     module Bad_request = struct end
@@ -59,6 +72,19 @@ module GetApiV4ProjectsIdRegistryRepositoriesRepositoryIdTagsTagName = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "registry"
+    / "repositories"
+    /% Path.int
+    / "tags"
+    /% Path.string
 
   module Responses = struct
     module OK = struct end
@@ -116,10 +142,18 @@ module DeleteApiV4ProjectsIdRegistryRepositoriesRepositoryIdTags = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "registry"
+    / "repositories"
+    /% Path.int
+    / "tags"
     /? option (string "name_regex_delete")
     /? option (string "name_regex")
     /? option (string "name_regex_keep")
@@ -184,10 +218,20 @@ module GetApiV4ProjectsIdRegistryRepositoriesRepositoryIdTags = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "registry"
+    / "repositories"
+    /% Path.int
+    / "tags"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -239,6 +283,10 @@ module DeleteApiV4ProjectsIdRegistryRepositoriesRepositoryId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "registry" / "repositories" /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Unauthorized = struct end
@@ -286,10 +334,16 @@ module GetApiV4ProjectsIdRegistryRepositories = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "registry"
+    / "repositories"
     /? option_default 1 (int "page")
     /? option_default 20 (int "per_page")
     /? option_default false (bool "tags")
@@ -351,6 +405,19 @@ module PatchApiV4ProjectsIdRegistryProtectionRepositoryRulesProtectionRuleId = s
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "registry"
+    / "protection"
+    / "repository"
+    / "rules"
+    /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -409,6 +476,19 @@ module DeleteApiV4ProjectsIdRegistryProtectionRepositoryRulesProtectionRuleId = 
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "registry"
+    / "protection"
+    / "repository"
+    / "rules"
+    /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Bad_request = struct end
@@ -463,6 +543,18 @@ module PostApiV4ProjectsIdRegistryProtectionRepositoryRules = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "registry"
+    / "protection"
+    / "repository"
+    / "rules"
+
   module Responses = struct
     module Created = struct end
     module Bad_request = struct end
@@ -513,6 +605,18 @@ module GetApiV4ProjectsIdRegistryProtectionRepositoryRules = struct
   module Parameters = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "registry"
+    / "protection"
+    / "repository"
+    / "rules"
 
   module Responses = struct
     module OK = struct end

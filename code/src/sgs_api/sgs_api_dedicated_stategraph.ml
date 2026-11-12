@@ -3,6 +3,10 @@ module Handoff = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "dedicated-stategraphs" /% Path.string / "handoff"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Dedicated_stategraph_handoff_response.t
@@ -59,6 +63,10 @@ module Delete = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "dedicated-stategraphs" /% Path.string
+
   module Responses = struct
     module No_content = struct end
     module Unauthorized = struct end
@@ -104,6 +112,10 @@ module Get = struct
   module Parameters = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "dedicated-stategraphs" /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -157,6 +169,10 @@ module Create = struct
     type t = Sgs_api_components.Dedicated_stategraph_create_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "dedicated-stategraphs"
 
   module Responses = struct
     module Created = struct
@@ -214,6 +230,10 @@ end
 module List = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "dedicated-stategraphs"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Dedicated_stategraphs_response.t
@@ -258,6 +278,10 @@ end
 
 module Regions = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "dedicated-stategraph-regions"
 
   module Responses = struct
     module OK = struct

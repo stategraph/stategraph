@@ -8,6 +8,10 @@ module PostApiV4UsersUserIdKeys = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "users" /% Path.int / "keys"
+
   module Responses = struct
     module Created = struct end
 
@@ -43,10 +47,17 @@ module GetApiV4UsersUserIdKeys = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "users"
+    /% Path.string
+    / "keys"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -83,6 +94,10 @@ module DeleteApiV4UsersIdKeysKeyId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "users" /% Path.int / "keys" /% Path.int
+
   module Responses = struct
     module OK = struct end
 
@@ -114,6 +129,10 @@ module GetApiV4UsersIdKeysKeyId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "users" /% Path.int / "keys" /% Path.int
 
   module Responses = struct
     module OK = struct end

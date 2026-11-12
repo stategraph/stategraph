@@ -118,7 +118,6 @@ COPY --chown=${USERNAME}:${USERNAME} --chmod=755 code/src/focus_etl/load-focus-b
 
 FROM base-tenv-tofu AS base
 
-# region:apk-base
 RUN apk add --no-cache \
     bash \
     brotli-static \
@@ -172,7 +171,6 @@ RUN apk add --no-cache \
     zlib-static \
     zstd-dev \
     zstd-static
-# endregion:apk-base
 
 # Development-specific base extensions
 FROM base AS base-development
@@ -240,9 +238,7 @@ RUN eval $(opam env) && \
 FROM ocaml-sandbox AS ocaml-sandbox-development-or-devcontainer
 
 # Development or devcontainer: install ocamlformat
-# region:ocamlformat
 RUN eval $(opam env) && opam pin add -y ocamlformat 0.29.0
-# endregion:ocamlformat
 
 FROM ocaml-sandbox-development-or-devcontainer AS ocaml-sandbox-devcontainer
 
@@ -768,7 +764,6 @@ RUN --mount=type=cache,id=${DUNE_CACHE_ID},target=/dune-cache,uid=1000,gid=1000,
 # for hermes' ui-export. (This avoids the dist/-is-gitignored staleness trap: a
 # restored _build no longer leaves the UI missing.)
 
-# region:terrat-images
 # What is copied from terrat-build is chowned to root: COPY --from keeps the
 # owner of the build stage, which docker/stategraph/Dockerfile runs as its
 # build user (UID), and the images ship these files read-only, as root's.
@@ -842,4 +837,3 @@ COPY --from=terrat-build --chown=root:root /tmp/mono/_build/default/code/src/ter
 # Final terrat-oss image
 FROM terrat-final-base AS terrat-oss
 COPY --from=terrat-build --chown=root:root /tmp/mono/_build/default/code/src/terrat_oss/terrat_oss.exe /usr/local/bin/terrat
-# endregion:terrat-images

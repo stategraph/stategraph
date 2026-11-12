@@ -9,10 +9,17 @@ module Get_tree = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "recursive")
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "git"
+    / "trees"
+    /% Path.string
+    /? option (string "recursive")
 
   module Responses = struct
     module OK = struct
@@ -163,6 +170,10 @@ module Create_tree = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "git" / "trees"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Git_tree.t
@@ -235,6 +246,10 @@ module Get_tag = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "git" / "tags" /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -344,6 +359,10 @@ module Create_tag = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "git" / "tags"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Git_tag.t
@@ -415,6 +434,10 @@ module Update_ref = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "git" / "refs" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Git_ref.t
@@ -477,6 +500,10 @@ module Delete_ref = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "git" / "refs" /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -543,6 +570,10 @@ module Create_ref = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "git" / "refs"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Git_ref.t
@@ -601,6 +632,10 @@ module Get_ref = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "git" / "ref" /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -662,6 +697,10 @@ module List_matching_refs = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "git" / "matching-refs" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Git_ref.t list
@@ -714,6 +753,10 @@ module Get_commit = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "git" / "commits" /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -820,6 +863,10 @@ module Create_commit = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "git" / "commits"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Git_commit.t
@@ -885,6 +932,10 @@ module Get_blob = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "git" / "blobs" /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -971,6 +1022,10 @@ module Create_blob = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "git" / "blobs"
 
   module Responses = struct
     module Created = struct

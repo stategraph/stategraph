@@ -8,6 +8,10 @@ module PostApiV4ProjectsIdHousekeeping = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "housekeeping"
+
   module Responses = struct
     module Created = struct end
     module Unauthorized = struct end

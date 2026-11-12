@@ -2642,6 +2642,16 @@
     "/api/github/v1/work-manifests/{work_manifest_id}/access-token": {
       "post": {
         "operationId": "work-manifest/get-access-token",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_manifest_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {

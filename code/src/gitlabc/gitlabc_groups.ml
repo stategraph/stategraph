@@ -7,10 +7,20 @@ module GetApiV4GroupsIdPackagesPypiSimple_packageName = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "package_name"
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.int
+    / "-"
+    / "packages"
+    / "pypi"
+    / "simple"
+    / "*package_name"
+    /? string "package_name"
 
   module Responses = struct
     module OK = struct end
@@ -57,6 +67,10 @@ module GetApiV4GroupsIdPackagesPypiSimple = struct
   module Parameters = struct
     type t = { id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "-" / "packages" / "pypi" / "simple"
 
   module Responses = struct
     module OK = struct end
@@ -106,10 +120,21 @@ module GetApiV4GroupsIdPackagesPypiFilesSha256_fileIdentifier = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "file_identifier"
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.int
+    / "-"
+    / "packages"
+    / "pypi"
+    / "files"
+    /% Path.string
+    / "*file_identifier"
+    /? string "file_identifier"
 
   module Responses = struct
     module OK = struct end
@@ -157,6 +182,10 @@ module GetApiV4GroupsIdPackagesNugetV2_metadata = struct
     type t = { id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "-" / "packages" / "nuget" / "v2" / "$metadata"
+
   module Responses = struct
     module OK = struct end
 
@@ -184,6 +213,10 @@ module GetApiV4GroupsIdPackagesNugetV2 = struct
   module Parameters = struct
     type t = { id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "-" / "packages" / "nuget" / "v2"
 
   module Responses = struct
     module OK = struct end
@@ -225,10 +258,24 @@ module GetApiV4GroupsIdPackagesNugetSymbolfiles_fileName_signature_sameFileName 
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "file_name" /? string "signature" /? string "same_file_name"
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.int
+    / "-"
+    / "packages"
+    / "nuget"
+    / "symbolfiles"
+    / "*file_name"
+    / "*signature"
+    / "*same_file_name"
+    /? string "file_name"
+    /? string "signature"
+    /? string "same_file_name"
 
   module Responses = struct
     module OK = struct end
@@ -287,10 +334,18 @@ module GetApiV4GroupsIdPackagesNugetQuery = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.int
+    / "-"
+    / "packages"
+    / "nuget"
+    / "query"
     /? option (string "q")
     /? option_default 0 (int "skip")
     /? option_default 20 (int "take")
@@ -351,10 +406,21 @@ module GetApiV4GroupsIdPackagesNugetMetadata_packageNameIndex = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "package_name"
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.int
+    / "-"
+    / "packages"
+    / "nuget"
+    / "metadata"
+    / "*package_name"
+    / "index"
+    /? string "package_name"
 
   module Responses = struct
     module OK = struct end
@@ -407,10 +473,22 @@ module GetApiV4GroupsIdPackagesNugetMetadata_packageName_packageVersion = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "package_name" /? string "package_version"
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.int
+    / "-"
+    / "packages"
+    / "nuget"
+    / "metadata"
+    / "*package_name"
+    / "*package_version"
+    /? string "package_name"
+    /? string "package_version"
 
   module Responses = struct
     module OK = struct end
@@ -461,6 +539,10 @@ module GetApiV4GroupsIdPackagesNugetIndex = struct
     type t = { id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "-" / "packages" / "nuget" / "index"
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -499,10 +581,23 @@ module DeleteApiV4GroupsIdPackagesNpmPackage_packageNameDistTagsTag = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "package_name"
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "packages"
+    / "npm"
+    / "-"
+    / "package"
+    / "*package_name"
+    / "dist-tags"
+    /% Path.string
+    /? string "package_name"
 
   module Responses = struct
     module No_content = struct end
@@ -562,6 +657,22 @@ module PutApiV4GroupsIdPackagesNpmPackage_packageNameDistTagsTag = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "packages"
+    / "npm"
+    / "-"
+    / "package"
+    / "*package_name"
+    / "dist-tags"
+    /% Path.string
+
   module Responses = struct
     module No_content = struct end
     module Bad_request = struct end
@@ -614,10 +725,22 @@ module GetApiV4GroupsIdPackagesNpmPackage_packageNameDistTags = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "package_name"
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "packages"
+    / "npm"
+    / "-"
+    / "package"
+    / "*package_name"
+    / "dist-tags"
+    /? string "package_name"
 
   module Responses = struct
     module OK = struct end
@@ -668,6 +791,23 @@ module PostApiV4GroupsIdPackagesNpmNpmV1SecurityAuditsQuick = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "packages"
+    / "npm"
+    / "-"
+    / "npm"
+    / "v1"
+    / "security"
+    / "audits"
+    / "quick"
+
   module Responses = struct
     module OK = struct end
     module Temporary_redirect = struct end
@@ -713,6 +853,23 @@ module PostApiV4GroupsIdPackagesNpmNpmV1SecurityAdvisoriesBulk = struct
   module Parameters = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "packages"
+    / "npm"
+    / "-"
+    / "npm"
+    / "v1"
+    / "security"
+    / "advisories"
+    / "bulk"
 
   module Responses = struct
     module OK = struct end
@@ -764,10 +921,19 @@ module GetApiV4GroupsIdPackagesNpm_packageName = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "package_name"
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "packages"
+    / "npm"
+    / "*package_name"
+    /? string "package_name"
 
   module Responses = struct
     module OK = struct end
@@ -826,10 +992,20 @@ module GetApiV4GroupsIdPackagesMaven_pathFileName = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "path"
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "packages"
+    / "maven"
+    / "*path"
+    /% Path.string
+    /? string "path"
 
   module Responses = struct
     module OK = struct end
@@ -891,6 +1067,24 @@ struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "packages"
+    / "debian"
+    / "pool"
+    /% Path.string
+    /% Path.int
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -950,10 +1144,25 @@ struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "distribution"
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "packages"
+    / "debian"
+    / "dists"
+    / "*distribution"
+    /% Path.string
+    / "source"
+    / "by-hash"
+    / "SHA256"
+    /% Path.int
+    /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -1017,10 +1226,23 @@ module GetApiV4GroupsIdPackagesDebianDists_distributionComponentSourceSources = 
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "distribution"
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "packages"
+    / "debian"
+    / "dists"
+    / "*distribution"
+    /% Path.string
+    / "source"
+    / "Sources"
+    /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -1083,10 +1305,26 @@ struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "distribution"
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "packages"
+    / "debian"
+    / "dists"
+    / "*distribution"
+    /% Path.string
+    / "debian-installer"
+    /% Path.ud (fun segment -> CCString.chop_prefix ~pre:"binary-" segment)
+    / "by-hash"
+    / "SHA256"
+    /% Path.int
+    /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -1154,10 +1392,24 @@ struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "distribution"
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "packages"
+    / "debian"
+    / "dists"
+    / "*distribution"
+    /% Path.string
+    / "debian-installer"
+    /% Path.ud (fun segment -> CCString.chop_prefix ~pre:"binary-" segment)
+    / "Packages"
+    /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -1225,10 +1477,25 @@ struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "distribution"
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "packages"
+    / "debian"
+    / "dists"
+    / "*distribution"
+    /% Path.string
+    /% Path.ud (fun segment -> CCString.chop_prefix ~pre:"binary-" segment)
+    / "by-hash"
+    / "SHA256"
+    /% Path.int
+    /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -1294,10 +1561,23 @@ module GetApiV4GroupsIdPackagesDebianDists_distributionComponentBinaryArchitectu
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "distribution"
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "packages"
+    / "debian"
+    / "dists"
+    / "*distribution"
+    /% Path.string
+    /% Path.ud (fun segment -> CCString.chop_prefix ~pre:"binary-" segment)
+    / "Packages"
+    /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -1360,10 +1640,21 @@ module GetApiV4GroupsIdPackagesDebianDists_distributionReleaseGpg = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "distribution"
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "packages"
+    / "debian"
+    / "dists"
+    / "*distribution"
+    / "Release.gpg"
+    /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -1418,10 +1709,21 @@ module GetApiV4GroupsIdPackagesDebianDists_distributionRelease = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "distribution"
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "packages"
+    / "debian"
+    / "dists"
+    / "*distribution"
+    / "Release"
+    /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -1476,10 +1778,21 @@ module GetApiV4GroupsIdPackagesDebianDists_distributionInrelease = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "distribution"
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "packages"
+    / "debian"
+    / "dists"
+    / "*distribution"
+    / "InRelease"
+    /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -1533,6 +1846,18 @@ module GetApiV4GroupsIdDebianDistributionsCodenameKeyAsc = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "debian_distributions"
+    /% Path.string
+    / "key.asc"
 
   module Responses = struct
     module OK = struct end
@@ -1597,10 +1922,17 @@ module DeleteApiV4GroupsIdDebianDistributionsCodename = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "debian_distributions"
+    /% Path.string
     /? option (string "suite")
     /? option (string "origin")
     /? option (string "label")
@@ -1677,6 +2009,10 @@ module PutApiV4GroupsIdDebianDistributionsCodename = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "-" / "debian_distributions" /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -1729,6 +2065,10 @@ module GetApiV4GroupsIdDebianDistributionsCodename = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "-" / "debian_distributions" /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -1776,6 +2116,10 @@ module PostApiV4GroupsIdDebianDistributions = struct
     type t = Gitlabc_components.PostApiV4GroupsIdDebianDistributions.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "-" / "debian_distributions"
 
   module Responses = struct
     module Created = struct end
@@ -1847,10 +2191,16 @@ module GetApiV4GroupsIdDebianDistributions = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "-"
+    / "debian_distributions"
     /? option_default 1 (int "page")
     /? option_default 20 (int "per_page")
     /? option (string "codename")
@@ -1921,6 +2271,10 @@ module DeleteApiV4GroupsId = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -1953,6 +2307,10 @@ module PutApiV4GroupsId = struct
     type t = Gitlabc_components.PutApiV4GroupsId.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string
 
   module Responses = struct
     module OK = struct end
@@ -1989,10 +2347,14 @@ module GetApiV4GroupsId = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
     /? option_default false (bool "with_custom_attributes")
     /? option_default true (bool "with_projects")
 
@@ -2031,6 +2393,10 @@ end
 module PostApiV4GroupsImportAuthorize = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" / "import" / "authorize"
+
   module Responses = struct
     module Created = struct end
 
@@ -2062,6 +2428,10 @@ module PostApiV4GroupsImport = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" / "import"
 
   module Responses = struct
     module Accepted = struct end
@@ -2108,6 +2478,10 @@ module PostApiV4Groups = struct
     type t = Gitlabc_components.PostApiV4Groups.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups"
 
   module Responses = struct
     module Created = struct end
@@ -2220,10 +2594,13 @@ module GetApiV4Groups = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "groups"
     /? option_default false (bool "statistics")
     /? option (array (int "skip_groups"))
     /? option (bool "all_available")

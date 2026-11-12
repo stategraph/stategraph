@@ -7,6 +7,10 @@ module GetApiV4GroupsIdAuditEventsAuditEventId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "audit_events" /% Path.int
+
   module Responses = struct
     module OK = struct end
 
@@ -42,10 +46,15 @@ module GetApiV4GroupsIdAuditEvents = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.int
+    / "audit_events"
     /? option (string "created_after")
     /? option (string "created_before")
     /? option_default 1 (int "page")

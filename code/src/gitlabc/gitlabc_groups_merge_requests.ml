@@ -225,10 +225,15 @@ module GetApiV4GroupsIdMergeRequests = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "merge_requests"
     /? option (int "author_id")
     /? option (string "author_username")
     /? option (int "assignee_id")

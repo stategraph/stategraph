@@ -1,6 +1,10 @@
 module GetApiV4Version = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "version"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end

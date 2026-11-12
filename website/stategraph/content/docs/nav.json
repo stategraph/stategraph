@@ -152,6 +152,10 @@
                 {
                   "page": "/docs/orchestration/workflows/advanced/github-reusable-workflows",
                   "label": "GitHub reusable workflows"
+                },
+                {
+                  "page": "/docs/orchestration/workflows/advanced/run-titles",
+                  "label": "Run titles"
                 }
               ]
             }

@@ -3,6 +3,10 @@ module Get_task_by_id = struct
     type t = { task_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "agents" / "tasks" /% Path.string
+
   module Responses = struct
     module OK = struct
       module All_of = struct
@@ -1122,10 +1126,12 @@ module List_tasks = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "agents"
+    / "tasks"
     /? option_default 30 (int "per_page")
     /? option_default 1 (int "page")
     /? option_default
@@ -1676,6 +1682,10 @@ module Get_task_by_repo_and_id = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "agents" / "repos" /% Path.string /% Path.string / "tasks" /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -2775,6 +2785,10 @@ module Create_task_in_repo = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "agents" / "repos" /% Path.string /% Path.string / "tasks"
+
   module Responses = struct
     module Created = struct
       module Primary = struct
@@ -3337,10 +3351,15 @@ module List_tasks_for_repo = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "agents"
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "tasks"
     /? option_default 30 (int "per_page")
     /? option_default 1 (int "page")
     /? option_default

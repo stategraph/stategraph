@@ -1,6 +1,10 @@
 module Remove_restrictions_for_authenticated_user = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "interaction-limits"
+
   module Responses = struct
     module No_content = struct end
 
@@ -28,6 +32,10 @@ module Set_restrictions_for_authenticated_user = struct
     type t = Githubc2_components.Interaction_limit.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "interaction-limits"
 
   module Responses = struct
     module OK = struct
@@ -70,6 +78,10 @@ end
 
 module Get_restrictions_for_authenticated_user = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "interaction-limits"
 
   module Responses = struct
     module OK = struct
@@ -142,6 +154,10 @@ module Update_pull_request_creation_cap_for_repo = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "interaction-limits" / "pulls" / "creation-cap"
 
   module Responses = struct
     module OK = struct
@@ -222,6 +238,10 @@ module Get_pull_request_creation_cap_for_repo = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "interaction-limits" / "pulls" / "creation-cap"
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -296,6 +316,10 @@ module Remove_pull_request_bypass_list_for_repo = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "interaction-limits" / "pulls" / "bypass-list"
+
   module Responses = struct
     module No_content = struct end
 
@@ -363,6 +387,10 @@ module Set_pull_request_bypass_list_for_repo = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "interaction-limits" / "pulls" / "bypass-list"
+
   module Responses = struct
     module No_content = struct end
 
@@ -425,6 +453,10 @@ module Get_pull_request_bypass_list_for_repo = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "interaction-limits" / "pulls" / "bypass-list"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Simple_user.t list
@@ -480,6 +512,10 @@ module Remove_restrictions_for_repo = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "interaction-limits"
+
   module Responses = struct
     module No_content = struct end
     module Conflict = struct end
@@ -521,6 +557,10 @@ module Set_restrictions_for_repo = struct
     type t = Githubc2_components.Interaction_limit.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "interaction-limits"
 
   module Responses = struct
     module OK = struct
@@ -567,6 +607,10 @@ module Get_restrictions_for_repo = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "interaction-limits"
 
   module Responses = struct
     module OK = struct
@@ -629,6 +673,10 @@ module Update_pull_request_creation_cap_for_org = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "interaction-limits" / "pulls" / "creation-cap"
 
   module Responses = struct
     module OK = struct
@@ -705,6 +753,10 @@ module Get_pull_request_creation_cap_for_org = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "interaction-limits" / "pulls" / "creation-cap"
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -770,6 +822,10 @@ module Remove_restrictions_for_org = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "interaction-limits"
+
   module Responses = struct
     module No_content = struct end
 
@@ -802,6 +858,10 @@ module Set_restrictions_for_org = struct
     type t = Githubc2_components.Interaction_limit.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "interaction-limits"
 
   module Responses = struct
     module OK = struct
@@ -849,6 +909,10 @@ module Get_restrictions_for_org = struct
   module Parameters = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "interaction-limits"
 
   module Responses = struct
     module OK = struct

@@ -7,6 +7,17 @@ module GetApiV4ProjectsIdDebianDistributionsCodenameKeyAsc = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "debian_distributions"
+    /% Path.string
+    / "key.asc"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -70,10 +81,16 @@ module DeleteApiV4ProjectsIdDebianDistributionsCodename = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "debian_distributions"
+    /% Path.string
     /? option (string "suite")
     /? option (string "origin")
     /? option (string "label")
@@ -150,6 +167,10 @@ module PutApiV4ProjectsIdDebianDistributionsCodename = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "debian_distributions" /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -202,6 +223,10 @@ module GetApiV4ProjectsIdDebianDistributionsCodename = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "debian_distributions" /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -249,6 +274,10 @@ module PostApiV4ProjectsIdDebianDistributions = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdDebianDistributions.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "debian_distributions"
 
   module Responses = struct
     module Created = struct end
@@ -320,10 +349,15 @@ module GetApiV4ProjectsIdDebianDistributions = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "debian_distributions"
     /? option_default 1 (int "page")
     /? option_default 20 (int "per_page")
     /? option (string "codename")

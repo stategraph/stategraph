@@ -8,6 +8,10 @@ module Get_sarif = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "code-scanning" / "sarifs" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Code_scanning_sarifs_status.t
@@ -91,6 +95,10 @@ module Upload_sarif = struct
     }
     [@@deriving make, yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "code-scanning" / "sarifs"
 
   module Responses = struct
     module Accepted = struct
@@ -176,6 +184,10 @@ module Update_default_setup = struct
     type t = Githubc2_components.Code_scanning_default_setup_update.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "code-scanning" / "default-setup"
 
   module Responses = struct
     module OK = struct
@@ -271,6 +283,10 @@ module Get_default_setup = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "code-scanning" / "default-setup"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Code_scanning_default_setup.t
@@ -344,6 +360,20 @@ module Get_variant_analysis_repo_task = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "code-scanning"
+    / "codeql"
+    / "variant-analyses"
+    /% Path.int
+    / "repos"
+    /% Path.string
+    /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Code_scanning_variant_analysis_repo_task.t
@@ -414,6 +444,17 @@ module Get_variant_analysis = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "code-scanning"
+    / "codeql"
+    / "variant-analyses"
+    /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -574,6 +615,10 @@ module Create_variant_analysis = struct
       | V2 v -> V2.to_yojson v
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "code-scanning" / "codeql" / "variant-analyses"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Code_scanning_variant_analysis.t
@@ -648,6 +693,17 @@ module Delete_codeql_database = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "code-scanning"
+    / "codeql"
+    / "databases"
+    /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -719,6 +775,17 @@ module Get_codeql_database = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "code-scanning"
+    / "codeql"
+    / "databases"
+    /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -798,6 +865,10 @@ module List_codeql_databases = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "code-scanning" / "codeql" / "databases"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Code_scanning_codeql_database.t list
@@ -870,10 +941,17 @@ module Delete_analysis = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "confirm_delete")
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "code-scanning"
+    / "analyses"
+    /% Path.int
+    /? option (string "confirm_delete")
 
   module Responses = struct
     module OK = struct
@@ -959,6 +1037,10 @@ module Get_analysis = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "code-scanning" / "analyses" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -1080,10 +1162,15 @@ module List_recent_analyses = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "code-scanning"
+    / "analyses"
     /? option (string "tool_name")
     /? option (string "tool_guid")
     /? option_default 1 (int "page")
@@ -1187,10 +1274,17 @@ module List_alert_instances = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "code-scanning"
+    / "alerts"
+    /% Path.int
+    / "instances"
     /? option_default 1 (int "page")
     /? option_default 30 (int "per_page")
     /? option (string "ref")
@@ -1284,6 +1378,18 @@ module Commit_autofix = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "code-scanning"
+    / "alerts"
+    /% Path.int
+    / "autofix"
+    / "commits"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Code_scanning_autofix_commits_response.t
@@ -1372,6 +1478,10 @@ module Create_autofix = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "code-scanning" / "alerts" /% Path.int / "autofix"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Code_scanning_autofix.t
@@ -1458,6 +1568,10 @@ module Get_autofix = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "code-scanning" / "alerts" /% Path.int / "autofix"
 
   module Responses = struct
     module OK = struct
@@ -1586,6 +1700,10 @@ module Update_alert = struct
       | V1 v -> V1.to_yojson v
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "code-scanning" / "alerts" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Code_scanning_alert.t
@@ -1669,6 +1787,10 @@ module Get_alert = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "code-scanning" / "alerts" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -1797,10 +1919,15 @@ module List_alerts_for_repo = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "code-scanning"
+    / "alerts"
     /? option (string "tool_name")
     /? option (string "tool_guid")
     /? option_default 1 (int "page")
@@ -1969,10 +2096,14 @@ module List_alerts_for_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "code-scanning"
+    / "alerts"
     /? option (string "tool_name")
     /? option (string "tool_guid")
     /? option (string "before")

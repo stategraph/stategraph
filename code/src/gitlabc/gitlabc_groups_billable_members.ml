@@ -9,10 +9,19 @@ module GetApiV4GroupsIdBillableMembersUserIdMemberships = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "billable_members"
+    /% Path.int
+    / "memberships"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -51,10 +60,19 @@ module GetApiV4GroupsIdBillableMembersUserIdIndirect = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "billable_members"
+    /% Path.int
+    / "indirect"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -90,6 +108,10 @@ module DeleteApiV4GroupsIdBillableMembersUserId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "billable_members" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -168,10 +190,15 @@ module GetApiV4GroupsIdBillableMembers = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "billable_members"
     /? option_default 1 (int "page")
     /? option_default 20 (int "per_page")
     /? option (string "search")

@@ -14,6 +14,10 @@ module Revoke = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "credentials" / "revoke"
+
   module Responses = struct
     module Accepted = struct
       include Json_schema.Additional_properties.Make (Json_schema.Empty_obj) (Json_schema.Obj)

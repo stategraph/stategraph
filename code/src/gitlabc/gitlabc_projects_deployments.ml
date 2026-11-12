@@ -222,10 +222,17 @@ module GetApiV4ProjectsIdDeploymentsDeploymentIdMergeRequests = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "deployments"
+    /% Path.int
+    / "merge_requests"
     /? option_default 1 (int "page")
     /? option_default 20 (int "per_page")
     /? option (int "author_id")
@@ -375,6 +382,10 @@ module PostApiV4ProjectsIdDeploymentsDeploymentIdApproval = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "deployments" /% Path.int / "approval"
+
   module Responses = struct
     module Created = struct end
 
@@ -408,6 +419,10 @@ module DeleteApiV4ProjectsIdDeploymentsDeploymentId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "deployments" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -457,6 +472,10 @@ module PutApiV4ProjectsIdDeploymentsDeploymentId = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdDeploymentsDeploymentId.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "deployments" /% Path.int
 
   module Responses = struct
     module OK = struct end
@@ -510,6 +529,10 @@ module GetApiV4ProjectsIdDeploymentsDeploymentId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "deployments" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -552,6 +575,10 @@ module PostApiV4ProjectsIdDeployments = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdDeployments.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "deployments"
 
   module Responses = struct
     module Created = struct end
@@ -689,10 +716,15 @@ module GetApiV4ProjectsIdDeployments = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "deployments"
     /? option_default 1 (int "page")
     /? option_default 20 (int "per_page")
     /? option_default

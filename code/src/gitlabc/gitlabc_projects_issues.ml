@@ -9,6 +9,20 @@ module DeleteApiV4ProjectsIdIssuesIssueIidNotesNoteIdAwardEmojiAwardId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "issues"
+    /% Path.int
+    / "notes"
+    /% Path.int
+    / "award_emoji"
+    /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Unauthorized = struct end
@@ -60,6 +74,20 @@ module GetApiV4ProjectsIdIssuesIssueIidNotesNoteIdAwardEmojiAwardId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "issues"
+    /% Path.int
+    / "notes"
+    /% Path.int
+    / "award_emoji"
+    /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -107,6 +135,19 @@ module PostApiV4ProjectsIdIssuesIssueIidNotesNoteIdAwardEmoji = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdIssuesIssueIidNotesNoteIdAwardEmoji.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "issues"
+    /% Path.int
+    / "notes"
+    /% Path.int
+    / "award_emoji"
 
   module Responses = struct
     module Created = struct end
@@ -161,10 +202,21 @@ module GetApiV4ProjectsIdIssuesIssueIidNotesNoteIdAwardEmoji = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "issues"
+    /% Path.int
+    / "notes"
+    /% Path.int
+    / "award_emoji"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -210,6 +262,10 @@ module DeleteApiV4ProjectsIdIssuesIssueIidLinksIssueLinkId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "issues" /% Path.int / "links" /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -259,6 +315,10 @@ module GetApiV4ProjectsIdIssuesIssueIidLinksIssueLinkId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "issues" /% Path.int / "links" /% Path.string
 
   module Responses = struct
     module OK = struct end
@@ -311,6 +371,10 @@ module PostApiV4ProjectsIdIssuesIssueIidLinks = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "issues" /% Path.int / "links"
+
   module Responses = struct
     module Created = struct end
     module Bad_request = struct end
@@ -357,6 +421,10 @@ module GetApiV4ProjectsIdIssuesIssueIidLinks = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "issues" /% Path.int / "links"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -399,6 +467,10 @@ module DeleteApiV4ProjectsIdIssuesIssueIidAwardEmojiAwardId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "issues" /% Path.int / "award_emoji" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -449,6 +521,10 @@ module GetApiV4ProjectsIdIssuesIssueIidAwardEmojiAwardId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "issues" /% Path.int / "award_emoji" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -494,6 +570,10 @@ module PostApiV4ProjectsIdIssuesIssueIidAwardEmoji = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdIssuesIssueIidAwardEmoji.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "issues" /% Path.int / "award_emoji"
 
   module Responses = struct
     module Created = struct end
@@ -543,10 +623,19 @@ module GetApiV4ProjectsIdIssuesIssueIidAwardEmoji = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "issues"
+    /% Path.int
+    / "award_emoji"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -588,6 +677,18 @@ module GetApiV4ProjectsIdIssuesEventableIdResourceMilestoneEventsEventId = struc
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "issues"
+    /% Path.int
+    / "resource_milestone_events"
+    /% Path.string
 
   module Responses = struct
     module OK = struct end
@@ -632,10 +733,19 @@ module GetApiV4ProjectsIdIssuesEventableIdResourceMilestoneEvents = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "issues"
+    /% Path.int
+    / "resource_milestone_events"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end

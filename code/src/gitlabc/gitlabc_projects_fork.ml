@@ -7,6 +7,10 @@ module PostApiV4ProjectsIdForkForkedFromId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "fork" /% Path.string
+
   module Responses = struct
     module Created = struct end
     module Unauthorized = struct end
@@ -51,6 +55,10 @@ module DeleteApiV4ProjectsIdFork = struct
   module Parameters = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "fork"
 
   module Responses = struct
     module No_content = struct end
@@ -99,6 +107,10 @@ module PostApiV4ProjectsIdFork = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdFork.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "fork"
 
   module Responses = struct
     module Created = struct end

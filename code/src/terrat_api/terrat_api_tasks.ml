@@ -3,6 +3,10 @@ module Get = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tasks" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Terrat_api_components.Task.t

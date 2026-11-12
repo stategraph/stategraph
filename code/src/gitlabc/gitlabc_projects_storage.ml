@@ -3,6 +3,10 @@ module GetApiV4ProjectsIdStorage = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "storage"
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end

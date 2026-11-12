@@ -82,10 +82,16 @@ module GetApiV4GroupsIdGroupsShared = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "groups"
+    / "shared"
     /? option (array (int "skip_groups"))
     /? option
          (ud "visibility" (fun value ->

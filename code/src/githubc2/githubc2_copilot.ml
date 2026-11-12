@@ -7,6 +7,10 @@ module Get_copilot_cloud_agent_configuration = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "copilot" / "cloud-agent" / "configuration"
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -113,6 +117,10 @@ module Get_copilot_seat_details_for_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "members" /% Path.string / "copilot"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Copilot_seat_details.t
@@ -184,6 +192,10 @@ module Copilot_organization_users_usage_metrics = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot" / "metrics" / "reports" / "users-28-day" / "latest"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Copilot_usage_metrics_28_day_report.t
@@ -248,10 +260,10 @@ module Copilot_organization_users_one_day_usage_metrics = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "day"
+    rel / "orgs" /% Path.string / "copilot" / "metrics" / "reports" / "users-1-day" /? string "day"
 
   module Responses = struct
     module OK = struct
@@ -324,10 +336,17 @@ module Copilot_organization_user_teams_one_day_report = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "day"
+    rel
+    / "orgs"
+    /% Path.string
+    / "copilot"
+    / "metrics"
+    / "reports"
+    / "user-teams-1-day"
+    /? string "day"
 
   module Responses = struct
     module OK = struct
@@ -400,10 +419,10 @@ module Copilot_organization_repos_one_day_report = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "day"
+    rel / "orgs" /% Path.string / "copilot" / "metrics" / "reports" / "repos-1-day" /? string "day"
 
   module Responses = struct
     module OK = struct
@@ -472,6 +491,17 @@ module Copilot_organization_usage_metrics = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "orgs"
+    /% Path.string
+    / "copilot"
+    / "metrics"
+    / "reports"
+    / "organization-28-day"
+    / "latest"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Copilot_usage_metrics_28_day_report.t
@@ -536,10 +566,17 @@ module Copilot_organization_one_day_usage_metrics = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "day"
+    rel
+    / "orgs"
+    /% Path.string
+    / "copilot"
+    / "metrics"
+    / "reports"
+    / "organization-1-day"
+    /? string "day"
 
   module Responses = struct
     module OK = struct
@@ -668,6 +705,10 @@ module Set_copilot_content_exclusion_for_organization = struct
     include Json_schema.Additional_properties.Make (Json_schema.Empty_obj) (Additional)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot" / "content_exclusion"
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -759,6 +800,10 @@ module Copilot_content_exclusion_for_organization = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot" / "content_exclusion"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Copilot_organization_content_exclusion_details.t
@@ -829,6 +874,17 @@ module Disable_copilot_coding_agent_for_repository_in_organization = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "orgs"
+    /% Path.string
+    / "copilot"
+    / "coding-agent"
+    / "permissions"
+    / "repositories"
+    /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -904,6 +960,17 @@ module Enable_copilot_coding_agent_for_repository_in_organization = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "orgs"
+    /% Path.string
+    / "copilot"
+    / "coding-agent"
+    / "permissions"
+    / "repositories"
+    /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -997,6 +1064,10 @@ module Set_copilot_coding_agent_selected_repositories_for_organization = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot" / "coding-agent" / "permissions" / "repositories"
+
   module Responses = struct
     module No_content = struct end
 
@@ -1083,10 +1154,18 @@ module List_copilot_coding_agent_selected_repositories_for_organization = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "copilot"
+    / "coding-agent"
+    / "permissions"
+    / "repositories"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1207,6 +1286,10 @@ module Set_copilot_coding_agent_permissions_organization = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot" / "coding-agent" / "permissions"
+
   module Responses = struct
     module No_content = struct end
 
@@ -1280,6 +1363,10 @@ module Get_copilot_coding_agent_permissions_organization = struct
   module Parameters = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot" / "coding-agent" / "permissions"
 
   module Responses = struct
     module OK = struct
@@ -1389,6 +1476,10 @@ module Cancel_copilot_seat_assignment_for_users = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot" / "billing" / "selected_users"
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -1478,6 +1569,10 @@ module Add_copilot_seats_for_users = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot" / "billing" / "selected_users"
 
   module Responses = struct
     module Created = struct
@@ -1569,6 +1664,10 @@ module Cancel_copilot_seat_assignment_for_teams = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot" / "billing" / "selected_teams"
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -1659,6 +1758,10 @@ module Add_copilot_seats_for_teams = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot" / "billing" / "selected_teams"
+
   module Responses = struct
     module Created = struct
       module Primary = struct
@@ -1741,10 +1844,17 @@ module List_copilot_seats = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 50 (int "per_page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "copilot"
+    / "billing"
+    / "seats"
+    /? option_default 1 (int "page")
+    /? option_default 50 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -1827,6 +1937,10 @@ module Get_copilot_organization_details = struct
   module Parameters = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot" / "billing"
 
   module Responses = struct
     module OK = struct
@@ -1935,6 +2049,10 @@ module Remove_organizations_from_enterprise_coding_agent_policy = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "copilot" / "policies" / "coding_agent" / "organizations"
+
   module Responses = struct
     module No_content = struct end
 
@@ -2014,6 +2132,10 @@ module Add_organizations_to_enterprise_coding_agent_policy = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "copilot" / "policies" / "coding_agent" / "organizations"
+
   module Responses = struct
     module No_content = struct end
 
@@ -2090,6 +2212,10 @@ module Set_enterprise_coding_agent_policy = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "copilot" / "policies" / "coding_agent"
+
   module Responses = struct
     module No_content = struct end
 
@@ -2132,6 +2258,17 @@ module Copilot_users_usage_metrics = struct
   module Parameters = struct
     type t = { enterprise : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "enterprises"
+    /% Path.string
+    / "copilot"
+    / "metrics"
+    / "reports"
+    / "users-28-day"
+    / "latest"
 
   module Responses = struct
     module OK = struct
@@ -2197,10 +2334,17 @@ module Copilot_users_one_day_usage_metrics = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "day"
+    rel
+    / "enterprises"
+    /% Path.string
+    / "copilot"
+    / "metrics"
+    / "reports"
+    / "users-1-day"
+    /? string "day"
 
   module Responses = struct
     module OK = struct
@@ -2269,10 +2413,17 @@ module Copilot_enterprise_user_teams_one_day_report = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "day"
+    rel
+    / "enterprises"
+    /% Path.string
+    / "copilot"
+    / "metrics"
+    / "reports"
+    / "user-teams-1-day"
+    /? string "day"
 
   module Responses = struct
     module OK = struct
@@ -2341,10 +2492,17 @@ module Copilot_enterprise_repos_one_day_report = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "day"
+    rel
+    / "enterprises"
+    /% Path.string
+    / "copilot"
+    / "metrics"
+    / "reports"
+    / "repos-1-day"
+    /? string "day"
 
   module Responses = struct
     module OK = struct
@@ -2413,6 +2571,17 @@ module Copilot_enterprise_usage_metrics = struct
     type t = { enterprise : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "enterprises"
+    /% Path.string
+    / "copilot"
+    / "metrics"
+    / "reports"
+    / "enterprise-28-day"
+    / "latest"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Copilot_usage_metrics_28_day_report.t
@@ -2477,10 +2646,17 @@ module Copilot_enterprise_one_day_usage_metrics = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "day"
+    rel
+    / "enterprises"
+    /% Path.string
+    / "copilot"
+    / "metrics"
+    / "reports"
+    / "enterprise-1-day"
+    /? string "day"
 
   module Responses = struct
     module OK = struct

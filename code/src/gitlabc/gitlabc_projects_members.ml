@@ -9,10 +9,16 @@ module DeleteApiV4ProjectsIdMembersUserId = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "members"
+    /% Path.int
     /? option_default false (bool "skip_subresources")
     /? option_default false (bool "unassign_issuables")
 
@@ -59,6 +65,10 @@ module PutApiV4ProjectsIdMembersUserId = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "members" /% Path.int
+
   module Responses = struct
     module OK = struct end
 
@@ -93,6 +103,10 @@ module GetApiV4ProjectsIdMembersUserId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "members" /% Path.int
+
   module Responses = struct
     module OK = struct end
 
@@ -124,6 +138,10 @@ module GetApiV4ProjectsIdMembersAllUserId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "members" / "all" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -196,10 +214,16 @@ module GetApiV4ProjectsIdMembersAll = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "members"
+    / "all"
     /? option (string "query")
     /? option (array (int "user_ids"))
     /? option (bool "show_seat_info")
@@ -251,6 +275,10 @@ module PostApiV4ProjectsIdMembers = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "members"
+
   module Responses = struct
     module Created = struct end
 
@@ -299,10 +327,15 @@ module GetApiV4ProjectsIdMembers = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "members"
     /? option (string "query")
     /? option (array (int "user_ids"))
     /? option (array (int "skip_users"))

@@ -1,6 +1,5 @@
 module Rt = struct
   let api_v1 () = Brtl_rtng.Route.(rel / "api" / "v1")
-  let user_tenants () = Brtl_rtng.Route.(api_v1 () / "user" / "tenants")
 
   let tenants_create () =
     Brtl_rtng.Route.(
@@ -64,10 +63,6 @@ module Rt = struct
   let tenant_invitation_revoke () =
     Brtl_rtng.Route.(tenant () / "invitations" / "revoke" /? Query.string "id")
 
-  (* Unauthenticated: the invitation token is the credential, so this sits outside the tenant path. *)
-  let invitation_preview () =
-    Brtl_rtng.Route.(api_v1 () / "invitations" / "preview" /? Query.string "token")
-
   let invitation_accept () =
     Brtl_rtng.Route.(
       api_v1 ()
@@ -109,7 +104,9 @@ module Make (Cloud : Sgs_cloud.S) = struct
   let routes { config; storage } =
     Brtl_rtng.Route.
       [
-        (`GET, Rt.user_tenants () --> Sgs_service_tenants_ep_user_tenants.run config storage);
+        ( `GET,
+          Sgs_api_user.Tenants.route () --> Sgs_service_tenants_ep_user_tenants.run config storage
+        );
         (* Members before the bare tenant route: /members and /members/set-role are more specific
          than the tenant path they hang off, and the router matches in order. *)
         (`POST, Rt.tenants_create () --> Sgs_service_tenants_ep_create.run config storage);
@@ -130,9 +127,11 @@ module Make (Cloud : Sgs_cloud.S) = struct
         ( `GET,
           Rt.tenant_invitations () --> Sgs_service_tenants_ep_invitation_list.run config storage );
         (`POST, Rt.tenant_invitation_create () --> Ep_invitation_create.run config storage);
+        (* Unauthenticated: the invitation token is the credential, so this sits outside the tenant
+           path. *)
         ( `GET,
-          Rt.invitation_preview () --> Sgs_service_tenants_ep_invitation_preview.run config storage
-        );
+          Sgs_api_invitations.Preview.route ()
+          --> Sgs_service_tenants_ep_invitation_preview.run config storage );
         ( `POST,
           Rt.invitation_accept () --> Sgs_service_tenants_ep_invitation_accept.run config storage );
       ]

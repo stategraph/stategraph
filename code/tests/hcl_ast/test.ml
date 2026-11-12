@@ -275,10 +275,9 @@ let tofu_parity_skipped_fixtures =
     "ghfail_zheli_harmony-cloudwatch-synthetic-canary-scripts__terraform__expected_results_bad.hcl";
   ]
 
-(* The tag every test in this group carries, so a build that deliberately ships no
-   OpenTofu can turn the whole group off with
-   [OTH_EXCLUDE_TAGS=HCL_AST_TESTS_NEEDING_TOFU] instead of carrying known-red tests.
-   The terrateam image does exactly that. *)
+(* The tag every test in this group carries, so that a run without OpenTofu can turn the whole
+   group off with [OTH_EXCLUDE_TAGS=HCL_AST_TESTS_NEEDING_TOFU] instead of carrying known-red
+   tests. No test name can stand in for it: the names hold spaces, which a tag expression cannot. *)
 let tofu_tag = "HCL_AST_TESTS_NEEDING_TOFU"
 
 (* [tofu fmt] is the ground truth this group compares the shim against, so its

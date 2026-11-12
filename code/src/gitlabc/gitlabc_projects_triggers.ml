@@ -7,6 +7,10 @@ module DeleteApiV4ProjectsIdTriggersTriggerId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "triggers" /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Unauthorized = struct end
@@ -62,6 +66,10 @@ module PutApiV4ProjectsIdTriggersTriggerId = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "triggers" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -114,6 +122,10 @@ module GetApiV4ProjectsIdTriggersTriggerId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "triggers" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -161,6 +173,10 @@ module PostApiV4ProjectsIdTriggers = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdTriggers.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "triggers"
 
   module Responses = struct
     module Created = struct end
@@ -215,10 +231,17 @@ module GetApiV4ProjectsIdTriggers = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "triggers"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct

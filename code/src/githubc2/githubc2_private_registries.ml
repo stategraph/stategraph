@@ -156,6 +156,10 @@ module Update_org_private_registry = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "private-registries" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -211,6 +215,10 @@ module Delete_org_private_registry = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "private-registries" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -263,6 +271,10 @@ module Get_org_private_registry = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "private-registries" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Org_private_registry_configuration.t
@@ -306,6 +318,10 @@ module Get_org_public_key = struct
   module Parameters = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "private-registries" / "public-key"
 
   module Responses = struct
     module OK = struct
@@ -507,6 +523,10 @@ module Create_org_private_registry = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "private-registries"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Org_private_registry_configuration_with_selected_repositories.t
@@ -566,10 +586,15 @@ module List_org_private_registries = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "private-registries"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct

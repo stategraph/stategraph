@@ -80,6 +80,10 @@ module Update = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "teams" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Enterprise_team.t
@@ -133,6 +137,10 @@ module Delete = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "teams" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -180,6 +188,10 @@ module Get = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "teams" /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -301,6 +313,10 @@ module Create = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "teams"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Enterprise_team.t
@@ -339,10 +355,15 @@ module List = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "enterprises"
+    /% Path.string
+    / "teams"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct

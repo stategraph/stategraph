@@ -18,13 +18,23 @@
 -- delete_old_terraform_plans.sql: after it the plan of that run is gone as well, thus its tree can
 -- answer no question.
 --
+-- The tree of the commit or of the base commit of a queued or running work manifest stays: the
+-- result of that run is evaluated with the refs of the run pinned, and a pinned evaluation cannot
+-- store a tree again.
+--
 -- The limit is arbitrary, as it is in delete_old_terraform_plans.sql.  A run which does not keep up
 -- leaves the rest to the run of the next hour.
 with
+in_flight as (
+    select sha from work_manifests where state in ('queued', 'running')
+    union
+    select base_sha from work_manifests where state in ('queued', 'running')
+),
 old_trees as (
     select installation, sha
     from repo_tree_builds
     where created_at < now() - interval '14 days'
+          and sha not in (select sha from in_flight)
     limit 100
 ),
 deleted_trees as (

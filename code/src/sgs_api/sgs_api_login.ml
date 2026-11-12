@@ -7,10 +7,10 @@ module Initiate = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "rd")
+    rel / "api" / "v1" / "login" /% Path.string /? option (string "rd")
 
   module Responses = struct
     module Found = struct end
@@ -58,6 +58,10 @@ module Password = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "login" / "password"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Login_password_response.t
@@ -101,6 +105,10 @@ end
 
 module Options = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "login" / "options"
 
   module Responses = struct
     module OK = struct

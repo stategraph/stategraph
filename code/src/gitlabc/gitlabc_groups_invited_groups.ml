@@ -34,10 +34,15 @@ module GetApiV4GroupsIdInvitedGroups = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "invited_groups"
     /? option
          (array
             (ud "relation" (fun value ->

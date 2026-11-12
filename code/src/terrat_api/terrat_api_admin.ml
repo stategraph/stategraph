@@ -1,6 +1,10 @@
 module Drifts = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "admin" / "drifts"
+
   module Responses = struct
     module OK = struct
       module Results = struct

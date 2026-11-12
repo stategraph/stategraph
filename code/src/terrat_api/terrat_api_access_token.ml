@@ -7,10 +7,10 @@ module Delete = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "id"
+    rel / "api" / "v1" /% Path.string / "access-token" /? string "id"
 
   module Responses = struct
     module OK = struct end
@@ -55,6 +55,10 @@ module Create = struct
     type t = Terrat_api_components.Access_token_create.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" /% Path.string / "access-token"
 
   module Responses = struct
     module OK = struct
@@ -111,10 +115,16 @@ module List = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 20 (int "limit") /? option (array (string "page"))
+    rel
+    / "api"
+    / "v1"
+    /% Path.string
+    / "access-token"
+    /? option_default 20 (int "limit")
+    /? option (array (string "page"))
 
   module Responses = struct
     module OK = struct
@@ -156,6 +166,10 @@ end
 
 module Refresh = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "access-token" / "refresh"
 
   module Responses = struct
     module OK = struct

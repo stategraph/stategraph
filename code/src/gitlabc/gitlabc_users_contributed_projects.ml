@@ -77,10 +77,15 @@ module GetApiV4UsersUserIdContributedProjects = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "users"
+    /% Path.string
+    / "contributed_projects"
     /? option_default
          `Created_at
          (ud "order_by" (fun value ->

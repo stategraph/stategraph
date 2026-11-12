@@ -8,6 +8,18 @@ module DeleteApiV4ProjectsIdAlertManagementAlertsAlertIidMetricImagesMetricImage
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "alert_management_alerts"
+    /% Path.int
+    / "metric_images"
+    /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Forbidden = struct end
@@ -60,6 +72,18 @@ module PutApiV4ProjectsIdAlertManagementAlertsAlertIidMetricImagesMetricImageId 
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "alert_management_alerts"
+    /% Path.int
+    / "metric_images"
+    /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -109,6 +133,18 @@ module PostApiV4ProjectsIdAlertManagementAlertsAlertIidMetricImagesAuthorize = s
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "alert_management_alerts"
+    /% Path.int
+    / "metric_images"
+    / "authorize"
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -149,6 +185,17 @@ module PostApiV4ProjectsIdAlertManagementAlertsAlertIidMetricImages = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "alert_management_alerts"
+    /% Path.int
+    / "metric_images"
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -185,6 +232,17 @@ module GetApiV4ProjectsIdAlertManagementAlertsAlertIidMetricImages = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "alert_management_alerts"
+    /% Path.int
+    / "metric_images"
 
   module Responses = struct
     module OK = struct end

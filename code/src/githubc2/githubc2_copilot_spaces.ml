@@ -8,6 +8,10 @@ module Delete_resource_for_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "copilot-spaces" /% Path.int / "resources" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -78,6 +82,10 @@ module Update_resource_for_user = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "copilot-spaces" /% Path.int / "resources" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Copilot_space_resource.t
@@ -147,6 +155,10 @@ module Get_resource_for_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "copilot-spaces" /% Path.int / "resources" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -250,6 +262,10 @@ module Create_resource_for_user = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "copilot-spaces" /% Path.int / "resources"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Copilot_space_resource.t
@@ -324,6 +340,10 @@ module List_resources_for_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "copilot-spaces" /% Path.int / "resources"
 
   module Responses = struct
     module OK = struct
@@ -411,6 +431,17 @@ module Remove_collaborator_for_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "users"
+    /% Path.string
+    / "copilot-spaces"
+    /% Path.int
+    / "collaborators"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Actor_type.t_of_yojson (`String value)))
+    /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -521,6 +552,17 @@ module Update_collaborator_for_user = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "users"
+    /% Path.string
+    / "copilot-spaces"
+    /% Path.int
+    / "collaborators"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Actor_type.t_of_yojson (`String value)))
+    /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -649,6 +691,10 @@ module Add_collaborator_for_user = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "copilot-spaces" /% Path.int / "collaborators"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Copilot_space_collaborator.t
@@ -717,6 +763,10 @@ module List_collaborators_for_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "copilot-spaces" /% Path.int / "collaborators"
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -783,6 +833,10 @@ module Delete_for_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "copilot-spaces" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -937,6 +991,10 @@ module Update_for_user = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "copilot-spaces" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Copilot_space.t
@@ -1004,6 +1062,10 @@ module Get_for_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "copilot-spaces" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -1156,6 +1218,10 @@ module Create_for_user = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "copilot-spaces"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Copilot_space.t
@@ -1223,10 +1289,13 @@ module List_for_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "users"
+    /% Path.string
+    / "copilot-spaces"
     /? option_default 30 (int "per_page")
     /? option (string "before")
     /? option (string "after")
@@ -1302,6 +1371,10 @@ module Delete_resource_for_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot-spaces" /% Path.int / "resources" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -1372,6 +1445,10 @@ module Update_resource_for_org = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot-spaces" /% Path.int / "resources" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Copilot_space_resource.t
@@ -1441,6 +1518,10 @@ module Get_resource_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot-spaces" /% Path.int / "resources" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -1544,6 +1625,10 @@ module Create_resource_for_org = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot-spaces" /% Path.int / "resources"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Copilot_space_resource.t
@@ -1615,6 +1700,10 @@ module List_resources_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot-spaces" /% Path.int / "resources"
 
   module Responses = struct
     module OK = struct
@@ -1699,6 +1788,17 @@ module Remove_collaborator_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "orgs"
+    /% Path.string
+    / "copilot-spaces"
+    /% Path.int
+    / "collaborators"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Actor_type.t_of_yojson (`String value)))
+    /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -1809,6 +1909,17 @@ module Update_collaborator_for_org = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "orgs"
+    /% Path.string
+    / "copilot-spaces"
+    /% Path.int
+    / "collaborators"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Actor_type.t_of_yojson (`String value)))
+    /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -1937,6 +2048,10 @@ module Add_collaborator_for_org = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot-spaces" /% Path.int / "collaborators"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Copilot_space_collaborator.t
@@ -2002,6 +2117,10 @@ module List_collaborators_for_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot-spaces" /% Path.int / "collaborators"
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -2065,6 +2184,10 @@ module Delete_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot-spaces" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -2222,6 +2345,10 @@ module Update_for_org = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot-spaces" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Copilot_space.t
@@ -2286,6 +2413,10 @@ module Get_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot-spaces" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -2441,6 +2572,10 @@ module Create_for_org = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "copilot-spaces"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Copilot_space.t
@@ -2508,10 +2643,13 @@ module List_for_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "copilot-spaces"
     /? option_default 30 (int "per_page")
     /? option (string "before")
     /? option (string "after")

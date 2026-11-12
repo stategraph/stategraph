@@ -9,6 +9,20 @@ module Get_pull_requests_stack = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v1"
+    /% Path.string
+    / "installations"
+    /% Path.string
+    / "repos"
+    /% Path.string
+    / "prs"
+    /% Path.string
+    / "stacks"
+
   module Responses = struct
     module OK = struct
       type t = Terrat_api_components.Stacks.t
@@ -68,10 +82,18 @@ module Get_work_manifest_outputs = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v1"
+    / "github"
+    / "installations"
+    /% Path.string
+    / "work-manifests"
+    /% Path.string
+    / "outputs"
     /? option (string "q")
     /? option (array (string "page"))
     /? option (string "tz")
@@ -150,6 +172,10 @@ module Get_work_manifest = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "github" / "installations" /% Path.string / "work-manifests" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Terrat_api_components.Installation_work_manifest.t
@@ -227,10 +253,16 @@ module List_work_manifests = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v1"
+    / "github"
+    / "installations"
+    /% Path.string
+    / "work-manifests"
     /? option (array (string "page"))
     /? option (string "q")
     /? option (ud "d" (fun value -> CCResult.to_opt (Parameters.D.t_of_yojson (`String value))))
@@ -303,6 +335,10 @@ module Delete_repo = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "github" / "installations" /% Path.string / "repos" /% Path.string
+
   module Responses = struct
     module OK = struct
       include Json_schema.Additional_properties.Make (Json_schema.Empty_obj) (Json_schema.Obj)
@@ -360,6 +396,10 @@ module Repo_refresh = struct
     type t = { installation_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "github" / "installations" /% Path.string / "repos" / "refresh"
+
   module Responses = struct
     module OK = struct
       type t = { id : string } [@@deriving yojson { strict = false; meta = true }, show, eq]
@@ -408,10 +448,18 @@ module List_repos = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (array (string "page")) /? option_default 20 (int "limit")
+    rel
+    / "api"
+    / "v1"
+    / "github"
+    / "installations"
+    /% Path.string
+    / "repos"
+    /? option (array (string "page"))
+    /? option_default 20 (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -472,10 +520,16 @@ module List_pull_requests = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v1"
+    / "github"
+    / "installations"
+    /% Path.string
+    / "pull-requests"
     /? option (array (string "page"))
     /? option (int "pr")
     /? option (string "repo")
@@ -564,10 +618,16 @@ module List_dirspaces = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v1"
+    / "github"
+    / "installations"
+    /% Path.string
+    / "dirspaces"
     /? option (array (string "page"))
     /? option (string "q")
     /? option (ud "d" (fun value -> CCResult.to_opt (Parameters.D.t_of_yojson (`String value))))

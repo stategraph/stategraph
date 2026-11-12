@@ -3,6 +3,10 @@ module DeleteApiV4ApplicationsId = struct
     type t = { id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "applications" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -34,6 +38,10 @@ module PostApiV4Applications = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "applications"
+
   module Responses = struct
     module OK = struct end
 
@@ -58,6 +66,10 @@ end
 
 module GetApiV4Applications = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "applications"
 
   module Responses = struct
     module OK = struct end

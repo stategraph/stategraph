@@ -12,7 +12,7 @@
 ; `dune build @code/hermes` silently skipped npm and the production image's
 ; `COPY .../hermes/out/` failed. That only stayed hidden because long-lived
 ; runners kept a stale out/ in their workspace; it broke on the first clean
-; checkout. docker/terrat/Dockerfile documents the same trap for iris/dist/.
+; checkout. docker/stategraph/Dockerfile documents the same trap for iris/dist/.
 ;
 ; This rule produces the static export consumed by the production Docker
 ; image. It does NOT run the JS test suite -- that's handled by

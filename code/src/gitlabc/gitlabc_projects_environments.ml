@@ -12,6 +12,10 @@ module PostApiV4ProjectsIdEnvironmentsEnvironmentIdStop = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "environments" /% Path.int / "stop"
+
   module Responses = struct
     module Created = struct end
     module Unauthorized = struct end
@@ -57,6 +61,10 @@ module DeleteApiV4ProjectsIdEnvironmentsEnvironmentId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "environments" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -107,6 +115,10 @@ module PutApiV4ProjectsIdEnvironmentsEnvironmentId = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "environments" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -156,6 +168,10 @@ module GetApiV4ProjectsIdEnvironmentsEnvironmentId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "environments" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -198,6 +214,10 @@ module PostApiV4ProjectsIdEnvironmentsStopStale = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdEnvironmentsStopStale.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "environments" / "stop_stale"
 
   module Responses = struct
     module Created = struct end
@@ -247,10 +267,16 @@ module DeleteApiV4ProjectsIdEnvironmentsReviewApps = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "environments"
+    / "review_apps"
     /? option (string "before")
     /? option_default 100 (int "limit")
     /? option_default true (bool "dry_run")
@@ -312,6 +338,10 @@ module PostApiV4ProjectsIdEnvironments = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdEnvironments.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "environments"
 
   module Responses = struct
     module Created = struct end
@@ -387,10 +417,15 @@ module GetApiV4ProjectsIdEnvironments = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "environments"
     /? option_default 1 (int "page")
     /? option_default 20 (int "per_page")
     /? option (string "name")

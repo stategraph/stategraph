@@ -1,0 +1,13 @@
+{
+  "paths": {
+    "/things/{id}": {
+      "get": {
+        "operationId": "things/get",
+        "responses": {
+          "200": {}
+        }
+      }
+    }
+  },
+  "components": {}
+}

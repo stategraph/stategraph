@@ -16,10 +16,18 @@ module Get_work_manifest_outputs = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v1"
+    / "gitlab"
+    / "installations"
+    /% Path.string
+    / "work-manifests"
+    /% Path.string
+    / "outputs"
     /? option (string "q")
     /? option (array (string "page"))
     /? option (string "tz")
@@ -98,6 +106,10 @@ module Get_work_manifest = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "gitlab" / "installations" /% Path.string / "work-manifests" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Terrat_api_components.Installation_work_manifest.t
@@ -175,10 +187,16 @@ module List_work_manifests = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v1"
+    / "gitlab"
+    / "installations"
+    /% Path.string
+    / "work-manifests"
     /? option (array (string "page"))
     /? option (string "q")
     /? option (ud "d" (fun value -> CCResult.to_opt (Parameters.D.t_of_yojson (`String value))))
@@ -251,6 +269,10 @@ module Delete_repo = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "gitlab" / "installations" /% Path.string / "repos" /% Path.string
+
   module Responses = struct
     module OK = struct
       include Json_schema.Additional_properties.Make (Json_schema.Empty_obj) (Json_schema.Obj)
@@ -317,10 +339,18 @@ module List_repos = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (array (string "page")) /? option_default 20 (int "limit")
+    rel
+    / "api"
+    / "v1"
+    / "gitlab"
+    / "installations"
+    /% Path.string
+    / "repos"
+    /? option (array (string "page"))
+    /? option_default 20 (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -400,10 +430,16 @@ module List_dirspaces = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v1"
+    / "gitlab"
+    / "installations"
+    /% Path.string
+    / "dirspaces"
     /? option (array (string "page"))
     /? option (string "q")
     /? option (ud "d" (fun value -> CCResult.to_opt (Parameters.D.t_of_yojson (`String value))))
@@ -477,6 +513,10 @@ module Create_access_token = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "gitlab" / "installations" /% Path.string / "access-token"
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -512,6 +552,10 @@ module Get_webhook = struct
     type t = { id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "gitlab" / "installations" /% Path.int / "webhook"
+
   module Responses = struct
     module OK = struct
       type t = Terrat_api_components.Gitlab_webhook.t
@@ -540,6 +584,10 @@ end
 
 module List = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "gitlab" / "installations"
 
   module Responses = struct
     module OK = struct

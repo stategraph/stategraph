@@ -7,6 +7,10 @@ module DeleteApiV4ProjectsIdFreezePeriodsFreezePeriodId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "freeze_periods" /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Unauthorized = struct end
@@ -50,6 +54,10 @@ module PutApiV4ProjectsIdFreezePeriodsFreezePeriodId = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdFreezePeriodsFreezePeriodId.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "freeze_periods" /% Path.int
 
   module Responses = struct
     module OK = struct end
@@ -99,6 +107,10 @@ module GetApiV4ProjectsIdFreezePeriodsFreezePeriodId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "freeze_periods" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -143,6 +155,10 @@ module PostApiV4ProjectsIdFreezePeriods = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdFreezePeriods.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "freeze_periods"
 
   module Responses = struct
     module Created = struct end
@@ -191,10 +207,17 @@ module GetApiV4ProjectsIdFreezePeriods = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "freeze_periods"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end

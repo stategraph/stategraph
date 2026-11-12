@@ -8,10 +8,15 @@ module List_ssh_signing_keys_for_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "users"
+    /% Path.string
+    / "ssh_signing_keys"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -52,10 +57,15 @@ module List_social_accounts_for_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "users"
+    /% Path.string
+    / "social_accounts"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -96,10 +106,15 @@ module List_public_keys_for_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "users"
+    /% Path.string
+    / "keys"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -164,10 +179,13 @@ module Get_context_for_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "users"
+    /% Path.string
+    / "hovercard"
     /? option
          (ud "subject_type" (fun value ->
               CCResult.to_opt (Parameters.Subject_type.t_of_yojson (`String value))))
@@ -236,10 +254,15 @@ module List_gpg_keys_for_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "users"
+    /% Path.string
+    / "gpg_keys"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -278,6 +301,10 @@ module Check_following_for_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "following" /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -320,10 +347,15 @@ module List_following_for_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "users"
+    /% Path.string
+    / "following"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -364,10 +396,15 @@ module List_followers_for_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "users"
+    /% Path.string
+    / "followers"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -411,10 +448,14 @@ module List_attestations = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "users"
+    /% Path.string
+    / "attestations"
+    /% Path.string
     /? option_default 30 (int "per_page")
     /? option (string "before")
     /? option (string "after")
@@ -540,6 +581,10 @@ module Delete_attestations_by_id = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "attestations" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module No_content = struct end
@@ -597,6 +642,10 @@ module Delete_attestations_by_subject_digest = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "attestations" / "digest" /% Path.string
 
   module Responses = struct
     module OK = struct end
@@ -690,6 +739,10 @@ module Delete_attestations_bulk = struct
       | V1 v -> V1.to_yojson v
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "attestations" / "delete-request"
+
   module Responses = struct
     module OK = struct end
 
@@ -755,10 +808,14 @@ module List_attestations_bulk = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "users"
+    /% Path.string
+    / "attestations"
+    / "bulk-list"
     /? option_default 30 (int "per_page")
     /? option (string "before")
     /? option (string "after")
@@ -873,6 +930,10 @@ module Get_by_username = struct
     type t = { username : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t =
@@ -935,10 +996,10 @@ module List = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (int "since") /? option_default 30 (int "per_page")
+    rel / "users" /? option (int "since") /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -980,6 +1041,10 @@ module Get_by_id = struct
   module Parameters = struct
     type t = { account_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -1039,6 +1104,10 @@ module Delete_ssh_signing_key_for_authenticated_user = struct
     type t = { ssh_signing_key_id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "ssh_signing_keys" /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Not_modified = struct end
@@ -1096,6 +1165,10 @@ module Get_ssh_signing_key_for_authenticated_user = struct
   module Parameters = struct
     type t = { ssh_signing_key_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "ssh_signing_keys" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -1168,6 +1241,10 @@ module Create_ssh_signing_key_for_authenticated_user = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "ssh_signing_keys"
 
   module Responses = struct
     module Created = struct
@@ -1242,10 +1319,14 @@ module List_ssh_signing_keys_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "user"
+    / "ssh_signing_keys"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1319,6 +1400,10 @@ module Delete_social_account_for_authenticated_user = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "social_accounts"
 
   module Responses = struct
     module No_content = struct end
@@ -1396,6 +1481,10 @@ module Add_social_account_for_authenticated_user = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "social_accounts"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Social_account.t list
@@ -1469,10 +1558,14 @@ module List_social_accounts_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "user"
+    / "social_accounts"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1540,10 +1633,14 @@ module List_public_emails_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "user"
+    / "public_emails"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1607,6 +1704,10 @@ module Delete_public_ssh_key_for_authenticated_user = struct
     type t = { key_id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "keys" /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Not_modified = struct end
@@ -1664,6 +1765,10 @@ module Get_public_ssh_key_for_authenticated_user = struct
   module Parameters = struct
     type t = { key_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "keys" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -1736,6 +1841,10 @@ module Create_public_ssh_key_for_authenticated_user = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "keys"
 
   module Responses = struct
     module Created = struct
@@ -1810,10 +1919,10 @@ module List_public_ssh_keys_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel / "user" / "keys" /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1876,6 +1985,10 @@ module Delete_gpg_key_for_authenticated_user = struct
   module Parameters = struct
     type t = { gpg_key_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "gpg_keys" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -1942,6 +2055,10 @@ module Get_gpg_key_for_authenticated_user = struct
   module Parameters = struct
     type t = { gpg_key_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "gpg_keys" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -2014,6 +2131,10 @@ module Create_gpg_key_for_authenticated_user = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "gpg_keys"
 
   module Responses = struct
     module Created = struct
@@ -2088,10 +2209,10 @@ module List_gpg_keys_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel / "user" / "gpg_keys" /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -2155,6 +2276,10 @@ module Unfollow = struct
     type t = { username : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "following" /% Path.string
+
   module Responses = struct
     module No_content = struct end
     module Not_modified = struct end
@@ -2212,6 +2337,10 @@ module Follow = struct
   module Parameters = struct
     type t = { username : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "following" /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -2279,6 +2408,10 @@ module Check_person_is_followed_by_authenticated = struct
     type t = { username : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "following" /% Path.string
+
   module Responses = struct
     module No_content = struct end
     module Not_modified = struct end
@@ -2341,10 +2474,14 @@ module List_followed_by_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "user"
+    / "following"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -2405,10 +2542,14 @@ module List_followers_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "user"
+    / "followers"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -2505,6 +2646,10 @@ module Delete_email_for_authenticated_user = struct
       | V1 v -> V1.to_yojson v
       | V2 v -> V2.to_yojson v
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "emails"
 
   module Responses = struct
     module No_content = struct end
@@ -2612,6 +2757,10 @@ module Add_email_for_authenticated_user = struct
       | V2 v -> V2.to_yojson v
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "emails"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Email.t list
@@ -2685,10 +2834,10 @@ module List_emails_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel / "user" / "emails" /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -2777,6 +2926,10 @@ module Set_primary_email_visibility_for_authenticated_user = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "email" / "visibility"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Email.t list
@@ -2846,6 +2999,10 @@ module Unblock = struct
     type t = { username : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "blocks" /% Path.string
+
   module Responses = struct
     module No_content = struct end
     module Not_modified = struct end
@@ -2903,6 +3060,10 @@ module Block = struct
   module Parameters = struct
     type t = { username : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "blocks" /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -2970,6 +3131,10 @@ module Check_blocked = struct
     type t = { username : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "blocks" /% Path.string
+
   module Responses = struct
     module No_content = struct end
     module Not_modified = struct end
@@ -3032,10 +3197,10 @@ module List_blocked_by_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel / "user" / "blocks" /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -3115,6 +3280,10 @@ module Update_authenticated = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Private_user.t
@@ -3181,6 +3350,10 @@ end
 
 module Get_authenticated = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user"
 
   module Responses = struct
     module OK = struct

@@ -145,10 +145,15 @@ module GetApiV4GroupsIdPackages = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "packages"
     /? option_default false (bool "exclude_subgroups")
     /? option_default 1 (int "page")
     /? option_default 20 (int "per_page")

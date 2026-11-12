@@ -1,6 +1,10 @@
 module Whoami = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "whoami"
+
   module Responses = struct
     module OK = struct
       type t = Terrat_api_components.User.t
@@ -35,6 +39,10 @@ end
 
 module List_github_installations = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "user" / "github" / "installations"
 
   module Responses = struct
     module OK = struct
@@ -75,6 +83,10 @@ end
 
 module Logout = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "logout"
 
   module Responses = struct
     module OK = struct end

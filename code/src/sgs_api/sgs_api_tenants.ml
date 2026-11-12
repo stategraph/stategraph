@@ -8,6 +8,10 @@ module Unlink_vcs_installation = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "vcs-installations" /% Path.string /% Path.uuid
+
   module Responses = struct
     module No_content = struct end
 
@@ -72,6 +76,10 @@ module Link_vcs_installation = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "vcs-installations" /% Path.string /% Path.uuid
 
   module Responses = struct
     module OK = struct
@@ -145,6 +153,10 @@ module Rotate_gitlab_installation = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "vcs-installations" / "gitlab" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Gitlab_rotate_response.t
@@ -217,6 +229,10 @@ module Provision_gitlab_installation = struct
     type t = Sgs_api_components.Gitlab_provision_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "vcs-installations" / "gitlab"
 
   module Responses = struct
     module Created = struct
@@ -293,6 +309,10 @@ module List_claimable_github_installations = struct
     type t = { tenant_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "vcs-installations" / "github" / "claimable"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Github_claimable_installations.t
@@ -363,10 +383,19 @@ module Start_github_claim = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "rd")
+    rel
+    / "api"
+    / "v1"
+    / "tenants"
+    /% Path.uuid
+    / "vcs-installations"
+    / "github"
+    / "claim"
+    / "start"
+    /? option (string "rd")
 
   module Responses = struct
     module Found = struct end
@@ -419,6 +448,10 @@ module Claim_github_installation = struct
     type t = Sgs_api_components.Github_claim_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "vcs-installations" / "github" / "claim"
 
   module Responses = struct
     module OK = struct
@@ -502,6 +535,10 @@ module List_vcs_installations = struct
     type t = { tenant_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "vcs-installations"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Vcs_installation_list_response.t
@@ -562,6 +599,10 @@ module Tx_create = struct
     }
     [@@deriving make, yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "tx" / "create"
 
   module Responses = struct
     module Created = struct
@@ -624,10 +665,15 @@ module Tx_list = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v1"
+    / "tenants"
+    /% Path.uuid
+    / "tx"
     /? option (array (string "page"))
     /? option_default 20 (int "limit")
     /? option (string "from")
@@ -693,10 +739,10 @@ module Summary = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "state_id")
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "summary" /? option (string "state_id")
 
   module Responses = struct
     module OK = struct
@@ -761,6 +807,10 @@ module Import_state = struct
     [@@deriving make, yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "states" / "import"
+
   module Responses = struct
     module Created = struct
       type t = Sgs_api_components.State.t
@@ -819,6 +869,10 @@ module Create_state = struct
     }
     [@@deriving make, yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "states"
 
   module Responses = struct
     module Created = struct
@@ -881,10 +935,15 @@ module List_states = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v1"
+    / "tenants"
+    /% Path.uuid
+    / "states"
     /? option (array (string "page"))
     /? option (string "q")
     /? option (string "tz")
@@ -944,10 +1003,19 @@ module Security_findings_history = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "from") /? option (string "to")
+    rel
+    / "api"
+    / "v1"
+    / "tenants"
+    /% Path.uuid
+    / "security"
+    / "findings"
+    / "history"
+    /? option (string "from")
+    /? option (string "to")
 
   module Responses = struct
     module OK = struct
@@ -1011,10 +1079,10 @@ module Resource_types = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "state_id")
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "resource-types" /? option (string "state_id")
 
   module Responses = struct
     module OK = struct
@@ -1069,10 +1137,10 @@ module Set_member_role = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "user_id"
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "members" / "set-role" /? string "user_id"
 
   module Responses = struct
     module OK = struct
@@ -1152,10 +1220,10 @@ module Remove_member = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "user_id"
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "members" /? string "user_id"
 
   module Responses = struct
     module OK = struct
@@ -1233,6 +1301,10 @@ module Add_member = struct
     type t = Sgs_api_components.Tenant_member_add_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "members"
 
   module Responses = struct
     module OK = struct
@@ -1312,10 +1384,15 @@ module List_members = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v1"
+    / "tenants"
+    /% Path.uuid
+    / "members"
     /? option (string "search")
     /? option (string "role")
     /? option (string "cursor")
@@ -1381,10 +1458,10 @@ module Revoke_invitation = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "id"
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "invitations" / "revoke" /? string "id"
 
   module Responses = struct
     module No_content = struct end
@@ -1459,10 +1536,10 @@ module Reissue_invitation = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "id"
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "invitations" / "reissue" /? string "id"
 
   module Responses = struct
     module OK = struct
@@ -1548,6 +1625,10 @@ module Create_invitation = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "invitations"
+
   module Responses = struct
     module Created = struct
       type t = Sgs_api_components.Invitation_create_response.t
@@ -1624,10 +1705,17 @@ module List_invitations = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "cursor") /? option_default 25 (int "limit")
+    rel
+    / "api"
+    / "v1"
+    / "tenants"
+    /% Path.uuid
+    / "invitations"
+    /? option (string "cursor")
+    /? option_default 25 (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -1685,6 +1773,10 @@ module Gaps_import = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "gaps" / "import"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Gap_import_response.t
@@ -1735,10 +1827,10 @@ module Gaps_config = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "provider"
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "gaps" / "config" /? string "provider"
 
   module Responses = struct
     module OK = struct
@@ -1807,10 +1899,15 @@ module Gaps = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v1"
+    / "tenants"
+    /% Path.uuid
+    / "gaps"
     /? string "provider"
     /? option_default
          `Cache
@@ -1879,10 +1976,18 @@ module Costs_unmanaged = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (array (string "page")) /? option_default 20 (int "limit")
+    rel
+    / "api"
+    / "v1"
+    / "tenants"
+    /% Path.uuid
+    / "costs"
+    / "unmanaged"
+    /? option (array (string "page"))
+    /? option_default 20 (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -1935,6 +2040,10 @@ module Costs_tag_keys = struct
     type t = { tenant_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "costs" / "tag-keys"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Tenant_cost_tag_keys.t
@@ -1983,10 +2092,16 @@ module Costs_history = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v1"
+    / "tenants"
+    /% Path.uuid
+    / "costs"
+    / "history"
     /? option (string "from")
     /? option (string "to")
     /? option (string "group_by")
@@ -2048,6 +2163,10 @@ module Costs_attribution = struct
     type t = { tenant_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "costs" / "attribution"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Tenant_cost_attribution.t
@@ -2093,10 +2212,10 @@ module Costs = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "tag_key")
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "costs" /? option (string "tag_key")
 
   module Responses = struct
     module OK = struct
@@ -2150,6 +2269,10 @@ module Sync_billing_source = struct
     type t = Sgs_api_components.Billing_source_sync_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "billing-sources" /% Path.uuid / "sync"
 
   module Responses = struct
     module Accepted = struct
@@ -2219,6 +2342,10 @@ module Delete_billing_source = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "billing-sources" /% Path.uuid
+
   module Responses = struct
     module No_content = struct end
     module Unauthorized = struct end
@@ -2278,6 +2405,10 @@ module Update_billing_source = struct
     type t = Sgs_api_components.Billing_source_update_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "billing-sources" /% Path.uuid
 
   module Responses = struct
     module OK = struct
@@ -2355,6 +2486,10 @@ module Create_billing_source = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "billing-sources"
+
   module Responses = struct
     module Created = struct
       type t = Sgs_api_components.Billing_source.t
@@ -2419,6 +2554,10 @@ module List_billing_sources = struct
     type t = { tenant_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "billing-sources"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Billing_source_list_response.t
@@ -2471,6 +2610,10 @@ module Update = struct
     type t = Sgs_api_components.Tenant_update_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid
 
   module Responses = struct
     module OK = struct
@@ -2545,6 +2688,10 @@ module Create = struct
     type t = Sgs_api_components.Tenant_create_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants"
 
   module Responses = struct
     module Created = struct

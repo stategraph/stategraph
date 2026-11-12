@@ -1,6 +1,3 @@
 code/build/
 node_modules/
 *~
-
-# 127k mostly-empty files reproducing a large monorepo's shape; nothing to grep
-system-tests/tests/core/scaling/

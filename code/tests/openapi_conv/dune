@@ -10,7 +10,10 @@
   query_params_api_components_shade
   query_params_api_params
   routes_api_alerts
-  routes_api_components)
+  routes_api_colors
+  routes_api_components
+  routes_api_items
+  routes_api_packages)
  (flags
   (:standard -w -27-67))
  (libraries brtl containers openapi)
@@ -24,10 +27,12 @@
 (test
  (name test)
  (modules test)
- (libraries brtl containers fixture_apis openapi_conv oth unix uri)
+ (libraries brtl containers fixture_apis openapi_conv oth unix uri uuidm)
  (deps
   integer_enum.json
+  path_param_not_in_template.json
   query_params.json
   required_array_default.json
   routes.json
+  undeclared_template_param.json
   unsupported_array_default.json))

@@ -3,6 +3,10 @@ module PostApiV4RunnersIdResetAuthenticationToken = struct
     type t = { id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "runners" /% Path.int / "reset_authentication_token"
+
   module Responses = struct
     module Created = struct end
     module Forbidden = struct end

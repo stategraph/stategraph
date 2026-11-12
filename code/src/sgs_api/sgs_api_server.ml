@@ -1,6 +1,10 @@
 module Version = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "version"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Version_response.t
@@ -26,6 +30,10 @@ end
 
 module Api_schema = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "openapi"
 
   module Responses = struct
     module OK = struct

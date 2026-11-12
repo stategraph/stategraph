@@ -7,10 +7,10 @@ module GetApiV4ProjectsIdSnapshot = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (bool "wiki")
+    rel / "api" / "v4" / "projects" /% Path.int / "snapshot" /? option (bool "wiki")
 
   module Responses = struct
     module OK = struct end
