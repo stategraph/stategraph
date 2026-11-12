@@ -9,10 +9,19 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidVersionsVersionId = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default false (bool "unidiff")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "versions"
+    /% Path.int
+    /? option_default false (bool "unidiff")
 
   module Responses = struct
     module OK = struct end
@@ -55,10 +64,19 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidVersions = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "versions"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -97,6 +115,10 @@ module PostApiV4ProjectsIdMergeRequestsMergeRequestIidUnapprove = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "merge_requests" /% Path.int / "unapprove"
 
   module Responses = struct
     module Created = struct end
@@ -143,6 +165,10 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidTimeStats = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "merge_requests" /% Path.int / "time_stats"
 
   module Responses = struct
     module OK = struct end
@@ -193,6 +219,10 @@ module PostApiV4ProjectsIdMergeRequestsMergeRequestIidTimeEstimate = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdMergeRequestsMergeRequestIidTimeEstimate.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "merge_requests" /% Path.int / "time_estimate"
 
   module Responses = struct
     module Created = struct end
@@ -246,6 +276,10 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidReviewers = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "merge_requests" /% Path.int / "reviewers"
+
   module Responses = struct
     module OK = struct
       type t = Gitlabc_components.API_Entities_MergeRequestReviewer.t list
@@ -292,6 +326,17 @@ module PostApiV4ProjectsIdMergeRequestsMergeRequestIidResetTimeEstimate = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "reset_time_estimate"
 
   module Responses = struct
     module Created = struct end
@@ -340,6 +385,17 @@ module PostApiV4ProjectsIdMergeRequestsMergeRequestIidResetSpentTime = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "reset_spent_time"
+
   module Responses = struct
     module Created = struct end
     module Unauthorized = struct end
@@ -387,6 +443,10 @@ module PutApiV4ProjectsIdMergeRequestsMergeRequestIidResetApprovals = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "merge_requests" /% Path.int / "reset_approvals"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -433,10 +493,19 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidRelatedIssues = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "related_issues"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -488,6 +557,10 @@ module PutApiV4ProjectsIdMergeRequestsMergeRequestIidRebase = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdMergeRequestsMergeRequestIidRebase.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "merge_requests" /% Path.int / "rebase"
 
   module Responses = struct
     module OK = struct end
@@ -541,6 +614,10 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidRawDiffs = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "merge_requests" /% Path.int / "raw_diffs"
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -588,6 +665,10 @@ module PostApiV4ProjectsIdMergeRequestsMergeRequestIidPipelines = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdMergeRequestsMergeRequestIidPipelines.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "merge_requests" /% Path.int / "pipelines"
 
   module Responses = struct
     module Created = struct end
@@ -641,6 +722,10 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidPipelines = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "merge_requests" /% Path.int / "pipelines"
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -680,6 +765,10 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidParticipants = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "merge_requests" /% Path.int / "participants"
 
   module Responses = struct
     module OK = struct end
@@ -722,6 +811,20 @@ module DeleteApiV4ProjectsIdMergeRequestsMergeRequestIidNotesNoteIdAwardEmojiAwa
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "merge_requests"
+    /% Path.int
+    / "notes"
+    /% Path.int
+    / "award_emoji"
+    /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -775,6 +878,20 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidNotesNoteIdAwardEmojiAwardI
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "merge_requests"
+    /% Path.int
+    / "notes"
+    /% Path.int
+    / "award_emoji"
+    /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -820,10 +937,20 @@ module PostApiV4ProjectsIdMergeRequestsMergeRequestIidNotesNoteIdAwardEmoji = st
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "name"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "merge_requests"
+    /% Path.int
+    / "notes"
+    /% Path.int
+    / "award_emoji"
+    /? string "name"
 
   module Responses = struct
     module Created = struct
@@ -883,10 +1010,21 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidNotesNoteIdAwardEmoji = str
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "merge_requests"
+    /% Path.int
+    / "notes"
+    /% Path.int
+    / "award_emoji"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -933,6 +1071,18 @@ module DeleteApiV4ProjectsIdMergeRequestsMergeRequestIidNotesNotesId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "notes"
+    /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -976,10 +1126,19 @@ module PutApiV4ProjectsIdMergeRequestsMergeRequestIidNotesNotesId = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "body"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "notes"
+    /% Path.int
+    /? string "body"
 
   module Responses = struct
     module OK = struct end
@@ -1025,6 +1184,18 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidNotesNotesId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "notes"
+    /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -1078,6 +1249,10 @@ module PostApiV4ProjectsIdMergeRequestsMergeRequestIidNotesNotesId = struct
     type t = { body : string } [@@deriving make, yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "merge_requests" /% Path.int / "notes"
+
   module Responses = struct
     module Created = struct
       type t = { id : int } [@@deriving yojson { strict = false; meta = true }, show, eq]
@@ -1126,6 +1301,10 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidNotes = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "merge_requests" /% Path.int / "notes"
 
   module Responses = struct
     module OK = struct
@@ -1212,10 +1391,17 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidMergeRef = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "merge_ref"
     /? option
          (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
     /? option
@@ -1272,6 +1458,10 @@ module PutApiV4ProjectsIdMergeRequestsMergeRequestIidMerge = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdMergeRequestsMergeRequestIidMerge.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "merge_requests" /% Path.int / "merge"
 
   module Responses = struct
     module OK = struct
@@ -1357,6 +1547,19 @@ module PutApiV4ProjectsIdMergeRequestsMergeRequestIidDraftNotesDraftNoteIdPublis
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "draft_notes"
+    /% Path.int
+    / "publish"
+
   module Responses = struct
     module No_content = struct end
     module Unauthorized = struct end
@@ -1407,6 +1610,18 @@ module DeleteApiV4ProjectsIdMergeRequestsMergeRequestIidDraftNotesDraftNoteId = 
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "draft_notes"
+    /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Not_found = struct end
@@ -1454,6 +1669,18 @@ module PutApiV4ProjectsIdMergeRequestsMergeRequestIidDraftNotesDraftNoteId = str
       Gitlabc_components.PutApiV4ProjectsIdMergeRequestsMergeRequestIidDraftNotesDraftNoteId.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "draft_notes"
+    /% Path.int
 
   module Responses = struct
     module OK = struct end
@@ -1504,6 +1731,18 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidDraftNotesDraftNoteId = str
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "draft_notes"
+    /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -1549,6 +1788,18 @@ module PostApiV4ProjectsIdMergeRequestsMergeRequestIidDraftNotesBulkPublish = st
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "draft_notes"
+    / "bulk_publish"
 
   module Responses = struct
     module No_content = struct end
@@ -1602,6 +1853,10 @@ module PostApiV4ProjectsIdMergeRequestsMergeRequestIidDraftNotes = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "merge_requests" /% Path.int / "draft_notes"
+
   module Responses = struct
     module Created = struct end
     module Unauthorized = struct end
@@ -1651,6 +1906,10 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidDraftNotes = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "merge_requests" /% Path.int / "draft_notes"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -1699,10 +1958,17 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidDiffs = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "diffs"
     /? option_default 1 (int "page")
     /? option_default 20 (int "per_page")
     /? option_default false (bool "unidiff")
@@ -1770,10 +2036,18 @@ module DeleteApiV4ProjectsIdMergeRequestsMergeRequestIidContextCommits = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? array (string "commits")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "context_commits"
+    /? array (string "commits")
 
   module Responses = struct
     module No_content = struct end
@@ -1833,6 +2107,17 @@ module PostApiV4ProjectsIdMergeRequestsMergeRequestIidContextCommits = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "context_commits"
+
   module Responses = struct
     module Created = struct end
     module Unauthorized = struct end
@@ -1882,6 +2167,17 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidContextCommits = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "context_commits"
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -1924,10 +2220,19 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidCommits = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "commits"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -1974,10 +2279,19 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidClosesIssues = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "closes_issues"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -2026,10 +2340,18 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidChanges = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default false (bool "unidiff")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "changes"
+    /? option_default false (bool "unidiff")
 
   module Responses = struct
     module OK = struct end
@@ -2073,6 +2395,17 @@ module PostApiV4ProjectsIdMergeRequestsMergeRequestIidCancelMergeWhenPipelineSuc
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "cancel_merge_when_pipeline_succeeds"
 
   module Responses = struct
     module Created = struct end
@@ -2129,6 +2462,18 @@ module DeleteApiV4ProjectsIdMergeRequestsMergeRequestIidAwardEmojiAwardId = stru
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "merge_requests"
+    /% Path.int
+    / "award_emoji"
+    /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Unauthorized = struct end
@@ -2178,6 +2523,18 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidAwardEmojiAwardId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "merge_requests"
+    /% Path.int
+    / "award_emoji"
+    /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -2223,6 +2580,10 @@ module PostApiV4ProjectsIdMergeRequestsMergeRequestIidAwardEmoji = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdMergeRequestsMergeRequestIidAwardEmoji.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "merge_requests" /% Path.int / "award_emoji"
 
   module Responses = struct
     module Created = struct end
@@ -2274,10 +2635,19 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidAwardEmoji = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "award_emoji"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -2326,6 +2696,10 @@ module PostApiV4ProjectsIdMergeRequestsMergeRequestIidApprove = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdMergeRequestsMergeRequestIidApprove.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "merge_requests" /% Path.int / "approve"
 
   module Responses = struct
     module Created = struct end
@@ -2380,6 +2754,10 @@ module PostApiV4ProjectsIdMergeRequestsMergeRequestIidApprovals = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "merge_requests" /% Path.int / "approvals"
+
   module Responses = struct
     module Created = struct end
 
@@ -2416,6 +2794,10 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidApprovals = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "merge_requests" /% Path.int / "approvals"
 
   module Responses = struct
     module OK = struct
@@ -2463,6 +2845,10 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIidApprovalState = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "merge_requests" /% Path.int / "approval_state"
+
   module Responses = struct
     module OK = struct end
 
@@ -2502,6 +2888,10 @@ module PostApiV4ProjectsIdMergeRequestsMergeRequestIidAddSpentTime = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdMergeRequestsMergeRequestIidAddSpentTime.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "merge_requests" /% Path.int / "add_spent_time"
 
   module Responses = struct
     module Created = struct end
@@ -2551,6 +2941,10 @@ module DeleteApiV4ProjectsIdMergeRequestsMergeRequestIid = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "merge_requests" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -2606,6 +3000,10 @@ module PutApiV4ProjectsIdMergeRequestsMergeRequestIid = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdMergeRequestsMergeRequestIid.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "merge_requests" /% Path.int
 
   module Responses = struct
     module OK = struct end
@@ -2665,10 +3063,16 @@ module GetApiV4ProjectsIdMergeRequestsMergeRequestIid = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
     /? option (bool "render_html")
     /? option (bool "include_diverged_commits_count")
     /? option (bool "include_rebase_in_progress")
@@ -2729,6 +3133,18 @@ module GetApiV4ProjectsIdMergeRequestsEventableIdResourceMilestoneEventsEventId 
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "resource_milestone_events"
+    /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -2773,10 +3189,19 @@ module GetApiV4ProjectsIdMergeRequestsEventableIdResourceMilestoneEvents = struc
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
+    /% Path.int
+    / "resource_milestone_events"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -2813,6 +3238,10 @@ module PostApiV4ProjectsIdMergeRequests = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdMergeRequests.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "merge_requests"
 
   module Responses = struct
     module Created = struct end
@@ -3091,10 +3520,15 @@ module GetApiV4ProjectsIdMergeRequests = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "merge_requests"
     /? option (int "author_id")
     /? option (string "author_username")
     /? option (int "assignee_id")

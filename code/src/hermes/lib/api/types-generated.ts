@@ -5754,7 +5754,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                state_id: string;
+                group_id: string;
             };
             cookie?: never;
         };
@@ -5811,7 +5811,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                state_id: string;
+                group_id: string;
                 workspace: string;
             };
             cookie?: never;

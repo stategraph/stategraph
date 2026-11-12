@@ -88,10 +88,15 @@ module GetApiV4GroupsIdDescendantGroups = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "descendant_groups"
     /? option_default false (bool "statistics")
     /? option (array (int "skip_groups"))
     /? option (bool "all_available")

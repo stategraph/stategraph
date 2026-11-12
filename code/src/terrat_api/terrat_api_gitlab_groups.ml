@@ -3,6 +3,10 @@ module Is_member = struct
     type t = { id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "gitlab" / "groups" /% Path.int / "is-member"
+
   module Responses = struct
     module OK = struct
       type t = { result : bool } [@@deriving yojson { strict = false; meta = true }, show, eq]
@@ -30,6 +34,10 @@ end
 
 module List = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "gitlab" / "groups"
 
   module Responses = struct
     module OK = struct

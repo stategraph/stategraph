@@ -3,6 +3,10 @@ module DeleteApiV4RunnersId = struct
     type t = { id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "runners" /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Unauthorized = struct end
@@ -54,6 +58,10 @@ module PutApiV4RunnersId = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "runners" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -102,6 +110,10 @@ module GetApiV4RunnersId = struct
     type t = { id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "runners" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -148,6 +160,10 @@ module PostApiV4RunnersVerify = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "runners" / "verify"
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -185,6 +201,10 @@ end
 module PostApiV4RunnersResetRegistrationToken = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "runners" / "reset_registration_token"
+
   module Responses = struct
     module Created = struct end
     module Forbidden = struct end
@@ -217,6 +237,10 @@ module PostApiV4RunnersResetAuthenticationToken = struct
     type t = Gitlabc_components.PostApiV4RunnersResetAuthenticationToken.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "runners" / "reset_authentication_token"
 
   module Responses = struct
     module Created = struct end
@@ -254,10 +278,10 @@ module DeleteApiV4RunnersManagers = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "token" /? string "system_id"
+    rel / "api" / "v4" / "runners" / "managers" /? string "token" /? string "system_id"
 
   module Responses = struct
     module No_content = struct end
@@ -412,10 +436,14 @@ module GetApiV4RunnersAll = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "runners"
+    / "all"
     /? option
          (ud "scope" (fun value -> CCResult.to_opt (Parameters.Scope.t_of_yojson (`String value))))
     /? option
@@ -477,10 +505,10 @@ module DeleteApiV4Runners = struct
     type t = { token : string } [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "token"
+    rel / "api" / "v4" / "runners" /? string "token"
 
   module Responses = struct
     module No_content = struct end
@@ -517,6 +545,10 @@ module PostApiV4Runners = struct
     type t = Gitlabc_components.PostApiV4Runners.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "runners"
 
   module Responses = struct
     module Created = struct end
@@ -670,10 +702,13 @@ module GetApiV4Runners = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "runners"
     /? option
          (ud "scope" (fun value -> CCResult.to_opt (Parameters.Scope.t_of_yojson (`String value))))
     /? option

@@ -7,6 +7,10 @@ module Get_scan_history = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "secret-scanning" / "scan-history"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Secret_scanning_scan_history.t
@@ -78,6 +82,10 @@ module Create_push_protection_bypass = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "secret-scanning" / "push-protection-bypasses"
 
   module Responses = struct
     module OK = struct
@@ -152,6 +160,10 @@ module Update_repo_custom_pattern = struct
     type t = Githubc2_components.Secret_scanning_custom_pattern_to_update.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "secret-scanning" / "custom-patterns" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -271,6 +283,10 @@ module Bulk_delete_repo_custom_patterns = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "secret-scanning" / "custom-patterns"
+
   module Responses = struct
     module No_content = struct end
 
@@ -352,6 +368,10 @@ module Bulk_create_repo_custom_patterns = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "secret-scanning" / "custom-patterns"
 
   module Responses = struct
     module Created = struct
@@ -540,10 +560,15 @@ module List_repo_custom_patterns = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "secret-scanning"
+    / "custom-patterns"
     /? option
          (ud "state" (fun value -> CCResult.to_opt (Parameters.State.t_of_yojson (`String value))))
     /? option
@@ -628,10 +653,19 @@ module List_locations_for_alert = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "secret-scanning"
+    / "alerts"
+    /% Path.int
+    / "locations"
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -825,6 +859,10 @@ module Update_alert = struct
       | V2 v -> V2.to_yojson v
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "secret-scanning" / "alerts" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Secret_scanning_alert_with_metadata.t
@@ -902,10 +940,17 @@ module Get_alert = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default false (bool "hide_secret")
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "secret-scanning"
+    / "alerts"
+    /% Path.int
+    /? option_default false (bool "hide_secret")
 
   module Responses = struct
     module OK = struct
@@ -1051,10 +1096,15 @@ module List_alerts_for_repo = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "secret-scanning"
+    / "alerts"
     /? option
          (ud "state" (fun value -> CCResult.to_opt (Parameters.State.t_of_yojson (`String value))))
     /? option (string "secret_type")
@@ -1247,6 +1297,10 @@ module Update_org_pattern_configs = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "secret-scanning" / "pattern-configurations"
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -1326,6 +1380,10 @@ module List_org_pattern_configs = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "secret-scanning" / "pattern-configurations"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Secret_scanning_pattern_configuration.t
@@ -1385,6 +1443,10 @@ module Update_org_custom_pattern = struct
     type t = Githubc2_components.Secret_scanning_custom_pattern_to_update.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "secret-scanning" / "custom-patterns" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -1496,6 +1558,10 @@ module Bulk_delete_org_custom_patterns = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "secret-scanning" / "custom-patterns"
+
   module Responses = struct
     module No_content = struct end
 
@@ -1573,6 +1639,10 @@ module Bulk_create_org_custom_patterns = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "secret-scanning" / "custom-patterns"
 
   module Responses = struct
     module Created = struct
@@ -1760,10 +1830,14 @@ module List_org_custom_patterns = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "secret-scanning"
+    / "custom-patterns"
     /? option
          (ud "state" (fun value -> CCResult.to_opt (Parameters.State.t_of_yojson (`String value))))
     /? option
@@ -1918,10 +1992,14 @@ module List_alerts_for_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "secret-scanning"
+    / "alerts"
     /? option
          (ud "state" (fun value -> CCResult.to_opt (Parameters.State.t_of_yojson (`String value))))
     /? option (string "secret_type")

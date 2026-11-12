@@ -3,6 +3,10 @@ module Get_conduct_code = struct
     type t = { key : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "codes_of_conduct" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Code_of_conduct.t
@@ -48,6 +52,10 @@ end
 
 module Get_all_codes_of_conduct = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "codes_of_conduct"
 
   module Responses = struct
     module OK = struct

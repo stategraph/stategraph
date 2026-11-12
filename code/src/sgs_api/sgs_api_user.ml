@@ -1,6 +1,10 @@
 module Whoami = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "whoami"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.User.t
@@ -36,6 +40,10 @@ end
 
 module Tenants = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "user" / "tenants"
 
   module Responses = struct
     module OK = struct
@@ -75,10 +83,10 @@ module Access_tokens_revoke = struct
     type t = { token_id : string } [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "token_id"
+    rel / "api" / "v1" / "user" / "access-tokens" / "revoke" /? string "token_id"
 
   module Responses = struct
     module OK = struct
@@ -129,6 +137,10 @@ module Access_tokens_create = struct
     type t = Sgs_api_components.Access_token_create_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "user" / "access-tokens"
 
   module Responses = struct
     module Created = struct
@@ -181,6 +193,10 @@ end
 
 module Access_tokens_list = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "user" / "access-tokens"
 
   module Responses = struct
     module OK = struct

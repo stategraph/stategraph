@@ -7,6 +7,10 @@ module DeleteApiV4GroupsIdCustomAttributesKey = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "custom_attributes" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -44,6 +48,10 @@ module PutApiV4GroupsIdCustomAttributesKey = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "custom_attributes" /% Path.string
+
   module Responses = struct
     module OK = struct end
 
@@ -78,6 +86,10 @@ module GetApiV4GroupsIdCustomAttributesKey = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "custom_attributes" /% Path.string
+
   module Responses = struct
     module OK = struct end
 
@@ -105,6 +117,10 @@ module GetApiV4GroupsIdCustomAttributes = struct
   module Parameters = struct
     type t = { id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "custom_attributes"
 
   module Responses = struct
     module OK = struct end

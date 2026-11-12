@@ -7,10 +7,19 @@ module GetApiV4ProjectsProjectIdPackagesNugetV2Packages____ = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "$filter"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "nuget"
+    / "v2"
+    / "Packages\\(\\)"
+    /? string "$filter"
 
   module Responses = struct
     module OK = struct end
@@ -57,10 +66,19 @@ module GetApiV4ProjectsProjectIdPackagesNugetV2Findpackagesbyid____ = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "id"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "nuget"
+    / "v2"
+    / "FindPackagesById\\(\\)"
+    /? string "id"
 
   module Responses = struct
     module OK = struct end
@@ -110,10 +128,17 @@ module GetApiV4ProjectsIdPackagesPackageIdPipelines = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    /% Path.int
+    / "pipelines"
     /? option_default 1 (int "page")
     /? option_default 20 (int "per_page")
     /? option (string "cursor")
@@ -173,6 +198,18 @@ module DeleteApiV4ProjectsIdPackagesPackageIdPackageFilesPackageFileId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    /% Path.int
+    / "package_files"
+    /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Forbidden = struct end
@@ -223,10 +260,19 @@ module GetApiV4ProjectsIdPackagesPackageIdPackageFiles = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    /% Path.int
+    / "package_files"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -262,6 +308,10 @@ module DeleteApiV4ProjectsIdPackagesPackageId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -306,6 +356,10 @@ module GetApiV4ProjectsIdPackagesPackageId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" /% Path.int
 
   module Responses = struct
     module OK = struct end
@@ -357,6 +411,22 @@ struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "terraform"
+    / "modules"
+    /% Path.string
+    /% Path.string
+    / "*module_version"
+    / "file"
+    / "authorize"
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -403,6 +473,21 @@ module PutApiV4ProjectsIdPackagesTerraformModulesModuleNameModuleSystem_moduleVe
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "terraform"
+    / "modules"
+    /% Path.string
+    /% Path.string
+    / "*module_version"
+    / "file"
 
   module Responses = struct
     module Created = struct end
@@ -473,10 +558,20 @@ module GetApiV4ProjectsIdPackagesTerraformModulesModuleNameModuleSystem_moduleVe
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "terraform"
+    / "modules"
+    /% Path.string
+    /% Path.string
+    / "*module_version"
     /? string "module_version"
     /? option
          (ud "terraform-get" (fun value ->
@@ -553,10 +648,19 @@ module GetApiV4ProjectsIdPackagesTerraformModulesModuleNameModuleSystem = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "terraform"
+    / "modules"
+    /% Path.string
+    /% Path.string
     /? option
          (ud "terraform-get" (fun value ->
               CCResult.to_opt (Parameters.Terraform_get.t_of_yojson (`String value))))
@@ -615,6 +719,10 @@ module GetApiV4ProjectsIdPackagesRubygemsFileName = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "packages" / "rubygems" /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -657,6 +765,19 @@ module GetApiV4ProjectsIdPackagesRubygemsQuickMarshal48FileName = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "packages"
+    / "rubygems"
+    / "quick"
+    / "Marshal.4.8"
+    /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -698,6 +819,10 @@ module GetApiV4ProjectsIdPackagesRubygemsGemsFileName = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "packages" / "rubygems" / "gems" /% Path.string
 
   module Responses = struct
     module OK = struct end
@@ -742,6 +867,20 @@ module PostApiV4ProjectsIdPackagesRubygemsApiV1GemsAuthorize = struct
     type t = { id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "packages"
+    / "rubygems"
+    / "api"
+    / "v1"
+    / "gems"
+    / "authorize"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -784,6 +923,10 @@ module PostApiV4ProjectsIdPackagesRubygemsApiV1Gems = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdPackagesRubygemsApiV1Gems.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "packages" / "rubygems" / "api" / "v1" / "gems"
 
   module Responses = struct
     module Created = struct end
@@ -838,10 +981,20 @@ module GetApiV4ProjectsIdPackagesRubygemsApiV1Dependencies = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (array (string "gems"))
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "packages"
+    / "rubygems"
+    / "api"
+    / "v1"
+    / "dependencies"
+    /? option (array (string "gems"))
 
   module Responses = struct
     module OK = struct end
@@ -893,10 +1046,19 @@ module GetApiV4ProjectsIdPackagesRpmRepodata_fileName = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "file_name"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "rpm"
+    / "repodata"
+    / "*file_name"
+    /? string "file_name"
 
   module Responses = struct
     module OK = struct end
@@ -943,6 +1105,10 @@ module PostApiV4ProjectsIdPackagesRpmAuthorize = struct
   module Parameters = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "rpm" / "authorize"
 
   module Responses = struct
     module Created = struct end
@@ -992,10 +1158,20 @@ module GetApiV4ProjectsIdPackagesRpm_packageFileId_fileName = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? int "package_file_id" /? string "file_name"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "rpm"
+    / "*package_file_id"
+    / "*file_name"
+    /? int "package_file_id"
+    /? string "file_name"
 
   module Responses = struct
     module OK = struct end
@@ -1045,6 +1221,10 @@ module PostApiV4ProjectsIdPackagesRpm = struct
   module Parameters = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "rpm"
 
   module Responses = struct
     module Created = struct end
@@ -1096,10 +1276,19 @@ module GetApiV4ProjectsIdPackagesPypiSimple_packageName = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "package_name"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "pypi"
+    / "simple"
+    / "*package_name"
+    /? string "package_name"
 
   module Responses = struct
     module OK = struct end
@@ -1146,6 +1335,10 @@ module GetApiV4ProjectsIdPackagesPypiSimple = struct
   module Parameters = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "pypi" / "simple"
 
   module Responses = struct
     module OK = struct end
@@ -1195,10 +1388,20 @@ module GetApiV4ProjectsIdPackagesPypiFilesSha256_fileIdentifier = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "file_identifier"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "pypi"
+    / "files"
+    /% Path.string
+    / "*file_identifier"
+    /? string "file_identifier"
 
   module Responses = struct
     module OK = struct end
@@ -1245,6 +1448,10 @@ module PostApiV4ProjectsIdPackagesPypiAuthorize = struct
   module Parameters = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "pypi" / "authorize"
 
   module Responses = struct
     module OK = struct end
@@ -1293,6 +1500,10 @@ module PostApiV4ProjectsIdPackagesPypi = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdPackagesPypi.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "pypi"
 
   module Responses = struct
     module Created = struct end
@@ -1354,6 +1565,10 @@ module PatchApiV4ProjectsIdPackagesProtectionRulesPackageProtectionRuleId = stru
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "protection" / "rules" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -1412,6 +1627,10 @@ module DeleteApiV4ProjectsIdPackagesProtectionRulesPackageProtectionRuleId = str
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "protection" / "rules" /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Bad_request = struct end
@@ -1466,6 +1685,10 @@ module PostApiV4ProjectsIdPackagesProtectionRules = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "protection" / "rules"
+
   module Responses = struct
     module Created = struct end
     module Bad_request = struct end
@@ -1517,6 +1740,10 @@ module GetApiV4ProjectsIdPackagesProtectionRules = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "protection" / "rules"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -1559,6 +1786,10 @@ module PutApiV4ProjectsIdPackagesNugetV2Authorize = struct
   module Parameters = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "nuget" / "v2" / "authorize"
 
   module Responses = struct
     module OK = struct end
@@ -1603,6 +1834,10 @@ module GetApiV4ProjectsIdPackagesNugetV2_metadata = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "nuget" / "v2" / "$metadata"
+
   module Responses = struct
     module OK = struct end
 
@@ -1635,6 +1870,10 @@ module PutApiV4ProjectsIdPackagesNugetV2 = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdPackagesNugetV2.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "nuget" / "v2"
 
   module Responses = struct
     module Created = struct end
@@ -1684,6 +1923,10 @@ module GetApiV4ProjectsIdPackagesNugetV2 = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "nuget" / "v2"
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -1716,6 +1959,18 @@ module PutApiV4ProjectsIdPackagesNugetSymbolpackageAuthorize = struct
   module Parameters = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "nuget"
+    / "symbolpackage"
+    / "authorize"
 
   module Responses = struct
     module OK = struct end
@@ -1764,6 +2019,10 @@ module PutApiV4ProjectsIdPackagesNugetSymbolpackage = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdPackagesNugetSymbolpackage.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "nuget" / "symbolpackage"
 
   module Responses = struct
     module Created = struct end
@@ -1820,10 +2079,23 @@ module GetApiV4ProjectsIdPackagesNugetSymbolfiles_fileName_signature_sameFileNam
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "file_name" /? string "signature" /? string "same_file_name"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "nuget"
+    / "symbolfiles"
+    / "*file_name"
+    / "*signature"
+    / "*same_file_name"
+    /? string "file_name"
+    /? string "signature"
+    /? string "same_file_name"
 
   module Responses = struct
     module OK = struct end
@@ -1882,10 +2154,17 @@ module GetApiV4ProjectsIdPackagesNugetQuery = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "nuget"
+    / "query"
     /? option (string "q")
     /? option_default 0 (int "skip")
     /? option_default 20 (int "take")
@@ -1946,10 +2225,20 @@ module GetApiV4ProjectsIdPackagesNugetMetadata_packageNameIndex = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "package_name"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "nuget"
+    / "metadata"
+    / "*package_name"
+    / "index"
+    /? string "package_name"
 
   module Responses = struct
     module OK = struct end
@@ -2002,10 +2291,21 @@ module GetApiV4ProjectsIdPackagesNugetMetadata_packageName_packageVersion = stru
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "package_name" /? string "package_version"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "nuget"
+    / "metadata"
+    / "*package_name"
+    / "*package_version"
+    /? string "package_name"
+    /? string "package_version"
 
   module Responses = struct
     module OK = struct end
@@ -2056,6 +2356,10 @@ module GetApiV4ProjectsIdPackagesNugetIndex = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "nuget" / "index"
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -2093,10 +2397,20 @@ module GetApiV4ProjectsIdPackagesNugetDownload_packageNameIndex = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "package_name"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "nuget"
+    / "download"
+    / "*package_name"
+    / "index"
+    /? string "package_name"
 
   module Responses = struct
     module OK = struct end
@@ -2150,10 +2464,23 @@ module GetApiV4ProjectsIdPackagesNugetDownload_packageName_packageVersion_packag
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "package_name" /? string "package_version" /? string "package_filename"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "nuget"
+    / "download"
+    / "*package_name"
+    / "*package_version"
+    / "*package_filename"
+    /? string "package_name"
+    /? string "package_version"
+    /? string "package_filename"
 
   module Responses = struct
     module OK = struct end
@@ -2206,6 +2533,10 @@ module PutApiV4ProjectsIdPackagesNugetAuthorize = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "nuget" / "authorize"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -2254,10 +2585,20 @@ module DeleteApiV4ProjectsIdPackagesNuget_packageName_packageVersion = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "package_name" /? string "package_version"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "nuget"
+    / "*package_name"
+    / "*package_version"
+    /? string "package_name"
+    /? string "package_version"
 
   module Responses = struct
     module No_content = struct end
@@ -2312,6 +2653,10 @@ module PutApiV4ProjectsIdPackagesNuget = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdPackagesNuget.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "nuget"
 
   module Responses = struct
     module Created = struct end
@@ -2370,6 +2715,10 @@ module PutApiV4ProjectsIdPackagesNpmPackageName = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "npm" /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -2423,10 +2772,22 @@ module DeleteApiV4ProjectsIdPackagesNpmPackage_packageNameDistTagsTag = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "package_name"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "npm"
+    / "-"
+    / "package"
+    / "*package_name"
+    / "dist-tags"
+    /% Path.string
+    /? string "package_name"
 
   module Responses = struct
     module No_content = struct end
@@ -2486,6 +2847,21 @@ module PutApiV4ProjectsIdPackagesNpmPackage_packageNameDistTagsTag = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "npm"
+    / "-"
+    / "package"
+    / "*package_name"
+    / "dist-tags"
+    /% Path.string
+
   module Responses = struct
     module No_content = struct end
     module Bad_request = struct end
@@ -2538,10 +2914,21 @@ module GetApiV4ProjectsIdPackagesNpmPackage_packageNameDistTags = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "package_name"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "npm"
+    / "-"
+    / "package"
+    / "*package_name"
+    / "dist-tags"
+    /? string "package_name"
 
   module Responses = struct
     module OK = struct end
@@ -2592,6 +2979,22 @@ module PostApiV4ProjectsIdPackagesNpmNpmV1SecurityAuditsQuick = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "npm"
+    / "-"
+    / "npm"
+    / "v1"
+    / "security"
+    / "audits"
+    / "quick"
+
   module Responses = struct
     module OK = struct end
     module Temporary_redirect = struct end
@@ -2637,6 +3040,22 @@ module PostApiV4ProjectsIdPackagesNpmNpmV1SecurityAdvisoriesBulk = struct
   module Parameters = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "npm"
+    / "-"
+    / "npm"
+    / "v1"
+    / "security"
+    / "advisories"
+    / "bulk"
 
   module Responses = struct
     module OK = struct end
@@ -2689,10 +3108,21 @@ module GetApiV4ProjectsIdPackagesNpm_packageName__fileName = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "package_name" /? string "file_name"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "npm"
+    / "*package_name"
+    / "-"
+    / "*file_name"
+    /? string "package_name"
+    /? string "file_name"
 
   module Responses = struct
     module OK = struct end
@@ -2740,10 +3170,18 @@ module GetApiV4ProjectsIdPackagesNpm_packageName = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "package_name"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "npm"
+    / "*package_name"
+    /? string "package_name"
 
   module Responses = struct
     module OK = struct end
@@ -2806,6 +3244,19 @@ module PutApiV4ProjectsIdPackagesMaven_pathFileNameAuthorize = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "maven"
+    / "*path"
+    /% Path.string
+    / "authorize"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -2863,6 +3314,10 @@ module PutApiV4ProjectsIdPackagesMaven_pathFileName = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "maven" / "*path" /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -2919,10 +3374,19 @@ module GetApiV4ProjectsIdPackagesMaven_pathFileName = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "path"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "maven"
+    / "*path"
+    /% Path.string
+    /? string "path"
 
   module Responses = struct
     module OK = struct end
@@ -2977,6 +3441,10 @@ module GetApiV4ProjectsIdPackagesHelmChannelIndexYaml = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "packages" / "helm" /% Path.string / "index.yaml"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -3019,6 +3487,19 @@ module GetApiV4ProjectsIdPackagesHelmChannelChartsFileNameTgz = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "packages"
+    / "helm"
+    /% Path.string
+    / "charts"
+    /% Path.ud (fun segment -> CCString.chop_suffix ~suf:".tgz" segment)
 
   module Responses = struct
     module OK = struct end
@@ -3070,6 +3551,20 @@ module PostApiV4ProjectsIdPackagesHelmApiChannelChartsAuthorize = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "packages"
+    / "helm"
+    / "api"
+    /% Path.string
+    / "charts"
+    / "authorize"
 
   module Responses = struct
     module OK = struct end
@@ -3123,6 +3618,19 @@ module PostApiV4ProjectsIdPackagesHelmApiChannelCharts = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "packages"
+    / "helm"
+    / "api"
+    /% Path.string
+    / "charts"
+
   module Responses = struct
     module Created = struct end
     module Unauthorized = struct end
@@ -3173,10 +3681,20 @@ module GetApiV4ProjectsIdPackagesGo_moduleName_vModuleVersionZip = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "module_name"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "go"
+    / "*module_name"
+    / "@v"
+    /% Path.ud (fun segment -> CCString.chop_suffix ~suf:".zip" segment)
+    /? string "module_name"
 
   module Responses = struct
     module OK = struct end
@@ -3216,10 +3734,20 @@ module GetApiV4ProjectsIdPackagesGo_moduleName_vModuleVersionMod = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "module_name"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "go"
+    / "*module_name"
+    / "@v"
+    /% Path.ud (fun segment -> CCString.chop_suffix ~suf:".mod" segment)
+    /? string "module_name"
 
   module Responses = struct
     module OK = struct end
@@ -3259,10 +3787,20 @@ module GetApiV4ProjectsIdPackagesGo_moduleName_vModuleVersionInfo = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "module_name"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "go"
+    / "*module_name"
+    / "@v"
+    /% Path.ud (fun segment -> CCString.chop_suffix ~suf:".info" segment)
+    /? string "module_name"
 
   module Responses = struct
     module OK = struct end
@@ -3301,10 +3839,20 @@ module GetApiV4ProjectsIdPackagesGo_moduleName_vList = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "module_name"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "go"
+    / "*module_name"
+    / "@v"
+    / "list"
+    /? string "module_name"
 
   module Responses = struct
     module OK = struct end
@@ -3345,6 +3893,18 @@ module PutApiV4ProjectsIdPackagesDebianFileNameAuthorize = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdPackagesDebianFileNameAuthorize.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "debian"
+    /% Path.string
+    / "authorize"
 
   module Responses = struct
     module OK = struct end
@@ -3403,6 +3963,10 @@ module PutApiV4ProjectsIdPackagesDebianFileName = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "debian" /% Path.string
+
   module Responses = struct
     module Created = struct end
     module Bad_request = struct end
@@ -3459,6 +4023,22 @@ struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "debian"
+    / "pool"
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
 
   module Responses = struct
     module OK = struct end
@@ -3518,10 +4098,24 @@ struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "distribution"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "debian"
+    / "dists"
+    / "*distribution"
+    /% Path.string
+    / "source"
+    / "by-hash"
+    / "SHA256"
+    /% Path.int
+    /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -3585,10 +4179,22 @@ module GetApiV4ProjectsIdPackagesDebianDists_distributionComponentSourceSources 
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "distribution"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "debian"
+    / "dists"
+    / "*distribution"
+    /% Path.string
+    / "source"
+    / "Sources"
+    /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -3651,10 +4257,25 @@ struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "distribution"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "debian"
+    / "dists"
+    / "*distribution"
+    /% Path.string
+    / "debian-installer"
+    /% Path.ud (fun segment -> CCString.chop_prefix ~pre:"binary-" segment)
+    / "by-hash"
+    / "SHA256"
+    /% Path.int
+    /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -3722,10 +4343,23 @@ struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "distribution"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "debian"
+    / "dists"
+    / "*distribution"
+    /% Path.string
+    / "debian-installer"
+    /% Path.ud (fun segment -> CCString.chop_prefix ~pre:"binary-" segment)
+    / "Packages"
+    /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -3793,10 +4427,24 @@ struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "distribution"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "debian"
+    / "dists"
+    / "*distribution"
+    /% Path.string
+    /% Path.ud (fun segment -> CCString.chop_prefix ~pre:"binary-" segment)
+    / "by-hash"
+    / "SHA256"
+    /% Path.int
+    /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -3863,10 +4511,22 @@ struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "distribution"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "debian"
+    / "dists"
+    / "*distribution"
+    /% Path.string
+    /% Path.ud (fun segment -> CCString.chop_prefix ~pre:"binary-" segment)
+    / "Packages"
+    /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -3929,10 +4589,20 @@ module GetApiV4ProjectsIdPackagesDebianDists_distributionReleaseGpg = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "distribution"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "debian"
+    / "dists"
+    / "*distribution"
+    / "Release.gpg"
+    /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -3987,10 +4657,20 @@ module GetApiV4ProjectsIdPackagesDebianDists_distributionRelease = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "distribution"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "debian"
+    / "dists"
+    / "*distribution"
+    / "Release"
+    /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -4045,10 +4725,20 @@ module GetApiV4ProjectsIdPackagesDebianDists_distributionInrelease = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "distribution"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "debian"
+    / "dists"
+    / "*distribution"
+    / "InRelease"
+    /? string "distribution"
 
   module Responses = struct
     module OK = struct end
@@ -4098,6 +4788,19 @@ module GetApiV4ProjectsIdPackagesConanV2UsersCheckCredentials = struct
   module Parameters = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v2"
+    / "users"
+    / "check_credentials"
 
   module Responses = struct
     module OK = struct end
@@ -4178,6 +4881,26 @@ struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v2"
+    / "conans"
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    / "revisions"
+    /% Path.string
+    / "files"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.File_name.t_of_yojson (`String value)))
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -4237,10 +4960,20 @@ module GetApiV4ProjectsIdPackagesConanV2ConansSearch = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "q"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v2"
+    / "conans"
+    / "search"
+    /? string "q"
 
   module Responses = struct
     module OK = struct end
@@ -4283,6 +5016,19 @@ module GetApiV4ProjectsIdPackagesConanV1UsersCheckCredentials = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v1"
+    / "users"
+    / "check_credentials"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -4321,6 +5067,19 @@ module GetApiV4ProjectsIdPackagesConanV1UsersAuthenticate = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v1"
+    / "users"
+    / "authenticate"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -4358,6 +5117,10 @@ module GetApiV4ProjectsIdPackagesConanV1Ping = struct
   module Parameters = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "conan" / "v1" / "ping"
 
   module Responses = struct
     module OK = struct end
@@ -4434,6 +5197,28 @@ struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v1"
+    / "files"
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    / "package"
+    /% Path.string
+    /% Path.string
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.File_name.t_of_yojson (`String value)))
+    / "authorize"
 
   module Responses = struct
     module OK = struct end
@@ -4543,6 +5328,27 @@ struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v1"
+    / "files"
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    / "package"
+    /% Path.string
+    /% Path.string
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.File_name.t_of_yojson (`String value)))
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -4645,6 +5451,27 @@ struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v1"
+    / "files"
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    / "package"
+    /% Path.string
+    /% Path.string
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.File_name.t_of_yojson (`String value)))
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -4732,6 +5559,26 @@ struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v1"
+    / "files"
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    / "export"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.File_name.t_of_yojson (`String value)))
+    / "authorize"
 
   module Responses = struct
     module OK = struct end
@@ -4837,6 +5684,25 @@ struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v1"
+    / "files"
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    / "export"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.File_name.t_of_yojson (`String value)))
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -4935,6 +5801,25 @@ struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v1"
+    / "files"
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    / "export"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.File_name.t_of_yojson (`String value)))
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -4996,6 +5881,23 @@ struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v1"
+    / "conans"
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    / "upload_urls"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -5055,6 +5957,25 @@ struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v1"
+    / "conans"
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    / "packages"
+    /% Path.string
+    / "upload_urls"
 
   module Responses = struct
     module OK = struct end
@@ -5117,6 +6038,25 @@ struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v1"
+    / "conans"
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    / "packages"
+    /% Path.string
+    / "download_urls"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -5177,6 +6117,25 @@ struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v1"
+    / "conans"
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    / "packages"
+    /% Path.string
+    / "digest"
 
   module Responses = struct
     module OK = struct end
@@ -5239,6 +6198,24 @@ struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v1"
+    / "conans"
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    / "packages"
+    /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -5299,6 +6276,23 @@ struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v1"
+    / "conans"
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    / "download_urls"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -5357,6 +6351,23 @@ struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v1"
+    / "conans"
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    / "digest"
 
   module Responses = struct
     module OK = struct end
@@ -5417,6 +6428,22 @@ struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v1"
+    / "conans"
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+
   module Responses = struct
     module No_content = struct end
     module Bad_request = struct end
@@ -5475,6 +6502,22 @@ struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v1"
+    / "conans"
+    /% Path.string
+    /% Path.string
+    /% Path.string
+    /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -5529,10 +6572,20 @@ module GetApiV4ProjectsIdPackagesConanV1ConansSearch = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "q"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "conan"
+    / "v1"
+    / "conans"
+    / "search"
+    /? string "q"
 
   module Responses = struct
     module OK = struct end
@@ -5580,10 +6633,20 @@ module GetApiV4ProjectsIdPackagesComposerArchives_packageName = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "sha" /? string "package_name"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
+    / "composer"
+    / "archives"
+    / "*package_name"
+    /? string "sha"
+    /? string "package_name"
 
   module Responses = struct
     module OK = struct end
@@ -5635,6 +6698,10 @@ module PostApiV4ProjectsIdPackagesComposer = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdPackagesComposer.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "packages" / "composer"
 
   module Responses = struct
     module Created = struct end
@@ -5822,10 +6889,15 @@ module GetApiV4ProjectsIdPackages = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "packages"
     /? option_default 1 (int "page")
     /? option_default 20 (int "per_page")
     /? option_default

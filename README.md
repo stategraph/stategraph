@@ -189,8 +189,7 @@ The full walkthrough, including exploring what you imported, is in the [quicksta
 ## Community
 
 * [Slack](https://stategraph.com/slack): chat with the team and other users
-* [GitHub Discussions](https://github.com/orgs/stategraph/discussions): questions and ideas
-* [GitHub Issues](https://github.com/stategraph/stategraph/issues): bugs and feature requests
+* [GitHub Issues](https://github.com/stategraph/stategraph/issues): questions, bugs, and feature requests
 
 ## Contributing
 

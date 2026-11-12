@@ -3,6 +3,10 @@ module Workspaces = struct
     type t = { work_manifest_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "github" / "v1" / "work-manifests" /% Path.string / "workspaces"
+
   module Responses = struct
     module OK = struct
       type t = Terrat_api_components.Work_manifest_workspaces.t
@@ -48,6 +52,10 @@ module Plan_create = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "github" / "v1" / "work-manifests" /% Path.string / "plans"
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -88,10 +96,18 @@ module Plan_get = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "dir" /? string "workspace"
+    rel
+    / "api"
+    / "github"
+    / "v1"
+    / "work-manifests"
+    /% Path.string
+    / "plans"
+    /? string "dir"
+    /? string "workspace"
 
   module Responses = struct
     module OK = struct
@@ -131,6 +147,10 @@ module Initiate = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "github" / "v1" / "work-manifests" /% Path.string / "initiate"
+
   module Responses = struct
     module OK = struct
       type t = Terrat_api_components.Work_manifest.t
@@ -169,7 +189,13 @@ module Initiate = struct
 end
 
 module Get_access_token = struct
-  module Parameters = struct end
+  module Parameters = struct
+    type t = { work_manifest_id : string } [@@deriving make, show, eq]
+  end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "github" / "v1" / "work-manifests" /% Path.string / "access-token"
 
   module Responses = struct
     module OK = struct
@@ -184,10 +210,13 @@ module Get_access_token = struct
 
   let url = "/api/github/v1/work-manifests/{work_manifest_id}/access-token"
 
-  let make () =
+  let make params =
     Openapi.Request.make
       ~headers:[]
-      ~url_params:[]
+      ~url_params:
+        (let open Openapi.Request.Var in
+         let open Parameters in
+         [ ("work_manifest_id", Var (params.work_manifest_id, String)) ])
       ~query_params:[]
       ~url
       ~responses:Responses.t
@@ -203,6 +232,10 @@ module Results = struct
     type t = Terrat_api_components.Work_manifest_result.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "github" / "v1" / "work-manifests" /% Path.string
 
   module Responses = struct
     module OK = struct end

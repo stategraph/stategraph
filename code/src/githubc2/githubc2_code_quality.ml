@@ -12,6 +12,10 @@ module Update_setup = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "code-quality" / "setup"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Empty_object.t
@@ -106,6 +110,10 @@ module Get_setup = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "code-quality" / "setup"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Code_quality_setup.t
@@ -176,6 +184,10 @@ module Get_finding = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "code-quality" / "findings" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -292,10 +304,15 @@ module List_findings_for_repo = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "code-quality"
+    / "findings"
     /? option_default 30 (int "per_page")
     /? option_default
          `Desc

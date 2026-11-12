@@ -8,10 +8,10 @@ module Get_for_repo = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "ref")
+    rel / "repos" /% Path.string /% Path.string / "license" /? option (string "ref")
 
   module Responses = struct
     module OK = struct
@@ -59,6 +59,10 @@ module Get = struct
   module Parameters = struct
     type t = { license : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "licenses" /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -120,10 +124,11 @@ module Get_all_commonly_used = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "licenses"
     /? option (bool "featured")
     /? option_default 30 (int "per_page")
     /? option_default 1 (int "page")

@@ -1,6 +1,10 @@
 module Get = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "capabilities"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Capabilities.t

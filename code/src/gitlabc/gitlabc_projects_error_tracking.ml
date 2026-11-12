@@ -8,6 +8,10 @@ module PatchApiV4ProjectsIdErrorTrackingSettings = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "error_tracking" / "settings"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -58,6 +62,10 @@ module PutApiV4ProjectsIdErrorTrackingSettings = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "error_tracking" / "settings"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -103,6 +111,10 @@ module GetApiV4ProjectsIdErrorTrackingSettings = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "error_tracking" / "settings"
+
   module Responses = struct
     module OK = struct end
 
@@ -134,6 +146,10 @@ module DeleteApiV4ProjectsIdErrorTrackingClientKeysKeyId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "error_tracking" / "client_keys" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -175,6 +191,10 @@ module PostApiV4ProjectsIdErrorTrackingClientKeys = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "error_tracking" / "client_keys"
+
   module Responses = struct
     module Created = struct end
 
@@ -202,6 +222,10 @@ module GetApiV4ProjectsIdErrorTrackingClientKeys = struct
   module Parameters = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "error_tracking" / "client_keys"
 
   module Responses = struct
     module OK = struct end

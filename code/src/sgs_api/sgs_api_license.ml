@@ -1,6 +1,10 @@
 module Status = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "license" / "status"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.License_status_response.t
@@ -46,6 +50,10 @@ module Submit = struct
     type t = Sgs_api_components.License_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "license"
 
   module Responses = struct
     module OK = struct

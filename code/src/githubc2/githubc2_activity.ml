@@ -8,10 +8,15 @@ module List_repos_watched_by_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "users"
+    /% Path.string
+    / "subscriptions"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -90,10 +95,13 @@ module List_repos_starred_by_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "users"
+    /% Path.string
+    / "starred"
     /? option_default
          `Created
          (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
@@ -172,10 +180,16 @@ module List_received_public_events_for_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "users"
+    /% Path.string
+    / "received_events"
+    / "public"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -216,10 +230,15 @@ module List_received_events_for_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "users"
+    /% Path.string
+    / "received_events"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -260,10 +279,16 @@ module List_public_events_for_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "users"
+    /% Path.string
+    / "events"
+    / "public"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -305,10 +330,17 @@ module List_org_events_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "users"
+    /% Path.string
+    / "events"
+    / "orgs"
+    /% Path.string
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -349,10 +381,15 @@ module List_events_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "users"
+    /% Path.string
+    / "events"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -392,10 +429,14 @@ module List_watched_repos_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "user"
+    / "subscriptions"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -455,6 +496,10 @@ module Unstar_repo_for_authenticated_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "starred" /% Path.string /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -518,6 +563,10 @@ module Star_repo_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "starred" /% Path.string /% Path.string
+
   module Responses = struct
     module No_content = struct end
     module Not_modified = struct end
@@ -579,6 +628,10 @@ module Check_repo_is_starred_by_authenticated_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "starred" /% Path.string /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -680,10 +733,12 @@ module List_repos_starred_by_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "user"
+    / "starred"
     /? option_default
          `Created
          (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
@@ -758,6 +813,10 @@ module Delete_repo_subscription = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "subscription"
+
   module Responses = struct
     module No_content = struct end
 
@@ -802,6 +861,10 @@ module Set_repo_subscription = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "subscription"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Repository_subscription.t
@@ -838,6 +901,10 @@ module Get_repo_subscription = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "subscription"
 
   module Responses = struct
     module OK = struct
@@ -893,10 +960,16 @@ module List_watchers_for_repo = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "subscribers"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -935,6 +1008,10 @@ module Get_stargazer_count_for_repo = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "stargazers" / "count"
 
   module Responses = struct
     module OK = struct
@@ -989,10 +1066,16 @@ module List_stargazers_for_repo = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "stargazers"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1079,6 +1162,10 @@ module Mark_repo_notifications_as_read = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "notifications"
+
   module Responses = struct
     module Accepted = struct
       module Primary = struct
@@ -1139,10 +1226,14 @@ module List_repo_notifications_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "notifications"
     /? option_default false (bool "all")
     /? option_default false (bool "participating")
     /? option (string "since")
@@ -1197,10 +1288,16 @@ module List_repo_events = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "events"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1241,10 +1338,15 @@ module List_public_org_events = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "events"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1279,6 +1381,10 @@ module Delete_thread_subscription = struct
   module Parameters = struct
     type t = { thread_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "notifications" / "threads" /% Path.int / "subscription"
 
   module Responses = struct
     module No_content = struct end
@@ -1340,6 +1446,10 @@ module Set_thread_subscription = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "notifications" / "threads" /% Path.int / "subscription"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Thread_subscription.t
@@ -1397,6 +1507,10 @@ module Get_thread_subscription_for_authenticated_user = struct
     type t = { thread_id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "notifications" / "threads" /% Path.int / "subscription"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Thread_subscription.t
@@ -1452,6 +1566,10 @@ module Mark_thread_as_read = struct
     type t = { thread_id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "notifications" / "threads" /% Path.int
+
   module Responses = struct
     module Reset_content = struct end
     module Not_modified = struct end
@@ -1496,6 +1614,10 @@ module Mark_thread_as_done = struct
     type t = { thread_id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "notifications" / "threads" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -1523,6 +1645,10 @@ module Get_thread = struct
   module Parameters = struct
     type t = { thread_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "notifications" / "threads" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -1588,6 +1714,10 @@ module Mark_notifications_as_read = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "notifications"
 
   module Responses = struct
     module Accepted = struct
@@ -1658,10 +1788,11 @@ module List_notifications_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "notifications"
     /? option_default false (bool "all")
     /? option_default false (bool "participating")
     /? option (string "since")
@@ -1745,10 +1876,16 @@ module List_public_events_for_repo_network = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "networks"
+    /% Path.string
+    /% Path.string
+    / "events"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1813,6 +1950,10 @@ end
 module Get_feeds = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "feeds"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Feed.t
@@ -1845,10 +1986,10 @@ module List_public_events = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 15 (int "per_page") /? option_default 1 (int "page")
+    rel / "events" /? option_default 15 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct

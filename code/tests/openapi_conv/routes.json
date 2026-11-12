@@ -37,6 +37,90 @@
           "200": {}
         }
       }
+    },
+    "/tenants/{tenant_id}/items/{name}/{count}/{big}": {
+      "get": {
+        "operationId": "items/get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": { "type": "integer", "default": 5 }
+          },
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "count",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "in": "path",
+            "name": "big",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "responses": {
+          "200": {}
+        }
+      }
+    },
+    "/colors/{color}/{workflow}": {
+      "get": {
+        "operationId": "colors/get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "color",
+            "required": true,
+            "schema": { "type": "string", "enum": ["red", "green"] }
+          },
+          {
+            "in": "path",
+            "name": "workflow",
+            "required": true,
+            "schema": { "oneOf": [{ "type": "integer" }, { "type": "string" }] }
+          }
+        ],
+        "responses": {
+          "200": {}
+        }
+      }
+    },
+    "/packages/binary-{arch}/{version}.info": {
+      "get": {
+        "operationId": "packages/get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "arch",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {}
+        }
+      }
     }
   },
   "components": {}

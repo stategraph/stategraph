@@ -8,10 +8,15 @@ module List_for_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "users"
+    /% Path.string
+    / "orgs"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -51,10 +56,10 @@ module List_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel / "user" / "orgs" /? option_default 30 (int "per_page") /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -132,6 +137,10 @@ module Update_membership_for_authenticated_user = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "memberships" / "orgs" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Org_membership.t
@@ -199,6 +208,10 @@ module Get_membership_for_authenticated_user = struct
   module Parameters = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "memberships" / "orgs" /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -274,10 +287,13 @@ module List_memberships_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "user"
+    / "memberships"
+    / "orgs"
     /? option
          (ud "state" (fun value -> CCResult.to_opt (Parameters.State.t_of_yojson (`String value))))
     /? option_default 30 (int "per_page")
@@ -433,6 +449,15 @@ module Enable_or_disable_security_product_on_all_org_repos = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "orgs"
+    /% Path.string
+    /% Path.ud (fun value ->
+        CCResult.to_opt (Parameters.Security_product.t_of_yojson (`String value)))
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Enablement.t_of_yojson (`String value)))
+
   module Responses = struct
     module No_content = struct end
     module Unprocessable_entity = struct end
@@ -476,6 +501,10 @@ module Disable_selected_repository_immutable_releases_organization = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "settings" / "immutable-releases" / "repositories" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -507,6 +536,10 @@ module Enable_selected_repository_immutable_releases_organization = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "settings" / "immutable-releases" / "repositories" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -549,6 +582,10 @@ module Set_immutable_releases_settings_repositories = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "settings" / "immutable-releases" / "repositories"
+
   module Responses = struct
     module No_content = struct end
 
@@ -584,10 +621,17 @@ module Get_immutable_releases_settings_repositories = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "settings"
+    / "immutable-releases"
+    / "repositories"
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -672,6 +716,10 @@ module Set_immutable_releases_settings = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "settings" / "immutable-releases"
+
   module Responses = struct
     module No_content = struct end
 
@@ -701,6 +749,10 @@ module Get_immutable_releases_settings = struct
   module Parameters = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "settings" / "immutable-releases"
 
   module Responses = struct
     module OK = struct
@@ -737,6 +789,10 @@ module Remove_security_manager_team = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "security-managers" / "teams" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -769,6 +825,10 @@ module Add_security_manager_team = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "security-managers" / "teams" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -796,6 +856,10 @@ module List_security_manager_teams = struct
   module Parameters = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "security-managers"
 
   module Responses = struct
     module OK = struct
@@ -832,6 +896,10 @@ module Get_org_ruleset_version = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "rulesets" /% Path.int / "history" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -896,10 +964,17 @@ module Get_org_ruleset_history = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "rulesets"
+    /% Path.int
+    / "history"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -961,6 +1036,10 @@ module Remove_public_membership_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "public_members" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -992,6 +1071,10 @@ module Set_public_membership_for_authenticated_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "public_members" /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -1038,6 +1121,10 @@ module Check_public_membership_for_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "public_members" /% Path.string
+
   module Responses = struct
     module No_content = struct end
     module Not_found = struct end
@@ -1076,10 +1163,15 @@ module List_public_members = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "public_members"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1135,6 +1227,10 @@ module Custom_properties_for_repos_create_or_update_organization_values = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "properties" / "values"
 
   module Responses = struct
     module No_content = struct end
@@ -1200,10 +1296,14 @@ module Custom_properties_for_repos_get_organization_values = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "properties"
+    / "values"
     /? option_default 30 (int "per_page")
     /? option_default 1 (int "page")
     /? option (string "repository_query")
@@ -1270,6 +1370,10 @@ module Custom_properties_for_repos_delete_organization_definition = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "properties" / "schema" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -1330,6 +1434,10 @@ module Custom_properties_for_repos_create_or_update_organization_definition = st
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "properties" / "schema" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Custom_property.t
@@ -1389,6 +1497,10 @@ module Custom_properties_for_repos_get_organization_definition = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "properties" / "schema" /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -1458,6 +1570,10 @@ module Custom_properties_for_repos_create_or_update_organization_definitions = s
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "properties" / "schema"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Custom_property.t list
@@ -1510,6 +1626,10 @@ module Custom_properties_for_repos_get_organization_definitions = struct
   module Parameters = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "properties" / "schema"
 
   module Responses = struct
     module OK = struct
@@ -1568,10 +1688,17 @@ module List_pat_grant_repositories = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "personal-access-tokens"
+    /% Path.int
+    / "repositories"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1660,6 +1787,10 @@ module Update_pat_access = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "personal-access-tokens" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -1755,6 +1886,10 @@ module Update_pat_accesses = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "personal-access-tokens"
 
   module Responses = struct
     module Accepted = struct
@@ -1876,10 +2011,13 @@ module List_pat_grants = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "personal-access-tokens"
     /? option_default 30 (int "per_page")
     /? option_default 1 (int "page")
     /? option_default
@@ -1984,10 +2122,17 @@ module List_pat_grant_request_repositories = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "personal-access-token-requests"
+    /% Path.int
+    / "repositories"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -2085,6 +2230,10 @@ module Review_pat_grant_request = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "personal-access-token-requests" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -2187,6 +2336,10 @@ module Review_pat_grant_requests_in_bulk = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "personal-access-token-requests"
 
   module Responses = struct
     module Accepted = struct
@@ -2308,10 +2461,13 @@ module List_pat_grant_requests = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "personal-access-token-requests"
     /? option_default 30 (int "per_page")
     /? option_default 1 (int "page")
     /? option_default
@@ -2414,6 +2570,10 @@ module Remove_outside_collaborator = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "outside_collaborators" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -2475,6 +2635,10 @@ module Convert_member_to_outside_collaborator = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "outside_collaborators" /% Path.string
 
   module Responses = struct
     module Accepted = struct
@@ -2556,10 +2720,13 @@ module List_outside_collaborators = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "outside_collaborators"
     /? option_default
          `All
          (ud "filter" (fun value -> CCResult.to_opt (Parameters.Filter.t_of_yojson (`String value))))
@@ -2610,10 +2777,17 @@ module List_org_role_users = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "organization-roles"
+    /% Path.int
+    / "users"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -2668,10 +2842,17 @@ module List_org_role_teams = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "organization-roles"
+    /% Path.int
+    / "teams"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -2723,6 +2904,10 @@ module Get_org_role = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "organization-roles" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -2781,6 +2966,10 @@ module Revoke_org_role_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "organization-roles" / "users" /% Path.string /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -2817,6 +3006,10 @@ module Assign_user_to_org_role = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "organization-roles" / "users" /% Path.string /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -2866,6 +3059,10 @@ module Revoke_all_org_roles_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "organization-roles" / "users" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -2898,6 +3095,10 @@ module Revoke_org_role_team = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "organization-roles" / "teams" /% Path.string /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -2935,6 +3136,10 @@ module Assign_team_to_org_role = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "organization-roles" / "teams" /% Path.string /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -2984,6 +3189,10 @@ module Revoke_all_org_roles_team = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "organization-roles" / "teams" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -3011,6 +3220,10 @@ module List_org_roles = struct
   module Parameters = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "organization-roles"
 
   module Responses = struct
     module OK = struct
@@ -3079,6 +3292,10 @@ module Remove_membership_for_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "memberships" /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -3159,6 +3376,10 @@ module Set_membership_for_user = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "memberships" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Org_membership.t
@@ -3217,6 +3438,10 @@ module Get_membership_for_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "memberships" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Org_membership.t
@@ -3272,6 +3497,10 @@ module Remove_member = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "members" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -3316,6 +3545,10 @@ module Check_membership_for_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "members" /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -3406,10 +3639,13 @@ module List_members = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "members"
     /? option_default
          `All
          (ud "filter" (fun value -> CCResult.to_opt (Parameters.Filter.t_of_yojson (`String value))))
@@ -3476,6 +3712,10 @@ module Delete_issue_type = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "issue-types" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -3533,6 +3773,10 @@ module Update_issue_type = struct
     type t = Githubc2_components.Organization_update_issue_type.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "issue-types" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -3593,6 +3837,10 @@ module Create_issue_type = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "issue-types"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Issue_type.t
@@ -3647,6 +3895,10 @@ module List_issue_types = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "issue-types"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Issue_type.t list
@@ -3699,6 +3951,10 @@ module Update_issue_field = struct
     type t = Githubc2_components.Organization_update_issue_field.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "issue-fields" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -3758,6 +4014,10 @@ module Delete_issue_field = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "issue-fields" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -3811,6 +4071,10 @@ module Create_issue_field = struct
     type t = Githubc2_components.Organization_create_issue_field.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "issue-fields"
 
   module Responses = struct
     module OK = struct
@@ -3866,6 +4130,10 @@ module List_issue_fields = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "issue-fields"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Issue_field.t list
@@ -3916,10 +4184,17 @@ module List_invitation_teams = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "invitations"
+    /% Path.int
+    / "teams"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -3971,6 +4246,10 @@ module Cancel_invitation = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "invitations" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -4062,6 +4341,10 @@ module Create_invitation = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "invitations"
 
   module Responses = struct
     module Created = struct
@@ -4172,10 +4455,13 @@ module List_pending_invitations = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "invitations"
     /? option_default 30 (int "per_page")
     /? option_default 1 (int "page")
     /? option_default
@@ -4243,10 +4529,15 @@ module List_app_installations = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "installations"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -4298,6 +4589,10 @@ module Ping_webhook = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "hooks" /% Path.int / "pings"
+
   module Responses = struct
     module No_content = struct end
 
@@ -4343,6 +4638,10 @@ module Redeliver_webhook_delivery = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "hooks" /% Path.int / "deliveries" /% Path.int / "attempts"
 
   module Responses = struct
     module Accepted = struct
@@ -4403,6 +4702,10 @@ module Get_webhook_delivery = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "hooks" /% Path.int / "deliveries" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -4485,10 +4788,15 @@ module List_webhook_deliveries = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "hooks"
+    /% Path.int
+    / "deliveries"
     /? option_default 30 (int "per_page")
     /? option (string "cursor")
     /? option
@@ -4571,6 +4879,10 @@ module Update_webhook_config_for_org = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "hooks" /% Path.int / "config"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Webhook_config.t
@@ -4607,6 +4919,10 @@ module Get_webhook_config_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "hooks" /% Path.int / "config"
 
   module Responses = struct
     module OK = struct
@@ -4675,6 +4991,10 @@ module Update_webhook = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "hooks" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Org_hook.t
@@ -4733,6 +5053,10 @@ module Delete_webhook = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "hooks" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -4777,6 +5101,10 @@ module Get_webhook = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "hooks" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -4856,6 +5184,10 @@ module Create_webhook = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "hooks"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Org_hook.t
@@ -4915,10 +5247,15 @@ module List_webhooks = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "hooks"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -4972,10 +5309,15 @@ module List_failed_invitations = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "failed_invitations"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -5028,6 +5370,10 @@ module Unblock_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "blocks" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -5059,6 +5405,10 @@ module Block_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "blocks" /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -5106,6 +5456,10 @@ module Check_blocked_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "blocks" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -5152,10 +5506,15 @@ module List_blocked_users = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "blocks"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -5199,10 +5558,14 @@ module List_attestations = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "attestations"
+    /% Path.string
     /? option_default 30 (int "per_page")
     /? option (string "before")
     /? option (string "after")
@@ -5303,6 +5666,10 @@ module Delete_attestations_by_id = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "attestations" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module No_content = struct end
@@ -5361,10 +5728,14 @@ module List_attestation_repositories = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "attestations"
+    / "repositories"
     /? option_default 30 (int "per_page")
     /? option (string "before")
     /? option (string "after")
@@ -5423,6 +5794,10 @@ module Delete_attestations_by_subject_digest = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "attestations" / "digest" /% Path.string
 
   module Responses = struct
     module OK = struct end
@@ -5515,6 +5890,10 @@ module Delete_attestations_bulk = struct
       | V1 v -> V1.to_yojson v
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "attestations" / "delete-request"
+
   module Responses = struct
     module OK = struct end
 
@@ -5580,10 +5959,14 @@ module List_attestations_bulk = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "attestations"
+    / "bulk-list"
     /? option_default 30 (int "per_page")
     /? option (string "before")
     /? option (string "after")
@@ -5702,6 +6085,10 @@ module List_artifact_storage_records = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "artifacts" /% Path.string / "metadata" / "storage-records"
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -5768,6 +6155,10 @@ module List_artifact_deployment_records = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "artifacts" /% Path.string / "metadata" / "deployment-records"
 
   module Responses = struct
     module OK = struct
@@ -5854,6 +6245,10 @@ module Create_artifact_storage_record = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "artifacts" / "metadata" / "storage-record"
 
   module Responses = struct
     module OK = struct
@@ -5942,6 +6337,19 @@ module Get_cluster_deployment_records_job = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "orgs"
+    /% Path.string
+    / "artifacts"
+    / "metadata"
+    / "deployment-record"
+    / "cluster"
+    /% Path.string
+    / "jobs"
+    /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -6126,6 +6534,18 @@ module Create_cluster_deployment_records_job = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "orgs"
+    /% Path.string
+    / "artifacts"
+    / "metadata"
+    / "deployment-record"
+    / "cluster"
+    /% Path.string
+    / "jobs"
+
   module Responses = struct
     module Accepted = struct
       module Primary = struct
@@ -6302,6 +6722,17 @@ module Set_cluster_deployment_records = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "orgs"
+    /% Path.string
+    / "artifacts"
+    / "metadata"
+    / "deployment-record"
+    / "cluster"
+    /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -6530,6 +6961,10 @@ module Create_artifact_deployment_record = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "artifacts" / "metadata" / "deployment-record"
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -6682,6 +7117,10 @@ module Update = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Organization_full.t
@@ -6754,6 +7193,10 @@ module Delete = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string
+
   module Responses = struct
     module Accepted = struct
       include Json_schema.Additional_properties.Make (Json_schema.Empty_obj) (Json_schema.Obj)
@@ -6804,6 +7247,10 @@ module Get = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Organization_full.t
@@ -6852,10 +7299,10 @@ module List = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (int "since") /? option_default 30 (int "per_page")
+    rel / "organizations" /? option (int "since") /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct

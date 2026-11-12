@@ -24,15 +24,6 @@ module Rt = struct
       /% Path.int
       /* Body.decode ~json:Sgs_api_tenants.Rotate_gitlab_installation.Request_body.of_yojson ())
 
-  let vcs_installations_github_unclaimed () =
-    Brtl_rtng.Route.(
-      api_v1 ()
-      / "vcs-installations"
-      / "github"
-      / "unclaimed"
-      /? Query.(option (string "cursor"))
-      /? Query.(option_default 100 (int "limit")))
-
   (* GitHub identity claim (#1795): start the handshake, take GitHub's answer,
      list what was proven, spend the proof. The callback is not tenant-scoped
      because GitHub redirects to a fixed URL; the tenant rides in the signed
@@ -40,20 +31,6 @@ module Rt = struct
   let tenant_github_claim_start () =
     Brtl_rtng.Route.(
       tenant () / "vcs-installations" / "github" / "claim" / "start" /? Query.(option (string "rd")))
-
-  (* All optional: GitHub also lands the user here after an app installation,
-     with installation_id and setup_action but no state to complete. Requiring
-     them would answer that navigation with a 404. *)
-  let vcs_installations_github_claim_callback () =
-    Brtl_rtng.Route.(
-      api_v1 ()
-      / "vcs-installations"
-      / "github"
-      / "claim"
-      / "callback"
-      /? Query.(option (string "code"))
-      /? Query.(option (string "state"))
-      /? Query.(option (string "setup_action")))
 
   let tenant_github_claimable () =
     Brtl_rtng.Route.(tenant () / "vcs-installations" / "github" / "claimable")
@@ -92,15 +69,6 @@ module Rt = struct
       setup_github_app ()
       / "credentials"
       /* Body.decode ~json:Sgs_api_components_github_app_credentials_request.of_yojson ())
-
-  let setup_github_app_callback () =
-    Brtl_rtng.Route.(
-      api_v1 ()
-      / "setup"
-      / "github-app"
-      / "callback"
-      /? Query.(option (string "code"))
-      /? Query.(option (string "state")))
 end
 
 type t = {
@@ -133,7 +101,7 @@ let routes { config; storage } =
   Brtl_rtng.Route.
     [
       ( `GET,
-        Rt.vcs_installations_github_unclaimed ()
+        Sgs_api_vcs_installations.List_unclaimed_github.route ()
         --> fun cursor limit ->
         Sgs_service_orchestration_ep_vcs_installation_unclaimed_github.run
           ~cursor
@@ -156,7 +124,7 @@ let routes { config; storage } =
         Rt.tenant_github_claim_start ()
         --> Sgs_service_orchestration_ep_github_claim_start.run config storage );
       ( `GET,
-        Rt.vcs_installations_github_claim_callback ()
+        Sgs_api_vcs_installations.Github_claim_callback.route ()
         --> Sgs_service_orchestration_ep_github_claim_callback.run config storage );
       ( `GET,
         Rt.tenant_github_claimable ()
@@ -171,10 +139,11 @@ let routes { config; storage } =
         Rt.setup_github_app_manifest ()
         --> Sgs_service_orchestration_ep_github_app_manifest.run config storage );
       ( `GET,
-        Rt.setup_github_app_callback ()
+        Sgs_api_setup.Github_app_callback.route ()
         --> Sgs_service_orchestration_ep_github_app_callback.run config storage );
       ( `GET,
-        Rt.setup_github_app () --> Sgs_service_orchestration_ep_github_app_get.run config storage );
+        Sgs_api_setup.Github_app_get.route ()
+        --> Sgs_service_orchestration_ep_github_app_get.run config storage );
       ( `DELETE,
         Rt.setup_github_app_delete ()
         --> Sgs_service_orchestration_ep_github_app_delete.run config storage );

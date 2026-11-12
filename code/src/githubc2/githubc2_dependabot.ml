@@ -8,6 +8,10 @@ module Delete_repo_secret = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "dependabot" / "secrets" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -56,6 +60,10 @@ module Create_or_update_repo_secret = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "dependabot" / "secrets" /% Path.string
 
   module Responses = struct
     module Created = struct
@@ -109,6 +117,10 @@ module Get_repo_secret = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "dependabot" / "secrets" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Dependabot_secret.t
@@ -148,6 +160,10 @@ module Get_repo_public_key = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "dependabot" / "secrets" / "public-key"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Dependabot_public_key.t
@@ -185,10 +201,17 @@ module List_repo_secrets = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "dependabot"
+    / "secrets"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -398,6 +421,10 @@ module Update_alert = struct
       | V1 v -> V1.to_yojson v
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "dependabot" / "alerts" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Dependabot_alert.t
@@ -481,6 +508,10 @@ module Get_alert = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "dependabot" / "alerts" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -645,10 +676,15 @@ module List_alerts_for_repo = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "dependabot"
+    / "alerts"
     /? option (string "classification")
     /? option (string "state")
     /? option (string "severity")
@@ -787,6 +823,17 @@ module Remove_selected_repo_from_org_secret = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "orgs"
+    /% Path.string
+    / "dependabot"
+    / "secrets"
+    /% Path.string
+    / "repositories"
+    /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Conflict = struct end
@@ -828,6 +875,17 @@ module Add_selected_repo_to_org_secret = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "orgs"
+    /% Path.string
+    / "dependabot"
+    / "secrets"
+    /% Path.string
+    / "repositories"
+    /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -883,6 +941,10 @@ module Set_selected_repos_for_org_secret = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "dependabot" / "secrets" /% Path.string / "repositories"
+
   module Responses = struct
     module No_content = struct end
 
@@ -919,10 +981,18 @@ module List_selected_repos_for_org_secret = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "dependabot"
+    / "secrets"
+    /% Path.string
+    / "repositories"
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -973,6 +1043,10 @@ module Delete_org_secret = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "dependabot" / "secrets" /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -1072,6 +1146,10 @@ module Create_or_update_org_secret = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "dependabot" / "secrets" /% Path.string
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Empty_object.t
@@ -1119,6 +1197,10 @@ module Get_org_secret = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "dependabot" / "secrets" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Organization_dependabot_secret.t
@@ -1149,6 +1231,10 @@ module Get_org_public_key = struct
   module Parameters = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "dependabot" / "secrets" / "public-key"
 
   module Responses = struct
     module OK = struct
@@ -1186,10 +1272,16 @@ module List_org_secrets = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "dependabot"
+    / "secrets"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1264,6 +1356,10 @@ module Set_repository_access_default_level = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "dependabot" / "repository-access" / "default-level"
+
   module Responses = struct
     module No_content = struct end
 
@@ -1334,6 +1430,10 @@ module Update_repository_access_for_org = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "dependabot" / "repository-access"
+
   module Responses = struct
     module No_content = struct end
 
@@ -1389,10 +1489,16 @@ module Repository_access_for_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "dependabot"
+    / "repository-access"
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -1559,10 +1665,14 @@ module List_alerts_for_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "dependabot"
+    / "alerts"
     /? option (string "classification")
     /? option (string "state")
     /? option (string "severity")
@@ -1727,6 +1837,10 @@ module Set_repository_access_default_level_for_enterprise = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "dependabot" / "repository-access" / "default-level"
+
   module Responses = struct
     module No_content = struct end
 
@@ -1797,6 +1911,10 @@ module Update_repository_access_for_enterprise = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "dependabot" / "repository-access"
+
   module Responses = struct
     module No_content = struct end
 
@@ -1852,10 +1970,16 @@ module Repository_access_for_enterprise = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
+    rel
+    / "enterprises"
+    /% Path.string
+    / "dependabot"
+    / "repository-access"
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -2013,10 +2137,14 @@ module List_alerts_for_enterprise = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "enterprises"
+    /% Path.string
+    / "dependabot"
+    / "alerts"
     /? option (string "classification")
     /? option (string "state")
     /? option (string "severity")

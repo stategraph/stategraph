@@ -1,6 +1,10 @@
 module Get = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "emojis"
+
   module Responses = struct
     module OK = struct
       module Additional = struct

@@ -8,6 +8,10 @@ module PutApiV4ProjectsIdTransfer = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "transfer"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end

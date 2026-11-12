@@ -41,10 +41,17 @@ module GetApiV4ProjectsIdTemplatesTypeName = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "templates"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Type.t_of_yojson (`String value)))
+    /% Path.string
     /? option (int "source_template_project_id")
     /? option (string "project")
     /? option (string "fullname")
@@ -134,10 +141,18 @@ module GetApiV4ProjectsIdTemplatesType = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "templates"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Type.t_of_yojson (`String value)))
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end

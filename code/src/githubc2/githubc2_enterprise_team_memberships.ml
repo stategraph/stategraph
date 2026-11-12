@@ -8,6 +8,10 @@ module Remove = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "teams" /% Path.string / "memberships" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -58,6 +62,10 @@ module Add = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "teams" /% Path.string / "memberships" /% Path.string
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Simple_user.t
@@ -97,6 +105,10 @@ module Get = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "teams" /% Path.string / "memberships" /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -149,6 +161,10 @@ module Bulk_remove = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "teams" /% Path.string / "memberships" / "remove"
 
   module Responses = struct
     module OK = struct
@@ -203,6 +219,10 @@ module Bulk_add = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "enterprises" /% Path.string / "teams" /% Path.string / "memberships" / "add"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Simple_user.t list
@@ -245,10 +265,17 @@ module List = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "enterprises"
+    /% Path.string
+    / "teams"
+    /% Path.string
+    / "memberships"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct

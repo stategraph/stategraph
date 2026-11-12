@@ -63,10 +63,16 @@ module Get_user_stats = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "insights"
+    / "api"
+    / "user-stats"
+    /% Path.string
     /? string "min_timestamp"
     /? option (string "max_timestamp")
     /? option_default 1 (int "page")
@@ -158,10 +164,17 @@ module Get_time_stats_by_actor = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "insights"
+    / "api"
+    / "time-stats"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Actor_type.t_of_yojson (`String value)))
+    /% Path.int
     /? string "min_timestamp"
     /? option (string "max_timestamp")
     /? string "timestamp_increment"
@@ -215,10 +228,17 @@ module Get_time_stats_by_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "insights"
+    / "api"
+    / "time-stats"
+    / "users"
+    /% Path.string
     /? string "min_timestamp"
     /? option (string "max_timestamp")
     /? string "timestamp_increment"
@@ -267,10 +287,15 @@ module Get_time_stats = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "insights"
+    / "api"
+    / "time-stats"
     /? string "min_timestamp"
     /? option (string "max_timestamp")
     /? string "timestamp_increment"
@@ -347,10 +372,19 @@ module Get_summary_stats_by_actor = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "min_timestamp" /? option (string "max_timestamp")
+    rel
+    / "orgs"
+    /% Path.string
+    / "insights"
+    / "api"
+    / "summary-stats"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Actor_type.t_of_yojson (`String value)))
+    /% Path.int
+    /? string "min_timestamp"
+    /? option (string "max_timestamp")
 
   module Responses = struct
     module OK = struct
@@ -399,10 +433,19 @@ module Get_summary_stats_by_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "min_timestamp" /? option (string "max_timestamp")
+    rel
+    / "orgs"
+    /% Path.string
+    / "insights"
+    / "api"
+    / "summary-stats"
+    / "users"
+    /% Path.string
+    /? string "min_timestamp"
+    /? option (string "max_timestamp")
 
   module Responses = struct
     module OK = struct
@@ -446,10 +489,17 @@ module Get_summary_stats = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "min_timestamp" /? option (string "max_timestamp")
+    rel
+    / "orgs"
+    /% Path.string
+    / "insights"
+    / "api"
+    / "summary-stats"
+    /? string "min_timestamp"
+    /? option (string "max_timestamp")
 
   module Responses = struct
     module OK = struct
@@ -547,10 +597,15 @@ module Get_subject_stats = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "insights"
+    / "api"
+    / "subject-stats"
     /? string "min_timestamp"
     /? option (string "max_timestamp")
     /? option_default 1 (int "page")
@@ -698,10 +753,17 @@ module Get_route_stats_by_actor = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "insights"
+    / "api"
+    / "route-stats"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Actor_type.t_of_yojson (`String value)))
+    /% Path.int
     /? string "min_timestamp"
     /? option (string "max_timestamp")
     /? option_default 1 (int "page")

@@ -3,10 +3,10 @@ module Logout = struct
     type t = { rd : string option [@default None] } [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "rd")
+    rel / "api" / "v1" / "logout" /? option (string "rd")
 
   module Responses = struct
     module Found = struct end

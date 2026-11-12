@@ -8,10 +8,17 @@ module DeleteApiV4ProjectsIdVariablesKey = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "filter[environment_scope]")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "variables"
+    /% Path.string
+    /? option (string "filter[environment_scope]")
 
   module Responses = struct
     module No_content = struct end
@@ -58,6 +65,10 @@ module PutApiV4ProjectsIdVariablesKey = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "variables" /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -98,10 +109,17 @@ module GetApiV4ProjectsIdVariablesKey = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "filter[environment_scope]")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "variables"
+    /% Path.string
+    /? option (string "filter[environment_scope]")
 
   module Responses = struct
     module OK = struct end
@@ -144,6 +162,10 @@ module PostApiV4ProjectsIdVariables = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "variables"
+
   module Responses = struct
     module Created = struct end
     module Bad_request = struct end
@@ -184,10 +206,17 @@ module GetApiV4ProjectsIdVariables = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "variables"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end

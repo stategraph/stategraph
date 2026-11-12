@@ -12,6 +12,10 @@ module PostApiV4GroupsIdAccessTokensTokenIdRotate = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "access_tokens" /% Path.string / "rotate"
+
   module Responses = struct
     module Created = struct end
 
@@ -45,6 +49,10 @@ module DeleteApiV4GroupsIdAccessTokensTokenId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "access_tokens" /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -90,6 +98,10 @@ module GetApiV4GroupsIdAccessTokensTokenId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "access_tokens" /% Path.string
+
   module Responses = struct
     module OK = struct end
 
@@ -122,6 +134,10 @@ module PostApiV4GroupsIdAccessTokensSelfRotate = struct
     type t = Gitlabc_components.PostApiV4GroupsIdAccessTokensSelfRotate.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "access_tokens" / "self" / "rotate"
 
   module Responses = struct
     module OK = struct end
@@ -176,6 +192,10 @@ module PostApiV4GroupsIdAccessTokens = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "access_tokens"
+
   module Responses = struct
     module Created = struct end
 
@@ -228,10 +248,15 @@ module GetApiV4GroupsIdAccessTokens = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "access_tokens"
     /? option
          (ud "state" (fun value -> CCResult.to_opt (Parameters.State.t_of_yojson (`String value))))
 

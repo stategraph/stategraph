@@ -7,6 +7,10 @@ module DeleteApiV4ProjectsIdProtectedTagsName = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "protected_tags" /% Path.string
+
   module Responses = struct
     module No_content = struct end
     module Forbidden = struct end
@@ -54,6 +58,10 @@ module GetApiV4ProjectsIdProtectedTagsName = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "protected_tags" /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -94,6 +102,10 @@ module PostApiV4ProjectsIdProtectedTags = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdProtectedTags.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "protected_tags"
 
   module Responses = struct
     module Created = struct end
@@ -145,10 +157,17 @@ module GetApiV4ProjectsIdProtectedTags = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "protected_tags"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end

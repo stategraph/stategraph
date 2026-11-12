@@ -7,6 +7,10 @@ module Delete_group_rule = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "caps" / "group-rules" /% Path.uuid
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -58,6 +62,10 @@ module Get_group_rule = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "caps" / "group-rules" /% Path.uuid
 
   module Responses = struct
     module OK = struct
@@ -115,6 +123,10 @@ module Create_group_rule = struct
     type t = Sgs_api_components.Caps_group_rule_create_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "caps" / "group-rules"
 
   module Responses = struct
     module OK = struct
@@ -181,6 +193,10 @@ module List_group_rules = struct
     type t = { tenant_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "caps" / "group-rules"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Caps_group_rule_list_response.t
@@ -231,6 +247,10 @@ module Set_default = struct
     type t = Sgs_api_components.Caps_default_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "caps" / "default"
 
   module Responses = struct
     module OK = struct
@@ -283,6 +303,10 @@ end
 
 module Get_default = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "caps" / "default"
 
   module Responses = struct
     module OK = struct

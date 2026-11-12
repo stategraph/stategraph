@@ -1,6 +1,5 @@
 module Rt = struct
   let api_v1 () = Brtl_rtng.Route.(rel / "api" / "v1")
-  let whoami () = Brtl_rtng.Route.(api_v1 () / "whoami")
 
   (* OAuth2 flow - /oauth2/{provider}/* paths *)
   let oauth2_start () = Brtl_rtng.Route.(rel / "oauth2" /% Path.string / "start")
@@ -9,10 +8,6 @@ module Rt = struct
   (* Login endpoints. The provider is a literal segment. *)
   let login provider =
     Brtl_rtng.Route.(api_v1 () / "login" / provider /? Query.(option (string "rd")))
-
-  let login_options () = Brtl_rtng.Route.(api_v1 () / "login" / "options")
-  let login_password () = Brtl_rtng.Route.(api_v1 () / "login" / "password")
-  let logout () = Brtl_rtng.Route.(api_v1 () / "logout" /? Query.(option (string "rd")))
 
   let set_cookie () =
     Brtl_rtng.Route.(
@@ -84,12 +79,14 @@ module Make (Cloud : Sgs_cloud.S) = struct
   let routes { config; storage; oauth2 } =
     Brtl_rtng.Route.
       [
-        (`GET, Rt.whoami () --> Sgs_service_auth_ep_whoami.run config storage);
+        (`GET, Sgs_api_user.Whoami.route () --> Sgs_service_auth_ep_whoami.run config storage);
         (`GET, Rt.set_cookie () --> Sgs_service_auth_ep_set_cookie.run config storage);
         (* Login endpoints *)
-        (`GET, Rt.login_options () --> Sgs_service_auth_ep_login.options config);
-        (`POST, Rt.login_password () --> Sgs_service_auth_ep_login_password.run config storage);
-        (`GET, Rt.logout () --> Sgs_service_auth_ep_login.logout config);
+        (`GET, Sgs_api_login.Options.route () --> Sgs_service_auth_ep_login.options config);
+        ( `POST,
+          Sgs_api_login.Password.route () --> Sgs_service_auth_ep_login_password.run config storage
+        );
+        (`GET, Sgs_api_auth.Logout.route () --> Sgs_service_auth_ep_login.logout config);
       ]
     @ login_routes config oauth2
     @ oauth2_routes config storage oauth2

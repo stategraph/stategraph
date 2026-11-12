@@ -515,6 +515,22 @@ let integer_enum_query_extractor
   in
   exp_apply (exp_ident [ "ud" ]) [ Exp.constant (Const.string param_name); parse ]
 
+(* An expression of type [string -> 'a option] that parses one value of a scalar [schema]. [what]
+   names the parameter in the error of an unsupported schema. *)
+let scalar_parser ~what enum_module = function
+  | { Schema.typ = Some "string"; enum = Some _; _ } -> enum_query_parser enum_module
+  | { Schema.typ = Some ("string" | "text" | "symbol" | "file"); _ } ->
+      exp_ident [ "CCOption"; "return" ]
+  | { Schema.typ = Some "integer"; format = Some "int64"; enum = None; _ } ->
+      exp_ident [ "CCInt64"; "of_string" ]
+  | { Schema.typ = Some "integer"; enum = None; _ } -> exp_ident [ "CCInt"; "of_string" ]
+  | { Schema.typ = Some "boolean"; _ } -> exp_ident [ "bool_of_string_opt" ]
+  | schema -> failwith ("Unsupported " ^ what ^ ": " ^ Schema.show_t_ schema)
+
+(* The variant constructor of alternative [idx] of the oneOf parameter [param_name]. *)
+let one_of_variant param_name idx =
+  [ "Parameters"; module_name_of_string param_name; Printf.sprintf "V%d" idx ]
+
 (* A query string does not tell a scalar from a one element array: the client sends [V0 "a"] and
    [V1 [ "a" ]] both as [name=a]. The alternatives are tried in the order of the schema, and a scalar
    alternative matches only one value. Thus [name=a] gives the first scalar alternative, and
@@ -522,20 +538,10 @@ let integer_enum_query_extractor
    variant module of the parameter, [Parameters.<Name>.V<idx>], which the client also uses. *)
 let one_of_query_extractor base_module_name components param_name alternatives =
   let open Ast_helper in
-  (* An expression of type [string -> 'a option]. *)
-  let scalar_parser enum_module = function
-    | { Schema.typ = Some "string"; enum = Some _; _ } -> enum_query_parser enum_module
-    | { Schema.typ = Some ("string" | "text" | "symbol" | "file"); _ } ->
-        exp_ident [ "CCOption"; "return" ]
-    | { Schema.typ = Some "integer"; format = Some "int64"; enum = None; _ } ->
-        exp_ident [ "CCInt64"; "of_string" ]
-    | { Schema.typ = Some "integer"; enum = None; _ } -> exp_ident [ "CCInt"; "of_string" ]
-    | { Schema.typ = Some "boolean"; _ } -> exp_ident [ "bool_of_string_opt" ]
-    | schema -> failwith ("Unsupported oneOf query parameter alternative: " ^ Schema.show_t_ schema)
-  in
+  let scalar_parser = scalar_parser ~what:"oneOf query parameter alternative" in
   let values = exp_ident [ "values" ] in
   let alternative idx schema_value =
-    let variant = [ "Parameters"; module_name_of_string param_name; Printf.sprintf "V%d" idx ] in
+    let variant = one_of_variant param_name idx in
     let parsed =
       match resolve_schema_ref components schema_value with
       | { Schema.typ = Some "array"; items = Some items; _ } ->
@@ -695,68 +701,230 @@ let query_default_of_schema param_name schema =
       | Some default -> Some default
       | None -> fail ())
 
-(* Keep server route query parsing tied to the same OpenAPI parameter declarations used by the
-   generated client request. The helper is deliberately just a route transformer, so a service can
-   compose it with its hand-written path and body matchers. *)
-let route_function base_module_name components params =
-  let params =
-    params
-    |> CCList.filter_map (fun param ->
-        let param = resolve_parameter_ref components param in
-        if CCString.equal param.Parameter.in_ "query" then Some param else None)
+(* A segment of a path template: a literal, or a parameter with the literal text around it in the
+   segment, as [binary-{architecture}]. *)
+type path_segment =
+  | Literal of string
+  | Param of {
+      prefix : string;
+      name : string;
+      suffix : string;
+    }
+
+let path_segments_of_uritmpl uritmpl =
+  let fail () = failwith ("Unsupported path template: " ^ uritmpl) in
+  match CCString.split_on_char '/' uritmpl with
+  | "" :: segments ->
+      CCList.map
+        (fun segment ->
+          match CCString.index_opt segment '{' with
+          | None -> if CCString.contains segment '}' then fail () else Literal segment
+          | Some start -> (
+              match CCString.index_from_opt segment start '}' with
+              | Some stop ->
+                  let prefix = CCString.sub segment 0 start in
+                  let name = CCString.sub segment (start + 1) (stop - start - 1) in
+                  let suffix = CCString.drop (stop + 1) segment in
+                  if
+                    CCString.contains prefix '}'
+                    || CCString.contains name '{'
+                    || CCString.contains suffix '{'
+                    || CCString.contains suffix '}'
+                  then fail ()
+                  else Param { prefix; name; suffix }
+              | None -> fail ()))
+        segments
+  | _ -> fail ()
+
+(* An expression of type [string -> 'a option] that parses the value of the path parameter
+   [param]. *)
+let path_parser base_module_name components param =
+  let name = param.Parameter.name in
+  match resolve_schema_ref components param.Parameter.schema with
+  | { Schema.typ = Some "string"; format = Some "uuid"; enum = None; _ } ->
+      exp_ident [ "Uuidm"; "of_string" ]
+  | { Schema.one_of = Some alternatives; _ } ->
+      let alternative idx schema_value =
+        let variant = one_of_variant name idx in
+        exp_apply
+          (exp_ident [ "CCOption"; "map" ])
+          [
+            exp_fun
+              "v"
+              (Ast_helper.Exp.construct
+                 (Location.mknoloc (Gen.ident variant))
+                 (Some (exp_ident [ "v" ])));
+            exp_apply
+              (scalar_parser
+                 ~what:"oneOf path parameter alternative"
+                 variant
+                 (resolve_schema_ref components schema_value))
+              [ exp_ident [ "value" ] ];
+          ]
+      in
+      exp_fun
+        "value"
+        (exp_apply
+           (exp_ident [ "CCOption"; "choice" ])
+           [ Gen.make_list (CCList.mapi alternative alternatives) ])
+  | schema ->
+      let enum_module =
+        match param.Parameter.schema with
+        | Value.Ref ref_ -> module_name_of_ref base_module_name "paths" ref_
+        | Value.V _ -> [ "Parameters"; module_name_of_string name ]
+      in
+      scalar_parser ~what:"path parameter schema" enum_module schema
+
+(* An expression of type ['a Brtl_rtng.Route.Path.t] that extracts the path parameter [param] from
+   a segment of [prefix], the value of [param], and [suffix]. *)
+let path_extractor base_module_name components ~prefix ~suffix param =
+  let path name = exp_ident [ "Path"; name ] in
+  match (prefix, suffix, resolve_schema_ref components param.Parameter.schema) with
+  | "", "", { Schema.typ = Some "string"; format = Some "uuid"; enum = None; _ } -> path "uuid"
+  | "", "", { Schema.typ = Some ("string" | "text" | "symbol" | "file"); enum = None; _ } ->
+      path "string"
+  | "", "", { Schema.typ = Some "integer"; format = None | Some "int32"; enum = None; _ } ->
+      path "int"
+  | "", "", _ -> exp_apply (path "ud") [ path_parser base_module_name components param ]
+  | _, _, schema ->
+      (* [CCString.<fn> ~<label>:<affix> <args>] for the chops of the affixes that are not empty,
+         applied in order to the segment. *)
+      let chops =
+        CCList.filter
+          (fun (_, _, affix) -> not (CCString.is_empty affix))
+          [ ("chop_prefix", "pre", prefix); ("chop_suffix", "suf", suffix) ]
+      in
+      let chop args (fn, label, affix) =
+        Ast_helper.Exp.apply
+          (exp_ident [ "CCString"; fn ])
+          ((Asttypes.Labelled label, Ast_helper.(Exp.constant (Const.string affix)))
+          :: CCList.map (fun arg -> (Asttypes.Nolabel, arg)) args)
+      in
+      let flat_map f value = exp_apply (exp_ident [ "CCOption"; "flat_map" ]) [ f; value ] in
+      let value =
+        match chops with
+        | first :: rest ->
+            CCList.fold_left
+              (fun value affix -> flat_map (chop [] affix) value)
+              (chop [ exp_ident [ "segment" ] ] first)
+              rest
+        | [] -> assert false
+      in
+      let value =
+        match schema with
+        | { Schema.typ = Some ("string" | "text" | "symbol" | "file"); format; enum = None; _ }
+          when not (CCOption.equal CCString.equal format (Some "uuid")) -> value
+        | _ -> flat_map (path_parser base_module_name components param) value
+      in
+      exp_apply (path "ud") [ exp_fun "segment" value ]
+
+let query_extractor base_module_name components param =
+  let open Ast_helper in
+  let schema = resolve_schema_ref components param.Parameter.schema in
+  let extractor =
+    query_extractor_of_schema
+      base_module_name
+      components
+      param.Parameter.name
+      param.Parameter.schema
+      schema
   in
-  match params with
-  | [] -> None
-  | params ->
-      let open Ast_helper in
-      let route = exp_ident [ "base_route" ] in
-      let route =
-        CCList.fold_left
-          (fun route param ->
-            let schema = resolve_schema_ref components param.Parameter.schema in
-            let extractor =
-              query_extractor_of_schema
-                base_module_name
-                components
-                param.Parameter.name
-                param.Parameter.schema
-                schema
-            in
-            let extractor =
-              match (param.Parameter.required, schema.Schema.nullable) with
-              | true, false -> extractor
-              | _, true -> (
-                  match query_default_of_schema param.Parameter.name schema with
-                  | Some default ->
-                      let default =
-                        Exp.construct (Location.mknoloc (Gen.ident [ "Some" ])) (Some default)
-                      in
-                      exp_apply
-                        (exp_ident [ "option_default" ])
-                        [ default; exp_apply (exp_ident [ "option" ]) [ extractor ] ]
-                  | None -> exp_apply (exp_ident [ "option" ]) [ extractor ])
-              | false, false -> (
-                  match query_default_of_schema param.Parameter.name schema with
-                  | Some default ->
-                      exp_apply (exp_ident [ "option_default" ]) [ default; extractor ]
-                  | None -> exp_apply (exp_ident [ "option" ]) [ extractor ])
-            in
-            exp_apply (exp_ident [ "/?" ]) [ route; extractor ])
-          route
-          params
-      in
-      let route =
-        Exp.struct_item
-          (Str.open_ (Opn.mk (Mod.ident (Location.mknoloc (Gen.ident [ "Brtl_rtng"; "Route" ])))))
-          route
-      in
-      let route =
-        Exp.struct_item
-          (Str.open_
-             (Opn.mk (Mod.ident (Location.mknoloc (Gen.ident [ "Brtl_rtng"; "Route"; "Query" ])))))
-          route
-      in
-      Some (Gen.make_func "route" (exp_fun "base_route" route))
+  match (param.Parameter.required, schema.Schema.nullable) with
+  | true, false -> extractor
+  | _, true -> (
+      match query_default_of_schema param.Parameter.name schema with
+      | Some default ->
+          let default = Exp.construct (Location.mknoloc (Gen.ident [ "Some" ])) (Some default) in
+          exp_apply
+            (exp_ident [ "option_default" ])
+            [ default; exp_apply (exp_ident [ "option" ]) [ extractor ] ]
+      | None -> exp_apply (exp_ident [ "option" ]) [ extractor ])
+  | false, false -> (
+      match query_default_of_schema param.Parameter.name schema with
+      | Some default -> exp_apply (exp_ident [ "option_default" ]) [ default; extractor ]
+      | None -> exp_apply (exp_ident [ "option" ]) [ extractor ])
+
+(* The server route of an operation, from the same OpenAPI declarations as the generated client
+   request: the segments of the path template [uritmpl], its path parameters, then the query
+   parameters. A handler of the route takes the path parameters in the order of the template, then
+   the query parameters in the order of their declaration. A service appends its body matcher to
+   the route. *)
+let route_function base_module_name components operation_id uritmpl params =
+  let params = CCList.map (resolve_parameter_ref components) params in
+  let params_in in_ = CCList.filter (fun param -> CCString.equal param.Parameter.in_ in_) params in
+  let path_params = params_in "path" in
+  let query_params = params_in "query" in
+  let segments = path_segments_of_uritmpl uritmpl in
+  let template_names =
+    CCList.filter_map
+      (function
+        | Param { name; _ } -> Some name
+        | Literal _ -> None)
+      segments
+  in
+  CCList.iter
+    (fun param ->
+      if not (CCList.mem ~eq:CCString.equal param.Parameter.name template_names) then
+        failwith
+          (Printf.sprintf
+             "Path parameter %S of %s is not in its path template %s"
+             param.Parameter.name
+             operation_id
+             uritmpl))
+    path_params;
+  let open Ast_helper in
+  let route =
+    CCList.fold_left
+      (fun route -> function
+        | Literal segment ->
+            exp_apply (exp_ident [ "/" ]) [ route; Exp.constant (Const.string segment) ]
+        | Param { prefix; name; suffix } -> (
+            match
+              CCList.find_opt (fun param -> CCString.equal param.Parameter.name name) path_params
+            with
+            | Some param ->
+                exp_apply
+                  (exp_ident [ "/%" ])
+                  [ route; path_extractor base_module_name components ~prefix ~suffix param ]
+            | None ->
+                failwith
+                  (Printf.sprintf
+                     "Path template %s of %s: {%s} is not a declared path parameter"
+                     uritmpl
+                     operation_id
+                     name)))
+      (exp_ident [ "rel" ])
+      segments
+  in
+  let route =
+    CCList.fold_left
+      (fun route param ->
+        exp_apply (exp_ident [ "/?" ]) [ route; query_extractor base_module_name components param ])
+      route
+      query_params
+  in
+  let open_ path route =
+    Exp.struct_item (Str.open_ (Opn.mk (Mod.ident (Location.mknoloc (Gen.ident path))))) route
+  in
+  let route = open_ [ "Brtl_rtng"; "Route" ] route in
+  let route =
+    match query_params with
+    | [] -> route
+    | _ :: _ -> open_ [ "Brtl_rtng"; "Route"; "Query" ] route
+  in
+  Gen.make_func
+    "route"
+    (Exp.function_
+       [
+         {
+           Parsetree.pparam_loc = Location.none;
+           pparam_desc =
+             Parsetree.Pparam_val
+               (Asttypes.Nolabel, None, Pat.construct (Location.mknoloc (Gen.ident [ "()" ])) None);
+         };
+       ]
+       None
+       (Parsetree.Pfunction_body route))
 
 (* To convert an operation we need to convert the parameters, request body, and
    responses.  The resulting module will have a function to create a
@@ -1160,8 +1328,12 @@ let convert_str_operation strict_records base_module_name components uritmpl op_
   ( operation_id,
     parameters_module
     @ request_body
-    @ CCOption.to_list (route_function base_module_name components op.Operation.parameters)
-    @ [ responses; url; make ] )
+    @ [
+        route_function base_module_name components operation_id uritmpl op.Operation.parameters;
+        responses;
+        url;
+        make;
+      ] )
 
 let convert_str_components
     strict_records

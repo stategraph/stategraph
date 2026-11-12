@@ -8,6 +8,19 @@ module DeleteApiV4ProjectsIdTerraformStateNameVersionsSerial = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "terraform"
+    / "state"
+    /% Path.int
+    / "versions"
+    /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Forbidden = struct end
@@ -57,6 +70,19 @@ module GetApiV4ProjectsIdTerraformStateNameVersionsSerial = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "terraform"
+    / "state"
+    /% Path.string
+    / "versions"
+    /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -102,10 +128,19 @@ module DeleteApiV4ProjectsIdTerraformStateNameLock = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "ID")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "terraform"
+    / "state"
+    /% Path.int
+    / "lock"
+    /? option (string "ID")
 
   module Responses = struct
     module No_content = struct end
@@ -165,6 +200,10 @@ module PostApiV4ProjectsIdTerraformStateNameLock = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "terraform" / "state" /% Path.int / "lock"
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -217,6 +256,10 @@ module DeleteApiV4ProjectsIdTerraformStateName = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "terraform" / "state" /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Forbidden = struct end
@@ -263,6 +306,10 @@ module PostApiV4ProjectsIdTerraformStateName = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "terraform" / "state" /% Path.int
 
   module Responses = struct
     module OK = struct end
@@ -315,10 +362,18 @@ module GetApiV4ProjectsIdTerraformStateName = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "ID")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "terraform"
+    / "state"
+    /% Path.string
+    /? option (string "ID")
 
   module Responses = struct
     module OK = struct end

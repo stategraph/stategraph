@@ -1,6 +1,10 @@
 module Get_schema = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "mql" / "schema"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Mql_schema_response.t
@@ -55,10 +59,16 @@ module Get = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (array (string "page")) /? option (string "tz") /? string "q"
+    rel
+    / "api"
+    / "v1"
+    / "mql"
+    /? option (array (string "page"))
+    /? option (string "tz")
+    /? string "q"
 
   module Responses = struct
     module OK = struct

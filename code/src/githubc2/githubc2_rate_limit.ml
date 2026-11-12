@@ -1,6 +1,10 @@
 module Get = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "rate_limit"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Rate_limit_overview.t

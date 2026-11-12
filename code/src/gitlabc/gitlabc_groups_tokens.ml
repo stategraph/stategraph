@@ -8,6 +8,10 @@ module PostApiV4GroupsIdTokensRevoke = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "tokens" / "revoke"
+
   module Responses = struct
     module Created = struct end
 

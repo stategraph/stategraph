@@ -129,10 +129,15 @@ module GetApiV4ProjectsIdForks = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "forks"
     /? option_default
          `Created_at
          (ud "order_by" (fun value ->

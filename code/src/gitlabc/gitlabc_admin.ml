@@ -8,6 +8,10 @@ module PostApiV4AdminMigrationsTimestampMark = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "admin" / "migrations" /% Path.int / "mark"
+
   module Responses = struct
     module Created = struct end
     module Unauthorized = struct end
@@ -78,6 +82,18 @@ module GetApiV4AdminDatabasesDatabaseNameDictionaryTablesTableName = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "admin"
+    / "databases"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Database_name.t_of_yojson (`String value)))
+    / "dictionary"
+    / "tables"
+    /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -124,6 +140,10 @@ module DeleteApiV4AdminClustersClusterId = struct
     type t = { cluster_id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "admin" / "clusters" /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Forbidden = struct end
@@ -168,6 +188,10 @@ module PutApiV4AdminClustersClusterId = struct
     type t = Gitlabc_components.PutApiV4AdminClustersClusterId.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "admin" / "clusters" /% Path.int
 
   module Responses = struct
     module OK = struct end
@@ -214,6 +238,10 @@ module GetApiV4AdminClustersClusterId = struct
     type t = { cluster_id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "admin" / "clusters" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -252,6 +280,10 @@ module PostApiV4AdminClustersAdd = struct
     type t = Gitlabc_components.PostApiV4AdminClustersAdd.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "admin" / "clusters" / "add"
 
   module Responses = struct
     module Created = struct end
@@ -293,6 +325,10 @@ end
 module GetApiV4AdminClusters = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "admin" / "clusters"
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -322,6 +358,10 @@ module DeleteApiV4AdminCiVariablesKey = struct
   module Parameters = struct
     type t = { key : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "admin" / "ci" / "variables" /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -355,6 +395,10 @@ module PutApiV4AdminCiVariablesKey = struct
     type t = Gitlabc_components.PutApiV4AdminCiVariablesKey.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "admin" / "ci" / "variables" /% Path.string
 
   module Responses = struct
     module OK = struct end
@@ -390,6 +434,10 @@ module GetApiV4AdminCiVariablesKey = struct
   module Parameters = struct
     type t = { key : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "admin" / "ci" / "variables" /% Path.string
 
   module Responses = struct
     module OK = struct end
@@ -427,6 +475,10 @@ module PostApiV4AdminCiVariables = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "admin" / "ci" / "variables"
+
   module Responses = struct
     module Created = struct end
     module Bad_request = struct end
@@ -463,10 +515,17 @@ module GetApiV4AdminCiVariables = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "admin"
+    / "ci"
+    / "variables"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -500,6 +559,10 @@ module PutApiV4AdminBatchedBackgroundMigrationsIdResume = struct
     type t = Gitlabc_components.PutApiV4AdminBatchedBackgroundMigrationsIdResume.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "admin" / "batched_background_migrations" /% Path.int / "resume"
 
   module Responses = struct
     module OK = struct end
@@ -553,6 +616,10 @@ module PutApiV4AdminBatchedBackgroundMigrationsIdPause = struct
     type t = Gitlabc_components.PutApiV4AdminBatchedBackgroundMigrationsIdPause.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "admin" / "batched_background_migrations" /% Path.int / "pause"
 
   module Responses = struct
     module OK = struct end
@@ -633,10 +700,15 @@ module GetApiV4AdminBatchedBackgroundMigrationsId = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "admin"
+    / "batched_background_migrations"
+    /% Path.int
     /? option_default
          `Main
          (ud "database" (fun value ->
@@ -715,10 +787,14 @@ module GetApiV4AdminBatchedBackgroundMigrations = struct
     type t = { database : Database.t [@default `Main] } [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "admin"
+    / "batched_background_migrations"
     /? option_default
          `Main
          (ud "database" (fun value ->

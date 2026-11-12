@@ -3,6 +3,10 @@ module DeleteApiV4ProjectsId = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string
+
   module Responses = struct
     module Accepted = struct end
     module Forbidden = struct end
@@ -47,6 +51,10 @@ module PutApiV4ProjectsId = struct
     type t = Gitlabc_components.PutApiV4ProjectsId.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string
 
   module Responses = struct
     module OK = struct end
@@ -94,10 +102,14 @@ module GetApiV4ProjectsId = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
     /? option_default false (bool "statistics")
     /? option_default false (bool "with_custom_attributes")
     /? option_default false (bool "license")
@@ -153,6 +165,10 @@ module PostApiV4ProjectsUserUserId = struct
     type t = Gitlabc_components.PostApiV4ProjectsUserUserId.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" / "user" /% Path.int
 
   module Responses = struct
     module Created = struct end
@@ -909,6 +925,10 @@ module PostApiV4ProjectsRemoteImportS3 = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" / "remote-import-s3"
+
   module Responses = struct
     module Created = struct end
     module Bad_request = struct end
@@ -1664,6 +1684,10 @@ module PostApiV4ProjectsRemoteImport = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" / "remote-import"
+
   module Responses = struct
     module Created = struct end
     module Bad_request = struct end
@@ -1711,6 +1735,10 @@ end
 module PostApiV4ProjectsImportAuthorize = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" / "import" / "authorize"
+
   module Responses = struct
     module Created = struct end
 
@@ -1733,6 +1761,10 @@ end
 
 module PostApiV4ProjectsImportRelationAuthorize = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" / "import-relation" / "authorize"
 
   module Responses = struct
     module Created = struct end
@@ -1773,6 +1805,10 @@ module PostApiV4ProjectsImportRelation = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" / "import-relation"
 
   module Responses = struct
     module Created = struct end
@@ -2535,6 +2571,10 @@ module PostApiV4ProjectsImport = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" / "import"
 
   module Responses = struct
     module Created = struct end

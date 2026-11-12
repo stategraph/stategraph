@@ -27,10 +27,15 @@ module GetApiV4UsersUserIdMemberships = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "users"
+    /% Path.int
+    / "memberships"
     /? option
          (ud "type" (fun value -> CCResult.to_opt (Parameters.Type.t_of_yojson (`String value))))
     /? option_default 1 (int "page")

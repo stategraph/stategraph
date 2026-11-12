@@ -3,6 +3,10 @@ module Stop_for_authenticated_user = struct
     type t = { codespace_name : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "codespaces" /% Path.string / "stop"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Codespace.t
@@ -69,6 +73,10 @@ module Start_for_authenticated_user = struct
   module Parameters = struct
     type t = { codespace_name : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "codespaces" /% Path.string / "start"
 
   module Responses = struct
     module OK = struct
@@ -174,6 +182,10 @@ module Publish_for_authenticated_user = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "codespaces" /% Path.string / "publish"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Codespace_with_full_repository.t
@@ -241,6 +253,10 @@ module Codespace_machines_for_authenticated_user = struct
   module Parameters = struct
     type t = { codespace_name : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "codespaces" /% Path.string / "machines"
 
   module Responses = struct
     module OK = struct
@@ -329,6 +345,10 @@ module Get_export_details_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "codespaces" /% Path.string / "exports" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Codespace_export_details.t
@@ -375,6 +395,10 @@ module Export_for_authenticated_user = struct
   module Parameters = struct
     type t = { codespace_name : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "codespaces" /% Path.string / "exports"
 
   module Responses = struct
     module Accepted = struct
@@ -468,6 +492,10 @@ module Update_for_authenticated_user = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "codespaces" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Codespace.t
@@ -527,6 +555,10 @@ module Delete_for_authenticated_user = struct
   module Parameters = struct
     type t = { codespace_name : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "codespaces" /% Path.string
 
   module Responses = struct
     module Accepted = struct
@@ -597,6 +629,10 @@ module Get_for_authenticated_user = struct
   module Parameters = struct
     type t = { codespace_name : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "codespaces" /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -673,6 +709,10 @@ module Remove_repository_for_secret_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "codespaces" / "secrets" /% Path.string / "repositories" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -743,6 +783,10 @@ module Add_repository_for_secret_for_authenticated_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "codespaces" / "secrets" /% Path.string / "repositories" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -824,6 +868,10 @@ module Set_repositories_for_secret_for_authenticated_user = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "codespaces" / "secrets" /% Path.string / "repositories"
+
   module Responses = struct
     module No_content = struct end
 
@@ -889,6 +937,10 @@ module List_repositories_for_secret_for_authenticated_user = struct
   module Parameters = struct
     type t = { secret_name : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "codespaces" / "secrets" /% Path.string / "repositories"
 
   module Responses = struct
     module OK = struct
@@ -969,6 +1021,10 @@ module Delete_secret_for_authenticated_user = struct
     type t = { secret_name : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "codespaces" / "secrets" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -1041,6 +1097,10 @@ module Create_or_update_secret_for_authenticated_user = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "codespaces" / "secrets" /% Path.string
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Empty_object.t
@@ -1099,6 +1159,10 @@ module Get_secret_for_authenticated_user = struct
     type t = { secret_name : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "codespaces" / "secrets" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Codespaces_secret.t
@@ -1127,6 +1191,10 @@ end
 
 module Get_public_key_for_authenticated_user = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "codespaces" / "secrets" / "public-key"
 
   module Responses = struct
     module OK = struct
@@ -1160,10 +1228,15 @@ module List_secrets_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "user"
+    / "codespaces"
+    / "secrets"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1324,6 +1397,10 @@ module Create_for_authenticated_user = struct
       | V1 v -> V1.to_yojson v
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "codespaces"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Codespace.t
@@ -1408,10 +1485,12 @@ module List_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "user"
+    / "codespaces"
     /? option_default 30 (int "per_page")
     /? option_default 1 (int "page")
     /? option (int "repository_id")
@@ -1552,6 +1631,10 @@ module Create_with_pr_for_authenticated_user = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls" /% Path.int / "codespaces"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Codespace.t
@@ -1643,6 +1726,10 @@ module Delete_repo_secret = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "codespaces" / "secrets" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -1691,6 +1778,10 @@ module Create_or_update_repo_secret = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "codespaces" / "secrets" /% Path.string
 
   module Responses = struct
     module Created = struct
@@ -1744,6 +1835,10 @@ module Get_repo_secret = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "codespaces" / "secrets" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Repo_codespaces_secret.t
@@ -1783,6 +1878,10 @@ module Get_repo_public_key = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "codespaces" / "secrets" / "public-key"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Codespaces_public_key.t
@@ -1820,10 +1919,17 @@ module List_repo_secrets = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "codespaces"
+    / "secrets"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1877,10 +1983,17 @@ module Check_permissions_for_devcontainer = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "ref" /? string "devcontainer_path"
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "codespaces"
+    / "permissions_check"
+    /? string "ref"
+    /? string "devcontainer_path"
 
   module Responses = struct
     module OK = struct
@@ -1975,10 +2088,17 @@ module Pre_flight_with_repo_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "ref") /? option (string "client_ip")
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "codespaces"
+    / "new"
+    /? option (string "ref")
+    /? option (string "client_ip")
 
   module Responses = struct
     module OK = struct
@@ -2070,10 +2190,18 @@ module Repo_machines_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "location") /? option (string "client_ip") /? option (string "ref")
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "codespaces"
+    / "machines"
+    /? option (string "location")
+    /? option (string "client_ip")
+    /? option (string "ref")
 
   module Responses = struct
     module OK = struct
@@ -2171,10 +2299,17 @@ module List_devcontainers_in_repository_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "codespaces"
+    / "devcontainers"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -2326,6 +2461,10 @@ module Create_with_repo_for_authenticated_user = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "codespaces"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Codespace.t
@@ -2421,10 +2560,16 @@ module List_in_repository_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "codespaces"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -2513,6 +2658,10 @@ module Stop_in_organization = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "members" /% Path.string / "codespaces" /% Path.string / "stop"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Codespace.t
@@ -2592,6 +2741,10 @@ module Delete_from_organization = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "members" /% Path.string / "codespaces" /% Path.string
 
   module Responses = struct
     module Accepted = struct
@@ -2673,10 +2826,17 @@ module Get_codespaces_for_user_in_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "members"
+    /% Path.string
+    / "codespaces"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -2769,6 +2929,17 @@ module Remove_selected_repo_from_org_secret = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "orgs"
+    /% Path.string
+    / "codespaces"
+    / "secrets"
+    /% Path.string
+    / "repositories"
+    /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -2830,6 +3001,17 @@ module Add_selected_repo_to_org_secret = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "orgs"
+    /% Path.string
+    / "codespaces"
+    / "secrets"
+    /% Path.string
+    / "repositories"
+    /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -2905,6 +3087,10 @@ module Set_selected_repos_for_org_secret = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "codespaces" / "secrets" /% Path.string / "repositories"
+
   module Responses = struct
     module No_content = struct end
 
@@ -2958,10 +3144,18 @@ module List_selected_repos_for_org_secret = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "codespaces"
+    / "secrets"
+    /% Path.string
+    / "repositories"
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -3025,6 +3219,10 @@ module Delete_org_secret = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "codespaces" / "secrets" /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -3110,6 +3308,10 @@ module Create_or_update_org_secret = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "codespaces" / "secrets" /% Path.string
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Empty_object.t
@@ -3172,6 +3374,10 @@ module Get_org_secret = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "codespaces" / "secrets" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Codespaces_org_secret.t
@@ -3202,6 +3408,10 @@ module Get_org_public_key = struct
   module Parameters = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "codespaces" / "secrets" / "public-key"
 
   module Responses = struct
     module OK = struct
@@ -3239,10 +3449,16 @@ module List_org_secrets = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "codespaces"
+    / "secrets"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -3302,6 +3518,10 @@ module Delete_codespaces_access_users = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "codespaces" / "access" / "selected_users"
 
   module Responses = struct
     module No_content = struct end
@@ -3381,6 +3601,10 @@ module Set_codespaces_access_users = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "codespaces" / "access" / "selected_users"
 
   module Responses = struct
     module No_content = struct end
@@ -3490,6 +3714,10 @@ module Set_codespaces_access = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "codespaces" / "access"
+
   module Responses = struct
     module No_content = struct end
     module Not_modified = struct end
@@ -3561,10 +3789,15 @@ module List_in_organization = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "codespaces"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct

@@ -7,6 +7,10 @@ module DeleteApiV4GroupsIdDeployTokensTokenId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "deploy_tokens" /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Unauthorized = struct end
@@ -51,6 +55,10 @@ module GetApiV4GroupsIdDeployTokensTokenId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "deploy_tokens" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -93,6 +101,10 @@ module PostApiV4GroupsIdDeployTokens = struct
     type t = Gitlabc_components.PostApiV4GroupsIdDeployTokens.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "deploy_tokens"
 
   module Responses = struct
     module Created = struct end
@@ -145,10 +157,15 @@ module GetApiV4GroupsIdDeployTokens = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.int
+    / "deploy_tokens"
     /? option_default 1 (int "page")
     /? option_default 20 (int "per_page")
     /? option (bool "active")

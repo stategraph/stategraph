@@ -8,6 +8,10 @@ module Create_fork = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "security-advisories" /% Path.string / "forks"
+
   module Responses = struct
     module Accepted = struct
       type t = Githubc2_components.Full_repository.t
@@ -82,6 +86,10 @@ module Create_repository_advisory_cve_request = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "security-advisories" /% Path.string / "cve"
 
   module Responses = struct
     module Accepted = struct
@@ -162,6 +170,10 @@ module Update_repository_advisory = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "security-advisories" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Repository_advisory.t
@@ -232,6 +244,10 @@ module Get_repository_advisory = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "security-advisories" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Repository_advisory.t
@@ -295,6 +311,10 @@ module Create_private_vulnerability_report = struct
     type t = Githubc2_components.Private_vulnerability_report_create.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "security-advisories" / "reports"
 
   module Responses = struct
     module Created = struct
@@ -365,6 +385,10 @@ module Create_repository_advisory = struct
     type t = Githubc2_components.Repository_advisory_create.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "security-advisories"
 
   module Responses = struct
     module Created = struct
@@ -500,10 +524,14 @@ module List_repository_advisories = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "security-advisories"
     /? option_default
          `Desc
          (ud "direction" (fun value ->
@@ -650,10 +678,13 @@ module List_org_repository_advisories = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "security-advisories"
     /? option_default
          `Desc
          (ud "direction" (fun value ->
@@ -727,6 +758,10 @@ module Get_global_advisory = struct
   module Parameters = struct
     type t = { ghsa_id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "advisories" /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -912,10 +947,11 @@ module List_global_advisories = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "advisories"
     /? option (string "ghsa_id")
     /? option_default
          `Reviewed

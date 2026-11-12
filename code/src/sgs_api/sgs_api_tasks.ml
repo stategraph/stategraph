@@ -3,6 +3,10 @@ module Results = struct
     type t = { task_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tasks" /% Path.uuid / "results"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Task_results_count.t
@@ -62,10 +66,10 @@ module Result = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (int "idx")
+    rel / "api" / "v1" / "tasks" /% Path.uuid / "result" /? option (int "idx")
 
   module Responses = struct
     module OK = struct
@@ -124,6 +128,10 @@ module Get = struct
     type t = { task_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tasks" /% Path.uuid
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Task.t
@@ -162,6 +170,10 @@ end
 
 module Create = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tasks"
 
   module Responses = struct
     module OK = struct

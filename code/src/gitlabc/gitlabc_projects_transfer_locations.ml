@@ -9,10 +9,15 @@ module GetApiV4ProjectsIdTransferLocations = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "transfer_locations"
     /? option (string "search")
     /? option_default 1 (int "page")
     /? option_default 20 (int "per_page")

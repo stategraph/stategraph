@@ -176,6 +176,16 @@ module DeleteApiV4ProjectsIdIntegrationsSlug = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "integrations"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Slug.t_of_yojson (`String value)))
+
   module Responses = struct
     module No_content = struct end
     module Bad_request = struct end
@@ -392,6 +402,16 @@ module GetApiV4ProjectsIdIntegrationsSlug = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "integrations"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Slug.t_of_yojson (`String value)))
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -439,6 +459,10 @@ module PutApiV4ProjectsIdIntegrationsZentao = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsZentao.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "zentao"
 
   module Responses = struct
     module OK = struct end
@@ -493,6 +517,10 @@ module PutApiV4ProjectsIdIntegrationsYoutrack = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "youtrack"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -545,6 +573,10 @@ module PutApiV4ProjectsIdIntegrationsWebexTeams = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsWebexTeams.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "webex-teams"
 
   module Responses = struct
     module OK = struct end
@@ -599,6 +631,10 @@ module PutApiV4ProjectsIdIntegrationsUnifyCircuit = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "unify-circuit"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -651,6 +687,10 @@ module PutApiV4ProjectsIdIntegrationsTelegram = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsTelegram.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "telegram"
 
   module Responses = struct
     module OK = struct end
@@ -705,6 +745,10 @@ module PutApiV4ProjectsIdIntegrationsTeamcity = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "teamcity"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -757,6 +801,10 @@ module PutApiV4ProjectsIdIntegrationsSquashTm = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsSquashTm.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "squash-tm"
 
   module Responses = struct
     module OK = struct end
@@ -811,6 +859,17 @@ module PostApiV4ProjectsIdIntegrationsSlackSlashCommandsTrigger = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "integrations"
+    / "slack_slash_commands"
+    / "trigger"
+
   module Responses = struct
     module Created = struct end
     module Unauthorized = struct end
@@ -857,6 +916,10 @@ module PutApiV4ProjectsIdIntegrationsSlackSlashCommands = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsSlackSlashCommands.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "slack-slash-commands"
 
   module Responses = struct
     module OK = struct end
@@ -911,6 +974,10 @@ module PutApiV4ProjectsIdIntegrationsSlack = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "slack"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -963,6 +1030,10 @@ module PutApiV4ProjectsIdIntegrationsRedmine = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsRedmine.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "redmine"
 
   module Responses = struct
     module OK = struct end
@@ -1017,6 +1088,10 @@ module PutApiV4ProjectsIdIntegrationsPushover = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "pushover"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -1069,6 +1144,10 @@ module PutApiV4ProjectsIdIntegrationsPumble = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsPumble.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "pumble"
 
   module Responses = struct
     module OK = struct end
@@ -1123,6 +1202,10 @@ module PutApiV4ProjectsIdIntegrationsPivotaltracker = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "pivotaltracker"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -1175,6 +1258,10 @@ module PutApiV4ProjectsIdIntegrationsPipelinesEmail = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsPipelinesEmail.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "pipelines-email"
 
   module Responses = struct
     module OK = struct end
@@ -1229,6 +1316,10 @@ module PutApiV4ProjectsIdIntegrationsPhorge = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "phorge"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -1281,6 +1372,10 @@ module PutApiV4ProjectsIdIntegrationsPackagist = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsPackagist.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "packagist"
 
   module Responses = struct
     module OK = struct end
@@ -1335,6 +1430,10 @@ module PutApiV4ProjectsIdIntegrationsMockMonitoring = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "mock-monitoring"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -1387,6 +1486,10 @@ module PutApiV4ProjectsIdIntegrationsMockCi = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsMockCi.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "mock-ci"
 
   module Responses = struct
     module OK = struct end
@@ -1441,6 +1544,10 @@ module PutApiV4ProjectsIdIntegrationsMicrosoftTeams = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "microsoft-teams"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -1494,6 +1601,17 @@ module PostApiV4ProjectsIdIntegrationsMattermostSlashCommandsTrigger = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "integrations"
+    / "mattermost_slash_commands"
+    / "trigger"
+
   module Responses = struct
     module Created = struct end
     module Unauthorized = struct end
@@ -1540,6 +1658,10 @@ module PutApiV4ProjectsIdIntegrationsMattermostSlashCommands = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsMattermostSlashCommands.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "mattermost-slash-commands"
 
   module Responses = struct
     module OK = struct end
@@ -1594,6 +1716,10 @@ module PutApiV4ProjectsIdIntegrationsMattermost = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "mattermost"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -1646,6 +1772,10 @@ module PutApiV4ProjectsIdIntegrationsMatrix = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsMatrix.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "matrix"
 
   module Responses = struct
     module OK = struct end
@@ -1700,6 +1830,10 @@ module PutApiV4ProjectsIdIntegrationsJiraCloudApp = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "jira-cloud-app"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -1752,6 +1886,10 @@ module PutApiV4ProjectsIdIntegrationsJira = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsJira.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "jira"
 
   module Responses = struct
     module OK = struct end
@@ -1806,6 +1944,10 @@ module PutApiV4ProjectsIdIntegrationsJenkins = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "jenkins"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -1858,6 +2000,10 @@ module PutApiV4ProjectsIdIntegrationsIrker = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsIrker.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "irker"
 
   module Responses = struct
     module OK = struct end
@@ -1912,6 +2058,10 @@ module PutApiV4ProjectsIdIntegrationsHarbor = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "harbor"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -1965,6 +2115,10 @@ module PutApiV4ProjectsIdIntegrationsHangoutsChat = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "hangouts-chat"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -2017,6 +2171,10 @@ module PutApiV4ProjectsIdIntegrationsGooglePlay = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsGooglePlay.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "google-play"
 
   module Responses = struct
     module OK = struct end
@@ -2073,6 +2231,16 @@ module PutApiV4ProjectsIdIntegrationsGoogleCloudPlatformWorkloadIdentityFederati
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "integrations"
+    / "google-cloud-platform-workload-identity-federation"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -2125,6 +2293,16 @@ module PutApiV4ProjectsIdIntegrationsGoogleCloudPlatformArtifactRegistry = struc
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsGoogleCloudPlatformArtifactRegistry.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "integrations"
+    / "google-cloud-platform-artifact-registry"
 
   module Responses = struct
     module OK = struct end
@@ -2179,6 +2357,10 @@ module PutApiV4ProjectsIdIntegrationsGitlabSlackApplication = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "gitlab-slack-application"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -2231,6 +2413,10 @@ module PutApiV4ProjectsIdIntegrationsGithub = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsGithub.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "github"
 
   module Responses = struct
     module OK = struct end
@@ -2285,6 +2471,10 @@ module PutApiV4ProjectsIdIntegrationsGitGuardian = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "git-guardian"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -2337,6 +2527,10 @@ module PutApiV4ProjectsIdIntegrationsExternalWiki = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsExternalWiki.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "external-wiki"
 
   module Responses = struct
     module OK = struct end
@@ -2391,6 +2585,10 @@ module PutApiV4ProjectsIdIntegrationsEwm = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "ewm"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -2443,6 +2641,10 @@ module PutApiV4ProjectsIdIntegrationsEmailsOnPush = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsEmailsOnPush.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "emails-on-push"
 
   module Responses = struct
     module OK = struct end
@@ -2497,6 +2699,10 @@ module PutApiV4ProjectsIdIntegrationsDroneCi = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "drone-ci"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -2549,6 +2755,10 @@ module PutApiV4ProjectsIdIntegrationsDiscord = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsDiscord.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "discord"
 
   module Responses = struct
     module OK = struct end
@@ -2603,6 +2813,10 @@ module PutApiV4ProjectsIdIntegrationsDiffblueCover = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "diffblue-cover"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -2655,6 +2869,10 @@ module PutApiV4ProjectsIdIntegrationsDatadog = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsDatadog.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "datadog"
 
   module Responses = struct
     module OK = struct end
@@ -2709,6 +2927,10 @@ module PutApiV4ProjectsIdIntegrationsCustomIssueTracker = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "custom-issue-tracker"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -2761,6 +2983,10 @@ module PutApiV4ProjectsIdIntegrationsConfluence = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsConfluence.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "confluence"
 
   module Responses = struct
     module OK = struct end
@@ -2815,6 +3041,10 @@ module PutApiV4ProjectsIdIntegrationsClickup = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "clickup"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -2867,6 +3097,10 @@ module PutApiV4ProjectsIdIntegrationsCampfire = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsCampfire.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "campfire"
 
   module Responses = struct
     module OK = struct end
@@ -2921,6 +3155,10 @@ module PutApiV4ProjectsIdIntegrationsBuildkite = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "buildkite"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -2973,6 +3211,10 @@ module PutApiV4ProjectsIdIntegrationsBugzilla = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsBugzilla.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "bugzilla"
 
   module Responses = struct
     module OK = struct end
@@ -3027,6 +3269,10 @@ module PutApiV4ProjectsIdIntegrationsBamboo = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "bamboo"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -3079,6 +3325,10 @@ module PutApiV4ProjectsIdIntegrationsAssembla = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdIntegrationsAssembla.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "assembla"
 
   module Responses = struct
     module OK = struct end
@@ -3133,6 +3383,10 @@ module PutApiV4ProjectsIdIntegrationsAsana = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "asana"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -3186,6 +3440,10 @@ module PutApiV4ProjectsIdIntegrationsAppleAppStore = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations" / "apple-app-store"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -3233,6 +3491,10 @@ module GetApiV4ProjectsIdIntegrations = struct
   module Parameters = struct
     type t = { id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "integrations"
 
   module Responses = struct
     module OK = struct end

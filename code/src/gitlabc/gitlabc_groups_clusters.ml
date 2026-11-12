@@ -7,6 +7,10 @@ module DeleteApiV4GroupsIdClustersClusterId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "clusters" /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Forbidden = struct end
@@ -55,6 +59,10 @@ module PutApiV4GroupsIdClustersClusterId = struct
     type t = Gitlabc_components.PutApiV4GroupsIdClustersClusterId.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "clusters" /% Path.int
 
   module Responses = struct
     module OK = struct end
@@ -105,6 +113,10 @@ module GetApiV4GroupsIdClustersClusterId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "clusters" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -145,6 +157,10 @@ module PostApiV4GroupsIdClustersUser = struct
     type t = Gitlabc_components.PostApiV4GroupsIdClustersUser.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "clusters" / "user"
 
   module Responses = struct
     module Created = struct end
@@ -196,10 +212,17 @@ module GetApiV4GroupsIdClusters = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "clusters"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end

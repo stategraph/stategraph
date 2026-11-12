@@ -3,6 +3,10 @@ module PostApiV4GroupsIdRunnersResetRegistrationToken = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "runners" / "reset_registration_token"
+
   module Responses = struct
     module Created = struct end
     module Unauthorized = struct end
@@ -111,10 +115,15 @@ module GetApiV4GroupsIdRunners = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.string
+    / "runners"
     /? option
          (ud "type" (fun value -> CCResult.to_opt (Parameters.Type.t_of_yojson (`String value))))
     /? option (bool "paused")

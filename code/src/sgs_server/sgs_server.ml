@@ -7,9 +7,6 @@ type route = Sgs_service.route
 module Rt = struct
   let api_v1 () = Brtl_rtng.Route.(rel / "api" / "v1")
   let health () = Brtl_rtng.Route.(api_v1 () / "health")
-  let version () = Brtl_rtng.Route.(api_v1 () / "version")
-  let openapi () = Brtl_rtng.Route.(api_v1 () / "openapi")
-  let capabilities () = Brtl_rtng.Route.(api_v1 () / "capabilities")
 
   (* MQL *)
   let mql () =
@@ -25,8 +22,6 @@ module Rt = struct
                 CCFun.(
                   CCOption.wrap Yojson.Safe.from_string
                   %> CCOption.flat_map (Mql_to_pgsql.Page.of_yojson %> CCResult.to_opt)))))
-
-  let mql_schema () = Brtl_rtng.Route.(api_v1 () / "mql" / "schema")
 end
 
 let response_404 =
@@ -38,12 +33,12 @@ let rtng ~routes config storage =
     Brtl_rtng.Route.
       [
         (`GET, Rt.health () --> Sgs_server_ep_health.run config storage);
-        (`GET, Rt.version () --> Sgs_server_ep_version.run config storage);
-        (`GET, Rt.openapi () --> Sgs_server_ep_openapi.run config storage);
-        (`GET, Rt.capabilities () --> Sgs_server_ep_capabilities.run config storage);
+        (`GET, Sgs_api_server.Version.route () --> Sgs_server_ep_version.run config storage);
+        (`GET, Sgs_api_server.Api_schema.route () --> Sgs_server_ep_openapi.run config storage);
+        (`GET, Sgs_api_capabilities.Get.route () --> Sgs_server_ep_capabilities.run config storage);
         (* Mql *)
         (`GET, Rt.mql () --> Sgs_mql_ep.run config storage);
-        (`GET, Rt.mql_schema () --> Sgs_mql_ep.Schema.run config);
+        (`GET, Sgs_api_mql.Get_schema.route () --> Sgs_mql_ep.Schema.run config);
       ]
   in
   let all_routes = base_routes @ routes in

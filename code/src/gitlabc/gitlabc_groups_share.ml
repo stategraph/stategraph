@@ -7,6 +7,10 @@ module DeleteApiV4GroupsIdShareGroupId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "share" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -39,6 +43,10 @@ module PostApiV4GroupsIdShare = struct
     type t = Gitlabc_components.PostApiV4GroupsIdShare.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.string / "share"
 
   module Responses = struct
     module Created = struct end

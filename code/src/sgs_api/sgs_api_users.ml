@@ -8,10 +8,10 @@ module Update = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? uuid "user_id"
+    rel / "api" / "v1" / "users" / "update" /? uuid "user_id"
 
   module Responses = struct
     module OK = struct
@@ -94,10 +94,10 @@ module Set_instance_admin = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? uuid "user_id"
+    rel / "api" / "v1" / "users" / "set-instance-admin" /? uuid "user_id"
 
   module Responses = struct
     module OK = struct
@@ -175,10 +175,10 @@ module Detail = struct
     type t = { user_id : string } [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? uuid "user_id"
+    rel / "api" / "v1" / "users" / "detail" /? uuid "user_id"
 
   module Responses = struct
     module OK = struct
@@ -254,10 +254,10 @@ module Delete = struct
     type t = { user_id : string } [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? uuid "user_id"
+    rel / "api" / "v1" / "users" / "delete" /? uuid "user_id"
 
   module Responses = struct
     module OK = struct
@@ -338,10 +338,10 @@ module Change_password = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? uuid "user_id"
+    rel / "api" / "v1" / "users" / "change-password" /? uuid "user_id"
 
   module Responses = struct
     module OK = struct
@@ -422,6 +422,10 @@ module Create = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "users"
+
   module Responses = struct
     module Created = struct
       type t = Sgs_api_components.User_create_response.t
@@ -494,10 +498,13 @@ module List = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v1"
+    / "users"
     /? option (string "type")
     /? option (string "search")
     /? option (string "cursor")

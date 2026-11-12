@@ -7,6 +7,10 @@ module DeleteApiV4GroupsIdWikisSlug = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "wikis" /% Path.string
+
   module Responses = struct
     module No_content = struct end
     module Bad_request = struct end
@@ -55,6 +59,10 @@ module PutApiV4GroupsIdWikisSlug = struct
     type t = Gitlabc_components.PutApiV4GroupsIdWikisSlug.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "wikis" /% Path.int
 
   module Responses = struct
     module OK = struct end
@@ -107,10 +115,18 @@ module GetApiV4GroupsIdWikisSlug = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "version") /? option_default false (bool "render_html")
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.int
+    / "wikis"
+    /% Path.string
+    /? option (string "version")
+    /? option_default false (bool "render_html")
 
   module Responses = struct
     module OK = struct end
@@ -156,6 +172,10 @@ module PostApiV4GroupsIdWikisAttachments = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "wikis" / "attachments"
+
   module Responses = struct
     module Created = struct end
     module Not_found = struct end
@@ -195,6 +215,10 @@ module PostApiV4GroupsIdWikis = struct
     type t = Gitlabc_components.PostApiV4GroupsIdWikis.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "wikis"
 
   module Responses = struct
     module Created = struct end
@@ -245,10 +269,16 @@ module GetApiV4GroupsIdWikis = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default false (bool "with_content")
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.int
+    / "wikis"
+    /? option_default false (bool "with_content")
 
   module Responses = struct
     module OK = struct end

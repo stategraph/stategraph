@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Generate docker/terrat/Dockerfile and docker/terrat/Dockerfile.fips from
-# docker/stategraph/Dockerfile (the source of truth), using cog. Blocks shared
-# with them are delimited with `# region:NAME` / `# endregion:NAME` in the
-# stategraph Dockerfile and pulled in by the cog blocks (`# [[[cog ... ]]]`) in
-# the generated files.
+# Generate docker/terrat/Dockerfile.fips, in part, from docker/stategraph/Dockerfile
+# (the source of truth), using cog. Blocks shared with it are delimited with
+# `# region:NAME` / `# endregion:NAME` in the stategraph Dockerfile and pulled in
+# by the cog blocks (`# [[[cog ... ]]]`) in the generated file.
 #
 #   render.sh            regenerate the generated files in place
 #   render.sh --check    exit non-zero if a committed file is stale (CI gate)
@@ -13,7 +12,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 COG="${COG:-cog}"
-TARGETS=(docker/terrat/Dockerfile docker/terrat/Dockerfile.fips)
+TARGETS=(docker/terrat/Dockerfile.fips)
 
 stale=0
 for target in "${TARGETS[@]}"; do

@@ -9,7 +9,7 @@ If you encounter any bugs or issues while using Stategraph, please report them t
 We welcome improvements to our documentation! Whether it’s fixing a typo, clarifying instructions, or adding new information, your contributions help make Stategraph easier to use for everyone. Please feel free to submit pull requests with documentation updates.
 
 ### Community Support 
-Helping other users by answering questions, participating in discussions, and sharing your experiences with Stategraph is a valuable contribution. You can participate in our [GitHub Discussions](https://github.com/orgs/stategraph/discussions)  or join our [Slack Community](https://stategraph.com/slack)  to connect with other users and developers.
+Helping other users by answering questions, participating in discussions, and sharing your experiences with Stategraph is a valuable contribution. You can answer questions in [GitHub Issues](https://github.com/stategraph/stategraph/issues)  or join our [Slack Community](https://stategraph.com/slack)  to connect with other users and developers.
 ### Bug Fixes and New Features 
 
 While we encourage pull requests for bug fixes or new features, please note that our codebase is written with specific styles. As a result, we may need to rewrite contributions to ensure consistency across the project. Please don’t be offended, your input is still highly valued, and we appreciate your effort to improve Stategraph.

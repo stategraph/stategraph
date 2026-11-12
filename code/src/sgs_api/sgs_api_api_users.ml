@@ -6,6 +6,10 @@ module Create = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "api-users"
+
   module Responses = struct
     module Created = struct
       type t = Sgs_api_components.Api_user_create_response.t

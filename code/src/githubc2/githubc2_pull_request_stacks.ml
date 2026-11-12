@@ -8,6 +8,10 @@ module Unstack = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "stacks" /% Path.int / "unstack"
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -119,6 +123,10 @@ module Add = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "stacks" /% Path.int / "add"
 
   module Responses = struct
     module OK = struct
@@ -308,6 +316,10 @@ module Get = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "stacks" /% Path.int
+
   module Responses = struct
     module OK = struct
       module Primary = struct
@@ -399,6 +411,10 @@ module Create = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "stacks"
 
   module Responses = struct
     module Created = struct
@@ -579,10 +595,14 @@ module List = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "stacks"
     /? option (int "pull_request")
     /? option_default 30 (int "per_page")
     /? option_default 1 (int "page")

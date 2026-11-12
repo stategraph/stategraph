@@ -7,6 +7,10 @@ module GetApiV4ProjectsIdSecureFilesSecureFileIdDownload = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "secure_files" /% Path.int / "download"
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -43,6 +47,10 @@ module DeleteApiV4ProjectsIdSecureFilesSecureFileId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "secure_files" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -81,6 +89,10 @@ module GetApiV4ProjectsIdSecureFilesSecureFileId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "secure_files" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -118,6 +130,10 @@ module PostApiV4ProjectsIdSecureFiles = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdSecureFiles.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "secure_files"
 
   module Responses = struct
     module Created = struct end
@@ -159,10 +175,17 @@ module GetApiV4ProjectsIdSecureFiles = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "secure_files"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end

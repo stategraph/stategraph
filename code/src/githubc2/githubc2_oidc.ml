@@ -19,6 +19,10 @@ module Update_oidc_custom_sub_template_for_org = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "actions" / "oidc" / "customization" / "sub"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Empty_object.t
@@ -72,6 +76,10 @@ module Get_oidc_custom_sub_template_for_org = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "actions" / "oidc" / "customization" / "sub"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Oidc_custom_sub.t
@@ -106,6 +114,18 @@ module Delete_oidc_custom_property_inclusion_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "orgs"
+    /% Path.string
+    / "actions"
+    / "oidc"
+    / "customization"
+    / "properties"
+    / "repo"
+    /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -163,6 +183,10 @@ module Create_oidc_custom_property_inclusion_for_org = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "actions" / "oidc" / "customization" / "properties" / "repo"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Oidc_custom_property_inclusion.t
@@ -216,6 +240,10 @@ module List_oidc_custom_property_inclusions_for_org = struct
   module Parameters = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "actions" / "oidc" / "customization" / "properties" / "repo"
 
   module Responses = struct
     module OK = struct
@@ -271,6 +299,18 @@ module Delete_oidc_custom_property_inclusion_for_enterprise = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "enterprises"
+    /% Path.string
+    / "actions"
+    / "oidc"
+    / "customization"
+    / "properties"
+    / "repo"
+    /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -329,6 +369,17 @@ module Create_oidc_custom_property_inclusion_for_enterprise = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "enterprises"
+    /% Path.string
+    / "actions"
+    / "oidc"
+    / "customization"
+    / "properties"
+    / "repo"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Oidc_custom_property_inclusion.t
@@ -382,6 +433,17 @@ module List_oidc_custom_property_inclusions_for_enterprise = struct
   module Parameters = struct
     type t = { enterprise : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "enterprises"
+    /% Path.string
+    / "actions"
+    / "oidc"
+    / "customization"
+    / "properties"
+    / "repo"
 
   module Responses = struct
     module OK = struct

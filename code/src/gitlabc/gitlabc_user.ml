@@ -1,6 +1,10 @@
 module PostApiV4UserSupportPin = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "support_pin"
+
   module Responses = struct
     module Created = struct end
 
@@ -23,6 +27,10 @@ end
 
 module GetApiV4UserSupportPin = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "support_pin"
 
   module Responses = struct
     module OK = struct end
@@ -51,6 +59,10 @@ module PatchApiV4UserStatus = struct
     type t = Gitlabc_components.PatchApiV4UserStatus.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "status"
 
   module Responses = struct
     module OK = struct end
@@ -82,6 +94,10 @@ module PutApiV4UserStatus = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "status"
+
   module Responses = struct
     module OK = struct end
 
@@ -106,6 +122,10 @@ end
 
 module GetApiV4UserStatus = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "status"
 
   module Responses = struct
     module OK = struct end
@@ -134,6 +154,10 @@ module PostApiV4UserRunners = struct
     type t = Gitlabc_components.PostApiV4UserRunners.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "runners"
 
   module Responses = struct
     module Created = struct end
@@ -177,6 +201,10 @@ module PutApiV4UserPreferences = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "preferences"
+
   module Responses = struct
     module OK = struct end
 
@@ -201,6 +229,10 @@ end
 
 module GetApiV4UserPreferences = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "preferences"
 
   module Responses = struct
     module OK = struct end
@@ -230,6 +262,10 @@ module PostApiV4UserPersonalAccessTokens = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "personal_access_tokens"
+
   module Responses = struct
     module Created = struct end
 
@@ -256,6 +292,10 @@ module DeleteApiV4UserKeysKeyId = struct
   module Parameters = struct
     type t = { key_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "keys" /% Path.int
 
   module Responses = struct
     module OK = struct end
@@ -284,6 +324,10 @@ module GetApiV4UserKeysKeyId = struct
   module Parameters = struct
     type t = { key_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "keys" /% Path.int
 
   module Responses = struct
     module OK = struct end
@@ -316,6 +360,10 @@ module PostApiV4UserKeys = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "keys"
+
   module Responses = struct
     module Created = struct end
 
@@ -347,10 +395,16 @@ module GetApiV4UserKeys = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "user"
+    / "keys"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -380,6 +434,10 @@ module PostApiV4UserGpgKeysKeyIdRevoke = struct
     type t = { key_id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "gpg_keys" /% Path.int / "revoke"
+
   module Responses = struct
     module Created = struct end
 
@@ -408,6 +466,10 @@ module DeleteApiV4UserGpgKeysKeyId = struct
     type t = { key_id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "gpg_keys" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -435,6 +497,10 @@ module GetApiV4UserGpgKeysKeyId = struct
   module Parameters = struct
     type t = { key_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "gpg_keys" /% Path.int
 
   module Responses = struct
     module OK = struct end
@@ -467,6 +533,10 @@ module PostApiV4UserGpgKeys = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "gpg_keys"
+
   module Responses = struct
     module Created = struct end
 
@@ -498,10 +568,16 @@ module GetApiV4UserGpgKeys = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "user"
+    / "gpg_keys"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -531,6 +607,10 @@ module DeleteApiV4UserEmailsEmailId = struct
     type t = { email_id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "emails" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -558,6 +638,10 @@ module GetApiV4UserEmailsEmailId = struct
   module Parameters = struct
     type t = { email_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "emails" /% Path.int
 
   module Responses = struct
     module OK = struct end
@@ -590,6 +674,10 @@ module PostApiV4UserEmails = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "emails"
+
   module Responses = struct
     module Created = struct end
 
@@ -621,10 +709,16 @@ module GetApiV4UserEmails = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "user"
+    / "emails"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -656,6 +750,10 @@ module PutApiV4UserAvatar = struct
     type t = Gitlabc_components.PutApiV4UserAvatar.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" / "avatar"
 
   module Responses = struct
     module OK = struct end
@@ -689,10 +787,14 @@ module GetApiV4UserActivities = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "user"
+    / "activities"
     /? option_default "2024-09-05T09:41:43.021Z" (string "from")
     /? option_default 1 (int "page")
     /? option_default 20 (int "per_page")
@@ -726,6 +828,10 @@ end
 
 module GetApiV3User = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v3" / "user"
 
   module Responses = struct
     module OK = struct

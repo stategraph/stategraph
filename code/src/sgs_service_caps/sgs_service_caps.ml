@@ -1,6 +1,5 @@
 module Rt = struct
   let api_v1 () = Brtl_rtng.Route.(rel / "api" / "v1")
-  let caps_default () = Brtl_rtng.Route.(api_v1 () / "caps" / "default")
 
   let tenant () =
     Brtl_rtng.Route.(
@@ -41,8 +40,10 @@ let start mgr =
 let routes { config; storage } =
   Brtl_rtng.Route.
     [
-      (`GET, Rt.caps_default () --> Sgs_service_caps_ep_default_get.run config storage);
-      (`PUT, Rt.caps_default () --> Sgs_service_caps_ep_default_set.run config storage);
+      ( `GET,
+        Sgs_api_caps.Get_default.route () --> Sgs_service_caps_ep_default_get.run config storage );
+      ( `PUT,
+        Sgs_api_caps.Set_default.route () --> Sgs_service_caps_ep_default_set.run config storage );
       ( `GET,
         Rt.tenant_caps_group_rules () --> Sgs_service_caps_ep_group_rules_list.run config storage );
       ( `POST,

@@ -3,6 +3,10 @@ module GetApiV4UsersIdAssociationsCount = struct
     type t = { id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "users" /% Path.int / "associations_count"
+
   module Responses = struct
     module OK = struct end
 
