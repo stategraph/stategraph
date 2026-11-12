@@ -8,10 +8,16 @@ module List_repos_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "user"
+    / "migrations"
+    /% Path.int
+    / "repositories"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -63,6 +69,10 @@ module Unlock_repo_for_authenticated_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "migrations" /% Path.int / "repos" /% Path.string / "lock"
 
   module Responses = struct
     module No_content = struct end
@@ -125,6 +135,10 @@ module Delete_archive_for_authenticated_user = struct
     type t = { migration_id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "migrations" /% Path.int / "archive"
+
   module Responses = struct
     module No_content = struct end
     module Not_modified = struct end
@@ -182,6 +196,10 @@ module Get_archive_for_authenticated_user = struct
   module Parameters = struct
     type t = { migration_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "migrations" /% Path.int / "archive"
 
   module Responses = struct
     module Found = struct end
@@ -242,10 +260,10 @@ module Get_status_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (array (string "exclude"))
+    rel / "user" / "migrations" /% Path.int /? option (array (string "exclude"))
 
   module Responses = struct
     module OK = struct
@@ -349,6 +367,10 @@ module Start_for_authenticated_user = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "migrations"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Migration.t
@@ -415,10 +437,14 @@ module List_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "user"
+    / "migrations"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -506,6 +532,10 @@ module Set_lfs_preference = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "import" / "lfs"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Import.t
@@ -564,6 +594,10 @@ module Get_large_files = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "import" / "large_files"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Porter_large_file.t list
@@ -620,6 +654,10 @@ module Map_commit_author = struct
     }
     [@@deriving make, yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "import" / "authors" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -691,10 +729,10 @@ module Get_commit_authors = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (int "since")
+    rel / "repos" /% Path.string /% Path.string / "import" / "authors" /? option (int "since")
 
   module Responses = struct
     module OK = struct
@@ -792,6 +830,10 @@ module Update_import = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "import"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Import.t
@@ -841,6 +883,10 @@ module Cancel_import = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "import"
 
   module Responses = struct
     module No_content = struct end
@@ -926,6 +972,10 @@ module Start_import = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "import"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Import.t
@@ -991,6 +1041,10 @@ module Get_import_status = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "import"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Import.t
@@ -1048,10 +1102,17 @@ module List_repos_for_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "migrations"
+    /% Path.int
+    / "repositories"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1105,6 +1166,10 @@ module Unlock_repo_for_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "migrations" /% Path.int / "repos" /% Path.string / "lock"
+
   module Responses = struct
     module No_content = struct end
 
@@ -1154,6 +1219,10 @@ module Delete_archive_for_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "migrations" /% Path.int / "archive"
+
   module Responses = struct
     module No_content = struct end
 
@@ -1198,6 +1267,10 @@ module Download_archive_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "migrations" /% Path.int / "archive"
 
   module Responses = struct
     module Found = struct end
@@ -1261,10 +1334,14 @@ module Get_status_for_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "migrations"
+    /% Path.int
     /? option
          (array
             (ud "exclude" (fun value ->
@@ -1356,6 +1433,10 @@ module Start_for_org = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "migrations"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Migration.t
@@ -1432,10 +1513,13 @@ module List_for_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "migrations"
     /? option_default 30 (int "per_page")
     /? option_default 1 (int "page")
     /? option

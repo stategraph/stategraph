@@ -7,6 +7,10 @@ module DeleteApiV4GroupsIdSshCertificatesSshCertificatesId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "ssh_certificates" /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Bad_request = struct end
@@ -61,6 +65,10 @@ module PostApiV4GroupsIdSshCertificates = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "ssh_certificates"
+
   module Responses = struct
     module Created = struct end
     module Bad_request = struct end
@@ -114,10 +122,17 @@ module GetApiV4GroupsIdSshCertificates = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.int
+    / "ssh_certificates"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end

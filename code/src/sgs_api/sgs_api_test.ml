@@ -3,10 +3,10 @@ module Set_cookie = struct
     type t = { session_id : string [@key "session-id"] } [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "session-id"
+    rel / "api" / "v1" / "test" / "set-cookie" /? string "session-id"
 
   module Responses = struct
     module OK = struct end

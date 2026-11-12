@@ -7,7 +7,7 @@
 # packages lose symbols when the swap happens. A package that links OpenSSL 4
 # is outside the swap, and the runtime stage refuses it.
 #
-# docker/terrat/Dockerfile remains the non-FIPS build.
+# docker/stategraph/Dockerfile builds the non-FIPS terrat images.
 #
 # GENERATED in part: the cog-managed sections below (the opam switch and the
 # GIT_SHA stamp) are pulled from docker/stategraph/Dockerfile (the source of

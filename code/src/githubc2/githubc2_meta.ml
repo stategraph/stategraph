@@ -1,6 +1,10 @@
 module Get_zen = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "zen"
+
   module Responses = struct
     module OK = struct end
 
@@ -23,6 +27,10 @@ end
 
 module Get_all_versions = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "versions"
 
   module Responses = struct
     module OK = struct
@@ -64,10 +72,10 @@ module Get_octocat = struct
     type t = { s : string option [@default None] } [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "s")
+    rel / "octocat" /? option (string "s")
 
   module Responses = struct
     module OK = struct end
@@ -94,6 +102,10 @@ end
 
 module Get = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "meta"
 
   module Responses = struct
     module OK = struct
@@ -130,6 +142,10 @@ end
 
 module Root = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / ""
 
   module Responses = struct
     module OK = struct

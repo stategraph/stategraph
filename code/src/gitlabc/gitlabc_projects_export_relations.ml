@@ -7,10 +7,17 @@ module GetApiV4ProjectsIdExportRelationsStatus = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "relation")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "export_relations"
+    / "status"
+    /? option (string "relation")
 
   module Responses = struct
     module OK = struct end
@@ -67,10 +74,19 @@ module GetApiV4ProjectsIdExportRelationsDownload = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "relation" /? option (bool "batched") /? option (int "batch_number")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "export_relations"
+    / "download"
+    /? string "relation"
+    /? option (bool "batched")
+    /? option (int "batch_number")
 
   module Responses = struct
     module OK = struct end
@@ -135,6 +151,10 @@ module PostApiV4ProjectsIdExportRelations = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdExportRelations.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "export_relations"
 
   module Responses = struct
     module Accepted = struct end

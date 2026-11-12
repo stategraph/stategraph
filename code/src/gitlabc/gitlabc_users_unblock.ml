@@ -3,6 +3,10 @@ module PostApiV4UsersIdUnblock = struct
     type t = { id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "users" /% Path.int / "unblock"
+
   module Responses = struct
     module Created = struct end
 

@@ -7,6 +7,10 @@ module Get_network_settings_for_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "settings" / "network-settings" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Network_settings.t
@@ -86,6 +90,10 @@ module Update_network_configuration_for_org = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "settings" / "network-configurations" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Network_configuration.t
@@ -126,6 +134,10 @@ module Delete_network_configuration_from_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "settings" / "network-configurations" /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -160,6 +172,10 @@ module Get_network_configuration_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "settings" / "network-configurations" /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -236,6 +252,10 @@ module Create_network_configuration_for_org = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "settings" / "network-configurations"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Network_configuration.t
@@ -274,10 +294,16 @@ module List_network_configurations_for_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "orgs"
+    /% Path.string
+    / "settings"
+    / "network-configurations"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct

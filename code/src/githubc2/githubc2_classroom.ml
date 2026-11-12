@@ -8,10 +8,15 @@ module List_assignments_for_a_classroom = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
+    rel
+    / "classrooms"
+    /% Path.int
+    / "assignments"
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -59,6 +64,10 @@ module Get_a_classroom = struct
   module Parameters = struct
     type t = { classroom_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "classrooms" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -115,10 +124,10 @@ module List_classrooms = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
+    rel / "classrooms" /? option_default 1 (int "page") /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -163,6 +172,10 @@ module Get_assignment_grades = struct
   module Parameters = struct
     type t = { assignment_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "assignments" /% Path.int / "grades"
 
   module Responses = struct
     module OK = struct
@@ -220,10 +233,15 @@ module List_accepted_assignments_for_an_assignment = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 30 (int "per_page")
+    rel
+    / "assignments"
+    /% Path.int
+    / "accepted_assignments"
+    /? option_default 1 (int "page")
+    /? option_default 30 (int "per_page")
 
   module Responses = struct
     module OK = struct
@@ -271,6 +289,10 @@ module Get_an_assignment = struct
   module Parameters = struct
     type t = { assignment_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "assignments" /% Path.int
 
   module Responses = struct
     module OK = struct

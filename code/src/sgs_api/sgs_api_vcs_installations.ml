@@ -7,10 +7,17 @@ module List_unclaimed_github = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "cursor") /? option_default 100 (int "limit")
+    rel
+    / "api"
+    / "v1"
+    / "vcs-installations"
+    / "github"
+    / "unclaimed"
+    /? option (string "cursor")
+    /? option_default 100 (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -72,10 +79,16 @@ module Github_claim_callback = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v1"
+    / "vcs-installations"
+    / "github"
+    / "claim"
+    / "callback"
     /? option (string "code")
     /? option (string "state")
     /? option (string "setup_action")

@@ -1,6 +1,10 @@
 module Client_id = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "github" / "client_id"
+
   module Responses = struct
     module OK = struct
       type t = { client_id : string } [@@deriving yojson { strict = false; meta = true }, show, eq]

@@ -12,7 +12,7 @@
 ; clean checkout / Docker build context -- so `dune build @code/src/iris/all`
 ; silently skipped Vite and the image's UI COPY found nothing. Making the export
 ; a directory target means it travels inside _build/ and survives the cache
-; restore. docker/terrat/Dockerfile documents the same trap; hermes solves it the
+; restore. docker/stategraph/Dockerfile documents the same trap; hermes solves it the
 ; same way for its Next.js export (ui-export).
 
 (rule

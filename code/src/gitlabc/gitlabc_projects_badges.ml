@@ -7,6 +7,10 @@ module DeleteApiV4ProjectsIdBadgesBadgeId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "badges" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -44,6 +48,10 @@ module PutApiV4ProjectsIdBadgesBadgeId = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "badges" /% Path.int
+
   module Responses = struct
     module OK = struct end
 
@@ -78,6 +86,10 @@ module GetApiV4ProjectsIdBadgesBadgeId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "badges" /% Path.int
+
   module Responses = struct
     module OK = struct end
 
@@ -111,10 +123,18 @@ module GetApiV4ProjectsIdBadgesRender = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "link_url" /? string "image_url"
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "badges"
+    / "render"
+    /? string "link_url"
+    /? string "image_url"
 
   module Responses = struct
     module OK = struct end
@@ -154,6 +174,10 @@ module PostApiV4ProjectsIdBadges = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "badges"
+
   module Responses = struct
     module Created = struct end
 
@@ -190,10 +214,15 @@ module GetApiV4ProjectsIdBadges = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "badges"
     /? option_default 1 (int "page")
     /? option_default 20 (int "per_page")
     /? option (string "name")

@@ -8,6 +8,18 @@ module DeleteApiV4ProjectsIdHooksHookIdUrlVariablesKey = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "hooks"
+    /% Path.int
+    / "url_variables"
+    /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -49,6 +61,18 @@ module PutApiV4ProjectsIdHooksHookIdUrlVariablesKey = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdHooksHookIdUrlVariablesKey.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "hooks"
+    /% Path.int
+    / "url_variables"
+    /% Path.string
 
   module Responses = struct
     module OK = struct end
@@ -149,6 +173,18 @@ module PostApiV4ProjectsIdHooksHookIdTestTrigger = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "hooks"
+    /% Path.int
+    / "test"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Trigger.t_of_yojson (`String value)))
+
   module Responses = struct
     module Created = struct end
     module Bad_request = struct end
@@ -203,6 +239,19 @@ module PostApiV4ProjectsIdHooksHookIdEventsHookLogIdResend = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "hooks"
+    /% Path.int
+    / "events"
+    /% Path.int
+    / "resend"
 
   module Responses = struct
     module Created = struct end
@@ -472,10 +521,17 @@ module GetApiV4ProjectsIdHooksHookIdEvents = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "hooks"
+    /% Path.int
+    / "events"
     /? option
          (array
             (ud "status" (fun value ->
@@ -538,6 +594,18 @@ module DeleteApiV4ProjectsIdHooksHookIdCustomHeadersKey = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "hooks"
+    /% Path.int
+    / "custom_headers"
+    /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -580,6 +648,18 @@ module PutApiV4ProjectsIdHooksHookIdCustomHeadersKey = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "hooks"
+    /% Path.int
+    / "custom_headers"
+    /% Path.string
+
   module Responses = struct
     module OK = struct end
 
@@ -618,6 +698,10 @@ module DeleteApiV4ProjectsIdHooksHookId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "hooks" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -654,6 +738,10 @@ module PutApiV4ProjectsIdHooksHookId = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdHooksHookId.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "hooks" /% Path.int
 
   module Responses = struct
     module OK = struct end
@@ -704,6 +792,10 @@ module GetApiV4ProjectsIdHooksHookId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "hooks" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -741,6 +833,10 @@ module PostApiV4ProjectsIdHooks = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdHooks.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "hooks"
 
   module Responses = struct
     module Created = struct end
@@ -792,10 +888,17 @@ module GetApiV4ProjectsIdHooks = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "hooks"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end

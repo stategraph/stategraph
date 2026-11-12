@@ -7,6 +7,10 @@ module DeleteApiV4ProjectsIdFeatureFlagsUserListsIid = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "feature_flags_user_lists" /% Path.string
+
   module Responses = struct
     module No_content = struct end
     module Unauthorized = struct end
@@ -59,6 +63,10 @@ module PutApiV4ProjectsIdFeatureFlagsUserListsIid = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "feature_flags_user_lists" /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -108,6 +116,10 @@ module GetApiV4ProjectsIdFeatureFlagsUserListsIid = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "feature_flags_user_lists" /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -150,6 +162,10 @@ module PostApiV4ProjectsIdFeatureFlagsUserLists = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdFeatureFlagsUserLists.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "feature_flags_user_lists"
 
   module Responses = struct
     module Created = struct end
@@ -202,10 +218,15 @@ module GetApiV4ProjectsIdFeatureFlagsUserLists = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "feature_flags_user_lists"
     /? option (string "search")
     /? option_default 1 (int "page")
     /? option_default 20 (int "per_page")

@@ -1,0 +1,27 @@
+{
+  "paths": {
+    "/things/{id}": {
+      "get": {
+        "operationId": "things/get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "thing_id",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {}
+        }
+      }
+    }
+  },
+  "components": {}
+}

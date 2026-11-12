@@ -43,10 +43,10 @@ module List =
           environment: string option [@default Some "none"];
           has: Has.t option [@default None]}[@@deriving (make, show, eq)]
       end
-    let route base_route =
+    let route () =
       let open Brtl_rtng.Route.Query in
         let open Brtl_rtng.Route in
-          ((base_route /?
+          (((rel / "alerts") /?
               (option
                  (ud_array "has"
                     (fun values ->

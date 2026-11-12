@@ -1,6 +1,10 @@
 module GetApiV4UserCounts = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user_counts"
+
   module Responses = struct
     module OK = struct end
 

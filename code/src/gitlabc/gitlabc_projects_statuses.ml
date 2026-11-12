@@ -12,6 +12,10 @@ module PostApiV4ProjectsIdStatusesSha = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "statuses" /% Path.string
+
   module Responses = struct
     module Created = struct
       type t = Gitlabc_components.API_Entities_CommitStatus.t

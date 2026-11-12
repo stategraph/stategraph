@@ -7,6 +7,10 @@ module DeleteApiV4GroupsIdUploadsUploadId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "uploads" /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Bad_request = struct end
@@ -54,6 +58,10 @@ module GetApiV4GroupsIdUploadsUploadId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "uploads" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -94,6 +102,10 @@ module DeleteApiV4GroupsIdUploadsSecretFilename = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "uploads" /% Path.string /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -147,6 +159,10 @@ module GetApiV4GroupsIdUploadsSecretFilename = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "groups" /% Path.int / "uploads" /% Path.string /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Forbidden = struct end
@@ -192,10 +208,17 @@ module GetApiV4GroupsIdUploads = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "groups"
+    /% Path.int
+    / "uploads"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end

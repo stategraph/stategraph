@@ -7,6 +7,10 @@ module PostApiV4UsersIdGpgKeysKeyIdRevoke = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "users" /% Path.int / "gpg_keys" /% Path.int / "revoke"
+
   module Responses = struct
     module Created = struct end
 
@@ -38,6 +42,10 @@ module DeleteApiV4UsersIdGpgKeysKeyId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "users" /% Path.int / "gpg_keys" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -71,6 +79,10 @@ module GetApiV4UsersIdGpgKeysKeyId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "users" /% Path.int / "gpg_keys" /% Path.int
+
   module Responses = struct
     module OK = struct end
 
@@ -103,6 +115,10 @@ module PostApiV4UsersIdGpgKeys = struct
     type t = Gitlabc_components.PostApiV4UsersIdGpgKeys.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "users" /% Path.int / "gpg_keys"
 
   module Responses = struct
     module Created = struct end
@@ -139,10 +155,17 @@ module GetApiV4UsersIdGpgKeys = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "users"
+    /% Path.int
+    / "gpg_keys"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end

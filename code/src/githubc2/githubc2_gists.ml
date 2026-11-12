@@ -9,10 +9,13 @@ module List_for_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "users"
+    /% Path.string
+    / "gists"
     /? option (string "since")
     /? option_default 30 (int "per_page")
     /? option_default 1 (int "page")
@@ -73,6 +76,10 @@ module Get_revision = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "gists" /% Path.string /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Gist_simple.t
@@ -132,6 +139,10 @@ module Unstar = struct
     type t = { gist_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "gists" /% Path.string / "star"
+
   module Responses = struct
     module No_content = struct end
     module Not_modified = struct end
@@ -182,6 +193,10 @@ module Star = struct
   module Parameters = struct
     type t = { gist_id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "gists" /% Path.string / "star"
 
   module Responses = struct
     module No_content = struct end
@@ -234,6 +249,10 @@ module Check_is_starred = struct
     type t = { gist_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "gists" /% Path.string / "star"
+
   module Responses = struct
     module No_content = struct end
     module Not_modified = struct end
@@ -284,6 +303,10 @@ module Fork = struct
   module Parameters = struct
     type t = { gist_id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "gists" /% Path.string / "forks"
 
   module Responses = struct
     module Created = struct
@@ -353,10 +376,15 @@ module List_forks = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "gists"
+    /% Path.string
+    / "forks"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -421,10 +449,15 @@ module List_commits = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "gists"
+    /% Path.string
+    / "commits"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -496,6 +529,10 @@ module Update_comment = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "gists" /% Path.string / "comments" /% Path.ud CCInt64.of_string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Gist_comment.t
@@ -547,6 +584,10 @@ module Delete_comment = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "gists" /% Path.string / "comments" /% Path.ud CCInt64.of_string
 
   module Responses = struct
     module No_content = struct end
@@ -604,6 +645,10 @@ module Get_comment = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "gists" /% Path.string / "comments" /% Path.ud CCInt64.of_string
 
   module Responses = struct
     module OK = struct
@@ -691,6 +736,10 @@ module Create_comment = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "gists" /% Path.string / "comments"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Gist_comment.t
@@ -753,10 +802,15 @@ module List_comments = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "gists"
+    /% Path.string
+    / "comments"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -844,6 +898,10 @@ module Update = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "gists" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Gist_simple.t
@@ -898,6 +956,10 @@ module Delete = struct
     type t = { gist_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "gists" /% Path.string
+
   module Responses = struct
     module No_content = struct end
     module Not_modified = struct end
@@ -948,6 +1010,10 @@ module Get = struct
   module Parameters = struct
     type t = { gist_id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "gists" /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -1030,10 +1096,12 @@ module List_starred = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "gists"
+    / "starred"
     /? option (string "since")
     /? option_default 30 (int "per_page")
     /? option_default 1 (int "page")
@@ -1102,10 +1170,12 @@ module List_public = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "gists"
+    / "public"
     /? option (string "since")
     /? option_default 30 (int "per_page")
     /? option_default 1 (int "page")
@@ -1235,6 +1305,10 @@ module Create = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "gists"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Gist_simple.t
@@ -1302,10 +1376,11 @@ module List = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "gists"
     /? option (string "since")
     /? option_default 30 (int "per_page")
     /? option_default 1 (int "page")

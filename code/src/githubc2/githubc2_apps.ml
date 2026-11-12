@@ -3,6 +3,10 @@ module Get_user_installation = struct
     type t = { username : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "installation"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Installation.t
@@ -38,10 +42,15 @@ module List_subscriptions_for_authenticated_user_stubbed = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "user"
+    / "marketplace_purchases"
+    / "stubbed"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -95,10 +104,14 @@ module List_subscriptions_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "user"
+    / "marketplace_purchases"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -158,6 +171,10 @@ module Remove_repo_from_installation_for_authenticated_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "installations" /% Path.int / "repositories" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -221,6 +238,10 @@ module Add_repo_to_installation_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "installations" /% Path.int / "repositories" /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Not_modified = struct end
@@ -280,10 +301,16 @@ module List_installation_repos_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "user"
+    / "installations"
+    /% Path.int
+    / "repositories"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -855,10 +882,14 @@ module List_installations_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "user"
+    / "installations"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -931,6 +962,10 @@ module Get_repo_installation = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "installation"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Installation.t
@@ -981,6 +1016,10 @@ module Get_org_installation = struct
   module Parameters = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "installation"
 
   module Responses = struct
     module OK = struct
@@ -1056,10 +1095,15 @@ module List_accounts_for_plan_stubbed = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "marketplace_listing"
+    / "stubbed"
+    / "plans"
+    /% Path.int
+    / "accounts"
     /? option_default
          `Created
          (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
@@ -1125,10 +1169,15 @@ module List_plans_stubbed = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "marketplace_listing"
+    / "stubbed"
+    / "plans"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1173,6 +1222,10 @@ module Get_subscription_plan_for_account_stubbed = struct
   module Parameters = struct
     type t = { account_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "marketplace_listing" / "stubbed" / "accounts" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -1265,10 +1318,14 @@ module List_accounts_for_plan = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "marketplace_listing"
+    / "plans"
+    /% Path.int
+    / "accounts"
     /? option_default
          `Created
          (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
@@ -1349,10 +1406,14 @@ module List_plans = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "marketplace_listing"
+    / "plans"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1405,6 +1466,10 @@ module Get_subscription_plan_for_account = struct
     type t = { account_id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "marketplace_listing" / "accounts" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Marketplace_purchase.t
@@ -1454,6 +1519,10 @@ end
 module Revoke_installation_access_token = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "installation" / "token"
+
   module Responses = struct
     module No_content = struct end
 
@@ -1483,10 +1552,14 @@ module List_repos_accessible_to_installation = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "installation"
+    / "repositories"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1555,6 +1628,10 @@ module Get_by_slug = struct
   module Parameters = struct
     type t = { app_slug : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "apps" /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -1630,6 +1707,10 @@ module Scope_token = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "applications" /% Path.string / "token" / "scoped"
 
   module Responses = struct
     module OK = struct
@@ -1708,6 +1789,10 @@ module Reset_token = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "applications" /% Path.string / "token"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Authorization.t
@@ -1764,6 +1849,10 @@ module Delete_token = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "applications" /% Path.string / "token"
+
   module Responses = struct
     module No_content = struct end
 
@@ -1816,6 +1905,10 @@ module Check_token = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "applications" /% Path.string / "token"
 
   module Responses = struct
     module OK = struct
@@ -1880,6 +1973,10 @@ module Delete_authorization = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "applications" /% Path.string / "grant"
+
   module Responses = struct
     module No_content = struct end
 
@@ -1924,6 +2021,10 @@ module Unsuspend_installation = struct
     type t = { installation_id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "app" / "installations" /% Path.int / "suspended"
+
   module Responses = struct
     module No_content = struct end
 
@@ -1964,6 +2065,10 @@ module Suspend_installation = struct
   module Parameters = struct
     type t = { installation_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "app" / "installations" /% Path.int / "suspended"
 
   module Responses = struct
     module No_content = struct end
@@ -2026,6 +2131,10 @@ module Create_installation_access_token = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "app" / "installations" /% Path.int / "access_tokens"
 
   module Responses = struct
     module Created = struct
@@ -2095,6 +2204,10 @@ module Delete_installation = struct
     type t = { installation_id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "app" / "installations" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -2135,6 +2248,10 @@ module Get_installation = struct
   module Parameters = struct
     type t = { installation_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "app" / "installations" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -2186,10 +2303,12 @@ module List_installations = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "app"
+    / "installations"
     /? option_default 30 (int "per_page")
     /? option_default 1 (int "page")
     /? option (string "since")
@@ -2235,10 +2354,14 @@ module List_installation_requests_for_authenticated_app = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "app"
+    / "installation-requests"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -2287,6 +2410,10 @@ module Redeliver_webhook_delivery = struct
   module Parameters = struct
     type t = { delivery_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "app" / "hook" / "deliveries" /% Path.int / "attempts"
 
   module Responses = struct
     module Accepted = struct
@@ -2338,6 +2465,10 @@ module Get_webhook_delivery = struct
   module Parameters = struct
     type t = { delivery_id : int } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "app" / "hook" / "deliveries" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -2414,10 +2545,13 @@ module List_webhook_deliveries = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "app"
+    / "hook"
+    / "deliveries"
     /? option_default 30 (int "per_page")
     /? option (string "cursor")
     /? option
@@ -2491,6 +2625,10 @@ module Update_webhook_config_for_app = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "app" / "hook" / "config"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Webhook_config.t
@@ -2519,6 +2657,10 @@ end
 module Get_webhook_config_for_app = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "app" / "hook" / "config"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Webhook_config.t
@@ -2546,6 +2688,10 @@ module Create_from_manifest = struct
   module Parameters = struct
     type t = { code : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "app-manifests" /% Path.string / "conversions"
 
   module Responses = struct
     module Created = struct
@@ -2741,6 +2887,10 @@ end
 
 module Get_authenticated = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "app"
 
   module Responses = struct
     module OK = struct

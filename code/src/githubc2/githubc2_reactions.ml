@@ -9,6 +9,10 @@ module Delete_for_release = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "releases" /% Path.int / "reactions" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -85,6 +89,10 @@ module Create_for_release = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "releases" /% Path.int / "reactions"
 
   module Responses = struct
     module OK = struct
@@ -182,10 +190,16 @@ module List_for_release = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "releases"
+    /% Path.int
+    / "reactions"
     /? option
          (ud "content" (fun value ->
               CCResult.to_opt (Parameters.Content.t_of_yojson (`String value))))
@@ -252,6 +266,18 @@ module Delete_for_pull_request_comment = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "pulls"
+    / "comments"
+    /% Path.ud CCInt64.of_string
+    / "reactions"
+    /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -335,6 +361,17 @@ module Create_for_pull_request_review_comment = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "pulls"
+    / "comments"
+    /% Path.ud CCInt64.of_string
+    / "reactions"
 
   module Responses = struct
     module OK = struct
@@ -438,10 +475,17 @@ module List_for_pull_request_review_comment = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "pulls"
+    / "comments"
+    /% Path.ud CCInt64.of_string
+    / "reactions"
     /? option
          (ud "content" (fun value ->
               CCResult.to_opt (Parameters.Content.t_of_yojson (`String value))))
@@ -508,6 +552,10 @@ module Delete_for_issue = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "issues" /% Path.int / "reactions" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -591,6 +639,10 @@ module Create_for_issue = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "issues" /% Path.int / "reactions"
 
   module Responses = struct
     module OK = struct
@@ -694,10 +746,16 @@ module List_for_issue = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "issues"
+    /% Path.int
+    / "reactions"
     /? option
          (ud "content" (fun value ->
               CCResult.to_opt (Parameters.Content.t_of_yojson (`String value))))
@@ -771,6 +829,18 @@ module Delete_for_issue_comment = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "issues"
+    / "comments"
+    /% Path.ud CCInt64.of_string
+    / "reactions"
+    /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -854,6 +924,17 @@ module Create_for_issue_comment = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "issues"
+    / "comments"
+    /% Path.ud CCInt64.of_string
+    / "reactions"
 
   module Responses = struct
     module OK = struct
@@ -957,10 +1038,17 @@ module List_for_issue_comment = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "issues"
+    / "comments"
+    /% Path.ud CCInt64.of_string
+    / "reactions"
     /? option
          (ud "content" (fun value ->
               CCResult.to_opt (Parameters.Content.t_of_yojson (`String value))))
@@ -1027,6 +1115,17 @@ module Delete_for_commit_comment = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "comments"
+    /% Path.ud CCInt64.of_string
+    / "reactions"
+    /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -1110,6 +1209,16 @@ module Create_for_commit_comment = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "comments"
+    /% Path.ud CCInt64.of_string
+    / "reactions"
 
   module Responses = struct
     module OK = struct
@@ -1213,10 +1322,16 @@ module List_for_commit_comment = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "comments"
+    /% Path.ud CCInt64.of_string
+    / "reactions"
     /? option
          (ud "content" (fun value ->
               CCResult.to_opt (Parameters.Content.t_of_yojson (`String value))))

@@ -6,6 +6,10 @@ module Results = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "actuator" / "results"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Task.t
@@ -65,6 +69,10 @@ end
 module Preview = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "actuator" / "preview"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Actuator_preview_response.t
@@ -110,6 +118,10 @@ end
 
 module Params = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "actuator" / "params"
 
   module Responses = struct
     module OK = struct
@@ -161,6 +173,10 @@ module Next = struct
     type t = Sgs_api_components.Actuator_next_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "actuator" / "next"
 
   module Responses = struct
     module OK = struct
@@ -226,6 +242,10 @@ module Bundle_cursors = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "actuator" / "bundle" / "cursors"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Actuator_bundle_cursors_response.t
@@ -275,6 +295,10 @@ module Bundle = struct
     type t = Sgs_api_components.Actuator_bundle_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "actuator" / "bundle"
 
   module Responses = struct
     module OK = struct

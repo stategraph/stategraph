@@ -7,6 +7,10 @@ module DeleteApiV4ProjectsIdRunnersRunnerId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "runners" /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Bad_request = struct end
@@ -52,6 +56,10 @@ module PostApiV4ProjectsIdRunnersResetRegistrationToken = struct
   module Parameters = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "runners" / "reset_registration_token"
 
   module Responses = struct
     module Created = struct end
@@ -100,6 +108,10 @@ module PostApiV4ProjectsIdRunners = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdRunners.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "runners"
 
   module Responses = struct
     module Created = struct end
@@ -257,10 +269,15 @@ module GetApiV4ProjectsIdRunners = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "runners"
     /? option
          (ud "scope" (fun value -> CCResult.to_opt (Parameters.Scope.t_of_yojson (`String value))))
     /? option

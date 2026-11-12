@@ -8,6 +8,10 @@ module PutApiV4UserUserIdCreditCardValidation = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "user" /% Path.string / "credit_card_validation"
+
   module Responses = struct
     module OK = struct end
 

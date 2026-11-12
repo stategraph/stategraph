@@ -27,10 +27,17 @@ module List_view_items_for_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "users"
+    /% Path.string
+    / "projectsV2"
+    /% Path.int
+    / "views"
+    /% Path.int
+    / "items"
     /? option
          (ud_array "fields" (fun values ->
               CCOption.choice
@@ -183,6 +190,10 @@ module Update_item_for_user = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "projectsV2" /% Path.int / "items" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Projects_v2_item_with_content.t
@@ -260,6 +271,10 @@ module Delete_item_for_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "projectsV2" /% Path.int / "items" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -333,10 +348,16 @@ module Get_user_item = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "users"
+    /% Path.string
+    / "projectsV2"
+    /% Path.int
+    / "items"
+    /% Path.int
     /? option
          (ud_array "fields" (fun values ->
               CCOption.choice
@@ -500,6 +521,10 @@ module Add_item_for_user = struct
       | V1 v -> V1.to_yojson v
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "projectsV2" /% Path.int / "items"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Projects_v2_item_simple.t
@@ -584,10 +609,15 @@ module List_items_for_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "users"
+    /% Path.string
+    / "projectsV2"
+    /% Path.int
+    / "items"
     /? option (string "before")
     /? option (string "after")
     /? option_default 30 (int "per_page")
@@ -681,6 +711,10 @@ module Get_field_for_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "projectsV2" /% Path.int / "fields" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -855,6 +889,10 @@ module Add_field_for_user = struct
       | V2 v -> V2.to_yojson v
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "projectsV2" /% Path.int / "fields"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Projects_v2_field.t
@@ -930,10 +968,15 @@ module List_fields_for_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "users"
+    /% Path.string
+    / "projectsV2"
+    /% Path.int
+    / "fields"
     /? option_default 30 (int "per_page")
     /? option (string "before")
     /? option (string "after")
@@ -1007,6 +1050,10 @@ module Get_for_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "projectsV2" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Projects_v2.t
@@ -1072,10 +1119,13 @@ module List_for_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "users"
+    /% Path.string
+    / "projectsV2"
     /? option (string "q")
     /? option (string "before")
     /? option (string "after")
@@ -1229,6 +1279,10 @@ module Create_view_for_user = struct
     [@@deriving make, yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "projectsV2" /% Path.int / "views"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Projects_v2_view.t
@@ -1327,6 +1381,10 @@ module Create_draft_item_for_authenticated_user = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" /% Path.string / "projectsV2" /% Path.int / "drafts"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Projects_v2_item_simple.t
@@ -1411,10 +1469,17 @@ module List_view_items_for_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "projectsV2"
+    /% Path.int
+    / "views"
+    /% Path.int
+    / "items"
     /? option
          (ud_array "fields" (fun values ->
               CCOption.choice
@@ -1595,6 +1660,10 @@ module Create_view_for_org = struct
     [@@deriving make, yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "projectsV2" /% Path.int / "views"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Projects_v2_view.t
@@ -1731,6 +1800,10 @@ module Update_item_for_org = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "projectsV2" /% Path.int / "items" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Projects_v2_item_with_content.t
@@ -1808,6 +1881,10 @@ module Delete_item_for_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "projectsV2" /% Path.int / "items" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -1881,10 +1958,16 @@ module Get_org_item = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "projectsV2"
+    /% Path.int
+    / "items"
+    /% Path.int
     /? option
          (ud_array "fields" (fun values ->
               CCOption.choice
@@ -2048,6 +2131,10 @@ module Add_item_for_org = struct
       | V1 v -> V1.to_yojson v
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "projectsV2" /% Path.int / "items"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Projects_v2_item_simple.t
@@ -2129,10 +2216,15 @@ module List_items_for_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "projectsV2"
+    /% Path.int
+    / "items"
     /? option (string "q")
     /? option
          (ud_array "fields" (fun values ->
@@ -2223,6 +2315,10 @@ module Get_field_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "projectsV2" /% Path.int / "fields" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -2409,6 +2505,10 @@ module Add_field_for_org = struct
       | V3 v -> V3.to_yojson v
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "projectsV2" /% Path.int / "fields"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Projects_v2_field.t
@@ -2481,10 +2581,15 @@ module List_fields_for_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "projectsV2"
+    /% Path.int
+    / "fields"
     /? option_default 30 (int "per_page")
     /? option (string "before")
     /? option (string "after")
@@ -2567,6 +2672,10 @@ module Create_draft_item_for_org = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "projectsV2" /% Path.int / "drafts"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Projects_v2_item_simple.t
@@ -2627,6 +2736,10 @@ module Get_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "projectsV2" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -2690,10 +2803,13 @@ module List_for_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "projectsV2"
     /? option (string "q")
     /? option (string "before")
     /? option (string "after")

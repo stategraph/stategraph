@@ -7,6 +7,10 @@ module DeleteApiV4UsersIdIdentitiesProvider = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "users" /% Path.int / "identities" /% Path.string
+
   module Responses = struct
     module OK = struct end
 

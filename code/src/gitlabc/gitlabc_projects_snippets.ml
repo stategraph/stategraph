@@ -7,6 +7,10 @@ module GetApiV4ProjectsIdSnippetsSnippetIdUserAgentDetail = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "snippets" /% Path.int / "user_agent_detail"
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -43,6 +47,10 @@ module GetApiV4ProjectsIdSnippetsSnippetIdRaw = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "snippets" /% Path.int / "raw"
 
   module Responses = struct
     module OK = struct end
@@ -82,6 +90,20 @@ module DeleteApiV4ProjectsIdSnippetsSnippetIdNotesNoteIdAwardEmojiAwardId = stru
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "snippets"
+    /% Path.int
+    / "notes"
+    /% Path.int
+    / "award_emoji"
+    /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -134,6 +156,20 @@ module GetApiV4ProjectsIdSnippetsSnippetIdNotesNoteIdAwardEmojiAwardId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "snippets"
+    /% Path.int
+    / "notes"
+    /% Path.int
+    / "award_emoji"
+    /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -181,6 +217,19 @@ module PostApiV4ProjectsIdSnippetsSnippetIdNotesNoteIdAwardEmoji = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdSnippetsSnippetIdNotesNoteIdAwardEmoji.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "snippets"
+    /% Path.int
+    / "notes"
+    /% Path.int
+    / "award_emoji"
 
   module Responses = struct
     module Created = struct end
@@ -235,10 +284,21 @@ module GetApiV4ProjectsIdSnippetsSnippetIdNotesNoteIdAwardEmoji = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "snippets"
+    /% Path.int
+    / "notes"
+    /% Path.int
+    / "award_emoji"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -286,6 +346,20 @@ module GetApiV4ProjectsIdSnippetsSnippetIdFilesRefFilePathRaw = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "snippets"
+    /% Path.int
+    / "files"
+    /% Path.string
+    /% Path.string
+    / "raw"
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -328,6 +402,10 @@ module DeleteApiV4ProjectsIdSnippetsSnippetIdAwardEmojiAwardId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "snippets" /% Path.int / "award_emoji" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -378,6 +456,10 @@ module GetApiV4ProjectsIdSnippetsSnippetIdAwardEmojiAwardId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "snippets" /% Path.int / "award_emoji" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -423,6 +505,10 @@ module PostApiV4ProjectsIdSnippetsSnippetIdAwardEmoji = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdSnippetsSnippetIdAwardEmoji.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "snippets" /% Path.int / "award_emoji"
 
   module Responses = struct
     module Created = struct end
@@ -472,10 +558,19 @@ module GetApiV4ProjectsIdSnippetsSnippetIdAwardEmoji = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "snippets"
+    /% Path.int
+    / "award_emoji"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -516,6 +611,10 @@ module DeleteApiV4ProjectsIdSnippetsSnippetId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "snippets" /% Path.int
 
   module Responses = struct
     module No_content = struct end
@@ -566,6 +665,10 @@ module PutApiV4ProjectsIdSnippetsSnippetId = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "snippets" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -615,6 +718,10 @@ module GetApiV4ProjectsIdSnippetsSnippetId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "snippets" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Not_found = struct end
@@ -652,6 +759,10 @@ module PostApiV4ProjectsIdSnippets = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdSnippets.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "snippets"
 
   module Responses = struct
     module Created = struct end
@@ -703,10 +814,17 @@ module GetApiV4ProjectsIdSnippets = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "snippets"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end

@@ -17,6 +17,10 @@ module Update_branch = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls" /% Path.int / "update-branch"
+
   module Responses = struct
     module Accepted = struct
       module Primary = struct
@@ -121,6 +125,18 @@ module Submit_review = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "pulls"
+    /% Path.int
+    / "reviews"
+    /% Path.int
+    / "events"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Pull_request_review.t
@@ -217,6 +233,18 @@ module Dismiss_review = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "pulls"
+    /% Path.int
+    / "reviews"
+    /% Path.int
+    / "dismissals"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Pull_request_review.t
@@ -284,10 +312,20 @@ module List_comments_for_review = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "pulls"
+    /% Path.int
+    / "reviews"
+    /% Path.int
+    / "comments"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -346,6 +384,10 @@ module Delete_pending_review = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls" /% Path.int / "reviews" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -418,6 +460,10 @@ module Update_review = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls" /% Path.int / "reviews" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Pull_request_review.t
@@ -475,6 +521,10 @@ module Get_review = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls" /% Path.int / "reviews" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -586,6 +636,10 @@ module Create_review = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls" /% Path.int / "reviews"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Pull_request_review.t
@@ -651,10 +705,18 @@ module List_reviews = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "pulls"
+    /% Path.int
+    / "reviews"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -718,6 +780,10 @@ module Remove_requested_reviewers = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls" /% Path.int / "requested_reviewers"
 
   module Responses = struct
     module OK = struct
@@ -834,6 +900,10 @@ module Request_reviewers = struct
       | V1 v -> V1.to_yojson v
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls" /% Path.int / "requested_reviewers"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Pull_request_simple.t
@@ -893,6 +963,10 @@ module List_requested_reviewers = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls" /% Path.int / "requested_reviewers"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Pull_request_review_request.t
@@ -933,6 +1007,10 @@ module Get_merge_async_result = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls" /% Path.int / "merge-async" /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -1051,6 +1129,10 @@ module Merge_async = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls" /% Path.int / "merge-async"
 
   module Responses = struct
     module OK = struct
@@ -1178,6 +1260,10 @@ module Merge = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls" /% Path.int / "merge"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Pull_request_merge_result.t
@@ -1276,6 +1362,10 @@ module Check_if_merged = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls" /% Path.int / "merge"
+
   module Responses = struct
     module No_content = struct end
     module Not_found = struct end
@@ -1320,10 +1410,18 @@ module List_files = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "pulls"
+    /% Path.int
+    / "files"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1408,10 +1506,18 @@ module List_commits = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "pulls"
+    /% Path.int
+    / "commits"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1464,6 +1570,18 @@ module Create_reply_for_review_comment = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "pulls"
+    /% Path.int
+    / "comments"
+    /% Path.ud CCInt64.of_string
+    / "replies"
 
   module Responses = struct
     module Created = struct
@@ -1598,6 +1716,10 @@ module Create_review_comment = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls" /% Path.int / "comments"
+
   module Responses = struct
     module Created = struct
       type t = Githubc2_components.Pull_request_review_comment.t
@@ -1702,10 +1824,16 @@ module List_review_comments = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "pulls"
+    /% Path.int
+    / "comments"
     /? option_default
          `Created
          (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
@@ -1798,6 +1926,10 @@ module Update = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Pull_request.t
@@ -1860,6 +1992,10 @@ module Get = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -1957,6 +2093,10 @@ module Update_review_comment = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls" / "comments" /% Path.ud CCInt64.of_string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Pull_request_review_comment.t
@@ -1998,6 +2138,10 @@ module Delete_review_comment = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls" / "comments" /% Path.ud CCInt64.of_string
 
   module Responses = struct
     module No_content = struct end
@@ -2048,6 +2192,10 @@ module Get_review_comment = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls" / "comments" /% Path.ud CCInt64.of_string
 
   module Responses = struct
     module OK = struct
@@ -2145,10 +2293,15 @@ module List_review_comments_for_repo = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "pulls"
+    / "comments"
     /? option
          (ud "sort" (fun value -> CCResult.to_opt (Parameters.Sort.t_of_yojson (`String value))))
     /? option
@@ -2219,6 +2372,10 @@ module Create = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "pulls"
 
   module Responses = struct
     module Created = struct
@@ -2348,10 +2505,14 @@ module List = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "pulls"
     /? option_default
          `Open
          (ud "state" (fun value -> CCResult.to_opt (Parameters.State.t_of_yojson (`String value))))

@@ -28,6 +28,10 @@ module Update_campaign = struct
     [@@deriving make, yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "campaigns" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Campaign_summary.t
@@ -110,6 +114,10 @@ module Delete_campaign = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "campaigns" /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -171,6 +179,10 @@ module Get_campaign_summary = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "campaigns" /% Path.int
 
   module Responses = struct
     module OK = struct
@@ -336,6 +348,10 @@ module Create_campaign = struct
       | V1 v -> V1.to_yojson v
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "campaigns"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Campaign_summary.t
@@ -466,10 +482,13 @@ module List_org_campaigns = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "campaigns"
     /? option_default 1 (int "page")
     /? option_default 30 (int "per_page")
     /? option_default

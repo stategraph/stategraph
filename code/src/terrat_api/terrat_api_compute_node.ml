@@ -8,6 +8,10 @@ module Initiate = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "github" / "v1" / "compute-node" /% Path.string / "initiate"
+
   module Responses = struct
     module OK = struct
       type t = Terrat_api_components.Work_manifest.t

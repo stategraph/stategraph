@@ -1,6 +1,10 @@
 module Whoami = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "github" / "whoami"
+
   module Responses = struct
     module OK = struct
       type t = Terrat_api_components.Github_user.t

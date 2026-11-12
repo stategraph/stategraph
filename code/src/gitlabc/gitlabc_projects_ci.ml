@@ -8,6 +8,10 @@ module PostApiV4ProjectsIdCiLint = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "ci" / "lint"
+
   module Responses = struct
     module OK = struct end
 
@@ -47,10 +51,16 @@ module GetApiV4ProjectsIdCiLint = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.int
+    / "ci"
+    / "lint"
     /? option (string "sha")
     /? option (string "content_ref")
     /? option_default false (bool "dry_run")

@@ -7,6 +7,10 @@ module DeleteApiV4ProjectsIdFeatureFlagsFeatureFlagName = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "feature_flags" /% Path.string
+
   module Responses = struct
     module No_content = struct end
     module Forbidden = struct end
@@ -58,6 +62,10 @@ module PutApiV4ProjectsIdFeatureFlagsFeatureFlagName = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdFeatureFlagsFeatureFlagName.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "feature_flags" /% Path.string
 
   module Responses = struct
     module OK = struct end
@@ -114,6 +122,10 @@ module GetApiV4ProjectsIdFeatureFlagsFeatureFlagName = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "feature_flags" /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -159,6 +171,10 @@ module PostApiV4ProjectsIdFeatureFlags = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdFeatureFlags.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "feature_flags"
 
   module Responses = struct
     module Created = struct end
@@ -229,10 +245,15 @@ module GetApiV4ProjectsIdFeatureFlags = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "feature_flags"
     /? option
          (ud "scope" (fun value -> CCResult.to_opt (Parameters.Scope.t_of_yojson (`String value))))
     /? option_default 1 (int "page")

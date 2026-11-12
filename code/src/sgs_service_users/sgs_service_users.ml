@@ -9,30 +9,11 @@ module Rt = struct
       / "access-tokens"
       /* Body.decode ~json:Sgs_api_components_access_token_create_request.of_yojson ())
 
-  let user_access_tokens_list () = Brtl_rtng.Route.(api_v1 () / "user" / "access-tokens")
-
-  let user_access_tokens_revoke () =
-    Brtl_rtng.Route.(api_v1 () / "user" / "access-tokens" / "revoke" /? Query.string "token_id")
-
   let api_users_create () =
     Brtl_rtng.Route.(
       api_v1 ()
       / "api-users"
       /* Body.decode ~json:Sgs_api_components_api_user_create_request.of_yojson ())
-
-  (* User Management *)
-  let users () = Brtl_rtng.Route.(api_v1 () / "users")
-  let users_list () = Sgs_api_users.List.route Brtl_rtng.Route.(api_v1 () / "users")
-  let users_detail () = Sgs_api_users.Detail.route Brtl_rtng.Route.(api_v1 () / "users" / "detail")
-  let users_update () = Sgs_api_users.Update.route Brtl_rtng.Route.(api_v1 () / "users" / "update")
-  let users_delete () = Sgs_api_users.Delete.route Brtl_rtng.Route.(api_v1 () / "users" / "delete")
-
-  let users_change_password () =
-    Sgs_api_users.Change_password.route Brtl_rtng.Route.(api_v1 () / "users" / "change-password")
-
-  let users_set_instance_admin () =
-    Sgs_api_users.Set_instance_admin.route
-      Brtl_rtng.Route.(api_v1 () / "users" / "set-instance-admin")
 end
 
 type t = {
@@ -65,25 +46,26 @@ let routes { config; storage } =
   Brtl_rtng.Route.
     [
       ( `GET,
-        Rt.user_access_tokens_list () --> Sgs_service_users_ep_access_token_list.run config storage
-      );
+        Sgs_api_user.Access_tokens_list.route ()
+        --> Sgs_service_users_ep_access_token_list.run config storage );
       ( `POST,
-        Rt.user_access_tokens_revoke ()
+        Sgs_api_user.Access_tokens_revoke.route ()
         --> Sgs_service_users_ep_access_token_revoke.run config storage );
       ( `POST,
         Rt.user_access_tokens_create ()
         --> Sgs_service_users_ep_access_token_create.run config storage );
       (`POST, Rt.api_users_create () --> Sgs_service_users_ep_api_user_create.run config storage);
       (* User Management *)
-      (`GET, Rt.users_list () --> Sgs_service_users_ep_list.run config storage);
-      (`GET, Rt.users_detail () --> Sgs_service_users_ep_detail.run config storage);
-      (`POST, Rt.users () --> Sgs_service_users_ep_create.run config storage);
-      (`PUT, Rt.users_update () --> Sgs_service_users_ep_update.run config storage);
-      (`DELETE, Rt.users_delete () --> Sgs_service_users_ep_delete.run config storage);
+      (`GET, Sgs_api_users.List.route () --> Sgs_service_users_ep_list.run config storage);
+      (`GET, Sgs_api_users.Detail.route () --> Sgs_service_users_ep_detail.run config storage);
+      (`POST, Sgs_api_users.Create.route () --> Sgs_service_users_ep_create.run config storage);
+      (`PUT, Sgs_api_users.Update.route () --> Sgs_service_users_ep_update.run config storage);
+      (`DELETE, Sgs_api_users.Delete.route () --> Sgs_service_users_ep_delete.run config storage);
       ( `POST,
-        Rt.users_change_password () --> Sgs_service_users_ep_change_password.run config storage );
+        Sgs_api_users.Change_password.route ()
+        --> Sgs_service_users_ep_change_password.run config storage );
       ( `POST,
-        Rt.users_set_instance_admin ()
+        Sgs_api_users.Set_instance_admin.route ()
         --> Sgs_service_users_ep_set_instance_admin.run config storage );
     ]
 

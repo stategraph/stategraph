@@ -3,6 +3,10 @@ module Summary = struct
     type t = { state_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "states" /% Path.uuid / "summary"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.State_summary.t
@@ -52,10 +56,18 @@ module Security_scans = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "page") /? option (int "limit")
+    rel
+    / "api"
+    / "v1"
+    / "states"
+    /% Path.uuid
+    / "security"
+    / "scans"
+    /? option (string "page")
+    /? option (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -126,6 +138,10 @@ module Security_scan = struct
     type t = { state_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "states" /% Path.uuid / "security" / "scan"
+
   module Responses = struct
     module Accepted = struct
       type t = Sgs_api_components.Task.t
@@ -194,6 +210,10 @@ module Security_findings_summary = struct
     type t = { state_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "states" /% Path.uuid / "security" / "findings" / "summary"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Security_findings_summary.t
@@ -259,10 +279,19 @@ module Security_findings = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "page") /? option (string "severity") /? option (int "limit")
+    rel
+    / "api"
+    / "v1"
+    / "states"
+    /% Path.uuid
+    / "security"
+    / "findings"
+    /? option (string "page")
+    /? option (string "severity")
+    /? option (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -337,6 +366,10 @@ module Revision_scopes = struct
     type t = { state_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "states" /% Path.uuid / "revision" / "scopes"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Revision_scopes_response.t
@@ -380,6 +413,10 @@ module Revision_hash = struct
   module Parameters = struct
     type t = { state_id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "states" /% Path.uuid / "revision" / "hash"
 
   module Responses = struct
     module OK = struct
@@ -429,6 +466,10 @@ module Revision_compare = struct
     type t = Sgs_api_components.Revision_compare_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "states" /% Path.uuid / "revision" / "compare"
 
   module Responses = struct
     module OK = struct
@@ -487,6 +528,10 @@ module Revision_add = struct
     type t = Sgs_api_components.Revision_add_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "states" /% Path.uuid / "revision"
 
   module Responses = struct
     module OK = struct end
@@ -547,6 +592,10 @@ module Resources_summary = struct
     type t = { state_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "states" /% Path.uuid / "resources" / "summary"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.Resources_summary.t
@@ -600,10 +649,17 @@ module Modules_list = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (array (string "page")) /? option_default 20 (int "limit")
+    rel
+    / "api"
+    / "v1"
+    / "states"
+    /% Path.uuid
+    / "modules"
+    /? option (array (string "page"))
+    /? option_default 20 (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -658,10 +714,19 @@ module Instance_blast_radius = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 100 (int "max_depth") /? option_default 1000 (int "limit")
+    rel
+    / "api"
+    / "v1"
+    / "states"
+    /% Path.uuid
+    / "instances"
+    /% Path.string
+    / "blast-radius"
+    /? option_default 100 (int "max_depth")
+    /? option_default 1000 (int "limit")
 
   module Responses = struct
     module OK = struct
@@ -731,10 +796,15 @@ module Instances_list = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v1"
+    / "states"
+    /% Path.uuid
+    / "instances"
     /? option (array (string "page"))
     /? option (string "q")
     /? option (string "tz")
@@ -799,6 +869,10 @@ module Export = struct
     type t = { state_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "states" /% Path.uuid / "export"
+
   module Responses = struct
     module OK = struct
       type t = Yojson.Safe.t [@@deriving yojson { strict = false; meta = false }, show, eq]
@@ -841,6 +915,10 @@ module Costs_unsupported = struct
   module Parameters = struct
     type t = { state_id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "states" /% Path.uuid / "costs" / "unsupported"
 
   module Responses = struct
     module OK = struct
@@ -893,6 +971,10 @@ module Costs_calculate = struct
   module Parameters = struct
     type t = { state_id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "states" /% Path.uuid / "costs" / "calculate"
 
   module Responses = struct
     module Accepted = struct
@@ -962,6 +1044,10 @@ module Costs_actuals = struct
     type t = { state_id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "states" /% Path.uuid / "costs" / "actuals"
+
   module Responses = struct
     module OK = struct
       type t = Sgs_api_components.State_cost_actuals.t
@@ -1005,6 +1091,10 @@ module Costs = struct
   module Parameters = struct
     type t = { state_id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "states" /% Path.uuid / "costs"
 
   module Responses = struct
     module OK = struct
@@ -1057,6 +1147,10 @@ module Delete = struct
   module Parameters = struct
     type t = { state_id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "states" /% Path.uuid
 
   module Responses = struct
     module OK = struct end
@@ -1116,7 +1210,7 @@ end
 module Backend_set_workspace = struct
   module Parameters = struct
     type t = {
-      state_id : string;
+      group_id : string;
       workspace : string;
     }
     [@@deriving make, show, eq]
@@ -1125,6 +1219,10 @@ module Backend_set_workspace = struct
   module Request_body = struct
     type t = string [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "states" / "backend" /% Path.uuid /% Path.string
 
   module Responses = struct
     module OK = struct end
@@ -1150,7 +1248,7 @@ module Backend_set_workspace = struct
         (let open Openapi.Request.Var in
          let open Parameters in
          [
-           ("state_id", Var (params.state_id, String)); ("workspace", Var (params.workspace, String));
+           ("group_id", Var (params.group_id, String)); ("workspace", Var (params.workspace, String));
          ])
       ~query_params:[]
       ~url
@@ -1166,6 +1264,10 @@ module Backend_get_workspace = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "states" / "backend" /% Path.uuid /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -1206,12 +1308,16 @@ end
 
 module Backend_set = struct
   module Parameters = struct
-    type t = { state_id : string } [@@deriving make, show, eq]
+    type t = { group_id : string } [@@deriving make, show, eq]
   end
 
   module Request_body = struct
     type t = string [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "states" / "backend" /% Path.uuid
 
   module Responses = struct
     module OK = struct end
@@ -1236,7 +1342,7 @@ module Backend_set = struct
       ~url_params:
         (let open Openapi.Request.Var in
          let open Parameters in
-         [ ("state_id", Var (params.state_id, String)) ])
+         [ ("group_id", Var (params.group_id, String)) ])
       ~query_params:[]
       ~url
       ~responses:Responses.t
@@ -1247,6 +1353,10 @@ module Backend_get = struct
   module Parameters = struct
     type t = { group_id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "states" / "backend" /% Path.uuid
 
   module Responses = struct
     module OK = struct

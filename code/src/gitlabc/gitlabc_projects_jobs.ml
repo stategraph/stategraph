@@ -7,6 +7,10 @@ module GetApiV4ProjectsIdJobsJobIdTrace = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "jobs" /% Path.int / "trace"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -53,6 +57,10 @@ module PostApiV4ProjectsIdJobsJobIdRetry = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "jobs" /% Path.int / "retry"
 
   module Responses = struct
     module Created = struct end
@@ -106,6 +114,10 @@ module PostApiV4ProjectsIdJobsJobIdPlay = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "jobs" /% Path.int / "play"
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -158,6 +170,10 @@ module PostApiV4ProjectsIdJobsJobIdErase = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "jobs" /% Path.int / "erase"
+
   module Responses = struct
     module Created = struct end
     module Unauthorized = struct end
@@ -208,6 +224,10 @@ module PostApiV4ProjectsIdJobsJobIdCancel = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "jobs" /% Path.int / "cancel"
+
   module Responses = struct
     module Created = struct end
     module Unauthorized = struct end
@@ -254,6 +274,10 @@ module PostApiV4ProjectsIdJobsJobIdArtifactsKeep = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "jobs" /% Path.int / "artifacts" / "keep"
 
   module Responses = struct
     module Created = struct end
@@ -304,10 +328,20 @@ module GetApiV4ProjectsIdJobsJobIdArtifacts_artifactPath = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "artifact_path" /? option (string "job_token")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "jobs"
+    /% Path.int
+    / "artifacts"
+    / "*artifact_path"
+    /? string "artifact_path"
+    /? option (string "job_token")
 
   module Responses = struct
     module OK = struct end
@@ -365,6 +399,10 @@ module DeleteApiV4ProjectsIdJobsJobIdArtifacts = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "jobs" /% Path.int / "artifacts"
+
   module Responses = struct
     module No_content = struct end
     module Unauthorized = struct end
@@ -413,10 +451,18 @@ module GetApiV4ProjectsIdJobsJobIdArtifacts = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "job_token")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "jobs"
+    /% Path.int
+    / "artifacts"
+    /? option (string "job_token")
 
   module Responses = struct
     module OK = struct end
@@ -468,6 +514,10 @@ module GetApiV4ProjectsIdJobsJobId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.int / "jobs" /% Path.int
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -518,10 +568,22 @@ module GetApiV4ProjectsIdJobsArtifactsRefNameRaw_artifactPath = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "job" /? string "artifact_path" /? option (string "job_token")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "jobs"
+    / "artifacts"
+    /% Path.string
+    / "raw"
+    / "*artifact_path"
+    /? string "job"
+    /? string "artifact_path"
+    /? option (string "job_token")
 
   module Responses = struct
     module OK = struct end
@@ -582,10 +644,20 @@ module GetApiV4ProjectsIdJobsArtifactsRefNameDownload = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "job" /? option (string "job_token")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "jobs"
+    / "artifacts"
+    /% Path.string
+    / "download"
+    /? string "job"
+    /? option (string "job_token")
 
   module Responses = struct
     module OK = struct end
@@ -694,10 +766,15 @@ module GetApiV4ProjectsIdJobs = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "jobs"
     /? option
          (array
             (ud "scope" (fun value ->

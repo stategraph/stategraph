@@ -3,6 +3,10 @@ module GetApiV4ProjectsIdExportDownload = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "export" / "download"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -53,6 +57,10 @@ module PostApiV4ProjectsIdExport = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdExport.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "export"
 
   module Responses = struct
     module Accepted = struct end
@@ -107,6 +115,10 @@ module GetApiV4ProjectsIdExport = struct
   module Parameters = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "export"
 
   module Responses = struct
     module OK = struct end

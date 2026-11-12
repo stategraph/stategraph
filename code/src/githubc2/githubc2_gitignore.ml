@@ -3,6 +3,10 @@ module Get_template = struct
     type t = { name : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "gitignore" / "templates" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Gitignore_template.t
@@ -41,6 +45,10 @@ end
 
 module Get_all_templates = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "gitignore" / "templates"
 
   module Responses = struct
     module OK = struct

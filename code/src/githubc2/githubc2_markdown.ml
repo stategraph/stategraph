@@ -1,6 +1,10 @@
 module Render_raw = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "markdown" / "raw"
+
   module Responses = struct
     module OK = struct end
     module Not_modified = struct end
@@ -59,6 +63,10 @@ module Render = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "markdown"
 
   module Responses = struct
     module OK = struct end

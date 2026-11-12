@@ -39,6 +39,18 @@ module Restore_package_version_for_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "users"
+    /% Path.string
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+    / "versions"
+    /% Path.int
+    / "restore"
+
   module Responses = struct
     module No_content = struct end
 
@@ -136,6 +148,17 @@ module Delete_package_version_for_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "users"
+    /% Path.string
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+    / "versions"
+    /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -232,6 +255,17 @@ module Get_package_version_for_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "users"
+    /% Path.string
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+    / "versions"
+    /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Package_version.t
@@ -302,6 +336,16 @@ module Get_all_package_versions_for_package_owned_by_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "users"
+    /% Path.string
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+    / "versions"
 
   module Responses = struct
     module OK = struct
@@ -401,10 +445,17 @@ module Restore_package_for_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "token")
+    rel
+    / "users"
+    /% Path.string
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+    / "restore"
+    /? option (string "token")
 
   module Responses = struct
     module No_content = struct end
@@ -503,6 +554,15 @@ module Delete_package_for_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "users"
+    /% Path.string
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -597,6 +657,15 @@ module Get_package_for_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "users"
+    /% Path.string
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Package.t
@@ -690,10 +759,13 @@ module List_packages_for_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "users"
+    /% Path.string
+    / "packages"
     /? ud "package_type" (fun value ->
         CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
     /? option
@@ -764,6 +836,10 @@ module List_docker_migration_conflicting_packages_for_user = struct
   module Parameters = struct
     type t = { username : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "users" /% Path.string / "docker" / "conflicts"
 
   module Responses = struct
     module OK = struct
@@ -850,6 +926,17 @@ module Restore_package_version_for_authenticated_user = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "user"
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+    / "versions"
+    /% Path.int
+    / "restore"
 
   module Responses = struct
     module No_content = struct end
@@ -945,6 +1032,16 @@ module Delete_package_version_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "user"
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+    / "versions"
+    /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -1039,6 +1136,16 @@ module Get_package_version_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "user"
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+    / "versions"
+    /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Package_version.t
@@ -1129,10 +1236,15 @@ module Get_all_package_versions_for_package_owned_by_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "user"
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+    / "versions"
     /? option_default 1 (int "page")
     /? option_default 30 (int "per_page")
     /? option_default
@@ -1242,10 +1354,16 @@ module Restore_package_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "token")
+    rel
+    / "user"
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+    / "restore"
+    /? option (string "token")
 
   module Responses = struct
     module No_content = struct end
@@ -1342,6 +1460,14 @@ module Delete_package_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "user"
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -1434,6 +1560,14 @@ module Get_package_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "user"
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Package.t
@@ -1525,10 +1659,12 @@ module List_packages_for_authenticated_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "user"
+    / "packages"
     /? ud "package_type" (fun value ->
         CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
     /? option
@@ -1580,6 +1716,10 @@ end
 
 module List_docker_migration_conflicting_packages_for_authenticated_user = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "user" / "docker" / "conflicts"
 
   module Responses = struct
     module OK = struct
@@ -1644,6 +1784,18 @@ module Restore_package_version_for_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "orgs"
+    /% Path.string
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+    / "versions"
+    /% Path.int
+    / "restore"
 
   module Responses = struct
     module No_content = struct end
@@ -1742,6 +1894,17 @@ module Delete_package_version_for_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "orgs"
+    /% Path.string
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+    / "versions"
+    /% Path.int
+
   module Responses = struct
     module No_content = struct end
 
@@ -1838,6 +2001,17 @@ module Get_package_version_for_organization = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "orgs"
+    /% Path.string
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+    / "versions"
+    /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Package_version.t
@@ -1930,10 +2104,16 @@ module Get_all_package_versions_for_package_owned_by_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+    / "versions"
     /? option_default 1 (int "page")
     /? option_default 30 (int "per_page")
     /? option_default
@@ -2045,10 +2225,17 @@ module Restore_package_for_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "token")
+    rel
+    / "orgs"
+    /% Path.string
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+    / "restore"
+    /? option (string "token")
 
   module Responses = struct
     module No_content = struct end
@@ -2147,6 +2334,15 @@ module Delete_package_for_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "orgs"
+    /% Path.string
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+
   module Responses = struct
     module No_content = struct end
 
@@ -2241,6 +2437,15 @@ module Get_package_for_organization = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "orgs"
+    /% Path.string
+    / "packages"
+    /% Path.ud (fun value -> CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
+    /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Package.t
@@ -2334,10 +2539,13 @@ module List_packages_for_organization = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "orgs"
+    /% Path.string
+    / "packages"
     /? ud "package_type" (fun value ->
         CCResult.to_opt (Parameters.Package_type.t_of_yojson (`String value)))
     /? option
@@ -2408,6 +2616,10 @@ module List_docker_migration_conflicting_packages_for_organization = struct
   module Parameters = struct
     type t = { org : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "orgs" /% Path.string / "docker" / "conflicts"
 
   module Responses = struct
     module OK = struct

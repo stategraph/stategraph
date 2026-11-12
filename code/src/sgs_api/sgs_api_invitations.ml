@@ -3,10 +3,10 @@ module Preview = struct
     type t = { token : string } [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? string "token"
+    rel / "api" / "v1" / "invitations" / "preview" /? string "token"
 
   module Responses = struct
     module OK = struct
@@ -75,6 +75,10 @@ module Accept = struct
     type t = Sgs_api_components.Invitation_accept_request.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "invitations" / "accept"
 
   module Responses = struct
     module OK = struct

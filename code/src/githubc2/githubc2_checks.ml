@@ -12,10 +12,16 @@ module List_suites_for_ref = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "commits"
+    /% Path.string
+    / "check-suites"
     /? option (int "app_id")
     /? option (string "check_name")
     /? option_default 30 (int "per_page")
@@ -126,10 +132,16 @@ module List_for_ref = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "commits"
+    /% Path.string
+    / "check-runs"
     /? option (string "check_name")
     /? option
          (ud "status" (fun value -> CCResult.to_opt (Parameters.Status.t_of_yojson (`String value))))
@@ -201,6 +213,10 @@ module Rerequest_suite = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "check-suites" /% Path.int / "rerequest"
 
   module Responses = struct
     module Created = struct
@@ -286,10 +302,16 @@ module List_for_suite = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "check-suites"
+    /% Path.int
+    / "check-runs"
     /? option (string "check_name")
     /? option
          (ud "status" (fun value -> CCResult.to_opt (Parameters.Status.t_of_yojson (`String value))))
@@ -360,6 +382,10 @@ module Get_suite = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "check-suites" /% Path.int
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Check_suite.t
@@ -424,6 +450,10 @@ module Set_suites_preferences = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "check-suites" / "preferences"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Check_suite_preference.t
@@ -469,6 +499,10 @@ module Create_suite = struct
 
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "check-suites"
 
   module Responses = struct
     module OK = struct
@@ -520,6 +554,16 @@ module Rerequest_run = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "check-runs"
+    /% Path.ud CCInt64.of_string
+    / "rerequest"
 
   module Responses = struct
     module Created = struct
@@ -591,10 +635,18 @@ module List_annotations = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 30 (int "per_page") /? option_default 1 (int "page")
+    rel
+    / "repos"
+    /% Path.string
+    /% Path.string
+    / "check-runs"
+    /% Path.ud CCInt64.of_string
+    / "annotations"
+    /? option_default 30 (int "per_page")
+    /? option_default 1 (int "page")
 
   module Responses = struct
     module OK = struct
@@ -1014,6 +1066,10 @@ module Update = struct
       | V1 v -> V1.to_yojson v
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "check-runs" /% Path.ud CCInt64.of_string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Check_run.t
@@ -1055,6 +1111,10 @@ module Get = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "check-runs" /% Path.ud CCInt64.of_string
 
   module Responses = struct
     module OK = struct
@@ -1471,6 +1531,10 @@ module Create = struct
       | V0 v -> V0.to_yojson v
       | V1 v -> V1.to_yojson v
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "repos" /% Path.string /% Path.string / "check-runs"
 
   module Responses = struct
     module Created = struct

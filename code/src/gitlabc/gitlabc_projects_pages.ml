@@ -7,6 +7,10 @@ module PutApiV4ProjectsIdPagesDomainsDomainVerify = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "pages" / "domains" /% Path.string / "verify"
+
   module Responses = struct
     module OK = struct end
 
@@ -38,6 +42,10 @@ module DeleteApiV4ProjectsIdPagesDomainsDomain = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "pages" / "domains" /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -76,6 +84,10 @@ module PutApiV4ProjectsIdPagesDomainsDomain = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "pages" / "domains" /% Path.string
+
   module Responses = struct
     module OK = struct end
 
@@ -110,6 +122,10 @@ module GetApiV4ProjectsIdPagesDomainsDomain = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "pages" / "domains" /% Path.string
+
   module Responses = struct
     module OK = struct end
 
@@ -142,6 +158,10 @@ module PostApiV4ProjectsIdPagesDomains = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdPagesDomains.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "pages" / "domains"
 
   module Responses = struct
     module Created = struct end
@@ -178,10 +198,18 @@ module GetApiV4ProjectsIdPagesDomains = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "pages"
+    / "domains"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end
@@ -218,6 +246,10 @@ module PatchApiV4ProjectsIdPages = struct
     type t = Gitlabc_components.PatchApiV4ProjectsIdPages.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "pages"
 
   module Responses = struct
     module OK = struct end
@@ -259,6 +291,10 @@ module DeleteApiV4ProjectsIdPages = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "pages"
+
   module Responses = struct
     module No_content = struct end
     module Unauthorized = struct end
@@ -298,6 +334,10 @@ module GetApiV4ProjectsIdPages = struct
   module Parameters = struct
     type t = { id : string } [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "pages"
 
   module Responses = struct
     module OK = struct end

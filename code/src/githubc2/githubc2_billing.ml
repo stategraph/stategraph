@@ -12,10 +12,16 @@ module Get_github_billing_usage_summary_report_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "users"
+    /% Path.string
+    / "settings"
+    / "billing"
+    / "usage"
+    / "summary"
     /? option (int "year")
     /? option (int "month")
     /? option (int "day")
@@ -121,10 +127,18 @@ module Get_github_billing_usage_report_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (int "year") /? option (int "month") /? option (int "day")
+    rel
+    / "users"
+    /% Path.string
+    / "settings"
+    / "billing"
+    / "usage"
+    /? option (int "year")
+    /? option (int "month")
+    /? option (int "day")
 
   module Responses = struct
     module OK = struct
@@ -216,10 +230,16 @@ module Get_github_billing_premium_request_usage_report_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "users"
+    /% Path.string
+    / "settings"
+    / "billing"
+    / "premium_request"
+    / "usage"
     /? option (int "year")
     /? option (int "month")
     /? option (int "day")
@@ -325,10 +345,16 @@ module Get_github_billing_ai_credit_usage_report_user = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "users"
+    /% Path.string
+    / "settings"
+    / "billing"
+    / "ai_credit"
+    / "usage"
     /? option (int "year")
     /? option (int "month")
     /? option (int "day")
@@ -435,10 +461,16 @@ module Get_github_billing_usage_summary_report_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "organizations"
+    /% Path.string
+    / "settings"
+    / "billing"
+    / "usage"
+    / "summary"
     /? option (int "year")
     /? option (int "month")
     /? option (int "day")
@@ -537,10 +569,18 @@ module Get_github_billing_usage_report_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (int "year") /? option (int "month") /? option (int "day")
+    rel
+    / "organizations"
+    /% Path.string
+    / "settings"
+    / "billing"
+    / "usage"
+    /? option (int "year")
+    /? option (int "month")
+    /? option (int "day")
 
   module Responses = struct
     module OK = struct
@@ -633,10 +673,16 @@ module Get_github_billing_premium_request_usage_report_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "organizations"
+    /% Path.string
+    / "settings"
+    / "billing"
+    / "premium_request"
+    / "usage"
     /? option (int "year")
     /? option (int "month")
     /? option (int "day")
@@ -862,6 +908,10 @@ module Update_budget_org = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "organizations" /% Path.string / "settings" / "billing" / "budgets" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Update_budget.t
@@ -950,6 +1000,10 @@ module Delete_budget_org = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "organizations" /% Path.string / "settings" / "billing" / "budgets" /% Path.string
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Delete_budget.t
@@ -1035,6 +1089,10 @@ module Get_budget_org = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "organizations" /% Path.string / "settings" / "billing" / "budgets" /% Path.string
 
   module Responses = struct
     module OK = struct
@@ -1234,6 +1292,10 @@ module Create_organization_budget = struct
     include Json_schema.Additional_properties.Make (Primary) (Json_schema.Obj)
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "organizations" /% Path.string / "settings" / "billing" / "budgets"
+
   module Responses = struct
     module OK = struct
       type t = Githubc2_components.Create_budget.t
@@ -1355,10 +1417,15 @@ module Get_all_budgets_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "organizations"
+    /% Path.string
+    / "settings"
+    / "billing"
+    / "budgets"
     /? option_default 1 (int "page")
     /? option_default 10 (int "per_page")
     /? option
@@ -1442,10 +1509,16 @@ module Get_github_billing_ai_credit_usage_report_org = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "organizations"
+    /% Path.string
+    / "settings"
+    / "billing"
+    / "ai_credit"
+    / "usage"
     /? option (int "year")
     /? option (int "month")
     /? option (int "day")

@@ -70,10 +70,15 @@ module GetApiV4UsersIdEvents = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "users"
+    /% Path.string
+    / "events"
     /? option_default 1 (int "page")
     /? option_default 20 (int "per_page")
     /? option (string "action")

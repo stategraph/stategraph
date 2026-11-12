@@ -3,6 +3,10 @@ module PostApiV4ApplicationsIdRenewSecret = struct
     type t = { id : int } [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "applications" /% Path.int / "renew-secret"
+
   module Responses = struct
     module OK = struct end
 

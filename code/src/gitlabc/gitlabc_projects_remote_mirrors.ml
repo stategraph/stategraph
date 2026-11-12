@@ -7,6 +7,10 @@ module PostApiV4ProjectsIdRemoteMirrorsMirrorIdSync = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "remote_mirrors" /% Path.string / "sync"
+
   module Responses = struct
     module No_content = struct end
     module Bad_request = struct end
@@ -54,6 +58,10 @@ module GetApiV4ProjectsIdRemoteMirrorsMirrorIdPublicKey = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "remote_mirrors" /% Path.string / "public_key"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -95,6 +103,10 @@ module DeleteApiV4ProjectsIdRemoteMirrorsMirrorId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "remote_mirrors" /% Path.string
 
   module Responses = struct
     module No_content = struct end
@@ -148,6 +160,10 @@ module PutApiV4ProjectsIdRemoteMirrorsMirrorId = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "remote_mirrors" /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Bad_request = struct end
@@ -197,6 +213,10 @@ module GetApiV4ProjectsIdRemoteMirrorsMirrorId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "remote_mirrors" /% Path.string
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -239,6 +259,10 @@ module PostApiV4ProjectsIdRemoteMirrors = struct
     type t = Gitlabc_components.PostApiV4ProjectsIdRemoteMirrors.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "remote_mirrors"
 
   module Responses = struct
     module Created = struct end
@@ -290,10 +314,17 @@ module GetApiV4ProjectsIdRemoteMirrors = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default 1 (int "page") /? option_default 20 (int "per_page")
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "remote_mirrors"
+    /? option_default 1 (int "page")
+    /? option_default 20 (int "per_page")
 
   module Responses = struct
     module OK = struct end

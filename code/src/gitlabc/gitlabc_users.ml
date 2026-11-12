@@ -7,10 +7,10 @@ module DeleteApiV4UsersId = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (bool "hard_delete")
+    rel / "api" / "v4" / "users" /% Path.int /? option (bool "hard_delete")
 
   module Responses = struct
     module OK = struct end
@@ -48,6 +48,10 @@ module PutApiV4UsersId = struct
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "users" /% Path.int
+
   module Responses = struct
     module OK = struct end
 
@@ -82,10 +86,10 @@ module GetApiV4UsersId = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option_default false (bool "with_custom_attributes")
+    rel / "api" / "v4" / "users" /% Path.int /? option_default false (bool "with_custom_attributes")
 
   module Responses = struct
     module OK = struct end
@@ -120,6 +124,10 @@ module PostApiV4Users = struct
     type t = Gitlabc_components.PostApiV4Users.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "users"
 
   module Responses = struct
     module Created = struct end
@@ -221,10 +229,13 @@ module GetApiV4Users = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "users"
     /? option (string "username")
     /? option (string "extern_uid")
     /? option (string "provider")

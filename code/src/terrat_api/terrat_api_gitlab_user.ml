@@ -1,6 +1,10 @@
 module Whoareyou = struct
   module Parameters = struct end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "gitlab" / "whoareyou"
+
   module Responses = struct
     module OK = struct
       type t = Terrat_api_components.Gitlab_whoareyou.t
@@ -26,6 +30,10 @@ end
 
 module Whoami = struct
   module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "gitlab" / "whoami"
 
   module Responses = struct
     module OK = struct

@@ -7,6 +7,10 @@ module GetApiV4ProjectsIdPipelinesPipelineIdVariables = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "pipelines" /% Path.int / "variables"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -53,6 +57,10 @@ module GetApiV4ProjectsIdPipelinesPipelineIdTestReportSummary = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "pipelines" /% Path.int / "test_report_summary"
 
   module Responses = struct
     module OK = struct end
@@ -101,6 +109,10 @@ module GetApiV4ProjectsIdPipelinesPipelineIdTestReport = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "pipelines" /% Path.int / "test_report"
+
   module Responses = struct
     module OK = struct end
     module Unauthorized = struct end
@@ -147,6 +159,10 @@ module PostApiV4ProjectsIdPipelinesPipelineIdRetry = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "pipelines" /% Path.int / "retry"
 
   module Responses = struct
     module Created = struct end
@@ -199,6 +215,10 @@ module PutApiV4ProjectsIdPipelinesPipelineIdMetadata = struct
     type t = Gitlabc_components.PutApiV4ProjectsIdPipelinesPipelineIdMetadata.t
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "pipelines" /% Path.int / "metadata"
 
   module Responses = struct
     module OK = struct end
@@ -307,10 +327,17 @@ module GetApiV4ProjectsIdPipelinesPipelineIdJobs = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "pipelines"
+    /% Path.int
+    / "jobs"
     /? option_default false (bool "include_retried")
     /? option
          (ud "scope" (fun value -> CCResult.to_opt (Parameters.Scope.t_of_yojson (`String value))))
@@ -371,6 +398,10 @@ module PostApiV4ProjectsIdPipelinesPipelineIdCancel = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "pipelines" /% Path.int / "cancel"
 
   module Responses = struct
     module Created = struct end
@@ -473,10 +504,17 @@ module GetApiV4ProjectsIdPipelinesPipelineIdBridges = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "pipelines"
+    /% Path.int
+    / "bridges"
     /? option
          (ud "scope" (fun value -> CCResult.to_opt (Parameters.Scope.t_of_yojson (`String value))))
     /? option_default 1 (int "page")
@@ -536,6 +574,10 @@ module DeleteApiV4ProjectsIdPipelinesPipelineId = struct
     [@@deriving make, show, eq]
   end
 
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "pipelines" /% Path.int
+
   module Responses = struct
     module No_content = struct end
     module Forbidden = struct end
@@ -572,6 +614,10 @@ module GetApiV4ProjectsIdPipelinesPipelineId = struct
     }
     [@@deriving make, show, eq]
   end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v4" / "projects" /% Path.string / "pipelines" /% Path.int
 
   module Responses = struct
     module OK = struct end
@@ -620,10 +666,10 @@ module GetApiV4ProjectsIdPipelinesLatest = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route /? option (string "ref")
+    rel / "api" / "v4" / "projects" /% Path.string / "pipelines" / "latest" /? option (string "ref")
 
   module Responses = struct
     module OK = struct end
@@ -880,10 +926,15 @@ module GetApiV4ProjectsIdPipelines = struct
     [@@deriving make, show, eq]
   end
 
-  let route base_route =
+  let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    base_route
+    rel
+    / "api"
+    / "v4"
+    / "projects"
+    /% Path.string
+    / "pipelines"
     /? option_default 1 (int "page")
     /? option_default 20 (int "per_page")
     /? option
