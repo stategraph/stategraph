@@ -21,8 +21,12 @@ module Make
 struct
   module Provider = struct
     include Shared
-    include Edition
     module Stategraph = Stategraph
+
+    (* Parallel applies need the reader: the reservation of an apply's transactions and the hold
+       of their commit are what keep them safe, and only the reader makes them. *)
+    let stategraph_parallel_applies =
+      Edition.stategraph_parallel_applies && Stategraph.parallel_applies
   end
 
   module Evaluator2 = Terrat_vcs_event_evaluator2.Make (Provider)

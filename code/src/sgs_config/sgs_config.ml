@@ -7,6 +7,7 @@ type oauth2_provider =
       google_admin_email : string option;
       google_service_account_json : (string[@opaque]) option;
     }
+  | Github of { github_orgs : string Sln_list.Non_empty.t }
   | Oidc of {
       oidc_issuer_url : string;
       (* Force Auth0 RP-initiated logout (`<issuer>/v2/logout`) even when
@@ -139,6 +140,15 @@ let of_opt fail = function
 
 let env_str key = of_opt (`Key_error key) (Sys.getenv_opt key)
 
+(* The non-empty values of a comma-separated setting, trimmed. *)
+let comma_separated value =
+  CCList.filter_map
+    (fun v ->
+      match CCString.trim v with
+      | "" -> None
+      | v -> Some v)
+    (CCString.split_on_char ',' value)
+
 (* A STATEGRAPH boolean env var is on iff it is exactly "true" or "1"; unset,
    empty, or any other value is off. *)
 let env_bool key =
@@ -191,6 +201,21 @@ let parse_oauth2_config () =
               ( Google { google_group; google_admin_email; google_service_account_json },
                 config_hash,
                 "google" )
+        | "github" ->
+            env_str "STATEGRAPH_OAUTH_GITHUB_ORG"
+            >>= fun github_org ->
+            of_opt
+              (`Key_error "STATEGRAPH_OAUTH_GITHUB_ORG: set at least one GitHub organization")
+              (Sln_list.Non_empty.of_list (comma_separated github_org))
+            >>= fun github_orgs ->
+            let config_hash =
+              compute_oauth2_config_hash
+                ~provider_type:"github"
+                ~client_id
+                ~email_domain
+                ~provider_specific:(Sln_list.Non_empty.to_list github_orgs)
+            in
+            Ok (Github { github_orgs }, config_hash, "github")
         | "oidc" ->
             (* Keep STATEGRAPH_OAUTH_OIDC_ISSUER_URL EXACTLY as the
              operator provided it — do not strip trailing slashes. OIDC
@@ -228,8 +253,8 @@ let parse_oauth2_config () =
             Error
               (`Key_error
                  (Printf.sprintf
-                    "STATEGRAPH_OAUTH_TYPE: unknown provider type '%s' (expected 'google' or \
-                     'oidc')"
+                    "STATEGRAPH_OAUTH_TYPE: unknown provider type '%s' (expected 'google', \
+                     'github' or 'oidc')"
                     other)))
       >>= fun (provider, config_hash, provider_name) ->
       (* Display name: use env var if non-empty, otherwise derive from provider *)
@@ -239,6 +264,7 @@ let parse_oauth2_config () =
         | Some _ | None -> (
             match provider_name with
             | "google" -> "Google"
+            | "github" -> "GitHub"
             | _ -> "SSO")
       in
       (* Cookie secret for the OAuth2 CSRF cookie. Prefer an operator-supplied value via

@@ -54,10 +54,15 @@ type query_err =
 (** [query ?tz ?page config storage user ast] runs [ast] against the caller's tenants: the page
     cursor is applied, the query compiled against the catalog and executed under the configured
     statement timeout (and [tz], when given), the rows trimmed to the effective limit, and the
-    next/prev cursors decided. *)
+    next/prev cursors decided.
+
+    In the tenants of [unmasked_tenants] (default: none), the [hcl], [tf_module_hcl] and [tfvars]
+    tables return the stored defaults of sensitive variables and the stored values of sensitive
+    tfvars. The caller decides which tenants the user may read unmasked. *)
 val query :
   ?tz:string ->
   ?page:Mql_to_pgsql.Page.t ->
+  ?unmasked_tenants:Uuidm.t list ->
   Sgs_config.t ->
   Sgs_storage.t ->
   Sgs_user.stored Sgs_user.t ->

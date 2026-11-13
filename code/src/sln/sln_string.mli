@@ -2,6 +2,9 @@
     ASCII-whitespace predicate used by {!words} and {!take_words}. *)
 val is_whitespace : char -> bool
 
+(** [not (CCString.is_empty s)]: [is_non_empty "a" = true] and [is_non_empty "" = false]. *)
+val is_non_empty : string -> bool
+
 (** Split [s] on runs of ASCII whitespace ([' '], ['\t'], ['\n'], ['\r']) and return the resulting
     non-empty words in order. Leading, trailing, and consecutive whitespace produce no empty
     elements.

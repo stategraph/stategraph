@@ -11,6 +11,7 @@ module Unlock_id = struct
   let of_pull_request id = raise (Failure "nyi")
   let drift () = raise (Failure "nyi")
   let to_string t = raise (Failure "nyi")
+  let pull_request t = raise (Failure "nyi")
 end
 
 module Db = struct
@@ -85,7 +86,6 @@ module Db = struct
       ~base_ref
       ~branch_ref
       ~stategraph_parallel_apply_dirspaces:_
-      ~stategraph_moments:_
       db
       pull_request
       dirspaces =
@@ -120,13 +120,14 @@ module Db = struct
       db
       pull_request
       dirspaces
-      ~stategraph_parallel_apply_dirspaces:_
-      ~stategraph_moments:_ =
+      ~stategraph_parallel_apply_dirspaces:_ =
     raise (Failure "nyi")
 
   let query_parallel_apply_transactions ~request_id db pull_request dirspaces =
     raise (Failure "nyi")
 
+  let query_pull_request_core_id ~request_id db repo pull_request_id = raise (Failure "nyi")
+  let query_releasable_stategraph_hold ~request_id db work_manifest_id = raise (Failure "nyi")
   let query_missing_drift_scheduled_runs ~request_id db = raise (Failure "nyi")
   let cleanup_repo_configs ~request_id db = raise (Failure "nyi")
   let cleanup_flow_states ~request_id db = raise (Failure "nyi")

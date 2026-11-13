@@ -1,7 +1,6 @@
 let src = Logs.Src.create "oauth2_htp_google"
 
 module Logs = (val Logs.src_log src : Logs.LOG)
-module J = Oauth2_htp_json
 
 type err =
   [ Oauth2_htp_requests.err
@@ -56,20 +55,83 @@ let possible_scopes =
     "https://www.googleapis.com/auth/admin.directory.group";
   ]
 
+(* The parts of Google's answers that a sign-in reads. *)
+
+module Id_token_claims = struct
+  type t = {
+    sub : string;
+    email : string;
+    email_verified : bool;
+    picture : string option; [@default None]
+        (* In the token only when the sign-in asked for the profile. *)
+  }
+  [@@deriving of_yojson { strict = false }]
+end
+
+module Token_response = struct
+  type t = {
+    id_token : string;
+    access_token : string;
+  }
+  [@@deriving of_yojson { strict = false }]
+end
+
+module Service_account = struct
+  type t = {
+    client_email : string;
+    private_key : string;
+  }
+  [@@deriving of_yojson { strict = false }]
+end
+
+module Admin_token = struct
+  type t = { access_token : string } [@@deriving of_yojson { strict = false }]
+end
+
+module Has_member = struct
+  type t = { is_member : bool [@key "isMember"] } [@@deriving of_yojson { strict = false }]
+end
+
+module Member = struct
+  type t = { status : string } [@@deriving of_yojson { strict = false }]
+end
+
+module Groups_page = struct
+  module Directory_group = struct
+    type t = { email : string } [@@deriving of_yojson { strict = false }]
+  end
+
+  (* A page without [groups] has none, and the last page has no [nextPageToken]. *)
+  type t = {
+    groups : Directory_group.t list; [@default []]
+    next_page_token : string option; [@key "nextPageToken"] [@default None]
+  }
+  [@@deriving of_yojson { strict = false }]
+end
+
+let decode what of_yojson json =
+  CCResult.map_err
+    (fun msg -> `Provider_err (Printf.sprintf "%s: unexpected Google answer: %s" what msg))
+    (of_yojson json)
+
 (* The ID token comes straight from Google's token endpoint over TLS, so its claims are read as they
    are: its signature, [alg], [iss], [aud] and [exp] are not checked.
    https://developers.google.com/accounts/docs/OAuth2Login#obtainuserinfo *)
 let claims_from_id_token id_token =
   match Jwt.of_token id_token with
   | None -> Error (`Provider_err "malformed id_token")
-  | Some jwt -> (
-      let claims = Jwt.Payload.to_json (Jwt.payload jwt) in
-      match
-        (J.must_string (J.member "email" claims), J.must_bool (J.member "email_verified" claims))
-      with
-      | "", _ -> Error (`Provider_err "missing email")
-      | email, false -> Error (`Unverified_email email)
-      | email, true -> Ok (J.must_string (J.member "sub" claims), email))
+  | Some jwt ->
+      CCResult.flat_map
+        (function
+          | { Id_token_claims.sub; email; email_verified = true; picture }
+            when Sln_string.is_non_empty sub && Sln_string.is_non_empty email ->
+              Ok (sub, email, CCOption.filter Sln_string.is_non_empty picture)
+          | { Id_token_claims.sub; email; email_verified = false; picture = _ }
+            when Sln_string.is_non_empty sub && Sln_string.is_non_empty email ->
+              Error (`Unverified_email email)
+          | { Id_token_claims.sub = _; email = _; email_verified = _; picture = _ } ->
+              Error (`Provider_err "the Google ID token has an empty sub or email"))
+        (decode "the ID token" Id_token_claims.of_yojson (Jwt.Payload.to_json (Jwt.payload jwt)))
 
 (* {2 Admin SDK access}
 
@@ -115,7 +177,10 @@ let token_for_scope ~endpoints ~client_email ~private_key_pem ~admin_email ~now 
     [
       ("grant_type", [ "urn:ietf:params:oauth:grant-type:jwt-bearer" ]); ("assertion", [ assertion ]);
     ]
-  >>| fun json -> J.must_string (J.member "access_token" json)
+  >>? fun json ->
+  CCResult.map
+    (fun { Admin_token.access_token } -> access_token)
+    (decode "the admin token" Admin_token.of_yojson json)
 
 (* The first of [possible_scopes] the credentials are authorized for. *)
 let admin_token ~endpoints ~now group =
@@ -123,23 +188,24 @@ let admin_token ~endpoints ~now group =
   match Yojson.Safe.from_string service_account_json with
   | exception Yojson.Json_error msg ->
       Abb.Future.return (Error (`Provider_err ("can't read Google service account key: " ^ msg)))
-  | creds ->
-      let open Abb.Future.Infix_monad in
-      let client_email = J.must_string (J.member "client_email" creds) in
-      let private_key_pem = J.must_string (J.member "private_key" creds) in
-      let insufficient =
-        `Provider_err
-          "google credentials do not have enough permissions to access the admin API scope"
-      in
-      Abbs_fc.List.fold_left
-        ~f:(fun acc scope ->
-          match acc with
-          | Ok _ -> Abb.Future.return acc
-          | Error _ ->
-              token_for_scope ~endpoints ~client_email ~private_key_pem ~admin_email ~now scope
-              >>| CCResult.map_err (fun _ -> insufficient))
-        ~init:(Error insufficient)
-        possible_scopes
+  | creds -> (
+      match decode "the service account key" Service_account.of_yojson creds with
+      | Ok { Service_account.client_email; private_key = private_key_pem } ->
+          let open Abb.Future.Infix_monad in
+          let insufficient =
+            `Provider_err
+              "google credentials do not have enough permissions to access the admin API scope"
+          in
+          Abbs_fc.List.fold_left
+            ~f:(fun acc scope ->
+              match acc with
+              | Ok _ -> Abb.Future.return acc
+              | Error _ ->
+                  token_for_scope ~endpoints ~client_email ~private_key_pem ~admin_email ~now scope
+                  >>| CCResult.map_err (fun _ -> insufficient))
+            ~init:(Error insufficient)
+            possible_scopes
+      | Error _ as err -> Abb.Future.return err)
 
 (* Use the [hasMember] API to check for the user's presence in the group or its nested
    subgroups. *)
@@ -156,7 +222,12 @@ let user_in_group ~endpoints ~access_token group email =
   in
   Oauth2_htp_requests.unmarshal ~headers (url "hasMember")
   >>= function
-  | Ok json -> Abb.Future.return (J.must_bool (J.member "isMember" json))
+  | Ok json -> (
+      match decode "hasMember" Has_member.of_yojson json with
+      | Ok { Has_member.is_member } -> Abb.Future.return is_member
+      | Error err ->
+          Logs.err (fun m -> m "checking membership in group %s: %a" group pp_err err);
+          Abb.Future.return false)
   | Error (`Unexpected_status (404, _)) ->
       Logs.err (fun m -> m "error checking membership in group %s: group does not exist" group);
       Abb.Future.return false
@@ -166,8 +237,12 @@ let user_in_group ~endpoints ~access_token group email =
       Oauth2_htp_requests.unmarshal ~headers (url "members")
       >>= function
       (* Only count the user as belonging to the group if they are ACTIVE. *)
-      | Ok json ->
-          Abb.Future.return (CCString.equal "ACTIVE" (J.must_string (J.member "status" json)))
+      | Ok json -> (
+          match decode "members" Member.of_yojson json with
+          | Ok { Member.status } -> Abb.Future.return (CCString.equal "ACTIVE" status)
+          | Error err ->
+              Logs.err (fun m -> m "checking member %s of group %s: %a" email group pp_err err);
+              Abb.Future.return false)
       | Error _ ->
           Logs.err (fun m ->
               m
@@ -196,20 +271,18 @@ let user_groups ~endpoints ~access_token email =
       ~headers
       (endpoints.Endpoints.admin_directory_url ^ "/groups?" ^ Oauth2_htp_values.encode params)
     >>= fun json ->
-    let acc =
-      acc
-      @ CCList.filter_map
-          (fun group ->
-            match J.must_string (J.member "email" group) with
-            | "" -> None
-            | email -> Some email)
-          (match J.member "groups" json with
-          | `List groups -> groups
-          | `Assoc _ | `Bool _ | `Float _ | `Int _ | `Intlit _ | `Null | `String _ -> [])
-    in
-    match J.must_string (J.member "nextPageToken" json) with
-    | "" -> Abb.Future.return (Ok acc)
-    | token -> fetch acc (Some token)
+    match decode "the groups list" Groups_page.of_yojson json with
+    | Ok { Groups_page.groups; next_page_token } -> (
+        let acc = acc @ CCList.map (fun { Groups_page.Directory_group.email } -> email) groups in
+        match next_page_token with
+        | None -> Abb.Future.return (Ok acc)
+        (* An empty token would ask for the first page again, forever. *)
+        | Some "" ->
+            Abb.Future.return
+              (Error
+                 (`Provider_err "the groups list: unexpected Google answer: empty nextPageToken"))
+        | Some token -> fetch acc (Some token))
+    | Error _ as err -> Abb.Future.return err
   in
   fetch [] None
 
@@ -229,8 +302,7 @@ let groups_of ~endpoints ~now group email =
           >>| function
           | Ok groups -> Some groups
           | Error err ->
-              Logs.err (fun m ->
-                  m "Failed to get user groups for %s: %a" email Oauth2_htp_requests.pp_err err);
+              Logs.err (fun m -> m "Failed to get user groups for %s: %a" email pp_err err);
               None))
   | groups -> (
       admin_token ~endpoints ~now group
@@ -263,16 +335,13 @@ let redeem ~now ~redirect_uri ~code t =
       ("grant_type", [ "authorization_code" ]);
     ]
   >>= fun json ->
-  Abb.Future.return (claims_from_id_token (J.must_string (J.member "id_token" json)))
-  >>= fun (user, email) ->
-  let session =
-    {
-      Oauth2_htp_session.user;
-      email;
-      groups = Some [];
-      access_token = J.must_string (J.member "access_token" json);
-    }
-  in
+  Abb.Future.return
+    (CCResult.flat_map
+       (fun { Token_response.id_token; access_token } ->
+         CCResult.map (fun claims -> (claims, access_token)) (claims_from_id_token id_token))
+       (decode "the token response" Token_response.of_yojson json))
+  >>= fun ((user, email, avatar_url), access_token) ->
+  let session = { Oauth2_htp_session.user; email; groups = Some []; avatar_url; access_token } in
   match t.group with
   | None -> Abb.Future.return (Ok session)
   | Some group ->

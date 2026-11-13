@@ -180,6 +180,30 @@ let jwk_test =
       ignore (Oth_abb.Assert.some (Jwk.get_kid "k1" jwk));
       Abb.Future.return ())
 
+(* {2 JSON} *)
+
+let json_test =
+  Oth_abb.test ~name:"json" (fun () ->
+      let module Json = Oauth2_htp_json in
+      let json_equal expected actual =
+        Oth_abb.Assert.true_ (CCOption.equal Yojson.Safe.equal expected actual)
+      in
+      let obj = `Assoc [ ("a", `Int 1); ("n", `Null) ] in
+      json_equal (Some (`Int 1)) (Json.member "a" obj);
+      json_equal (Some `Null) (Json.member "n" obj);
+      Oth_abb.Assert.none (Json.member "b" obj);
+      Oth_abb.Assert.none (Json.member "a" (`List [ obj ]));
+      Oth_abb.Assert.Eq.string
+        ~expected:"x"
+        ~actual:(Oth_abb.Assert.some (Json.string (`String "x")));
+      Oth_abb.Assert.none (Json.string (`Int 1));
+      Oth_abb.Assert.none (Json.string `Null);
+      Oth_abb.Assert.not_true @@ Oth_abb.Assert.some (Json.bool (`Bool false));
+      Oth_abb.Assert.none (Json.bool (`String "true"));
+      Oth_abb.Assert.List.length ~expected:1 (Oth_abb.Assert.some (Json.list (`List [ `Null ])));
+      Oth_abb.Assert.none (Json.list obj);
+      Abb.Future.return ())
+
 (* {2 Email domains} *)
 
 let validator_test =
@@ -391,6 +415,7 @@ let () =
           signed_value_test;
           nonce_test;
           jwk_test;
+          json_test;
           validator_test;
           csrf_test;
           oauth_start_test;

@@ -102,6 +102,7 @@ To query by resource type or provider, use the `resources` table.
 | `completed_at` | timestamp | Completion time |
 | `completed_by` | uuid | Completing user ID |
 | `params` | jsonb | Transaction parameters |
+| `metadata` | jsonb | What the server records about the transaction for the system that drives it: `hold`, the key of its hold while one does, which Orchestration sets to the ID of the pull request whose apply committed it and releases when that pull request merges, is closed or is unlocked |
 
 ### tenants
 

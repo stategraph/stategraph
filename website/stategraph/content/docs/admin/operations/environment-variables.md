@@ -58,18 +58,19 @@ Local email and password sign-in needs no variable. For the sign-in modes, see [
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `STATEGRAPH_OAUTH_TYPE` | unset | `google` or `oidc`. Unset: single sign-on is off |
+| `STATEGRAPH_OAUTH_TYPE` | unset | `google`, `github`, or `oidc`. Unset: single sign-on is off |
 | `STATEGRAPH_OAUTH_CLIENT_ID` | | OAuth client ID. Required with `STATEGRAPH_OAUTH_TYPE` |
 | `STATEGRAPH_OAUTH_CLIENT_SECRET` | | OAuth client secret. Required with `STATEGRAPH_OAUTH_TYPE` |
 | `STATEGRAPH_OAUTH_REDIRECT_BASE` | `http://localhost:<port>` | Base URL of the `/oauth2/{provider}/callback` callbacks. Set it to the public URL, as in `STATEGRAPH_UI_BASE` |
 | `STATEGRAPH_OAUTH_EMAIL_DOMAIN` | `*` | Email domains that can sign in, comma-separated. With `*`, any identity that the provider authenticates signs in, and the first to sign in while no instance admin exists becomes one. Restrict it to your domain on any public deployment |
-| `STATEGRAPH_OAUTH_DISPLAY_NAME` | `Google` or `SSO` | Provider name on the sign-in button |
+| `STATEGRAPH_OAUTH_DISPLAY_NAME` | `Google`, `GitHub`, or `SSO` | Provider name on the sign-in button |
 | `STATEGRAPH_OAUTH_COOKIE_SECRET` | random per process | Signs the sign-in CSRF cookie: 16, 24, or 32 characters. Set it on each replica of a multi-replica deployment, or a sign-in that starts on one replica fails on another |
 | `STATEGRAPH_OAUTH_OIDC_ISSUER_URL` | | OIDC issuer URL, required with `STATEGRAPH_OAUTH_TYPE=oidc`. The provider must support discovery at `{issuer}/.well-known/openid-configuration` |
 | `STATEGRAPH_OAUTH_OIDC_USE_AUTH0_LOGOUT` | `false` | Use the Auth0 logout endpoint for OIDC sign-out |
 | `STATEGRAPH_OAUTH_GOOGLE_GROUP` | unset | Google Groups whose members can sign in, comma-separated. Needs the two variables below |
 | `STATEGRAPH_OAUTH_GOOGLE_ADMIN_EMAIL` | unset | Google Workspace super admin email, for Google Groups API access. With the service account key and no group, every user signs in and group rules get all of the user's groups |
 | `STATEGRAPH_OAUTH_GOOGLE_SERVICE_ACCOUNT_JSON` | unset | Google Admin API service account key, as inline JSON or a file path |
+| `STATEGRAPH_OAUTH_GITHUB_ORG` | | GitHub organizations whose members can sign in, comma-separated. Required with `STATEGRAPH_OAUTH_TYPE=github`. The GitHub hosts are `GITHUB_WEB_BASE_URL` and `GITHUB_API_BASE_URL` |
 
 A missing or invalid sign-in variable stops the server at start, with the reason in the server log. If the sign-in provider cannot be set up, the server logs the reason, tries again every second, and accepts no requests until the setup succeeds.
 

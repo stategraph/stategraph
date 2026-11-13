@@ -1,22 +1,14 @@
 -- The dirspaces of our pull request that another pull request blocks, with that pull request.
 --
 -- A lock blocks, as it always has, unless the dirspace applies in parallel: it is one of
--- $parallel_dirs/$parallel_workspaces (the edition allows it and its workflow runs the Stategraph
--- engine, under the configuration of this evaluation) and the owner is not merged.  Such a lock
--- gives way to the rule below.
---
--- Stategraph refuses a commit that overlaps a transaction committed since its plan, where "since" is
--- the moment the plan's transaction opened (select_tx_conflicts.sql).  It cannot see the other
--- danger: a plan whose transaction opened AFTER another pull request's apply committed finds that
--- apply in the state and, our branch lacking its code, reverts it.  So on a parallel dirspace, a
--- running or successful eligible apply of another unmerged pull request, since its latest unlock,
--- blocks us unless our latest completed plan of the dirspace (the plan the apply uses, see
--- select_recent_plan.sql) opened its transaction before that apply committed: Stategraph then
--- settles any overlap.  A failed apply blocks no one.
---
--- The moments come from Stategraph, read by the orchestration where it reaches it ($planned_at,
--- $committed_at).  Without them the runs stand in: a plan completes at or after its transaction
--- opened, and an apply is dispatched before it commits, so the answer stays safe.
+-- $parallel_dirs/$parallel_workspaces (the edition allows it, its workflow runs the Stategraph
+-- engine, under the configuration of this evaluation, and the orchestration reaches Stategraph)
+-- and the owner is not merged.  Stategraph then settles the dirspace between the pull requests, by
+-- resource: it refuses a commit that overlaps a transaction committed since the plan opened, and
+-- one that overlaps a held commit, the commit of an apply whose pull request is not merged
+-- (#3179), whenever the plan opened.  The orchestration asks it before it starts an apply
+-- (select_parallel_apply_transactions.sql).  A merged owner still locks: a plan made before the
+-- merge lags the base branch.
 with
 our_pr as (
     select repository, pull_number, base_branch
@@ -29,20 +21,9 @@ dirspaces as (
 parallel_dirspaces as (
     select dir, workspace from unnest($parallel_dirs, $parallel_workspaces) as v(dir, workspace)
 ),
--- The moments the orchestration read from Stategraph, where it reaches it: when the transaction
--- of our latest plan of a dirspace opened, and when the transaction an apply commits completed,
--- by the apply's work manifest.  The runs bound a moment that is absent: a plan completes at or
--- after its transaction opened, and an apply is dispatched before it commits.
-planned as (
-    select dir, workspace, at
-    from unnest($planned_dirs, $planned_workspaces, $planned_at) as v(dir, workspace, at)
-),
-committed as (
-    select work_manifest, at
-    from unnest($committed_work_manifests, $committed_at) as v(work_manifest, at)
-),
+-- Distinct: a dirspace given twice is answered once.
 locks as (
-    select
+    select distinct
         dsprl.path as path,
         dsprl.workspace as workspace,
         dsprl.pull_number as pull_number
@@ -60,70 +41,10 @@ locks as (
                    and exists (select 1
                                from parallel_dirspaces as pds
                                where pds.dir = dsprl.path and pds.workspace = dsprl.workspace))
-),
-our_plans as (
-    select distinct on (pds.dir, pds.workspace)
-        pds.dir as dir,
-        pds.workspace as workspace,
-        coalesce(planned.at, gwm.completed_at) as planned_at
-    from parallel_dirspaces as pds
-    inner join work_manifest_results as wmr
-        on wmr.path = pds.dir and wmr.workspace = pds.workspace
-    inner join github_work_manifests as gwm
-        on gwm.id = wmr.work_manifest
-    inner join our_pr
-        on our_pr.repository = gwm.repository and our_pr.pull_number = gwm.pull_number
-    left join planned
-        on planned.dir = pds.dir and planned.workspace = pds.workspace
-    where gwm.run_type in ('autoplan', 'plan') and gwm.completed_at is not null
-    order by pds.dir, pds.workspace, gwm.created_at desc
-),
-applies as (
-    select
-        pds.dir as path,
-        pds.workspace as workspace,
-        gwm.pull_number as pull_number
-    from parallel_dirspaces as pds
-    inner join work_manifest_dirspaceflows as wmds
-        on wmds.path = pds.dir and wmds.workspace = pds.workspace
-    inner join github_work_manifests as gwm
-        on gwm.id = wmds.work_manifest
-    inner join work_manifests as core
-        on core.id = gwm.id
-    inner join our_pr
-        on our_pr.repository = gwm.repository
-    inner join github_pull_requests as gpr
-        on gpr.repository = gwm.repository and gpr.pull_number = gwm.pull_number
-    left join github_change_dirspaces as gcds
-        on gcds.repository = gwm.repository
-           and gcds.base_sha = gwm.base_sha
-           and gcds.sha = gwm.sha
-           and gcds.path = pds.dir
-           and gcds.workspace = pds.workspace
-    left join github_pull_request_latest_unlocks as unlocks
-        on unlocks.repository = gwm.repository and unlocks.pull_number = gwm.pull_number
-    left join work_manifest_results as wmr
-        on wmr.work_manifest = gwm.id and wmr.path = pds.dir and wmr.workspace = pds.workspace
-    left join our_plans
-        on our_plans.dir = pds.dir and our_plans.workspace = pds.workspace
-    left join committed
-        on committed.work_manifest = gwm.id
-    where gwm.pull_number <> our_pr.pull_number
-          and gwm.run_type in ('autoapply', 'apply', 'unsafe-apply')
-          and gpr.merged_at is null
-          and (coalesce(gcds.branch_target, 'all') = 'all'
-               or our_pr.base_branch = gpr.base_branch)
-          and (unlocks.unlocked_at is null or unlocks.unlocked_at < gwm.created_at)
-          and (gwm.state = 'running' or (gwm.state = 'completed' and wmr.success))
--- Without the commit moment, the dispatch time of the apply bounds from below
--- when it could have committed.  A work manifest dispatched before the column
--- existed falls back to its creation, which is earlier still.
-          and (our_plans.planned_at is null
-               or our_plans.planned_at >= coalesce(committed.at, core.dispatched_at, gwm.created_at))
 )
 select
-    blockers.path as path,
-    blockers.workspace as workspace,
+    locks.path as path,
+    locks.workspace as workspace,
     gpr.base_branch as base_branch,
     gpr.branch as branch_name,
     gpr.base_sha as bash_hash,
@@ -134,8 +55,8 @@ select
     gpr.state as state,
     gpr.title as title,
     gpr.username as username
-from (select * from locks union select * from applies) as blockers
+from locks
 inner join our_pr
     on true
 inner join github_pull_requests as gpr
-    on gpr.repository = our_pr.repository and gpr.pull_number = blockers.pull_number
+    on gpr.repository = our_pr.repository and gpr.pull_number = locks.pull_number

@@ -1,15 +1,19 @@
-(** Accessors over {!Yojson.Safe} that never fail to navigate: a missing key yields [`Null]. *)
+(** Accessors that read a value of one shape, and are [None] for any other:
 
-val member : string -> Yojson.Safe.t -> Yojson.Safe.t
-val is_null : Yojson.Safe.t -> bool
+    {[
+    member "a" (`Assoc [ ("a", `Int 1) ]) = Some (`Int 1)
+    member "a" (`Assoc []) = None
+    member "a" (`List []) = None
+    string (`String "x") = Some "x"
+    string (`Int 1) = None
+    ]} *)
 
-(** The string, [""] for anything that is not a JSON string. *)
-val must_string : Yojson.Safe.t -> string
+(** The value of the key, when the JSON is an object that has the key. *)
+val member : string -> Yojson.Safe.t -> Yojson.Safe.t option
 
-(** A JSON string as a one element list, the strings of a JSON array, [[]] for anything else. *)
-val string_list : Yojson.Safe.t -> string list
+val string : Yojson.Safe.t -> string option
+val bool : Yojson.Safe.t -> bool option
+val list : Yojson.Safe.t -> Yojson.Safe.t list option
 
-val must_bool : Yojson.Safe.t -> bool
-
-(** A JSON number, [0.] for anything else. *)
-val must_number : Yojson.Safe.t -> float
+(** An integer or a float, as a float. *)
+val number : Yojson.Safe.t -> float option

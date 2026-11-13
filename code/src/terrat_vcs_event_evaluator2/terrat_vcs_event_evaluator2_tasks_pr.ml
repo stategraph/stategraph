@@ -173,19 +173,11 @@ struct
           (S.Api.Pull_request.Id.to_string @@ S.Api.Pull_request.id pull_request)
           time)
       (fun () ->
-        let open Abbs_fc.Infix_result_monad in
-        Tasks_base.stategraph_moments
-          ~request_id:(Builder.log_id s)
-          db
-          pull_request
-          stategraph_parallel_apply_dirspaces
-        >>= fun stategraph_moments ->
         S.Db.query_dirspaces_without_valid_plans
           ~request_id:(Builder.log_id s)
           ~base_ref
           ~branch_ref
           ~stategraph_parallel_apply_dirspaces
-          ~stategraph_moments
           db
           pull_request
           dirspaces)
@@ -208,7 +200,9 @@ struct
       (fun m log_id time ->
         m "%s : UNLOCk : repo = %s : time=%f" log_id (S.Api.Repo.to_string repo) time)
       (fun () ->
-        Abbs_fc.List_result.iter ~f:(S.Db.unlock ~request_id:(Builder.log_id s) db repo) unlock_ids)
+        Abbs_fc.List_result.iter
+          ~f:(Tasks_base.unlock ~request_id:(Builder.log_id s) db repo)
+          unlock_ids)
 
   let react_to_comment s client pull_request comment_id =
     time_it
@@ -352,20 +346,12 @@ struct
           (S.Api.Pull_request.Id.to_string @@ S.Api.Pull_request.id pull_request)
           time)
       (fun () ->
-        let open Abbs_fc.Infix_result_monad in
-        Tasks_base.stategraph_moments
-          ~request_id:(Builder.log_id s)
-          db
-          pull_request
-          stategraph_parallel_apply_dirspaces
-        >>= fun stategraph_moments ->
         S.Db.query_dirspaces_owned_by_other_pull_requests
           ~request_id:(Builder.log_id s)
           db
           pull_request
           dirspaces
-          ~stategraph_parallel_apply_dirspaces
-          ~stategraph_moments)
+          ~stategraph_parallel_apply_dirspaces)
 
   (* The applies of other pull requests among the rows of a dirspace, each by its transaction.  A
      row without an apply is left out. *)
@@ -2369,7 +2355,27 @@ struct
                 None
             | E.Open | E.Sync | E.Ready_for_review ->
                 Abbs_fc.return_ok (Some Tjc.Job.Type_.Autoplan)
-            | E.Close -> Abbs_fc.return_ok (Some Tjc.Job.Type_.Autoapply)
+            | E.Close ->
+                fetch Keys.pull_request
+                >>= fun pull_request ->
+                (match S.Api.Pull_request.state pull_request with
+                  | Terrat_pull_request.State.Merged _ | Terrat_pull_request.State.Closed ->
+                      (* The holds of the pull request's applies can go (#3179): merged, the base branch
+                         carries the change now, so a plan from the merged state is safe; closed without
+                         merging, nobody is to bring the change in, and a hold would block every other
+                         pull request until an unlock. The apply this event may start lets its own go
+                         when it ends (release_stategraph_reservation). *)
+                      fetch Keys.repo
+                      >>= fun repo ->
+                      Builder.run_db s ~f:(fun db ->
+                          Abbs_fc.to_result
+                            (Tasks_base.release_stategraph_holds
+                               ~request_id:(Builder.log_id s)
+                               db
+                               repo
+                               (S.Api.Pull_request.id pull_request)))
+                  | Terrat_pull_request.State.Open -> Abbs_fc.return_ok ())
+                >>| fun () -> Some Tjc.Job.Type_.Autoapply
             | E.Comment { comment_id = _; comment } -> (
                 match comment with
                 | Terrat_comment.Apply { tag_query } ->

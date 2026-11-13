@@ -91,18 +91,6 @@ module Make
     int option Terrat_change.Dirspaceflow.t list ->
     Terrat_change.Dirspace.t list
 
-  (** The moments, read from Stategraph, of the transactions of the pull request's latest plans of
-      [dirspaces], which apply in parallel, and of the applies of other pull requests on them: what
-      the lock and the plan validity are given to order a plan against an apply. Empty where there
-      is nothing to read, and when the reader fails, which is logged: the rules then bound the
-      moments by the runs. *)
-  val stategraph_moments :
-    request_id:string ->
-    S.Db.t ->
-    'diff S.Api.Pull_request.t ->
-    Terrat_change.Dirspace.t list ->
-    (Terrat_vcs_provider2.Stategraph_moments.t, [> `Error ]) result Abb.Future.t
-
   (** Reserve, for the apply work manifest, the Stategraph transactions of the pull request's plans
       of [dirspaces], through [S.Stategraph]: from now until the apply commits them or the work
       manifest ends, Stategraph refuses an overlapping commit of another transaction. A failure is
@@ -115,9 +103,27 @@ module Make
     Terrat_change.Dirspace.t list ->
     unit Abb.Future.t
 
-  (** Give back the transactions the work manifest reserved and did not commit. The counterpart of
-      [reserve_stategraph_plans], with the same silence. *)
-  val release_stategraph_reservation : request_id:string -> Uuidm.t -> unit Abb.Future.t
+  (** The work manifest is over: give back the transactions it reserved and did not commit, the
+      counterpart of [reserve_stategraph_plans], and let go of the hold of the commit it made when
+      its pull request is merged, closed or unlocked already (the apply a merge starts, or the apply
+      a merge or a close raced, commits held with no merge to come). The same silence. *)
+  val release_stategraph_reservation : request_id:string -> S.Db.t -> Uuidm.t -> unit Abb.Future.t
+
+  (** Let go of the holds of the pull request's applies, through [S.Stategraph]: the pull request
+      merged, was closed or was unlocked, so a plan made after its applies no longer reverts them,
+      or no longer counts. A failure is logged and not an error: a hold this misses waits for
+      [terrateam unlock]. *)
+  val release_stategraph_holds :
+    request_id:string -> S.Db.t -> S.Api.Repo.t -> S.Api.Pull_request.Id.t -> unit Abb.Future.t
+
+  (** Unlock one id: the dirspace locks it names ([S.Db.unlock]) and, for a pull request, the holds
+      of its applies ({!release_stategraph_holds}), as the runs before an unlock no longer count. *)
+  val unlock :
+    request_id:string ->
+    S.Db.t ->
+    S.Api.Repo.t ->
+    S.Unlock_id.t ->
+    (unit, [> `Error ]) result Abb.Future.t
 
   (** The hash of a repository config, the part of the key of a built config that follows the config
       the build used. *)

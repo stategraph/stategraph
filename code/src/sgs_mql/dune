@@ -14,13 +14,17 @@
   mql_to_pgsql
   pgsql_io
   pgsql_pool
+  sg_caps
+  sg_caps_ops
   sgs_api
   sgs_config
   sgs_eplib
   sgs_storage
+  sgs_tenant
   sgs_terrateam_catalog
   sgs_user
   uri
+  uuidm
   yojson)
  (preprocessor_deps
   (glob_files_rec sql/*))

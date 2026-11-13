@@ -50,9 +50,10 @@ val login_url : t -> string
 val check_admin : now:float -> t -> (unit, [> err ]) result Abb.Future.t
 
 (** Exchange the authorization [code] for the user's identity, read from the ID token in Google's
-    token response. The email must be verified. With groups configured, the session's groups are
-    those of them the user is a member of. With a group lookup but no groups configured, they are
-    every group the user is in, or [None] when the lookup fails. *)
+    token response. The email must be verified. The session's [avatar_url] is the token's [picture]
+    claim, which Google sets with the [profile] scope. With groups configured, the session's groups
+    are those of them the user is a member of. With a group lookup but no groups configured, they
+    are every group the user is in, or [None] when the lookup fails. *)
 val redeem :
   now:float ->
   redirect_uri:string ->

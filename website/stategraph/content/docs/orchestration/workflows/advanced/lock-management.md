@@ -72,21 +72,20 @@ Any value other than `strict` is less safe. Use it only where a stale infrastruc
 
 Orchestration locks are per pull request and per dirspace. Infrastructure as a Database also locks single resources in a state, so two transactions that change different resources in the same state do not conflict. See [Resource-level locking](/docs/infrastructure-as-a-database/resource-locking).
 
-In the Enterprise edition, a dirspace that runs `engine: stategraph`, set for the whole repository or in its workflow, is not locked for other pull requests, whatever its `lock_policy`. Pull requests apply it in parallel, and Stategraph rejects an apply that changes a resource another apply committed since its plan. You must plan it again. Plans do not wait for another pull request's apply on such a dirspace either, nor applies for another pull request's plans.
+In the Enterprise edition, a dirspace that runs `engine: stategraph`, set for the whole repository or in its workflow, is not locked for other pull requests, whatever its `lock_policy`. Pull requests plan and apply it in parallel, and the rules below apply per resource rather than per directory.
 
-When Orchestration runs inside the Stategraph server, it asks Stategraph before it starts an apply. An apply whose plan changes a resource that another pull request is applying, or has applied since the plan was made, is refused with **Overlapping applies**, which names that pull request and the resources, instead of being started and rejected at commit. Wait for that pull request to merge, bring the base branch into yours and plan again. If its apply fails, your plan stands: apply again.
+- A plan never waits for another pull request.
+- An apply is refused, before it starts, when its plan changes a resource that another open pull request is applying or has applied. The refusal is the comment **Overlapping applies**, which names that pull request and the conflicting resources. This holds whether your plan was made before or after the other apply: a plan made after it, from a branch that does not contain the other pull request's change, would undo that change. Your own pull request's earlier applies never refuse your later plans: fix, plan and apply again.
+- The refusal lifts when the other pull request merges, when it is closed without merging, or when it is unlocked with `stategraph unlock`. Bring the base branch into yours, plan again and apply. When none of these can happen, for instance for a repository Orchestration no longer sees, an operator lists the held applies with `stategraph tx holds list` and releases one with `stategraph tx holds release` (see [Transactions](/docs/cli/transactions)).
+- If the other pull request's apply fails, your plan stands: apply again. A failed apply blocks no one.
+- An apply made outside Orchestration with the `stategraph` CLI (e.g., on a developer's laptop) follows the same rule: against the same state, it is rejected with a transaction conflict instead of a comment.
 
-An apply that passes the check reserves its transactions: from then until the commit, Stategraph rejects any other transaction that overlaps them, including one applied outside Orchestration with the `stategraph` CLI, so what the check allowed stays allowed. The reservation ends with the apply, or after an hour if the run never reports back. A reserved transaction shows the state `commit-reserved` in `stategraph tx list`.
-
-One rule still applies. Stategraph settles an overlap only between a transaction and the transactions committed after it opened. A plan whose transaction opened after another pull request's apply committed would undo that pull request's change, because your branch does not contain it, so Orchestration refuses such an apply until the other pull request merges:
+For example:
 
 1. Jane's and John's pull requests both plan `(dir1, default)`.
-2. Jane's pull request applies. John's pull request can still apply, during or after Jane's apply: his plan's transaction opened before hers committed, so Stategraph checks the two for an overlap. If they change the same resource, his apply is refused before it starts or rejected at commit, and he plans again.
-3. If John plans after Jane's apply committed, his apply is refused until Jane's pull request merges.
-
-Orchestration reads the transaction of a plan from the plan itself, as the Stategraph engine stores it, and an apply commits the transaction of the plan it applies. For the moments a plan opened and an apply committed, Orchestration compares the times of the runs themselves. That is safe, but it refuses more often than the transactions' own moments would: a plan that overlapped another pull request's apply in time counts as made after it.
-
-A failed apply does not block other pull requests.
+2. Jane's pull request applies. John's pull request can still apply, during or after Jane's apply, if his plan changes none of the resources hers did. If they change the same resource, his apply is refused before it starts, and he plans again.
+3. If John plans after Jane's apply, from a branch without her change, his plan undoes her resources, and his apply is refused until Jane's pull request merges. He then brings the base branch into his and plans again.
+4. A pull request stacked on Jane's branch carries her change, so its plan does not undo her resources, and it applies while hers is still open as long as it changes other resources.
 
 ## Best practices
 

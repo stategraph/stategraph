@@ -75,6 +75,29 @@ let test =
           | Error (`Key_error "DB_PORT") -> ()
           | Ok _ -> Oth.Assert.false_ "config loaded with an invalid DB_PORT"
           | Error err -> Oth.Assert.false_ (Sgs_config.show_err err));
+      Oth.test ~name:"GitHub sign-in reads its comma-separated organizations" (fun _ ->
+          set_env ();
+          Unix.putenv "STATEGRAPH_OAUTH_TYPE" "github";
+          Unix.putenv "STATEGRAPH_OAUTH_GITHUB_ORG" " acme, ,acme-labs ";
+          let config = Oth.Assert.ok_pp ~pp:Sgs_config.pp_err (Sgs_config.create ()) in
+          match CCOption.map (fun c -> c.Sgs_config.oauth2_provider) (Sgs_config.oauth2 config) with
+          | Some (Sgs_config.Github { github_orgs }) ->
+              Oth.Assert.Eq.string_list
+                ~expected:[ "acme"; "acme-labs" ]
+                ~actual:(Sln_list.Non_empty.to_list github_orgs)
+          | Some (Sgs_config.Google _ | Sgs_config.Oidc _) | None ->
+              Oth.Assert.false_ "not a GitHub sign-in");
+      Oth.test ~name:"GitHub sign-in without an organization is a config error" (fun _ ->
+          CCList.iter
+            (fun orgs ->
+              set_env ();
+              Unix.putenv "STATEGRAPH_OAUTH_TYPE" "github";
+              Unix.putenv "STATEGRAPH_OAUTH_GITHUB_ORG" orgs;
+              match Sgs_config.create () with
+              | Error (`Key_error key) ->
+                  Oth.Assert.str_contains ~haystack:key ~needle:"STATEGRAPH_OAUTH_GITHUB_ORG"
+              | Ok _ -> Oth.Assert.false_ (Printf.sprintf "config loaded with orgs %S" orgs))
+            [ ""; " , " ]);
       Oth.test ~name:"startup config print masks the Google service account key" (fun _ ->
           set_env ();
           let config = Oth.Assert.ok_pp ~pp:Sgs_config.pp_err (Sgs_config.create ()) in

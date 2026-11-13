@@ -1626,12 +1626,13 @@ struct
                       ~request_id:(Builder.log_id s)
                       db
                       work_manifest.Wm.id
-                      Wm.State.Completed)
-                >>= fun () ->
-                Abbs_fc.to_result
-                  (Tasks_base.release_stategraph_reservation
-                     ~request_id:(Builder.log_id s)
-                     work_manifest.Wm.id)
+                      Wm.State.Completed
+                    >>= fun () ->
+                    Abbs_fc.to_result
+                      (Tasks_base.release_stategraph_reservation
+                         ~request_id:(Builder.log_id s)
+                         db
+                         work_manifest.Wm.id))
                 >>= fun () ->
                 fetch Keys.publish_comment
                 >>= fun publish_comment ->

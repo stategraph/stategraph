@@ -4,10 +4,20 @@ module Logs = (val Logs.src_log src : Logs.LOG)
 module Br = Sgs_api_components.Bad_request_err
 
 (* Parse the query string, then run it through the MQL core. *)
-let run_query config storage user q tz page =
+let run_query ~unmasked_tenants config storage user q tz page =
   let open Abbs_fc.Infix_result_monad in
   Abb.Future.return (Mql.Ast.of_string q)
-  >>= fun ast -> Sgs_mql_paged.query ?tz ?page config storage user ast
+  >>= fun ast -> Sgs_mql_paged.query ?tz ?page ~unmasked_tenants config storage user ast
+
+(* The tenants that the preview capability of [caps] reaches.  A session that can preview in a
+   tenant gives the values of its sensitive variables to each plan. *)
+let unmasked_tenants caps tenants =
+  let reach = Sg_caps_ops.reach caps `Preview `Modified in
+  CCList.filter_map
+    (fun tenant ->
+      let id = Sgs_tenant.id tenant in
+      if Sg_caps_ops.reaches_tenant reach ~tenant:(Uuidm.to_string id) then Some id else None)
+    tenants
 
 (* Respond with [rows] as a JSON array, optionally attaching [headers]. *)
 let respond_rows ?headers ctx rows =
@@ -121,11 +131,43 @@ let respond ctx = function
               m "%s : MQL_INTERNAL_ERR : %a" (Brtl_ctx.token ctx) Sgs_mql_paged.pp_query_err err);
           respond_internal_error ctx)
 
-let run config storage q tz page =
-  Sgs_user_session.with_user ~caps:Sgs_user_session.Caps.allow_all ~f:(fun user ->
+let respond_unmasked_denied ctx =
+  Logs.info (fun m -> m "%s : MQL_UNMASKED_DENIED" (Brtl_ctx.token ctx));
+  Abb.Future.return
+    (Brtl_ctx.set_response
+       (Brtl_rspnc.create
+          ~status:`Forbidden
+          (Sgs_eplib.error_response_body
+             ~id:"MQL_UNMASKED_DENIED"
+             ~data:"Unmasked results need the preview capability in a tenant of the user"))
+       ctx)
+
+let run config storage q tz page unmasked =
+  Sgs_user_session.with_session ~caps:Sgs_user_session.Caps.allow_all ~f:(fun session ->
       Brtl_ep.run_json ~f:(fun ctx ->
           let open Abb.Future.Infix_monad in
-          run_query config storage user q tz page >>= respond ctx))
+          let user = Sgs_user_session.Session.user session in
+          match unmasked with
+          | None | Some false ->
+              run_query ~unmasked_tenants:[] config storage user q tz page >>= respond ctx
+          | Some true -> (
+              Pgsql_pool.with_conn storage ~f:(Sgs_tenant.list_by_user user)
+              >>= function
+              | Ok tenants -> (
+                  match
+                    unmasked_tenants (Sgs_user_session.Session.capabilities session) tenants
+                  with
+                  | [] -> respond_unmasked_denied ctx
+                  | unmasked_tenants ->
+                      run_query ~unmasked_tenants config storage user q tz page >>= respond ctx)
+              | Error (#Pgsql_io.err as err) ->
+                  Logs.err (fun m ->
+                      m "%s : MQL_TENANTS_ERR : %a" (Brtl_ctx.token ctx) Pgsql_io.pp_err err);
+                  respond_internal_error ctx
+              | Error (#Pgsql_pool.err as err) ->
+                  Logs.err (fun m ->
+                      m "%s : MQL_TENANTS_ERR : %a" (Brtl_ctx.token ctx) Pgsql_pool.pp_err err);
+                  respond_internal_error ctx)))
 
 module Schema = struct
   (* The schema-endpoint body, built from the compiler's schema plus the
@@ -167,6 +209,7 @@ end
 module Tests = struct
   let response_json = Schema.response_json
   let response_json_orchestration = Schema.response_json_orchestration
+  let unmasked_tenants = unmasked_tenants
 
   let status_of_err err =
     match err_response err with

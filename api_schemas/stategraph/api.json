@@ -7198,6 +7198,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Return the stored defaults of sensitive variables and the stored values of sensitive tfvars in the hcl, tf_module_hcl and tfvars tables, without masking, for the rows of each tenant that the preview capability of the session reaches. The rows of other tenants stay masked. Every other table stays masked.",
+            "in": "query",
+            "name": "unmasked",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -7220,6 +7229,16 @@
             }
           },
           "401": {},
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-response"
+                }
+              }
+            },
+            "description": "The session cannot preview in any tenant of the user, and the request asks for unmasked results."
+          },
           "414": {}
         }
       }
@@ -11814,6 +11833,38 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/preview-response"
+                }
+              }
+            }
+          },
+          "401": {},
+          "404": {
+            "description": "The transaction does not exist, or the caller is not a member of its tenant. The two are deliberately indistinguishable."
+          }
+        }
+      }
+    },
+    "/api/v1/tx/{tx_id}/release-hold": {
+      "post": {
+        "description": "Let go of the hold of a committed transaction, the key its reservation gave it (metadata.hold), so that it stands against no overlapping transaction from then on. For the operator: the orchestration releases the holds of a pull request itself when it merges, is closed or is unlocked, and this is the way out when it cannot, for a repository it no longer sees or a release that failed. Idempotent: a transaction with no hold, or not committed, is answered as it is.",
+        "operationId": "tx/release-hold",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tx_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/tx"
                 }
               }
             }

@@ -6,30 +6,17 @@
     Stategraph database is at hand, gives it Stategraph in its process; the orchestration on its own
     gives it {!Standalone}. *)
 
-(** When a transaction opened and, once it is over, when it completed, as Stategraph records them:
-    ISO 8601, UTC. *)
-module Transaction : sig
-  type t = {
-    created_at : string;
-    completed_at : string option;
-  }
-end
-
 module type S = sig
-  (** The moments of [txs], by transaction: the orchestration orders the opening of a plan's
-      transaction against the commit of another pull request's apply by them. A transaction that is
-      not of the tenants of [installation], or that an id names none, is absent. *)
-  val transactions :
-    request_id:string ->
-    installation:Uuidm.t ->
-    txs:Uuidm.t list ->
-    (Transaction.t Sln_map.Uuidm.t, [> `Error ]) result Abb.Future.t
+  (** Whether the orchestration reaches Stategraph. Parallel applies need it: the reservation of an
+      apply's transactions and the hold of their commit are what keep them safe, and only the reader
+      makes them. *)
+  val parallel_applies : bool
 
   (** The transactions of [other_tx_ids] that stand against [tx], each with the addresses of the
       nodes the two share: each shares a node with [tx] that at least one of them does more than
-      read, and it is applying, or it committed after [tx] opened. Those are the transactions whose
-      commit, or whose committed state, Stategraph refuses [tx] for; a transaction committed before
-      [tx] opened is not one, as [tx] was planned over it.
+      read, and it is applying, it committed after [tx] opened, or its commit is held. Those are the
+      transactions whose commit, or whose committed state, Stategraph refuses [tx] for; a
+      transaction committed before [tx] opened and not held is not one, as [tx] was planned over it.
 
       Only the transactions of the tenants of [installation] are seen: a transaction of another
       tenant, or an id that names no transaction, stands against nothing. *)
@@ -45,21 +32,34 @@ module type S = sig
       transaction as it would for a transaction being committed. This closes the window between the
       check of an apply and its commit. A reservation nobody releases lapses after an hour. A
       transaction that is not previewed, or not of the tenants of [installation], is not reserved,
-      and that is no error: the commit then decides on its own. *)
+      and that is no error: the commit then decides on its own. [pull_request] names the pull
+      request of the apply: it is the key of the hold the commit takes, see {!release_hold}.
+      Stategraph knows the key as an opaque string; what it names is the orchestration's. *)
   val reserve :
     request_id:string ->
     installation:Uuidm.t ->
     holder:string ->
+    pull_request:string ->
     txs:Uuidm.t list ->
     (unit, [> `Error ]) result Abb.Future.t
 
   (** Give back the transactions [holder] reserved and did not commit. *)
   val release : request_id:string -> holder:string -> (unit, [> `Error ]) result Abb.Future.t
+
+  (** A reserved transaction commits under a hold keyed by the pull request the reservation named,
+      and the commit stands against every overlapping transaction, whenever it opened, until the
+      hold goes; all but one reserved under the same key, a later plan of the pull request, which
+      contains the change. A plan made after the commit from a branch that lacks the pull request's
+      change would revert it, and Stategraph cannot tell such a plan apart: only the orchestration
+      knows the pull request is not merged. [release_hold] lets go of the holds keyed by
+      [pull_request], once it merged, was closed or was unlocked. *)
+  val release_hold :
+    request_id:string -> pull_request:string -> (unit, [> `Error ]) result Abb.Future.t
 end
 
 type t = (module S)
 
 (** The orchestration on its own, with no Stategraph in its process: it has nothing to ask, so
-    nothing overlaps and nothing is reserved. Stategraph's commit refuses an overlapping apply when
-    it runs, as it always has. *)
+    nothing overlaps, nothing is reserved and nothing is held, and no dirspace applies in parallel.
+    Stategraph's commit refuses an overlapping apply when it runs, as it always has. *)
 module Standalone : S

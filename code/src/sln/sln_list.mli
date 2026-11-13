@@ -32,3 +32,30 @@ module Uuidm : sig
   (** [CCList.mem ~eq:Uuidm.equal] *)
   val mem : Uuidm.t -> Uuidm.t list -> bool
 end
+
+(** A list with at least one element. Its constructor is [( :: )], so a value is written as a list
+    literal with the module in scope, and [[]] does not type-check:
+
+    {[
+    let orgs = Sln_list.Non_empty.[ "acme"; "acme-labs" ]
+    ]} *)
+module Non_empty : sig
+  type 'a t = ( :: ) of 'a * 'a list [@@deriving show]
+
+  (** [None] for [[]]. *)
+  val of_list : 'a list -> 'a t option
+
+  val to_list : 'a t -> 'a list
+
+  (** The first element: [hd Sln_list.Non_empty.[ "a"; "b" ] = "a"]. *)
+  val hd : 'a t -> 'a
+
+  (** The elements after the first, possibly none: [tl Sln_list.Non_empty.[ "a"; "b" ] = [ "b" ]]
+      and [tl Sln_list.Non_empty.[ "a" ] = []]. *)
+  val tl : 'a t -> 'a list
+
+  (** The elements after the first, [None] when there are none:
+      [tail_opt Sln_list.Non_empty.[ "a"; "b" ] = Some Sln_list.Non_empty.[ "b" ]] and
+      [tail_opt Sln_list.Non_empty.[ "a" ] = None]. *)
+  val tail_opt : 'a t -> 'a t option
+end

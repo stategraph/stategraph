@@ -249,21 +249,6 @@ module Stategraph_plan = struct
     | _ -> None
 end
 
-(** The moments the orchestration read from Stategraph, where it reaches it, for the two rules that
-    order a plan against another pull request's apply on a dirspace that applies in parallel: when
-    the transaction of our latest plan of a dirspace opened, and when the transaction an apply
-    commits completed, by the apply's work manifest. The rules bound a moment the orchestration did
-    not read by the run itself: a plan completes after its transaction opened, and an apply is
-    dispatched before it commits. *)
-module Stategraph_moments = struct
-  type t = {
-    planned_at : (Terrat_change.Dirspace.t * string) list;
-    committed_at : (Uuidm.t * string) list;
-  }
-
-  let empty = { planned_at = []; committed_at = [] }
-end
-
 (** The Stategraph transaction of our latest plan of a dirspace that applies in parallel, beside the
     transaction of an apply of another pull request on it, when there is one: the transactions the
     stored plans name ({!Stategraph_plan}). *)
@@ -711,6 +696,9 @@ module type Shared = sig
     val of_pull_request : Api.Pull_request.Id.t -> t
     val drift : unit -> t
     val to_string : t -> string
+
+    (** The pull request an id names; a drift unlock names none. *)
+    val pull_request : t -> Api.Pull_request.Id.t option
   end
 
   module Db : sig
@@ -1090,7 +1078,6 @@ module type Shared = sig
       base_ref:Api.Ref.t ->
       branch_ref:Api.Ref.t ->
       stategraph_parallel_apply_dirspaces:Terrat_change.Dirspace.t list ->
-      stategraph_moments:Stategraph_moments.t ->
       t ->
       'diff Api.Pull_request.t ->
       Terrat_change.Dirspace.t list ->
@@ -1163,16 +1150,16 @@ module type Shared = sig
       Abb.Future.t
 
     (** The dirspaces of the pull request that other pull requests block, each with the blocking
-        pull request. Those in [stategraph_parallel_apply_dirspaces] are blocked not by a lock but
-        by another pull request's apply that committed its Stategraph transaction before the
-        transaction of the pull request's latest plan of the dirspace opened. *)
+        pull request. Those in [stategraph_parallel_apply_dirspaces] are not blocked by an unmerged
+        pull request: Stategraph settles them by resource, the orchestration asking it before an
+        apply ({!query_parallel_apply_transactions}) and the commit refusing what it was not asked
+        about. *)
     val query_dirspaces_owned_by_other_pull_requests :
       request_id:string ->
       t ->
       'diff Api.Pull_request.t ->
       Terrat_change.Dirspace.t list ->
       stategraph_parallel_apply_dirspaces:Terrat_change.Dirspace.t list ->
-      stategraph_moments:Stategraph_moments.t ->
       ((Terrat_change.Dirspace.t * unit Api.Pull_request.t) list, [> `Error ]) result Abb.Future.t
 
     (** For each of [dirspaces], which apply in parallel, the transaction of the pull request's
@@ -1186,6 +1173,22 @@ module type Shared = sig
       'diff Api.Pull_request.t ->
       Terrat_change.Dirspace.t list ->
       (Parallel_apply_tx.t list, [> `Error ]) result Abb.Future.t
+
+    (** The core id of the pull request, the same for every provider: what the orchestration names
+        Stategraph as the pull request of an apply, the key of the hold of its commits (#3179).
+        [None] for a pull request this provider does not know. *)
+    val query_pull_request_core_id :
+      request_id:string ->
+      t ->
+      Api.Repo.t ->
+      Api.Pull_request.Id.t ->
+      (Uuidm.t option, [> `Error ]) result Abb.Future.t
+
+    (** The pull request of the apply work manifest, by core id, when its hold may go: it merged, or
+        was unlocked after the work manifest was made. [None] otherwise, and for a work manifest of
+        no pull request or that this provider does not know. *)
+    val query_releasable_stategraph_hold :
+      request_id:string -> t -> Uuidm.t -> (Uuidm.t option, [> `Error ]) result Abb.Future.t
 
     val query_missing_drift_scheduled_runs :
       request_id:string ->

@@ -308,7 +308,7 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                  made before (RFD 2903). *)
               S.Work_manifest.update_state ~request_id db wm.Wm.id Wm.State.Aborted
               >>= fun () ->
-              Fc.to_result (Tasks_base.release_stategraph_reservation ~request_id wm.Wm.id)
+              Fc.to_result (Tasks_base.release_stategraph_reservation ~request_id db wm.Wm.id)
               >>= fun () ->
               run_release_compute_node_work ~request_id ~config ~exec ~db ~compute_node_id
               >>= fun () ->
@@ -852,7 +852,7 @@ module Make (S : Terrat_vcs_provider2.S) = struct
             work_manifest_id
             Terrat_work_manifest3.State.Aborted
           >>= fun () ->
-          Fc.to_result (Tasks_base.release_stategraph_reservation ~request_id work_manifest_id)
+          Fc.to_result (Tasks_base.release_stategraph_reservation ~request_id db work_manifest_id)
       | Terrat_work_manifest3.State.(Completed | Aborted) -> Abbs_fc.return_ok ()
     in
     (* Read the node through [compute_node_work].  The id of a node names no work
@@ -1155,7 +1155,8 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                 work_manifest_id
                 Terrat_work_manifest3.State.Aborted
               >>= fun () ->
-              Fc.to_result (Tasks_base.release_stategraph_reservation ~request_id work_manifest_id)
+              Fc.to_result
+                (Tasks_base.release_stategraph_reservation ~request_id db work_manifest_id)
               >>= fun () ->
               let open Abb.Future.Infix_monad in
               (* Best effort so the unified comment reflects the abort. *)

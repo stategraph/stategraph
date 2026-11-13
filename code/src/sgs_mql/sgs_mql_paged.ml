@@ -45,7 +45,8 @@ module Sql = struct
       /% Var.(array (integer "integers"))
       /% Var.(array (bigint "bigints"))
       /% Var.(array (double "floats"))
-      /% Var.(array (timestamptz "timestamptzs")))
+      /% Var.(array (timestamptz "timestamptzs"))
+      /% Var.(str_array (uuid "unmasked_tenant_ids")))
 
   let set_timeout timeout =
     Pgsql_io.Typed_sql.(sql /^ Mql_sql.set ~local:true ~name:"statement_timeout" timeout)
@@ -77,7 +78,11 @@ end
    [select_mql_page.sql] masks every value the state marks sensitive (replacing
    it with the sentinel ["__SENSITIVE__"]), using the [pg_temp.*] helpers
    installed by [Sgs_mql_mask_fns.install]. [instances.sensitive_attributes] is
-   left intact: it is metadata naming which paths were masked, not a secret. *)
+   left intact: it is metadata naming which paths were masked, not a secret.
+
+   [hcl.data], [tf_module_hcl.data] and [tfvars.data] mask the defaults and the
+   tfvar values of sensitive variables, except in the tenants of
+   [$unmasked_tenant_ids]: the caller of [query] decides those tenants. *)
 let stategraph_tables =
   Mql_to_pgsql.Schema.
     [
@@ -189,6 +194,7 @@ let stategraph_tables =
             make ~name:"created_at" ~type_:Type_.Timestamptz ();
             make ~name:"created_by" ~type_:Type_.Uuid ();
             make ~name:"id" ~type_:Type_.Uuid ();
+            make ~name:"metadata" ~type_:Type_.Jsonb ();
             make ~name:"state" ~type_:Type_.Text ();
             make ~name:"tags" ~type_:Type_.Jsonb ();
             make ~name:"params" ~type_:Type_.Jsonb ();
@@ -598,7 +604,7 @@ let build_query_ast config ast page =
 (* Execute the compiled query inside a transaction, applying the configured
    statement timeout and, when provided, the caller's timezone. Returns the
    raw rows fetched from the database. *)
-let execute_query config storage user tz query =
+let execute_query ~unmasked_tenants config storage user tz query =
   let open Abbs_fc.Infix_result_monad in
   Abb.Future.return
     (Sql.select_page_query
@@ -632,7 +638,8 @@ let execute_query config storage user tz query =
             (CCVector.to_list @@ Mql_to_pgsql.integers query)
             (CCVector.to_list @@ Mql_to_pgsql.bigints query)
             (CCVector.to_list @@ Mql_to_pgsql.floats query)
-            (CCVector.to_list @@ Mql_to_pgsql.timestamptzs query)))
+            (CCVector.to_list @@ Mql_to_pgsql.timestamptzs query)
+            unmasked_tenants))
 
 (* The rows come back with the cursor row first when a page was applied (the
    keyset re-selects it) and, when a further page exists, the sentinel row last
@@ -724,11 +731,11 @@ type query_err =
 (* Run an MQL query end to end: build the query, execute it, trim the result
    set, and decide its pagination links. Also returns the effective [limit] so
    callers can surface it on their typed response shape. *)
-let query ?tz ?page config storage user ast =
+let query ?tz ?page ?(unmasked_tenants = []) config storage user ast =
   let open Abbs_fc.Infix_result_monad in
   build_query_ast config ast page
   >>= fun (query, limit, limit_defaulted) ->
-  execute_query config storage user tz query
+  execute_query ~unmasked_tenants config storage user tz query
   >>| fun rows ->
   let rows, excessive_rows = trim_rows ~limit ~page rows in
   (* The result was capped by the server default (not the caller's LIMIT) iff the

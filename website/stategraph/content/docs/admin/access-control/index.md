@@ -1,11 +1,11 @@
 ---
 title: Authentication
-description: Set up sign-in to Stategraph with local accounts, Google OAuth, or OIDC, and API keys for the CLI, scripts, and CI pipelines.
+description: Set up sign-in to Stategraph with local accounts, Google, GitHub, or OIDC, and API keys for the CLI, scripts, and CI pipelines.
 order: 1
 ---
 
 
-Stategraph signs people in with a local account, Google OAuth, or an OIDC provider, and accepts API keys from the CLI, Terraform, scripts, and CI pipelines.
+Stategraph signs people in with a local account, Google OAuth, GitHub OAuth, or an OIDC provider, and accepts API keys from the CLI, Terraform, scripts, and CI pipelines.
 
 ## Overview
 
@@ -15,6 +15,7 @@ Without authentication, anyone with network access can use Stategraph. Configure
 |------|----------|
 | Local authentication | Email and password accounts that you manage in Stategraph |
 | Google OAuth | Organizations that use Google Workspace |
+| GitHub OAuth | Members of your GitHub organizations, on GitHub or GitHub Enterprise Server |
 | Generic OIDC | Any OIDC provider, such as Okta, Auth0, or Azure AD |
 
 ## Authentication flow
@@ -44,7 +45,22 @@ STATEGRAPH_OAUTH_EMAIL_DOMAIN=example.com  # Restrict to domain
 STATEGRAPH_OAUTH_DISPLAY_NAME="Google Workspace"  # Button reads "Sign in with Google Workspace"
 ```
 
-See [Google OAuth setup](/docs/admin/access-control/google-oauth).
+See [Google OAuth setup](/docs/admin/access-control/google-oauth) for more details.
+
+### GitHub OAuth
+
+```bash
+# Required
+STATEGRAPH_OAUTH_TYPE=github
+STATEGRAPH_OAUTH_CLIENT_ID=your-client-id
+STATEGRAPH_OAUTH_CLIENT_SECRET=your-client-secret
+STATEGRAPH_OAUTH_GITHUB_ORG=acme  # Organizations whose members can sign in
+
+# Optional
+STATEGRAPH_OAUTH_EMAIL_DOMAIN=example.com
+```
+
+See [GitHub OAuth setup](/docs/admin/access-control/github) for more details.
 
 ### Generic OIDC
 
@@ -202,6 +218,12 @@ For Google OAuth:
 
 ```text
 https://stategraph.example.com/oauth2/google/callback
+```
+
+For GitHub OAuth:
+
+```text
+https://stategraph.example.com/oauth2/github/callback
 ```
 
 For OIDC providers:

@@ -226,65 +226,16 @@ struct
         else None)
       dirspaceflows
 
-  (* What the two rules that order a plan against an apply are given, read from Stategraph through
-     the reader for the overlap rows of our plans beside the applies of other pull requests: when
-     the transaction of our plan of each dirspace opened, and when the transaction of each apply
-     completed, by the apply's work manifest.  A transaction the reader does not know gives neither. *)
-  let stategraph_moments_of_rows ~request_id ~installation rows =
-    let module Pat = Terrat_vcs_provider2.Parallel_apply_tx in
-    let module Sm = Terrat_vcs_provider2.Stategraph_moments in
-    let module T = Terrat_stategraph.Transaction in
+  (* The pull request as Stategraph is told of it, the key of the hold of its applies' commits:
+     its core id, the same for every provider. *)
+  let stategraph_pull_request ~request_id db pull_request =
     let open Abbs_fc.Infix_result_monad in
-    let txs =
-      rows
-      |> CCList.flat_map (fun { Pat.tx; other; _ } ->
-          tx :: CCOption.map_or ~default:[] (fun { Pat.Other.tx; _ } -> [ tx ]) other)
-      |> CCList.sort_uniq ~cmp:Uuidm.compare
-    in
-    S.Stategraph.transactions ~request_id ~installation ~txs
-    >>| fun moments ->
-    let find tx = Sln_map.Uuidm.find_opt tx moments in
-    let planned_at =
-      rows
-      |> CCList.filter_map (fun { Pat.dirspace; tx; _ } ->
-          CCOption.map (fun { T.created_at; _ } -> (dirspace, created_at)) (find tx))
-      |> CCList.sort_uniq ~cmp:(fun (a, _) (b, _) -> Terrat_change.Dirspace.compare a b)
-    in
-    let committed_at =
-      rows
-      |> CCList.filter_map (fun { Pat.other; _ } ->
-          CCOption.flat_map
-            (fun { Pat.Other.work_manifest; tx; _ } ->
-              CCOption.flat_map
-                (fun { T.completed_at; _ } ->
-                  CCOption.map (fun at -> (work_manifest, at)) completed_at)
-                (find tx))
-            other)
-      |> CCList.sort_uniq ~cmp:(fun (a, _) (b, _) -> Uuidm.compare a b)
-    in
-    { Sm.planned_at; committed_at }
-
-  (* The moments of the transactions of our plans of [dirspaces] and of the applies of other pull
-     requests on them.  The reader failing is logged and leaves the rules to the bounds of the
-     runs, which are safe; a database error is an error. *)
-  let stategraph_moments ~request_id db pull_request dirspaces =
-    let module Pat = Terrat_vcs_provider2.Parallel_apply_tx in
-    let module Sm = Terrat_vcs_provider2.Stategraph_moments in
-    match dirspaces with
-    | [] -> Abbs_fc.return_ok Sm.empty
-    | dirspaces -> (
-        let open Abbs_fc.Infix_result_monad in
-        S.Db.query_parallel_apply_transactions ~request_id db pull_request dirspaces
-        >>= function
-        | [] -> Abbs_fc.return_ok Sm.empty
-        | { Pat.installation; _ } :: _ as rows -> (
-            let open Abb.Future.Infix_monad in
-            stategraph_moments_of_rows ~request_id ~installation rows
-            >>= function
-            | Ok _ as moments -> Abb.Future.return moments
-            | Error `Error ->
-                Logs.err (fun m -> m "%s : STATEGRAPH_MOMENTS_FAILED" request_id);
-                Abbs_fc.return_ok Sm.empty))
+    S.Db.query_pull_request_core_id
+      ~request_id
+      db
+      (S.Api.Pull_request.repo pull_request)
+      (S.Api.Pull_request.id pull_request)
+    >>| CCOption.map Uuidm.to_string
 
   (* The reservation is the work manifest's: its id is the holder.  Both are best effort, because
      the commit decides on its own without them: a failure here is logged and the apply goes on. *)
@@ -299,17 +250,22 @@ struct
           S.Db.query_parallel_apply_transactions ~request_id db pull_request dirspaces
           >>= function
           | [] -> Abbs_fc.return_ok ()
-          | { Pat.installation; _ } :: _ as rows ->
-              (* A dirspace gives one row per apply of another pull request on it: its plan's
-                 transaction once. *)
-              S.Stategraph.reserve
-                ~request_id
-                ~installation
-                ~holder:(Uuidm.to_string work_manifest_id)
-                ~txs:
-                  (rows
-                  |> CCList.map (fun { Pat.tx; _ } -> tx)
-                  |> CCList.sort_uniq ~cmp:Uuidm.compare)
+          | { Pat.installation; _ } :: _ as rows -> (
+              stategraph_pull_request ~request_id db pull_request
+              >>= function
+              | None -> Abbs_fc.return_err `Error
+              | Some pull_request ->
+                  (* A dirspace gives one row per apply of another pull request on it: its plan's
+                     transaction once. *)
+                  S.Stategraph.reserve
+                    ~request_id
+                    ~installation
+                    ~holder:(Uuidm.to_string work_manifest_id)
+                    ~pull_request
+                    ~txs:
+                      (rows
+                      |> CCList.map (fun { Pat.tx; _ } -> tx)
+                      |> CCList.sort_uniq ~cmp:Uuidm.compare))
         in
         run
         >>| function
@@ -322,18 +278,76 @@ struct
                   Uuidm.pp
                   work_manifest_id))
 
-  let release_stategraph_reservation ~request_id work_manifest_id =
+  (* The work manifest is over.  Its reservation goes, and so does the hold of the commit it made
+     when its pull request merged, was closed or was unlocked already: the apply the merge starts,
+     and the apply that was running when the merge or the close came, commit held with no event to
+     come and release them (select_releasable_stategraph_hold.sql). *)
+  let release_stategraph_reservation ~request_id db work_manifest_id =
     let open Abb.Future.Infix_monad in
-    S.Stategraph.release ~request_id ~holder:(Uuidm.to_string work_manifest_id)
+    let holder = Uuidm.to_string work_manifest_id in
+    S.Stategraph.release ~request_id ~holder
+    >>= (function
+    | Ok () -> Abb.Future.return ()
+    | Error `Error ->
+        Abb.Future.return
+          (Logs.err (fun m ->
+               m
+                 "%s : STATEGRAPH_RELEASE_FAILED : work_manifest_id=%a"
+                 request_id
+                 Uuidm.pp
+                 work_manifest_id)))
+    >>= fun () ->
+    let run =
+      let open Abbs_fc.Infix_result_monad in
+      S.Db.query_releasable_stategraph_hold ~request_id db work_manifest_id
+      >>= function
+      | None -> Abbs_fc.return_ok ()
+      | Some pull_request ->
+          S.Stategraph.release_hold ~request_id ~pull_request:(Uuidm.to_string pull_request)
+    in
+    run
     >>| function
     | Ok () -> ()
     | Error `Error ->
         Logs.err (fun m ->
             m
-              "%s : STATEGRAPH_RELEASE_FAILED : work_manifest_id=%a"
+              "%s : STATEGRAPH_RELEASE_HOLD_FAILED : work_manifest_id=%a"
               request_id
               Uuidm.pp
               work_manifest_id)
+
+  (* The holds of the applies of a pull request, keyed by the pull request.  Best effort, as the
+     reservation is: a hold this misses waits for 'terrateam unlock'. *)
+  let release_stategraph_holds ~request_id db repo pull_request_id =
+    let open Abb.Future.Infix_monad in
+    let run =
+      let open Abbs_fc.Infix_result_monad in
+      S.Db.query_pull_request_core_id ~request_id db repo pull_request_id
+      >>= function
+      | None -> Abbs_fc.return_ok ()
+      | Some pull_request ->
+          S.Stategraph.release_hold ~request_id ~pull_request:(Uuidm.to_string pull_request)
+    in
+    run
+    >>| function
+    | Ok () -> ()
+    | Error `Error ->
+        Logs.err (fun m ->
+            m
+              "%s : STATEGRAPH_RELEASE_HOLDS_FAILED : pull_request_id=%s"
+              request_id
+              (S.Api.Pull_request.Id.to_string pull_request_id))
+
+  let unlock ~request_id db repo unlock_id =
+    let open Abbs_fc.Infix_result_monad in
+    S.Db.unlock ~request_id db repo unlock_id
+    >>= fun () ->
+    (* The runs before an unlock no longer count, the applies among them included: the holds of
+       their commits go with them (#3179).  A drift unlock names no pull request and holds nothing. *)
+    match S.Unlock_id.pull_request unlock_id with
+    | Some pull_request_id ->
+        Abbs_fc.to_result (release_stategraph_holds ~request_id db repo pull_request_id)
+    | None -> Abbs_fc.return_ok ()
 
   (* With the tree builder off, the server reads a tree from the forge and stores it, as the
      [repo_tree_branch] task does.  With it on, only a tree build work manifest stores a tree, and

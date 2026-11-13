@@ -1,5 +1,5 @@
 (library
  (name sgs_config)
- (libraries containers uri)
+ (libraries containers sln uri)
  (preprocess
   (pps ppx_deriving.show)))

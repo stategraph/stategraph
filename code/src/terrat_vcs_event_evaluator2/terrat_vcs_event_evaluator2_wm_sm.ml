@@ -332,7 +332,7 @@ struct
         update_wm_state ~request_id:(Builder.log_id s) ~name work_manifest_id Wm.State.Completed db)
     >>= fun () ->
     Abbs_fc.to_result
-      (Tasks_base.release_stategraph_reservation ~request_id:(Builder.log_id s) work_manifest_id)
+      (Tasks_base.release_stategraph_reservation ~request_id:(Builder.log_id s) db work_manifest_id)
 
   let query_work_manifests s job_id db =
     time_it

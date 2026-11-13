@@ -21,7 +21,8 @@ module Rt = struct
                 "page"
                 CCFun.(
                   CCOption.wrap Yojson.Safe.from_string
-                  %> CCOption.flat_map (Mql_to_pgsql.Page.of_yojson %> CCResult.to_opt)))))
+                  %> CCOption.flat_map (Mql_to_pgsql.Page.of_yojson %> CCResult.to_opt))))
+      /? Query.(option (bool "unmasked")))
 end
 
 let response_404 =

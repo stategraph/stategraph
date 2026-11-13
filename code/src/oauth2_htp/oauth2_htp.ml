@@ -8,6 +8,7 @@ module Values = Oauth2_htp_values
 type err =
   [ Oauth2_htp_oidc.err
   | Oauth2_htp_google.err
+  | Oauth2_htp_github.err
   | Oauth2_htp_csrf.err
   | `Idp_error of string * string
   | `Invalid_state
@@ -21,6 +22,10 @@ type err =
 module Config = struct
   type provider =
     | Google of { group : Oauth2_htp_google.Group.t option }
+    | Github of {
+        orgs : string Sln_list.Non_empty.t;
+        endpoints : Oauth2_htp_github.Endpoints.t;
+      }
     | Oidc of { issuer_url : string }
 
   type t = {
@@ -36,8 +41,12 @@ module Config = struct
     cookie_secure : bool;
   }
 
+  let default_scope = function
+    | Github _ -> Oauth2_htp_github.scope
+    | Google _ | Oidc _ -> "openid email profile"
+
   let make
-      ?(scope = "openid email profile")
+      ?scope
       ?(login_params = [])
       ~provider
       ~client_id
@@ -52,7 +61,7 @@ module Config = struct
       provider;
       client_id;
       client_secret;
-      scope;
+      scope = CCOption.get_or ~default:(default_scope provider) scope;
       login_params;
       redirect_url;
       whitelist_domains;
@@ -79,6 +88,7 @@ end
 
 type provider =
   | Google of Oauth2_htp_google.t
+  | Github of Oauth2_htp_github.t
   | Oidc of Oauth2_htp_oidc.t
 
 type t = {
@@ -98,6 +108,9 @@ let create config =
         >>= fun now ->
         let open Abbs_fc.Infix_result_monad in
         Oauth2_htp_google.check_admin ~now provider >>| fun () -> Google provider
+    | Config.Github { orgs; endpoints } ->
+        Abb.Future.return
+          (Ok (Github (Oauth2_htp_github.make ~client_id ~client_secret ~endpoints ~orgs)))
     | Config.Oidc { issuer_url } ->
         Oauth2_htp_oidc.discover ~issuer_url ~client_id ~client_secret
         >>| fun provider -> Oidc provider)
@@ -117,6 +130,7 @@ let login_url t ~state =
     Uri.of_string
       (match t.provider with
       | Google provider -> Oauth2_htp_google.login_url provider
+      | Github provider -> Oauth2_htp_github.login_url provider
       | Oidc provider -> Oauth2_htp_oidc.login_url provider)
   in
   let params =
@@ -166,6 +180,7 @@ let redeem ~now ~code t =
   let redirect_uri = t.config.Config.redirect_url in
   match t.provider with
   | Google provider -> Oauth2_htp_google.redeem ~now ~redirect_uri ~code provider
+  | Github provider -> Oauth2_htp_github.redeem ~redirect_uri ~code provider
   | Oidc provider -> Oauth2_htp_oidc.redeem ~now ~redirect_uri ~code provider
 
 let authorize t session =
@@ -173,6 +188,7 @@ let authorize t session =
   &&
   match t.provider with
   | Google provider -> Oauth2_htp_google.authorize provider session
+  | Github provider -> Oauth2_htp_github.authorize provider session
   | Oidc _ -> true
 
 let clear_cookies t = [ Csrf.clear ~secure:t.config.Config.cookie_secure ]

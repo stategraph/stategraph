@@ -1722,6 +1722,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tx/{tx_id}/release-hold": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Let go of the hold of a committed transaction, the key its reservation gave it (metadata.hold), so that it stands against no overlapping transaction from then on. For the operator: the orchestration releases the holds of a pull request itself when it merges, is closed or is unlocked, and this is the way out when it cannot, for a repository it no longer sees or a release that failed. Idempotent: a transaction with no hold, or not committed, is answered as it is. */
+        post: operations["tx/release-hold"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tx/{tx_id}/security/impact": {
         parameters: {
             query?: never;
@@ -5287,6 +5304,8 @@ export interface operations {
                 page?: string[];
                 tz?: string;
                 q: string;
+                /** @description Return the stored defaults of sensitive variables and the stored values of sensitive tfvars in the hcl, tf_module_hcl and tfvars tables, without masking, for the rows of each tenant that the preview capability of the session reaches. The rows of other tenants stay masked. Every other table stays masked. */
+                unmasked?: boolean;
             };
             header?: never;
             path?: never;
@@ -5315,6 +5334,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description The session cannot preview in any tenant of the user, and the request asks for unmasked results. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["error-response"];
+                };
             };
             414: {
                 headers: {
@@ -9336,6 +9364,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["preview-response"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The transaction does not exist, or the caller is not a member of its tenant. The two are deliberately indistinguishable. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "tx/release-hold": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tx_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["tx"];
                 };
             };
             401: {

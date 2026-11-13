@@ -714,6 +714,10 @@
               "label": "Google OAuth"
             },
             {
+              "page": "/docs/admin/access-control/github",
+              "label": "GitHub OAuth"
+            },
+            {
               "page": "/docs/admin/access-control/oidc",
               "label": "OIDC"
             },
