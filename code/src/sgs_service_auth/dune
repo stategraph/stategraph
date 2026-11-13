@@ -3,7 +3,6 @@
  (wrapped false)
  (libraries
   abb
-  abb_curl
   abb_intf
   abbs
   brtl
@@ -38,4 +37,4 @@
  (preprocessor_deps
   (glob_files_rec sql/*))
  (preprocess
-  (pps ppx_blob ppx_deriving.show ppx_deriving_yojson)))
+  (pps ppx_blob ppx_deriving.show)))

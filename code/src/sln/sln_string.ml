@@ -2,6 +2,8 @@ let is_whitespace = function
   | ' ' | '\t' | '\n' | '\r' -> true
   | _ -> false
 
+let is_non_empty s = not (CCString.is_empty s)
+
 let take_words ~max_nb_words s =
   if max_nb_words <= 0 then []
   else

@@ -141,6 +141,9 @@ module type ASSERT = sig
 
     (** Asserts that two bool lists are equal. *)
     val bool_list : expected:bool list -> actual:bool list -> unit
+
+    (** Asserts that two UUID lists are equal. *)
+    val uuidm_list : expected:Uuidm.t list -> actual:Uuidm.t list -> unit
   end
 
   module String : sig

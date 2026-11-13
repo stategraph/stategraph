@@ -55,6 +55,7 @@ module Get = struct
       page : Page.t option; [@default None]
       q : string;
       tz : string option; [@default None]
+      unmasked : bool option; [@default None]
     }
     [@@deriving make, show, eq]
   end
@@ -69,6 +70,7 @@ module Get = struct
     /? option (array (string "page"))
     /? option (string "tz")
     /? string "q"
+    /? option (bool "unmasked")
 
   module Responses = struct
     module OK = struct
@@ -85,12 +87,19 @@ module Get = struct
     end
 
     module Unauthorized = struct end
+
+    module Forbidden = struct
+      type t = Sgs_api_components.Error_response.t
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
     module Request_uri_too_long = struct end
 
     type t =
       [ `OK of OK.t
       | `Bad_request of Bad_request.t
       | `Unauthorized
+      | `Forbidden of Forbidden.t
       | `Request_uri_too_long
       ]
     [@@deriving show, eq]
@@ -100,6 +109,7 @@ module Get = struct
         ("200", Openapi.of_json_body (fun v -> `OK v) OK.of_yojson);
         ("400", Openapi.of_json_body (fun v -> `Bad_request v) Bad_request.of_yojson);
         ("401", fun _ -> Ok `Unauthorized);
+        ("403", Openapi.of_json_body (fun v -> `Forbidden v) Forbidden.of_yojson);
         ("414", fun _ -> Ok `Request_uri_too_long);
       ]
   end
@@ -117,6 +127,7 @@ module Get = struct
            ("page", Var (params.page, Option (Array String)));
            ("tz", Var (params.tz, Option String));
            ("q", Var (params.q, String));
+           ("unmasked", Var (params.unmasked, Option Bool));
          ])
       ~url
       ~responses:Responses.t

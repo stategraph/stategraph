@@ -123,6 +123,9 @@ let run_sql ?(mode = `Tx) sql =
               stmts)
     | Error err -> Abbs_fc.return_err (`Mql_err err)
 
+let restore_masked_sensitive_values =
+  run_sql [%blob "./migrations/2026-11-13-restore-masked-sensitive-values.sql"]
+
 let migrations =
   [
     ("initial-tables", run_sql [%blob "./migrations/2025-10-25-add-initial-tables.sql"]);
@@ -575,6 +578,94 @@ let migrations =
        apply is about to commit; see the comment in the file. *)
     ( "add-tx-commit-reserved-state",
       run_sql [%blob "./migrations/2026-10-30-add-tx-commit-reserved-state.sql"] );
+    (* The metadata of a transaction: the pull request of its orchestrated apply, and the hold of
+       its commit while that pull request is open; see the comment in the file. *)
+    ("add-tx-metadata", run_sql [%blob "./migrations/2026-11-06-add-tx-metadata.sql"]);
+    ("restore-masked-sensitive-values", restore_masked_sensitive_values);
   ]
 
-let run config storage = Mig.run { Migrate.config; storage; tx = () } migrations
+(* Each value that [restore-masked-sensitive-values] cannot restore: its state and its address. *)
+let select_sensitive_placeholders_sql =
+  Mql_sql.read
+    {|
+select s.id::text, s.name, s.workspace, x.address
+from (
+    select h.state_id, h.fq_address as address
+    from hcl h
+    where h.data -> 0 ->> 'type' = 'variable'
+      and h.data -> 0 -> 'attrs' @> '[{"sensitive": true}]'
+      and h.data -> 0 -> 'attrs' @> '[{"default": "__SENSITIVE__"}]'
+    union all
+    select b.state_id, b.source || ' ' || b.fq_address as address
+    from tf_module_hcl b
+    where b.data -> 0 ->> 'type' = 'variable'
+      and b.data -> 0 -> 'attrs' @> '[{"sensitive": true}]'
+      and b.data -> 0 -> 'attrs' @> '[{"default": "__SENSITIVE__"}]'
+    union all
+    select tv.state_id, tv.var_address as address
+    from tfvars tv
+    where tv.data = '"__SENSITIVE__"'::jsonb
+) x
+join states s on s.id = x.state_id
+where s.deleted_at is null
+order by s.id, x.address
+|}
+
+let select_sensitive_placeholders () =
+  Pgsql_io.Typed_sql.(
+    sql
+    //
+    (* state_id *)
+    Ret.text
+    //
+    (* name *)
+    Ret.text
+    //
+    (* workspace *)
+    Ret.text
+    //
+    (* address *)
+    Ret.text
+    /^ select_sensitive_placeholders_sql)
+
+(* Log each stored sensitive value that is still the MQL mask.  The report does not stop the boot:
+   a failed read is logged and the server starts. *)
+let warn_sensitive_placeholders storage =
+  let open Abb.Future.Infix_monad in
+  Pgsql_pool.with_conn storage ~f:(fun db ->
+      Pgsql_io.Prepared_stmt.fetch
+        db
+        (select_sensitive_placeholders ())
+        ~f:(fun state_id name workspace address -> (state_id, name, workspace, address)))
+  >>| function
+  | Ok rows ->
+      CCList.iter
+        (fun (state_id, name, workspace, address) ->
+          Logs.warn (fun m ->
+              m
+                "SENSITIVE_PLACEHOLDER : state_id=%s : name=%s : workspace=%s : address=%s : the \
+                 stored value is \"__SENSITIVE__\" and no committed transaction holds the real \
+                 value. Run 'stategraph import tf --hcl --overwrite' from a checkout of the \
+                 applied configuration of this state."
+                state_id
+                name
+                workspace
+                address))
+        rows
+  | Error (#Pgsql_io.err as err) ->
+      Logs.err (fun m -> m "SENSITIVE_PLACEHOLDER_REPORT_ERR : %a" Pgsql_io.pp_err err)
+  | Error (#Pgsql_pool.err as err) ->
+      Logs.err (fun m -> m "SENSITIVE_PLACEHOLDER_REPORT_ERR : %a" Pgsql_pool.pp_err err)
+
+let run config storage =
+  let open Abbs_fc.Infix_result_monad in
+  Mig.run { Migrate.config; storage; tx = () } migrations
+  >>= fun () ->
+  let open Abb.Future.Infix_monad in
+  warn_sensitive_placeholders storage >>| fun () -> Ok ()
+
+module Tests = struct
+  let restore_masked_sensitive_values config storage db =
+    let open Abbs_fc.Infix_result_monad in
+    restore_masked_sensitive_values { Migrate.config; storage; tx = db } >>| fun _ -> ()
+end

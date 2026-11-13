@@ -203,6 +203,7 @@ transactions as (
     tx.tags as tags,
     tx.params as params,
     tx.tenant_id as tenant_id,
+    tx.metadata as metadata,
     tx.created_by as created_by,
     tx.completed_by as completed_by
   from transactions as tx
@@ -272,9 +273,11 @@ hcl as not materialized (
   select
     h.fq_address as fq_address,
     h.created_at as created_at,
-    -- SECURITY: the default of a variable declared [sensitive = true].
+    -- SECURITY: the default of a variable declared [sensitive = true], except
+    -- in a tenant of [$unmasked_tenant_ids].
     case
       when h.data -> 0 ->> 'type' = 'variable'
+           and not (s.tenant_id = any($unmasked_tenant_ids::uuid[]))
       then pg_temp.mask_hcl_variable_default(h.data)
       else h.data
     end as data,
@@ -350,9 +353,11 @@ tf_module_hcl as not materialized (
     tmh.version as version,
     tmh.id as id,
     tmh.fq_address as fq_address,
-    -- SECURITY: the default of a variable declared [sensitive = true].
+    -- SECURITY: the default of a variable declared [sensitive = true], except
+    -- in a tenant of [$unmasked_tenant_ids].
     case
       when tmh.data -> 0 ->> 'type' = 'variable'
+           and not (s.tenant_id = any($unmasked_tenant_ids::uuid[]))
       then pg_temp.mask_hcl_variable_default(tmh.data)
       else tmh.data
     end as data,
@@ -515,10 +520,12 @@ tfvars as not materialized (
     tv.id as id,
     tv.var_address as var_address,
     tv.file as file,
-    -- SECURITY: the value of a variable declared [sensitive = true]. [hcl] is
-    -- the scoped CTE above, whose [data] keeps the [sensitive] attribute.
+    -- SECURITY: the value of a variable declared [sensitive = true], except in a
+    -- tenant of [$unmasked_tenant_ids]. [hcl] is the scoped CTE above, whose
+    -- [data] keeps the [sensitive] attribute.
     case
-      when exists (
+      when not (s.tenant_id = any($unmasked_tenant_ids::uuid[]))
+           and exists (
         select 1
         from hcl as hv
         where hv.state_id = tv.state_id

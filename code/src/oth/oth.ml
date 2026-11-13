@@ -210,6 +210,7 @@ module Assert = struct
     let string_list = list ~eq:CCString.equal ~pp:Format.pp_print_string
     let int_list = list ~eq:Int.equal ~pp:Format.pp_print_int
     let bool_list = list ~eq:Bool.equal ~pp:Format.pp_print_bool
+    let uuidm_list = list ~eq:Uuidm.equal ~pp:Uuidm.pp
   end
 
   module String = struct

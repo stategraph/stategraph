@@ -222,7 +222,8 @@ end
 $$;
 
 -- Replace the [default] of a sensitive [variable] block in an hcl [data] array
--- with '__SENSITIVE__'.  Every other block passes through untouched.
+-- with '__SENSITIVE__'.  A null [default] holds no value and stays null.  Every
+-- other block passes through untouched.
 create or replace function pg_temp.mask_hcl_variable_default(data jsonb)
 returns jsonb
 language plpgsql
@@ -236,7 +237,7 @@ begin
         return data;
     end if;
     for attr in select * from jsonb_array_elements(data -> 0 -> 'attrs') loop
-        if attr ? 'default' then
+        if attr ? 'default' and attr -> 'default' <> 'null'::jsonb then
             attrs := attrs || jsonb_build_array(jsonb_build_object('default', '__SENSITIVE__'));
         else
             attrs := attrs || jsonb_build_array(attr);

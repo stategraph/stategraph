@@ -102,7 +102,9 @@ let logout_location config rd =
              (id_token_hint / post_logout_redirect_uri); see
              rfds/701 - OIDC Logout Flow/. Tracked as follow-up. *)
           rd
-      | Sgs_config.Google _ -> rd)
+      | Sgs_config.Google _ | Sgs_config.Github _ ->
+          (* GitHub has no logout endpoint: only the Stategraph session ends. *)
+          rd)
   | None -> rd
 
 (* GET /api/v1/logout — clear our cookies and redirect somewhere sensible.

@@ -41,7 +41,7 @@ let split_list value =
 
 (* A group lookup goes through the Admin SDK as the admin, with the service account's key. *)
 let google_group_of_provider = function
-  | Sgs_config.Oidc _ -> Ok None
+  | Sgs_config.Oidc _ | Sgs_config.Github _ -> Ok None
   | Sgs_config.Google { google_group; google_admin_email; google_service_account_json } -> (
       match
         (non_empty google_group, non_empty google_admin_email, non_empty google_service_account_json)
@@ -106,6 +106,17 @@ let make_config ~group ~email_domains ~callback_url config oauth2_config =
     | Sgs_config.Google _ ->
         (* Let users choose which Google account to sign in with. *)
         (Oauth2_htp.Config.Google { group }, [ ("prompt", "select_account") ])
+    | Sgs_config.Github { github_orgs } ->
+        ( Oauth2_htp.Config.Github
+            {
+              orgs = github_orgs;
+              endpoints =
+                {
+                  Oauth2_htp_github.Endpoints.web_base = Sgs_config.github_web_base config;
+                  api_base = Sgs_config.github_api_base config;
+                };
+            },
+          [] )
     | Sgs_config.Oidc { oidc_issuer_url; auth0_rp_logout = _ } ->
         (Oauth2_htp.Config.Oidc { issuer_url = oidc_issuer_url }, [])
   in

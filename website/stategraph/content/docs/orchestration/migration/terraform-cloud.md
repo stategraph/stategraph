@@ -1,6 +1,6 @@
 ---
 title: Migrating from Terraform Cloud
-description: "Move HCP Terraform workspaces to Stategraph with a script: settings and variables to .stategraph/config.yml, state to Infrastructure as a Database."
+description: "Move HCP Terraform workspaces to Stategraph with a script: settings and variables to .stategraph/config.yml, state to a bucket backend or to Infrastructure as a Database."
 order: 1
 ---
 

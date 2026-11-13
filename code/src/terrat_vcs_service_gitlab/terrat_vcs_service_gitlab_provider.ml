@@ -94,6 +94,10 @@ module Unlock_id = struct
   let to_string = function
     | Pull_request id -> CCInt.to_string id
     | Drift -> "drift"
+
+  let pull_request = function
+    | Pull_request id -> Some id
+    | Drift -> None
 end
 
 module Db = struct
@@ -861,12 +865,7 @@ module Db = struct
         /% Var.(ud (text "base_ref") Api.Ref.to_string)
         /% Var.(ud (text "branch_ref") Api.Ref.to_string)
         /% Var.(str_array (text "parallel_dirs"))
-        /% Var.(str_array (text "parallel_workspaces"))
-        /% Var.(str_array (text "planned_dirs"))
-        /% Var.(str_array (text "planned_workspaces"))
-        /% Var.(array (timestamptz "planned_at"))
-        /% Var.(str_array (uuid "committed_work_manifests"))
-        /% Var.(array (timestamptz "committed_at")))
+        /% Var.(str_array (text "parallel_workspaces")))
 
     let update_abort_duplicate_work_manifests_query =
       Mql_sql.read [%blob "sql/abort_duplicate_work_manifests.sql"]
@@ -1011,12 +1010,31 @@ module Db = struct
         /% Var.(str_array (text "dirs"))
         /% Var.(str_array (text "workspaces"))
         /% Var.(str_array (text "parallel_dirs"))
-        /% Var.(str_array (text "parallel_workspaces"))
-        /% Var.(str_array (text "planned_dirs"))
-        /% Var.(str_array (text "planned_workspaces"))
-        /% Var.(array (timestamptz "planned_at"))
-        /% Var.(str_array (uuid "committed_work_manifests"))
-        /% Var.(array (timestamptz "committed_at")))
+        /% Var.(str_array (text "parallel_workspaces")))
+
+    let select_pull_request_core_id_sql = Mql_sql.read [%blob "sql/select_pull_request_core_id.sql"]
+
+    let select_pull_request_core_id () =
+      Pgsql_io.Typed_sql.(
+        sql
+        //
+        (* core_id *)
+        Ret.uuid
+        /^ select_pull_request_core_id_sql
+        /% Var.bigint "repository"
+        /% Var.bigint "pull_number")
+
+    let select_releasable_stategraph_hold_sql =
+      Mql_sql.read [%blob "sql/select_releasable_stategraph_hold.sql"]
+
+    let select_releasable_stategraph_hold () =
+      Pgsql_io.Typed_sql.(
+        sql
+        //
+        (* core_id *)
+        Ret.uuid
+        /^ select_releasable_stategraph_hold_sql
+        /% Var.uuid "work_manifest")
 
     let select_parallel_apply_transactions_sql =
       Mql_sql.read [%blob "sql/select_parallel_apply_transactions.sql"]
@@ -2593,7 +2611,6 @@ module Db = struct
       ~base_ref
       ~branch_ref
       ~stategraph_parallel_apply_dirspaces
-      ~stategraph_moments
       db
       pull_request
       dirspaces =
@@ -2632,16 +2649,7 @@ module Db = struct
              stategraph_parallel_apply_dirspaces)
           (CCList.map
              (fun { Terrat_change.Dirspace.workspace; _ } -> workspace)
-             stategraph_parallel_apply_dirspaces)
-          (CCList.map
-             (fun ({ Terrat_change.Dirspace.dir; _ }, _) -> dir)
-             stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.planned_at)
-          (CCList.map
-             (fun ({ Terrat_change.Dirspace.workspace; _ }, _) -> workspace)
-             stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.planned_at)
-          (CCList.map snd stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.planned_at)
-          (CCList.map fst stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.committed_at)
-          (CCList.map snd stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.committed_at))
+             stategraph_parallel_apply_dirspaces))
     >>= function
     | Ok _ as ret -> Abb.Future.return ret
     | Error (#Pgsql_io.err as err) ->
@@ -2878,8 +2886,7 @@ module Db = struct
       db
       pull_request
       dirspaces
-      ~stategraph_parallel_apply_dirspaces
-      ~stategraph_moments =
+      ~stategraph_parallel_apply_dirspaces =
     let open Abb.Future.Infix_monad in
     Metrics.Psql_query_time.time
       (Metrics.psql_query_time "select_dirspaces_owned_by_other_pull_requests")
@@ -2931,16 +2938,7 @@ module Db = struct
              stategraph_parallel_apply_dirspaces)
           (CCList.map
              (fun { Terrat_change.Dirspace.workspace; _ } -> workspace)
-             stategraph_parallel_apply_dirspaces)
-          (CCList.map
-             (fun ({ Terrat_change.Dirspace.dir; _ }, _) -> dir)
-             stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.planned_at)
-          (CCList.map
-             (fun ({ Terrat_change.Dirspace.workspace; _ }, _) -> workspace)
-             stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.planned_at)
-          (CCList.map snd stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.planned_at)
-          (CCList.map fst stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.committed_at)
-          (CCList.map snd stategraph_moments.Terrat_vcs_provider2.Stategraph_moments.committed_at))
+             stategraph_parallel_apply_dirspaces))
     >>= function
     | Ok _ as res -> Abb.Future.return res
     | Error (#Pgsql_io.err as err) ->
@@ -3001,6 +2999,39 @@ module Db = struct
           (CCList.map (fun { Terrat_change.Dirspace.workspace; _ } -> workspace) dirspaces))
     >>= function
     | Ok rows -> Abbs_fc.return_ok (CCList.filter_map CCFun.id rows)
+    | Error (#Pgsql_io.err as err) ->
+        Prmths.Counter.inc_one Metrics.pgsql_errors_total;
+        Logs.err (fun m -> m "%s : ERROR : %a" request_id Pgsql_io.pp_err err);
+        Abbs_fc.return_err `Error
+
+  let query_pull_request_core_id ~request_id db repo pull_request_id =
+    let open Abb.Future.Infix_monad in
+    Metrics.Psql_query_time.time (Metrics.psql_query_time "select_pull_request_core_id") (fun () ->
+        Pgsql_io.Prepared_stmt.fetch
+          db
+          (Sql.select_pull_request_core_id ())
+          ~f:CCFun.id
+          (CCInt64.of_int @@ Api.Repo.id repo)
+          (CCInt64.of_int pull_request_id))
+    >>= function
+    | Ok rows -> Abbs_fc.return_ok (CCList.head_opt rows)
+    | Error (#Pgsql_io.err as err) ->
+        Prmths.Counter.inc_one Metrics.pgsql_errors_total;
+        Logs.err (fun m -> m "%s : ERROR : %a" request_id Pgsql_io.pp_err err);
+        Abbs_fc.return_err `Error
+
+  let query_releasable_stategraph_hold ~request_id db work_manifest_id =
+    let open Abb.Future.Infix_monad in
+    Metrics.Psql_query_time.time
+      (Metrics.psql_query_time "select_releasable_stategraph_hold")
+      (fun () ->
+        Pgsql_io.Prepared_stmt.fetch
+          db
+          (Sql.select_releasable_stategraph_hold ())
+          ~f:CCFun.id
+          work_manifest_id)
+    >>= function
+    | Ok rows -> Abbs_fc.return_ok (CCList.head_opt rows)
     | Error (#Pgsql_io.err as err) ->
         Prmths.Counter.inc_one Metrics.pgsql_errors_total;
         Logs.err (fun m -> m "%s : ERROR : %a" request_id Pgsql_io.pp_err err);

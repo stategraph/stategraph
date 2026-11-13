@@ -26,6 +26,8 @@ let oauth_env env =
        ("STATEGRAPH_OAUTH_GOOGLE_GROUP", "");
        ("STATEGRAPH_OAUTH_GOOGLE_ADMIN_EMAIL", "");
        ("STATEGRAPH_OAUTH_GOOGLE_SERVICE_ACCOUNT_JSON", "");
+       ("GITHUB_WEB_BASE_URL", "");
+       ("GITHUB_API_BASE_URL", "");
      ]
     @ env)
 
@@ -57,9 +59,9 @@ let assert_invalid_config ~needle = function
   | `Aborted -> Oth.Assert.false_ "scheduler aborted"
   | `Exn (exn, _) -> Oth.Assert.false_ (Printexc.to_string exn)
 
-(* The configuration was accepted and the service account reached the Admin SDK check. *)
+(* The configuration was accepted and the service account key was read and checked. *)
 let assert_admin_checked = function
-  | `Det (Error (`Provider_err msg)) -> Oth.Assert.str_contains ~haystack:msg ~needle:"credentials"
+  | `Det (Error (`Provider_err msg)) -> Oth.Assert.str_contains ~haystack:msg ~needle:"private_key"
   | `Det (Ok _) -> Oth.Assert.false_ "a service account without a private key was accepted"
   | `Det (Error err) -> Oth.Assert.false_ (Sgs_service_oauth2.Provider.show_create_err err)
   | `Aborted -> Oth.Assert.false_ "scheduler aborted"
@@ -94,7 +96,7 @@ let test =
   Oth.serial
     [
       Oth.test ~name:"a Google group takes its service account key inline" (fun _ ->
-          (* The key is read, then refused by the Admin SDK check for its missing private key. *)
+          (* The key is read, then refused for its missing private key. *)
           assert_admin_checked (with_oauth2 (group_env sa_json) (fun _ -> Abb.Future.return ())));
       Oth.test ~name:"a Google group reads its service account key from a path" (fun _ ->
           let path = Filename.temp_file "sa" ".json" in
@@ -144,6 +146,40 @@ let test =
                 (CCList.exists
                    (fun c -> CCString.equal c.Oauth2_htp_cookie.name Oauth2_htp_csrf.cookie_name)
                    set_cookies)
+          | `Det (Ok (Error err)) -> Oth.Assert.false_ (Oauth2_htp.show_err err)
+          | `Det (Error err) -> Oth.Assert.false_ (Sgs_service_oauth2.Provider.show_create_err err)
+          | `Aborted -> Oth.Assert.false_ "scheduler aborted"
+          | `Exn (exn, _) -> Oth.Assert.false_ (Printexc.to_string exn));
+      Oth.test ~name:"GitHub sign-in starts at the GitHub host with the GitHub scopes" (fun _ ->
+          match
+            with_oauth2
+              [
+                ("STATEGRAPH_OAUTH_TYPE", "github");
+                ("STATEGRAPH_OAUTH_GITHUB_ORG", "acme, other");
+                ("GITHUB_WEB_BASE_URL", "https://github.example.com/");
+                ("GITHUB_API_BASE_URL", "https://github.example.com/api/v3");
+              ]
+              (fun oauth2 ->
+                Oauth2_htp.oauth_start
+                  ~now:1700000000.
+                  (Sgs_service_oauth2.Provider.authenticator oauth2)
+                  (start_request "/oauth2/github/start?rd=%2Fstates"))
+          with
+          | `Det (Ok (Ok { Oauth2_htp.Start_result.login_url; set_cookies = _ })) ->
+              let uri = Uri.of_string login_url in
+              Oth.Assert.Eq.string
+                ~expected:"https://github.example.com/login/oauth/authorize"
+                ~actual:(Uri.to_string (Uri.with_query uri []));
+              CCList.iter
+                (fun (k, v) ->
+                  Oth.Assert.Eq.string
+                    ~expected:v
+                    ~actual:(CCOption.get_or ~default:"" (Uri.get_query_param uri k)))
+                [
+                  ("client_id", "client-id");
+                  ("redirect_uri", "https://example.com/oauth2/github/callback");
+                  ("scope", "read:user user:email read:org");
+                ]
           | `Det (Ok (Error err)) -> Oth.Assert.false_ (Oauth2_htp.show_err err)
           | `Det (Error err) -> Oth.Assert.false_ (Sgs_service_oauth2.Provider.show_create_err err)
           | `Aborted -> Oth.Assert.false_ "scheduler aborted"

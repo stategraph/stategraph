@@ -2682,10 +2682,13 @@ struct
                 ~request_id:(Builder.log_id s)
                 db
                 work_manifest_id
-                Terrat_work_manifest3.State.Aborted))
-      >>= fun () ->
-      Abbs_fc.to_result
-        (Tasks_base.release_stategraph_reservation ~request_id:(Builder.log_id s) work_manifest_id)
+                Terrat_work_manifest3.State.Aborted)
+          >>= fun () ->
+          Abbs_fc.to_result
+            (Tasks_base.release_stategraph_reservation
+               ~request_id:(Builder.log_id s)
+               db
+               work_manifest_id))
 
     (* A compute node can owe more work manifests than the one its run was
        started for, which is how the tree builder step and the config builder

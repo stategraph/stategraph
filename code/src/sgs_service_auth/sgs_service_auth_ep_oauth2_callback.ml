@@ -10,7 +10,6 @@ module Fc = Abbs_fc
 let src = Logs.Src.create "ep_oauth2_callback"
 
 module Logs = (val Logs.src_log src : Logs.LOG)
-module Http = Abb_curl.Make (Abb)
 
 module Sql = struct
   let find_user_by_external_id_sql =
@@ -53,35 +52,6 @@ module Sql = struct
     Pgsql_io.Typed_sql.(
       sql /^ update_user_avatar_sql /% Var.(option (text "avatar_url")) /% Var.uuid "user_id")
 end
-
-(* Google userinfo response - contains the picture URL *)
-module Google_userinfo = struct
-  type t = { picture : string option [@default None] } [@@deriving yojson { strict = false }]
-end
-
-(* Fetch picture URL from Google's userinfo endpoint using access token *)
-let fetch_google_picture ~token access_token =
-  let uri = "https://www.googleapis.com/oauth2/v2/userinfo" in
-  let headers = Http.Headers.of_list [ ("Authorization", "Bearer " ^ access_token) ] in
-  let open Abb.Future.Infix_monad in
-  Http.call ~headers `GET (Uri.of_string uri)
-  >>= function
-  | Ok (resp, body) ->
-      let status = Http.Status.to_int (Http.Response.status resp) in
-      if status = 200 then (
-        Logs.debug (fun m -> m "%s : Google userinfo response: %s" token body);
-        match Yojson.Safe.from_string body |> Google_userinfo.of_yojson with
-        | Ok info -> Abb.Future.return info.Google_userinfo.picture
-        | Error err ->
-            Logs.warn (fun m -> m "%s : Failed to parse Google userinfo: %s" token err);
-            Abb.Future.return None)
-      else (
-        Logs.warn (fun m -> m "%s : Google userinfo returned status %d" token status);
-        Abb.Future.return None)
-  | Error err ->
-      Logs.warn (fun m ->
-          m "%s : Failed to fetch Google userinfo: %a" token Http.pp_request_err err);
-      Abb.Future.return None
 
 (* Find or create user based on OAuth info *)
 let add_user_to_default_tenant token db default_tenant_name user user_id =
@@ -335,14 +305,11 @@ module Make (Cloud : Sgs_cloud.S) = struct
                       Logs.warn (fun m -> m "%s : UNSAFE_REDIRECT : %s" token rd);
                       "/"
                 in
-                let { Oauth2_htp_session.email; user; groups; access_token } = session in
+                let { Oauth2_htp_session.email; user; groups; avatar_url; access_token = _ } =
+                  session
+                in
                 let external_id = if CCString.is_empty user then email else user in
                 let display_name = None in
-                (match oauth_config.Sgs_config.oauth2_provider with
-                  | Sgs_config.Google _ when not (CCString.is_empty access_token) ->
-                      fetch_google_picture ~token access_token
-                  | Sgs_config.Google _ | Sgs_config.Oidc _ -> Abb.Future.return None)
-                >>= fun avatar_url ->
                 Logs.info (fun m ->
                     m
                       "%s : Avatar URL for %s: %s"

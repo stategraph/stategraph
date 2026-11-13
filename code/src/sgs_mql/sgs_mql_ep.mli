@@ -11,6 +11,12 @@
     - Page (optional) - Which page to start the query from, this is only valid if the query can be
       automatically paginated.
 
+    - Unmasked (optional) - In each tenant that the preview capability of the session reaches, the
+      [hcl], [tf_module_hcl] and [tfvars] tables return the stored defaults of sensitive variables
+      and the stored values of sensitive tfvars. The CLI evaluates these values and writes them
+      back, thus it must not read the mask. The rows of other tenants and the other tables stay
+      masked. A session that reaches no tenant of the user gets a 403 [MQL_UNMASKED_DENIED].
+
     {0 Row limit and default truncation}
 
     A query may carry its own [LIMIT]. If it does not, the endpoint applies a server [default_limit]
@@ -66,6 +72,7 @@ val run :
   string ->
   string option ->
   Mql_to_pgsql.Page.t option ->
+  bool option ->
   Brtl_rtng.Handler.t
 
 module Schema : sig
@@ -77,6 +84,10 @@ module Tests : sig
   val response_json : Yojson.Safe.t
 
   val response_json_orchestration : Yojson.Safe.t
+
+  (** The ids of the tenants in [tenants] that the preview capability of the session reaches: the
+      tenants whose rows an unmasked request reads unmasked. *)
+  val unmasked_tenants : Sg_caps.t -> 'a Sgs_tenant.t list -> Uuidm.t list
 
   (** The HTTP status that {!run} gives for an error of the MQL core. A query from outside that MQL
       or the compiler refuses is the caller's fault and gets [`Bad_request]. An audit failure or a

@@ -1,11 +1,11 @@
 ---
 title: Transactions Commands
-description: Use the stategraph tx commands to create, list, and abort Stategraph transactions, and to see their cost previews and their logs.
+description: Use the stategraph tx commands to create, list, and abort Stategraph transactions, to see their cost previews and their logs, and to release their holds.
 order: 3
 ---
 
 
-The `stategraph tx` commands create, list, and abort transactions, and show their cost previews and logs. A transaction records a change to your infrastructure and gives an audit trail. See [Transactions](/docs/infrastructure-as-a-database/transactions) for the model.
+The `stategraph tx` commands create, list, and abort transactions, show their cost previews and logs, and release their holds. A transaction records a change to your infrastructure and gives an audit trail. See [Transactions](/docs/infrastructure-as-a-database/transactions) for the model.
 
 ## Commands
 
@@ -17,6 +17,8 @@ The `stategraph tx` commands create, list, and abort transactions, and show thei
 | `stategraph tx costs` | Show the cost delta (current and planned) of a pending transaction |
 | `stategraph tx abort` | Abort an active transaction |
 | `stategraph tx logs list` | List the logs of a transaction |
+| `stategraph tx holds list` | List the held applies: applied transactions whose hold is not released |
+| `stategraph tx holds release` | Release the hold of an applied transaction |
 
 Common options:
 
@@ -167,6 +169,34 @@ stategraph tx logs list --tx <transaction-id>
 
 ```bash
 stategraph tx logs list --tx 550e8400-e29b-41d4-a716-446655440000
+```
+
+## stategraph tx holds list
+
+```bash
+stategraph tx holds list [--format json|table|simple]
+```
+
+An applied transaction may be held: an apply run by Orchestration leaves a hold on the transaction it applied until its pull request merges, is closed or is unlocked, so that no other pull request reverts the change meanwhile. An apply that overlaps a held one is refused until the hold is released. See [Lock management](/docs/orchestration/workflows/advanced/lock-management). This command lists the held applies of your tenants, with the key of each hold.
+
+### Example
+
+```bash
+stategraph tx holds list
+```
+
+## stategraph tx holds release
+
+```bash
+stategraph tx holds release --tx <transaction-id>
+```
+
+Releases the hold of an applied transaction. Orchestration releases the holds of a pull request itself when it merges, is closed or is unlocked; this command is the way out when it cannot, for a repository it no longer sees, or when a release failed. A no-op on a transaction without a hold.
+
+### Example
+
+```bash
+stategraph tx holds release --tx 550e8400-e29b-41d4-a716-446655440000
 ```
 
 Output (JSON):

@@ -5,6 +5,11 @@ type oauth2_provider =
       google_admin_email : string option;
       google_service_account_json : string option;
     }
+  | Github of {
+      github_orgs : string Sln_list.Non_empty.t;
+          (** STATEGRAPH_OAUTH_GITHUB_ORG, required: the organizations whose members can sign in,
+              comma-separated. The GitHub hosts are {!github_web_base} and {!github_api_base}. *)
+    }
   | Oidc of {
       oidc_issuer_url : string;
       auth0_rp_logout : bool;

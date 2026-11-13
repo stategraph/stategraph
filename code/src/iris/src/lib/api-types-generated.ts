@@ -1447,7 +1447,9 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                work_manifest_id: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -1710,6 +1712,7 @@ export interface operations {
                 page?: string[];
                 pr?: number;
                 repo?: string;
+                limit?: number;
             };
             header?: never;
             path: {
@@ -1741,6 +1744,7 @@ export interface operations {
         parameters: {
             query?: {
                 page?: string[];
+                limit?: number;
             };
             header?: never;
             path: {
@@ -2159,6 +2163,7 @@ export interface operations {
         parameters: {
             query?: {
                 page?: string[];
+                limit?: number;
             };
             header?: never;
             path: {
