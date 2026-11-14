@@ -687,6 +687,42 @@ export function navForMode(entries: NavEntry[], mode: string | undefined): NavEn
     );
 }
 
+/** Areas that read a tenant's states. They are empty until the tenant has one. */
+export type StateAreaId = "inventory" | "insights" | "analyze" | "security" | "costs";
+
+const stateAreaIds: ReadonlySet<ProductId> = new Set<StateAreaId>([
+  "inventory",
+  "insights",
+  "analyze",
+  "security",
+  "costs",
+]);
+
+function isStateAreaId(id: ProductId): id is StateAreaId {
+  return stateAreaIds.has(id);
+}
+
+export function isStateAreaNav(entry: NavEntry): boolean {
+  return isStateAreaId(entry.product.id);
+}
+
+/** The state area a route belongs to and the screen it opens, matched against the area's own href
+ *  and its screens' hrefs. A coming-soon screen belongs to no area. */
+export function stateAreaForRoute(
+  pathname: string,
+): { area: StateAreaId; screen: ProductId } | null {
+  for (const entry of mainNav) {
+    const area = entry.product.id;
+    if (!isStateAreaId(area)) continue;
+    for (const node of [...(entry.children ?? []), entry]) {
+      if (node.product.status === "available" && matchesRoute(pathname, node.product.href)) {
+        return { area, screen: node.product.id };
+      }
+    }
+  }
+  return null;
+}
+
 /** Should this nav entry render as active for the current pathname? Covers
  *  the entry's own route, the standalone routes it hosts, and its children. */
 export function navEntryActive(entry: NavEntry, pathname: string): boolean {

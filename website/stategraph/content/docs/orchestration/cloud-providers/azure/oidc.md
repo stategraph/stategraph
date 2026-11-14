@@ -149,7 +149,7 @@ To use one App Registration or subscription per environment, put the `oidc` step
 
 ```yaml
 workflows:
-  - tag_query: "dir:terraform/production/**"
+  - tag_query: "terraform/production in dir"
     plan:
       - type: oidc
         provider: azure
@@ -166,7 +166,7 @@ workflows:
         subscription_id: "PROD_SUBSCRIPTION_ID"
       - type: init
       - type: apply
-  - tag_query: "dir:terraform/staging/**"
+  - tag_query: "terraform/staging in dir"
     plan:
       - type: oidc
         provider: azure

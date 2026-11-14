@@ -5,8 +5,11 @@ import {
   accountNav,
   getProductByHref,
   getProductById,
+  isStateAreaNav,
   mainNav,
   navEntryActive,
+  navForMode,
+  stateAreaForRoute,
   type NavEntry,
   type ProductId,
 } from "./products";
@@ -228,6 +231,71 @@ test("every painted-door page belongs to a coming_soon product", () => {
     const id = readFileSync(f, "utf8").match(/getProductById\("([^"]+)"\)/)?.[1];
     assert.ok(id, `${f} renders PaintedDoorPage without getProductById`);
     assert.equal(getProductById(id as ProductId)?.status, "coming_soon", `${id} renders a painted door but is not coming_soon`);
+  }
+});
+
+test("the state areas are exactly the five that read a tenant's states", () => {
+  const ids = (entries: NavEntry[]) => entries.filter(isStateAreaNav).map((e) => e.product.id);
+  const areas = ["inventory", "insights", "analyze", "security", "costs"];
+  assert.deepEqual(ids(mainNav), areas);
+  assert.deepEqual(ids(navForMode(mainNav, "COMMUNISM")), areas);
+  assert.deepEqual(ids(accountNav), []);
+  for (const id of ["home", "orchestration", "getting-started"]) {
+    const entry = mainNav.find((e) => e.product.id === id)!;
+    assert.equal(isStateAreaNav(entry), false, `${id} is a state area`);
+  }
+});
+
+test("a route belongs to the state area whose own or screen href it matches", () => {
+  const cases: Array<[string, string, string]> = [
+    ["/inventory", "inventory", "inventory"],
+    ["/instances", "inventory", "instances"],
+    ["/states", "inventory", "states"],
+    ["/states/detail", "inventory", "states"],
+    ["/modules", "inventory", "modules"],
+    ["/types", "inventory", "types"],
+    ["/gap-analysis", "inventory", "gap-analysis"],
+    ["/insights", "insights", "insights"],
+    ["/timeline/detail", "insights", "timeline"],
+    ["/state-changes", "insights", "state-changes"],
+    ["/search", "insights", "search"],
+    ["/blast-radius", "insights", "blast-radius"],
+    ["/graph-explorer", "insights", "graph-explorer"],
+    ["/analyze", "analyze", "analyze"],
+    ["/query", "analyze", "query"],
+    ["/dashboards", "analyze", "dashboards"],
+    ["/security", "security", "security"],
+    ["/security/overview", "security", "security-overview"],
+    ["/security/findings/detail", "security", "security-findings"],
+    ["/costs", "costs", "costs"],
+    ["/cost-overview", "costs", "cost-overview"],
+    ["/cost-explorer", "costs", "cost-explorer"],
+    ["/cost-analysis", "costs", "cost-analysis"],
+    ["/billing-connections", "costs", "billing-connections"],
+  ];
+  for (const [pathname, area, screen] of cases) {
+    assert.deepEqual(stateAreaForRoute(pathname), { area, screen }, pathname);
+  }
+});
+
+test("routes outside the state areas, coming-soon screens and the routes a screen hosts belong to none", () => {
+  for (const pathname of [
+    "/",
+    "/orchestration",
+    "/runs",
+    "/drift",
+    "/getting-started",
+    "/migrate-stategraph",
+    "/settings",
+    "/support",
+    "/cost-budgets",
+    "/cost-policies",
+    "/cost-optimization",
+    "/dashboard",
+    "/visualization",
+    "/statesman",
+  ]) {
+    assert.equal(stateAreaForRoute(pathname), null, pathname);
   }
 });
 

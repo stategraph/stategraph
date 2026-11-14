@@ -1,5 +1,5 @@
 (library
  (name terrat_job_context)
- (libraries terrat_api terrat_tag_query uuidm)
+ (libraries sln terrat_api terrat_tag_query uuidm)
  (preprocess
   (pps ppx_deriving.eq ppx_deriving.show ppx_deriving_yojson)))

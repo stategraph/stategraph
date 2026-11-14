@@ -129,6 +129,148 @@ let test_a_row_of_this_version_round_trips =
       | Ok decoded -> Oth.Assert.eq ~eq:Cap.equal ~pp:Cap.pp capabilities decoded
       | Error err -> raise (Failure ("decode failed: " ^ err)))
 
+(* The carrier on the job type: a parameter map with the name unchanged. *)
+module T = Terrat_job_context.Job.Type_
+
+let expected_parameters = Sln_map.String.add "mode" "DEBUG" Sln_map.String.empty
+
+(* The stored row of a job, decoded the way the provider decodes it before it
+   builds the job type. *)
+let decode_job_type json =
+  match Terrat_job_type_type.of_yojson (Yojson.Safe.from_string json) with
+  | Ok type_ -> type_
+  | Error err -> raise (Failure ("decode failed: " ^ err))
+
+(* A parameter map must survive its own yojson form: this is the shape that
+   crosses into the stored row. *)
+let test_parameters_map_round_trips =
+  Oth.test ~name:"a parameter map round trips through yojson" (fun _ ->
+      Oth.Assert.eq
+        ~eq:T.Params.equal
+        ~pp:T.Params.pp
+        expected_parameters
+        (Oth.Assert.ok_pp
+           ~pp:Format.pp_print_string
+           (T.Params.of_yojson (T.Params.to_yojson expected_parameters))))
+
+(* The composition the provider runs: the map on the job type crosses into the
+   generated job schema and comes back with the same bindings. *)
+let test_parameters_compose_with_the_job_schema =
+  Oth.test ~name:"a parameter map survives the job schema composition" (fun _ ->
+      let generated =
+        Oth.Assert.ok_pp
+          ~pp:Format.pp_print_string
+          (Terrat_job_type_run_params.of_yojson (T.Params.to_yojson expected_parameters))
+      in
+      Oth.Assert.eq
+        ~eq:T.Params.equal
+        ~pp:T.Params.pp
+        expected_parameters
+        (Oth.Assert.ok_pp
+           ~pp:Format.pp_print_string
+           (T.Params.of_yojson (Terrat_job_type_run_params.to_yojson generated))))
+
+(* A stored plan row of a run with no run_params: the field is absent, and it
+   must decode to [None].  A row written before this field existed is this
+   row. *)
+let test_a_stored_plan_row_without_parameters =
+  Oth.test ~name:"a stored plan row without run_params decodes" (fun _ ->
+      Oth.Assert.eq
+        ~eq:Terrat_job_type_type.equal
+        ~pp:Terrat_job_type_type.pp
+        (Terrat_job_type_type.Plan
+           {
+             Terrat_job_type_plan.type_ = `Plan;
+             tag_query = Some "directory:foo";
+             kind = None;
+             force_fail = None;
+             run_params = None;
+           })
+        (decode_job_type {|{"type": "plan", "tag_query": "directory:foo"}|}))
+
+(* A stored plan row of a run with run_params: the field carries the map. *)
+let test_a_stored_plan_row_with_parameters =
+  Oth.test ~name:"a stored plan row with run_params decodes" (fun _ ->
+      match
+        decode_job_type
+          {|{"type": "plan", "tag_query": "directory:foo", "run_params": {"mode": "DEBUG"}}|}
+      with
+      | Terrat_job_type_type.Plan plan -> (
+          match plan.Terrat_job_type_plan.run_params with
+          | Some run_params ->
+              Oth.Assert.eq
+                ~eq:T.Params.equal
+                ~pp:T.Params.pp
+                expected_parameters
+                (Oth.Assert.ok_pp
+                   ~pp:Format.pp_print_string
+                   (T.Params.of_yojson (Terrat_job_type_run_params.to_yojson run_params)))
+          | None -> Oth.Assert.false_ "expected the row to carry run_params")
+      | _ -> Oth.Assert.false_ "expected a plan row")
+
+(* A stored apply row of a run with no parameters: the field is absent, and it
+   must decode to [None]. *)
+let test_a_stored_apply_row_without_parameters =
+  Oth.test ~name:"a stored apply row without run_params decodes" (fun _ ->
+      Oth.Assert.eq
+        ~eq:Terrat_job_type_type.equal
+        ~pp:Terrat_job_type_type.pp
+        (Terrat_job_type_type.Apply
+           {
+             Terrat_job_type_apply.type_ = `Apply;
+             tag_query = Some "directory:foo";
+             kind = None;
+             force = false;
+             force_fail = None;
+             run_params = None;
+           })
+        (decode_job_type {|{"type": "apply", "tag_query": "directory:foo"}|}))
+
+(* A stored apply row of a run with run_params: the field carries the map. *)
+let test_a_stored_apply_row_with_parameters =
+  Oth.test ~name:"a stored apply row with run_params decodes" (fun _ ->
+      match
+        decode_job_type
+          {|{"type": "apply", "tag_query": "directory:foo", "force": true, "run_params": {"mode": "DEBUG"}}|}
+      with
+      | Terrat_job_type_type.Apply apply -> (
+          match apply.Terrat_job_type_apply.run_params with
+          | Some run_params ->
+              Oth.Assert.eq
+                ~eq:T.Params.equal
+                ~pp:T.Params.pp
+                expected_parameters
+                (Oth.Assert.ok_pp
+                   ~pp:Format.pp_print_string
+                   (T.Params.of_yojson (Terrat_job_type_run_params.to_yojson run_params)))
+          | None -> Oth.Assert.false_ "expected the row to carry run_params")
+      | _ -> Oth.Assert.false_ "expected an apply row")
+
+(* A row whose parameter value is not a string breaks the schema and must be
+   rejected, not read as a run with no parameters. *)
+let test_a_stored_row_with_a_non_string_parameter_is_rejected =
+  Oth.test ~name:"a stored row with a non-string parameter is rejected" (fun _ ->
+      match
+        Terrat_job_type_type.of_yojson
+          (Yojson.Safe.from_string
+             {|{"type": "plan", "tag_query": "directory:foo", "run_params": {"mode": 42}}|})
+      with
+      | Error _ -> ()
+      | Ok _ -> Oth.Assert.false_ "expected the row to be rejected")
+
+(* The sub-key is [run_params].  A row that still spells it [parameters] is a row
+   of a build that no deployment carries, and the schema is strict: it must be
+   rejected, not read as a run with no parameters. *)
+let test_a_stored_row_with_the_old_parameters_key_is_rejected =
+  Oth.test ~name:"a stored row with the old parameters key is rejected" (fun _ ->
+      match
+        Terrat_job_type_type.of_yojson
+          (Yojson.Safe.from_string
+             {|{"type": "plan", "tag_query": "directory:foo", "parameters": {"mode": "DEBUG"}}|})
+      with
+      | Error _ -> ()
+      | Ok _ -> Oth.Assert.false_ "expected the row to be rejected")
+
 let test =
   Oth.parallel
     [
@@ -139,6 +281,14 @@ let test =
       test_a_row_with_only_the_removed_fields;
       test_a_row_of_the_setup_phase;
       test_a_row_of_this_version_round_trips;
+      test_parameters_map_round_trips;
+      test_parameters_compose_with_the_job_schema;
+      test_a_stored_plan_row_without_parameters;
+      test_a_stored_plan_row_with_parameters;
+      test_a_stored_apply_row_without_parameters;
+      test_a_stored_apply_row_with_parameters;
+      test_a_stored_row_with_a_non_string_parameter_is_rejected;
+      test_a_stored_row_with_the_old_parameters_key_is_rejected;
     ]
 
 let () =

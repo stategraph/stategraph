@@ -1180,7 +1180,10 @@ struct
           match job.Tjc.Job.type_ with
           | Tjc.Job.Type_.Autoplan -> (
               (* The static configuration, never the one that the config builder makes: a precheck
-                 exists to stop that builder, thus a precheck it produced is too late to read. *)
+                 exists to stop that builder, thus a precheck it produced is too late to read.
+                 A layer plan of a run that already answered them does not answer them again: the
+                 origin job ran them, and {!query_explicit_plan_exists} answers true for a run a
+                 comment started. *)
               fetch Keys.repo_config_raw'
               >>= fun (_, repo_config) ->
               match (V1.when_modified repo_config).V1.When_modified.prechecks with
@@ -1431,11 +1434,15 @@ struct
             match job with
             | {
              Tjc.Job.type_ =
-               Tjc.Job.Type_.(Autoapply | Apply { tag_query = _; kind = _; force = false });
+               Tjc.Job.Type_.(
+                 Autoapply | Apply { tag_query = _; kind = _; force = false; parameters = _ });
              _;
             } -> `Apply reviews
-            | { Tjc.Job.type_ = Tjc.Job.Type_.Apply { tag_query = _; kind = _; force = true }; _ }
-              -> `Apply_force
+            | {
+             Tjc.Job.type_ =
+               Tjc.Job.Type_.Apply { tag_query = _; kind = _; force = true; parameters = _ };
+             _;
+            } -> `Apply_force
             | _ -> assert false
           in
           let open Abb.Future.Infix_monad in
@@ -1509,7 +1516,8 @@ struct
               fetch Keys.job
               >>= function
               | {
-                  Tjc.Job.type_ = Tjc.Job.Type_.Apply { force = false; tag_query = _; kind = _ };
+                  Tjc.Job.type_ =
+                    Tjc.Job.Type_.Apply { force = false; tag_query = _; kind = _; parameters = _ };
                   _;
                 }
                 when not passed_apply_requirements ->
@@ -1749,7 +1757,7 @@ struct
           let open Irm in
           fetch Keys.job
           >>= function
-          | { Tjc.Job.type_ = Tjc.Job.Type_.Plan { tag_query; kind = _ }; _ } -> (
+          | { Tjc.Job.type_ = Tjc.Job.Type_.Plan { tag_query; kind = _; parameters = _ }; _ } -> (
               (* [working_set_matches] is what a plan would actually run.  If it is
                  empty then nothing is going to happen, and the user who typed the
                  command has to be told which of the reasons it is.  Running the
@@ -1884,7 +1892,10 @@ struct
               >>? function
               | [] -> Error `Noop
               | _ :: _ -> Ok ())
-          | { Tjc.Job.type_ = Tjc.Job.Type_.Apply { tag_query; kind = _; force = _ }; _ } -> (
+          | {
+              Tjc.Job.type_ = Tjc.Job.Type_.Apply { tag_query; kind = _; force = _; parameters = _ };
+              _;
+            } -> (
               (* Same reasoning as [check_dirspaces_to_plan]: an empty working set
                  has several causes and the user is owed the one that applies to
                  them, not the same sentence for all of them. *)
@@ -1953,8 +1964,8 @@ struct
           let module T = Tjc.Job.Type_ in
           let command_and_query =
             match job.Tjc.Job.type_ with
-            | T.Apply { tag_query; kind = _; force = _ } -> Some ("apply", tag_query)
-            | T.Plan { tag_query; kind = _ } -> Some ("plan", tag_query)
+            | T.Apply { tag_query; kind = _; force = _; parameters = _ } -> Some ("apply", tag_query)
+            | T.Plan { tag_query; kind = _; parameters = _ } -> Some ("plan", tag_query)
             | T.Autoapply
             | T.Autoplan
             | T.Gate_approval _
@@ -2018,8 +2029,11 @@ struct
             (fetch Keys.job)
           >>= fun (client, pull_request, working_set_matches, job) ->
           match job with
-          | { Tjc.Job.type_ = Tjc.Job.Type_.Apply { force = true; tag_query = _; kind = _ }; _ } ->
-              Abbs_fc.return_ok ()
+          | {
+           Tjc.Job.type_ =
+             Tjc.Job.Type_.Apply { force = true; tag_query = _; kind = _; parameters = _ };
+           _;
+          } -> Abbs_fc.return_ok ()
           | _ -> (
               let module Dc = Terrat_change_match3.Dirspace_config in
               let dirspaces = CCList.map (fun { Dc.dirspace; _ } -> dirspace) working_set_matches in
@@ -2377,25 +2391,55 @@ struct
                   | Terrat_pull_request.State.Open -> Abbs_fc.return_ok ())
                 >>| fun () -> Some Tjc.Job.Type_.Autoapply
             | E.Comment { comment_id = _; comment } -> (
-                match comment with
-                | Terrat_comment.Apply { tag_query } ->
-                    Abbs_fc.return_ok
-                      (Some (Tjc.Job.Type_.Apply { tag_query; kind = None; force = false }))
-                | Terrat_comment.Gate_approval { tokens } ->
-                    Abbs_fc.return_ok (Some (Tjc.Job.Type_.Gate_approval { tokens }))
-                | Terrat_comment.Plan { tag_query } ->
-                    Abbs_fc.return_ok (Some (Tjc.Job.Type_.Plan { tag_query; kind = None }))
-                | Terrat_comment.Apply_force { tag_query } ->
-                    Abbs_fc.return_ok
-                      (Some (Tjc.Job.Type_.Apply { tag_query; kind = None; force = true }))
-                | Terrat_comment.Repo_config -> Abbs_fc.return_ok (Some Tjc.Job.Type_.Repo_config)
-                | Terrat_comment.Unlock unlocks ->
-                    Abbs_fc.return_ok
-                      (Some (Tjc.Job.Type_.Unlock (Sln_list.String.sort_uniq unlocks)))
-                | Terrat_comment.Index -> Abbs_fc.return_ok (Some Tjc.Job.Type_.Index)
-                | Terrat_comment.Help -> Abbs_fc.return_ok (Some Tjc.Job.Type_.Help)
-                | Terrat_comment.Apply_autoapprove _ | Terrat_comment.Feedback _ ->
-                    raise (Failure "nyi")))
+                let (* The resolver owns the comment-to-job table: it validates the parameters of a
+                   run command against the configuration and expands an alias into the verb it
+                   maps to.  The configuration is read only when the comment needs it, so [help]
+                   answers even when the configuration does not decode. *)
+                  module
+                  Cr =
+                  Terrat_vcs_event_evaluator2_comment_resolve
+                in
+                let eval =
+                  let open Irm in
+                  (if Cr.needs_config comment then
+                     fetch Keys.repo_config_raw'
+                     >>| fun (_, repo_config_raw) ->
+                     Some (Terrat_base_repo_config_v1.parameters repo_config_raw)
+                   else Abbs_fc.return_ok None)
+                  >>= fun config ->
+                  match Cr.resolve ~config comment with
+                  | Ok job_type -> Abbs_fc.return_ok (Some job_type)
+                  | Error reply ->
+                      (* Every reply is published, [Not_a_run] included: a verb this system
+                         decodes but does not run yet still answers the comment.  A raise here
+                         leaves the HTTP shell with an internal error, no reply and no job. *)
+                      fetch Keys.publish_comment
+                      >>= fun publish_comment ->
+                      publish_comment'
+                        publish_comment
+                        (match reply with
+                        | `Unknown_command -> Msg.Unknown_command
+                        | `Parameter_err err -> Msg.Parameter_err err
+                        | `Not_a_run -> Msg.Not_a_run)
+                      >>| fun () -> None
+                in
+                (* A configuration read that fails ends the evaluation, but the repository's
+                   owner still hears the reason: publish it best effort, the way [iter_job]
+                   does, and let the error stand. *)
+                let maybe_publish_err err =
+                  let open Irm in
+                  CCOption.map_or
+                    ~default:(Abbs_fc.return_ok ())
+                    (fun msg ->
+                      fetch Keys.publish_comment
+                      >>= fun publish_comment -> publish_comment' publish_comment msg)
+                    (Tasks_base.msg_of_err err)
+                in
+                let open Abb.Future.Infix_monad in
+                eval
+                >>= function
+                | Ok _ as r -> Abb.Future.return r
+                | Error err -> maybe_publish_err err >>= fun _ -> Abb.Future.return (Error err)))
           >>= fun job_type ->
           match job_type with
           | Some job_type ->

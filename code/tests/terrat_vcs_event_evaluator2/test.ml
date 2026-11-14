@@ -372,6 +372,7 @@ let wm ?(branch_ref = "deadbeef") ?(environment = None) ?(dirspaceflows = []) st
     environment;
     id = Uuidm.nil;
     initiator = Wm.Initiator.System;
+    params = Sln_map.String.empty;
     run_id = None;
     runs_on = None;
     state = Wm.State.Queued;

@@ -11,7 +11,9 @@ module Type_ = struct
 end
 
 type t = {
+  force_fail : bool option; [@default None]
   kind : Terrat_job_type_kind.t option; [@default None]
+  run_params : Terrat_job_type_run_params.t option; [@default None]
   tag_query : string option; [@default None]
   type_ : Type_.t; [@key "type"]
 }

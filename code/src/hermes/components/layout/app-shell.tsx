@@ -6,6 +6,7 @@ import { TopBar } from "./top-bar";
 import { Sidebar } from "./sidebar";
 import { UpdateBanner } from "./update-banner";
 import { InspectorPanel } from "@/components/inspector/InspectorPanel";
+import { StateAreaGate } from "@/components/product/StateAreaGate";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -70,7 +71,7 @@ export function AppShell({ children }: AppShellProps) {
         <div className="flex flex-1 overflow-hidden">
           {/* Main Content */}
           <main className="flex-1 overflow-auto p-4 sm:p-6 min-w-0">
-            {children}
+            <StateAreaGate>{children}</StateAreaGate>
           </main>
 
           {/* Inspector Panel - Conditionally rendered based on context */}

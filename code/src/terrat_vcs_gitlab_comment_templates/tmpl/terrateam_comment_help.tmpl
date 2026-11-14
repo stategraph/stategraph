@@ -16,6 +16,18 @@ List of Stategraph commands:
 - `stategraph unlock <pull requests number>` - Release any locks owned by the listed pull requests.
 - `stategraph feedback <msg>` - Give use feedback.
 
+## Parameters
+
+Add one or more `name=value` parameters before the command. For example, `stategraph mode=DEBUG plan` sets the parameter `mode` to `DEBUG`. Add a tag query after the command, as in `stategraph mode=DEBUG plan dir:staging`.
+
+Only `plan`, `apply`, `apply-force` and `apply-autoapprove` accept parameters.
+
+An administrator declares each parameter and its allowed values in the configuration file. An administrator can also add an alias in the configuration file. An alias replaces a command and its parameters, so `stategraph debug dir:staging` is the same command as `stategraph mode=DEBUG plan dir:staging`.
+
+See the parameters reference:
+
+https://stategraph.com/docs/reference/orchestration/configuration/parameters
+
 For help see:
 
 https://stategraph.com/docs

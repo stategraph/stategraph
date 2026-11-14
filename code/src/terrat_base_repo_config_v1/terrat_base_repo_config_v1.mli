@@ -887,6 +887,40 @@ module Notifications : sig
     t -> run:[ `Apply | `Plan ] -> success:bool -> has_changes:bool -> gates_or_denials:bool -> bool
 end
 
+module Parameters : sig
+  module Alias : sig
+    type t = {
+      action : Terrat_repo_config_parameter_alias.Action.t;
+          (** The run verb the alias expands to. *)
+      params : string Sln_map.String.t; [@default Sln_map.String.empty]
+          (** The parameter values the alias sets, by declared name. Empty when the alias sets none.
+          *)
+    }
+    [@@deriving make, show, yojson, eq]
+  end
+
+  module Parameter : sig
+    type t = {
+      fail_if_set : bool; [@default false]
+          (** When true, a run that sets this parameter completes every work manifest and is then
+              marked failed. *)
+      values : string list option; [@default None]
+          (** The values a comment may set this parameter to. [None] accepts any string, which is
+              what an absent [values] key and an explicit [values: null] both give. [Some []]
+              accepts no value. *)
+    }
+    [@@deriving make, show, yojson, eq]
+  end
+
+  type t = {
+    aliases : Alias.t Sln_map.String.t; [@default Sln_map.String.empty]
+        (** The aliases a comment may use in place of a verb, by alias name. *)
+    names : Parameter.t Sln_map.String.t; [@default Sln_map.String.empty]
+        (** The parameters a comment may set, by parameter name. *)
+  }
+  [@@deriving make, show, yojson, eq]
+end
+
 module Stacks : sig
   module Rules : sig
     type t = {
@@ -1084,6 +1118,7 @@ module View : sig
     lock_policy : Workflows.Entry.Lock_policy.t; [@default Workflows.Entry.Lock_policy.Strict]
     notifications : Notifications.t; [@default Notifications.make ()]
     parallel_runs : int; [@default 3]
+    parameters : Parameters.t; [@default Parameters.make ()]
     stacks : Stacks.t; [@default Stacks.make ()]
     storage : Storage.t; [@default Storage.make ()]
     tags : Tags.t; [@default Tags.make ()]
@@ -1147,6 +1182,9 @@ type of_version_1_err =
   | `Drift_tag_query_err of string * string
   | `Glob_parse_err of string * string
   | `Notification_policy_tag_query_err of string * string
+  | `Parameters_alias_shadows_verb_err of string
+  | `Parameters_alias_unknown_parameter_err of string * string
+  | `Parameters_alias_value_not_allowed_err of string * string * string
   | `Pattern_parse_err of string
   | `Stack_config_tag_query_err of string * string
   | `Window_parse_timezone_err of string
@@ -1205,6 +1243,7 @@ val integrations : 'a t -> Integrations.t
 val lock_policy : 'a t -> Workflows.Entry.Lock_policy.t
 val notifications : 'a t -> Notifications.t
 val parallel_runs : 'a t -> int
+val parameters : 'a t -> Parameters.t
 val stacks : 'a t -> Stacks.t
 val storage : 'a t -> Storage.t
 val tags : 'a t -> Tags.t

@@ -385,6 +385,7 @@ module Publisher_tools = struct
       ~summary_unified
       ~pull_request_ref
       ~dirspace_run_urls
+      ~fail_if_set
       ~dirspace_applied
       request_id
       account_status
@@ -415,11 +416,16 @@ module Publisher_tools = struct
         | _ -> None)
       |> CCList.sort dirspace_compare
     in
+    (* A run whose parameter set forces it to fail shows what a failed run shows: the heading, the
+       counts and the step visibility of the template read [overall_success], and the dirspace rows
+       read their own [success]. *)
+    let force_fail = not (CCList.is_empty fail_if_set) in
     let overall_success =
-      CCList.for_all
-        (fun (_, steps) ->
-          CCList.for_all (fun { O.success; ignore_errors; _ } -> success || ignore_errors) steps)
-        by_scope
+      (not force_fail)
+      && CCList.for_all
+           (fun (_, steps) ->
+             CCList.for_all (fun { O.success; ignore_errors; _ } -> success || ignore_errors) steps)
+           by_scope
     in
     (* Resource counts per dirspace, plus totals over the dirspaces that reported them.  All
        "-" when no dirspace's runner emitted a summary (#1929). *)
@@ -491,6 +497,15 @@ module Publisher_tools = struct
       `Assoc
         (CCList.flatten
            [
+             [
+               ( "parameters",
+                 `List
+                   (CCList.map
+                      (fun (name, value) ->
+                        `Assoc [ ("name", `String name); ("value", `String value) ])
+                      (Sln_map.String.bindings work_manifest.Wm.params)) );
+             ];
+             [ ("fail_if_set", `List (CCList.map (fun name -> `String name) fail_if_set)) ];
              CCOption.map_or
                ~default:[]
                (fun work_manifest_url ->
@@ -558,7 +573,7 @@ module Publisher_tools = struct
                    (CCList.map
                       (fun (({ Terrat_dirspace.dir; workspace } as dirspace), steps) ->
                         let has_changes = steps_has_changes steps in
-                        let success = steps_success steps in
+                        let success = steps_success steps && not force_fail in
                         let rs = Rs.of_steps_or_none steps in
                         let run_url =
                           match

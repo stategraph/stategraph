@@ -7,6 +7,7 @@ module Kind_drift = Terrat_job_type_kind_drift
 module Plan = Terrat_job_type_plan
 module Push = Terrat_job_type_push
 module Repo_config = Terrat_job_type_repo_config
+module Run_params = Terrat_job_type_run_params
 module Type = Terrat_job_type_type
 module Unlock = Terrat_job_type_unlock
 

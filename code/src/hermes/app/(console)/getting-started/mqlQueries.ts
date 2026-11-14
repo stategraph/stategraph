@@ -1,3 +1,16 @@
+import type { VcsProvider } from "@/lib/vcs/links";
+
+/** Pull request plan runs counted per lifecycle state (queued, running,
+ *  completed, aborted). run_type keeps the legacy alias autoplan for a plan;
+ *  index, build-config and build-tree runs are not plans, and drift plans
+ *  post no pull request comment. */
+export function firstPlanQuery(provider: VcsProvider): string {
+  return (
+    `select state, count(*) as c from ${provider}_work_manifests ` +
+    `where run_kind = 'pr' and run_type in ('plan', 'autoplan') group by state`
+  );
+}
+
 /** Read a GitLab installation's state by its numeric group id, the primary
  *  key of the tenant-scoped gitlab_installations CTE. The id is validated
  *  here, not at the call site, so the builder can never interpolate anything

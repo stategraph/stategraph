@@ -1578,6 +1578,13 @@
           "installation_id": {
             "type": "string"
           },
+          "parameters": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The parameters that the run sets, as parameter name to value. The runner sets each one as an environment variable of that name. The field is absent when the run sets no parameter.",
+            "type": "object"
+          },
           "protocol_version": {
             "type": "integer"
           },
@@ -1981,6 +1988,13 @@
           },
           "installation_id": {
             "type": "string"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The parameters that the run sets, as parameter name to value. The runner sets each one as an environment variable of that name. The field is absent when the run sets no parameter.",
+            "type": "object"
           },
           "protocol_version": {
             "type": "integer"

@@ -509,6 +509,18 @@ module Msg = struct
     ]
   [@@deriving show]
 
+  (* Why the evaluator refused the parameters of a comment.  The reply names the parameter the
+     comment wrote, so the person who wrote the comment fixes the comment instead of the
+     configuration. *)
+  type parameter_err =
+    [ `Duplicate of string  (** The name two parameter tokens of the comment set *)
+    | `Undeclared of string  (** The name the configuration does not declare *)
+    | `Value_not_allowed of string * string * string list
+      (** The name, the value the comment wrote, and the values the configuration allows; empty when
+          it allows none *)
+    ]
+  [@@deriving show]
+
   type ('account, 'db, 'pull_request, 'target, 'apply_requirements, 'config) t =
     | Access_control_denied of (string * access_control_denied)
     | Account_expired
@@ -535,7 +547,12 @@ module Msg = struct
     | Matches_in_later_layer of Terrat_change.Dirspace.t list
     | Mismatched_refs
     | Missing_plans of Missing_plan.t list
+    (* The evaluator answers a comment that names a verb this system decodes but does
+       not run yet: [apply-autoapprove], directly or through an alias.  No payload: the
+       template holds the whole text of the reply. *)
+    | Not_a_run
     | Operation_failed of operation_failed_reason
+    | Parameter_err of parameter_err
     | Plan_all_changes_applied
     | Plan_already_planned of Plan_noop.t list
     | Plan_no_matching_dirspaces of Terrat_tag_query.t
@@ -582,6 +599,10 @@ module Msg = struct
       }
     | Tier_check of Terrat_tier.Check.t
     | Unlock_success
+    (* The evaluator answers an alias-shaped comment that is no verb this
+       system knows.  No payload: the template holds the whole text of the
+       reply. *)
+    | Unknown_command
     | Work_manifest_run_failed of { run_id : string }
     | Work_manifest_stale of Work_manifest_stale.t
 
@@ -783,15 +804,21 @@ module type Shared = sig
       list ->
       (unit, [> `Error ]) result Abb.Future.t
 
+    (** [store_tf_operation_result ~force_fail] stores the result of a run. [force_fail] is the
+        verdict of the run: a set verdict stores every dirspace failed, so the directories count as
+        needing a plan and the stored row says what the user reads. *)
     val store_tf_operation_result :
       request_id:string ->
+      force_fail:bool ->
       t ->
       Uuidm.t ->
       Terrat_api_components_work_manifest_tf_operation_result.t ->
       (unit, [> `Error ]) result Abb.Future.t
 
+    (** [store_tf_operation_result2], as {!store_tf_operation_result}, for the steps result. *)
     val store_tf_operation_result2 :
       request_id:string ->
+      force_fail:bool ->
       t ->
       Uuidm.t ->
       Terrat_api_components_work_manifest_tf_operation_result2.t ->
@@ -1688,6 +1715,21 @@ module type Shared = sig
         job_id:Uuidm.t ->
         Terrat_job_context.Job.State.t ->
         (unit, [> `Error ]) result Abb.Future.t
+
+      (** [set_force_fail] records whether a configuration set forces the run to count as failed
+          whatever its actual result. The one writer is the task that publishes the result of the
+          run, so the result comment and the completion of the job read one value. *)
+      val set_force_fail :
+        request_id:string ->
+        Db.t ->
+        job_id:Uuidm.t ->
+        force_fail:bool ->
+        (unit, [> `Error ]) result Abb.Future.t
+
+      (** [query_force_fail] answers the verdict {!set_force_fail} recorded, and [false] when no
+          task recorded one: a run that carries no parameter is not forced to fail. *)
+      val query_force_fail :
+        request_id:string -> Db.t -> job_id:Uuidm.t -> (bool, [> `Error ]) result Abb.Future.t
 
       val add_work_manifest :
         request_id:string ->

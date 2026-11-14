@@ -9,8 +9,18 @@
           "default": false,
           "type": "boolean"
         },
+        "force_fail": {
+          "description": "True when a configuration set forces the run to count as failed whatever its actual result.  Absent, null and false all mean the run is not forced to fail.  It is written once, when the result of the run is published.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "kind": {
           "$ref": "#/definitions/kind"
+        },
+        "run_params": {
+          "$ref": "#/definitions/run_params"
         },
         "tag_query": {
           "type": "string"
@@ -102,8 +112,18 @@
     "plan": {
       "additionalProperties": false,
       "properties": {
+        "force_fail": {
+          "description": "True when a configuration set forces the run to count as failed whatever its actual result.  Absent, null and false all mean the run is not forced to fail.  It is written once, when the result of the run is published.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "kind": {
           "$ref": "#/definitions/kind"
+        },
+        "run_params": {
+          "$ref": "#/definitions/run_params"
         },
         "tag_query": {
           "type": "string"
@@ -142,6 +162,12 @@
       "required": [
         "type"
       ],
+      "type": "object"
+    },
+    "run_params": {
+      "additionalProperties": {
+        "type": "string"
+      },
       "type": "object"
     },
     "type": {

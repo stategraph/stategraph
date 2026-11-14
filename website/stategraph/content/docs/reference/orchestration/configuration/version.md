@@ -1,7 +1,7 @@
 ---
 title: version
 description: Reference for the version key in .stategraph/config.yml. The configuration file format version, which must be the quoted string "1".
-order: 25
+order: 26
 ---
 
 

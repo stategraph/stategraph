@@ -146,7 +146,7 @@ To use one IAM role per environment, put the `oidc` step in [workflows](/docs/re
 
 ```yaml
 workflows:
-  - tag_query: "dir:terraform/production/**"
+  - tag_query: "terraform/production in dir"
     plan:
       - type: oidc
         provider: aws
@@ -159,7 +159,7 @@ workflows:
         role_arn: "arn:aws:iam::PROD_ACCOUNT_ID:role/stategraph-prod"
       - type: init
       - type: apply
-  - tag_query: "dir:terraform/staging/**"
+  - tag_query: "terraform/staging in dir"
     plan:
       - type: oidc
         provider: aws

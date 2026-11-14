@@ -152,6 +152,7 @@ export function pushGettingStartedEvent(
     | "getting_started_gitlab_group_selected"
     | "getting_started_step_completed"
     | "getting_started_github_installation_claimed"
+    | "getting_started_first_run_detected"
     | "getting_started_completed",
   props?: Record<string, unknown>
 ) {

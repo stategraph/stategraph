@@ -165,6 +165,7 @@ struct
      The threshold counts every dirspace of the result, as one set of checks would. *)
   let create_op_commit_checks_of_result
       ?stale
+      ~fail_if_set
       create_commit_checks
       status_checks_enabled
       config
@@ -181,11 +182,17 @@ struct
         (fun (_, dirspaces) -> dirspaces)
         stale
     in
+    let fail_if_set_description =
+      Printf.sprintf "Failed: fail_if_set set on %s" (CCString.concat ", " fail_if_set)
+    in
     let status_of dirspace success =
-      match (success, Terrat_data.Dirspace_set.mem dirspace stale_dirspaces) with
-      | true, false -> (Terrat_commit_check.Status.Completed, "Completed")
-      | true, true -> (Terrat_commit_check.Status.Failed, "Stale: commits moved during the run")
-      | false, (true | false) -> (Terrat_commit_check.Status.Failed, "Failed")
+      if not (CCList.is_empty fail_if_set) then
+        (Terrat_commit_check.Status.Failed, fail_if_set_description)
+      else
+        match (success, Terrat_data.Dirspace_set.mem dirspace stale_dirspaces) with
+        | true, false -> (Terrat_commit_check.Status.Completed, "Completed")
+        | true, true -> (Terrat_commit_check.Status.Failed, "Stale: commits moved during the run")
+        | false, (true | false) -> (Terrat_commit_check.Status.Failed, "Failed")
     in
     let step =
       match CCList.rev work_manifest.Wm.steps with
@@ -308,6 +315,15 @@ struct
           })
       changes
 
+  (* The parameters the run sets, as the payload of the run carries them.  [make] is the
+     [Parameters] module of the payload that is built.  A run that sets no parameter leaves the
+     field out, so its payload is the one served before the field existed. *)
+  let payload_parameters
+      ~(make : ?additional:string Sln_map.String.t -> Json_schema.Empty_obj.t -> 'a)
+      work_manifest =
+    if Sln_map.String.is_empty work_manifest.Wm.params then None
+    else Some (make ~additional:work_manifest.Wm.params Json_schema.Empty_obj.t)
+
   let create ~dest_branch_ref ~branch_ref ~branch op s { Bs.Fetcher.fetch } =
     let open Irm in
     fetch Keys.account
@@ -396,12 +412,15 @@ struct
     >>= fun initiator ->
     fetch Keys.job
     >>= fun job ->
-    let tag_query =
+    (* The tag query and the parameters read the job the same way: both come off the run record of
+       a plan or an apply, and a system-made run carries neither. *)
+    let tag_query, parameters =
       let module Tjc = Terrat_job_context in
       let module T = Tjc.Job.Type_ in
       match job.Tjc.Job.type_ with
-      | T.Plan { tag_query; kind = _ } | T.Apply { tag_query; kind = _; force = _ } -> tag_query
-      | T.Autoapply | T.Autoplan -> Terrat_tag_query.any
+      | T.Plan { tag_query; parameters; kind = _ }
+      | T.Apply { tag_query; parameters; kind = _; force = _ } -> (tag_query, parameters)
+      | T.Autoapply | T.Autoplan -> (Terrat_tag_query.any, Sln_map.String.empty)
       | T.Gate_approval _ | T.Help | T.Index | T.Repo_config | T.Unlock _ | T.Push -> assert false
     in
     Abbs_fc.List_result.map
@@ -426,6 +445,7 @@ struct
             environment;
             id = ();
             initiator;
+            params = parameters;
             run_id = ();
             runs_on;
             state = ();
@@ -849,12 +869,18 @@ struct
           ->
     match type_ with
     | Tjc.Job.Type_.(
-        ( Plan { tag_query; kind = Some (Kind.Drift { restart_on_change; reconcile = _ }) as kind }
+        ( Plan
+            {
+              tag_query;
+              kind = Some (Kind.Drift { restart_on_change; reconcile = _ }) as kind;
+              parameters;
+            }
         | Apply
             {
               tag_query;
               kind = Some (Kind.Drift { restart_on_change; reconcile = _ }) as kind;
               force = _;
+              parameters;
             } )) -> (
         Builder.run_db s ~f:(fun db ->
             S.Db.query_job_restart ~request_id:(Builder.log_id s) ~job_id db
@@ -880,7 +906,7 @@ struct
                     S.Job_context.Job.create
                       ~request_id:(Builder.log_id s)
                       db
-                      Tjc.Job.Type_.(Plan { tag_query; kind })
+                      Tjc.Job.Type_.(Plan { tag_query; kind; parameters })
                       context
                       initiator
                     >>= fun restart ->
@@ -898,8 +924,8 @@ struct
                           restart.Tjc.Job.id
                           (restarts + 1)))))
     | Tjc.Job.Type_.(
-        ( Plan { kind = None; tag_query = _ }
-        | Apply { kind = None; tag_query = _; force = _ }
+        ( Plan { kind = None; tag_query = _; parameters = _ }
+        | Apply { kind = None; tag_query = _; force = _; parameters = _ }
         | Autoapply | Autoplan | Gate_approval _ | Help | Index | Push | Repo_config | Unlock _ ))
       -> Abbs_fc.return_ok ()
 
@@ -978,6 +1004,11 @@ struct
                  { Rkdpr.id = S.Api.Pull_request.Id.to_string (S.Api.Pull_request.id pr) })
         | `Drift -> None
       in
+      let parameters =
+        payload_parameters
+          ~make:Terrat_api_components.Work_manifest_plan.Parameters.make
+          work_manifest
+      in
       fetch Keys.derived_repo_config
       >>= fun (_, repo_config) ->
       (* Publish the unified summary comment now, before the run can produce
@@ -1022,6 +1053,7 @@ struct
               dirspaces;
               run_kind = run_kind_str;
               run_kind_data;
+              parameters;
               type_ = `Plan;
               result_version;
               protocol_version = Some protocol_version;
@@ -1071,8 +1103,13 @@ struct
        is given up and the work manifest completes: a work manifest that stays running is given to
        the runner again, which runs it again.  With the refs pinned to the commit of the run, a wait
        happens only when the data of that commit is gone. *)
-    let report_result2 work_manifest result work_manifest_result s ({ Bs.Fetcher.fetch } as fetcher)
-        =
+    let report_result2
+        ~fail_if_set
+        work_manifest
+        result
+        work_manifest_result
+        s
+        ({ Bs.Fetcher.fetch } as fetcher) =
       let superseded () =
         let open Irm in
         match (work_manifest.Wm.target, work_manifest.Wm.steps) with
@@ -1209,6 +1246,7 @@ struct
             fetch Keys.status_checks_enabled
             >>= fun status_checks_enabled ->
             create_op_commit_checks_of_result
+              ~fail_if_set
               ?stale
               create_commit_checks
               status_checks_enabled
@@ -1325,9 +1363,35 @@ struct
 
     let result work_manifest result s ({ Bs.Fetcher.fetch } as fetcher) =
       let open Irm in
+      (* The verdict is a property of the run and not of the shape of its result, and it is decided
+         once, before the result is stored: the stored row, the commit checks, the comment and the
+         summary of the dirspaces all read this value, and the completion of the job reads it back
+         from the job.  The config is the one the run was made with, because the refs are pinned. *)
+      fetch Keys.repo_config
+      >>= fun repo_config ->
+      let fail_if_set =
+        Terrat_vcs_event_evaluator2_force_fail.fail_if_set
+          (Terrat_base_repo_config_v1.parameters repo_config)
+          work_manifest.Wm.params
+      in
+      let force_fail = not (CCList.is_empty fail_if_set) in
+      fetch Keys.job
+      >>= fun job ->
+      Builder.run_db s ~f:(fun db ->
+          S.Job_context.Job.set_force_fail
+            ~request_id:(Builder.log_id s)
+            db
+            ~job_id:job.Terrat_job_context.Job.id
+            ~force_fail)
+      >>= fun () ->
       match result with
       | Wmr.Work_manifest_tf_operation_result2 result ->
-          let work_manifest_result = S.Work_manifest.result2 result in
+          let work_manifest_result =
+            let work_manifest_result = S.Work_manifest.result2 result in
+            if force_fail then
+              Terrat_vcs_event_evaluator2_force_fail.force_fail_result work_manifest_result
+            else work_manifest_result
+          in
           Builder.run_db s ~f:(fun db ->
               time_it
                 s
@@ -1341,6 +1405,7 @@ struct
                 (fun () ->
                   S.Db.store_tf_operation_result2
                     ~request_id:(Builder.log_id s)
+                    ~force_fail
                     db
                     work_manifest.Wm.id
                     result))
@@ -1351,11 +1416,16 @@ struct
           if work_manifest.Wm.state <> Wm.State.Aborted then
             (* In the case of an abort, we do not report back to the user, we
                 just want to store the results. *)
-            report_result2 work_manifest result work_manifest_result s fetcher
+            report_result2 ~fail_if_set work_manifest result work_manifest_result s fetcher
           else record_result_heads s fetcher work_manifest >>| fun _ -> ()
       | Wmr.Work_manifest_tf_operation_result result ->
           let open Irm in
-          let work_manifest_result = S.Work_manifest.result result in
+          let work_manifest_result =
+            let work_manifest_result = S.Work_manifest.result result in
+            if force_fail then
+              Terrat_vcs_event_evaluator2_force_fail.force_fail_result work_manifest_result
+            else work_manifest_result
+          in
           Builder.run_db s ~f:(fun db ->
               time_it
                 s
@@ -1369,6 +1439,7 @@ struct
                 (fun () ->
                   S.Db.store_tf_operation_result
                     ~request_id:(Builder.log_id s)
+                    ~force_fail
                     db
                     work_manifest.Wm.id
                     result))
@@ -1383,6 +1454,7 @@ struct
             fetch Keys.status_checks_enabled
             >>= fun status_checks_enabled ->
             create_op_commit_checks_of_result
+              ~fail_if_set
               create_commit_checks
               status_checks_enabled
               (Builder.State.config s)
@@ -1543,6 +1615,11 @@ struct
                  { Rkdpr.id = S.Api.Pull_request.Id.to_string (S.Api.Pull_request.id pr) })
         | `Drift -> None
       in
+      let parameters =
+        payload_parameters
+          ~make:Terrat_api_components.Work_manifest_apply.Parameters.make
+          work_manifest
+      in
       fetch Keys.derived_repo_config
       >>= fun (_, repo_config) ->
       (* Publish the unified summary comment now, before the run can produce
@@ -1580,6 +1657,7 @@ struct
               changed_dirspaces = changed_dirspaces synthesized_config changes;
               run_kind = run_kind_str;
               run_kind_data;
+              parameters;
               type_ = `Apply;
               result_version;
               protocol_version = Some protocol_version;

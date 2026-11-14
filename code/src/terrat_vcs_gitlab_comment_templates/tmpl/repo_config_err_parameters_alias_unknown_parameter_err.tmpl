@@ -1,0 +1,11 @@
+# Repository Configuration Error
+
+## What is the error?
+
+The alias `{{ alias }}` sets the parameter `{{ name }}`, which the `parameters.names` section does not declare.
+
+## What to do?
+
+Add a parameter named `{{ name }}` to the `parameters.names` section of the `.terrateam/config.yml` file, or remove the entry from the `params` of the alias `{{ alias }}`, then commit the change.
+
+See the [documentation](https://stategraph.com/docs/reference/orchestration/configuration/parameters) for the parameters configuration.

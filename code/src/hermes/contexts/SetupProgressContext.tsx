@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -13,9 +14,15 @@ import { useAuth } from "@/components/auth";
 import { useTenant } from "./TenantContext";
 import { useStates } from "./StateContext";
 import { executeMQL, listVcsInstallations } from "@/lib/api/client";
+import { statesListQuery } from "./mqlQueries";
 import { isTenantAdmin } from "@/lib/api/capabilities";
 import { loadAcrossProviders, orchestrationUnavailable } from "@/lib/mql/providers";
-import type { SetupFacts } from "@/lib/getting-started/setup-progress";
+import {
+  sameSetupShape,
+  setupShape,
+  type SetupFacts,
+  type SetupShape,
+} from "@/lib/getting-started/setup-progress";
 import {
   RECENT_RUNS_CAP,
   mapRunRow,
@@ -31,7 +38,12 @@ export interface SetupProgressValue extends SetupFacts {
   isLoading: boolean;
   /** The newest run, for naming the repository that got its first plan. */
   latestRun: RunRow | null;
+  /** What the tenant has set up, `null` while not known. A reload keeps the last known shape. */
+  shape: SetupShape | null;
   refresh: () => void;
+  /** Re-reads the facts while the current ones stay in place, and reloads the state list once the
+   *  tenant has a state the list does not show. */
+  revalidate: () => void;
 }
 
 interface OrchestrationFacts {
@@ -58,7 +70,7 @@ function errorStatus(error: unknown): number | null {
 export function SetupProgressProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, user } = useAuth();
   const { currentTenant, isLoading: tenantLoading } = useTenant();
-  const { states } = useStates();
+  const { states, refreshStates, isLoading: statesLoading, error: statesError } = useStates();
   const [facts, setFacts] = useState<OrchestrationFacts | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -121,8 +133,48 @@ export function SetupProgressProvider({ children }: { children: ReactNode }) {
     setReloadKey((k) => k + 1);
   }, []);
 
+  const currentTenantId = useRef(tenantId);
+  useEffect(() => {
+    currentTenantId.current = tenantId;
+  }, [tenantId]);
+
+  const hasStates = states.length > 0;
+  const revalidate = useCallback(() => {
+    setReloadKey((k) => k + 1);
+    if (!tenantId || hasStates) return;
+    executeMQL(statesListQuery(tenantId)).then(
+      (result) => {
+        if (currentTenantId.current === tenantId && result.data.length > 0) void refreshStates();
+      },
+      () => undefined,
+    );
+  }, [tenantId, hasStates, refreshStates]);
+
+  const current = facts !== null && facts.tenantId === tenantId ? facts : null;
+  const shapeLoading = current === null || statesLoading;
+  const [settledShape, setSettledShape] = useState<{
+    tenantId: string | null;
+    shape: SetupShape | null;
+  }>({ tenantId: null, shape: null });
+  const computedShape = setupShape(
+    {
+      loading: shapeLoading,
+      statesFailed: statesError !== null,
+      stateCount: states.length,
+      hasWorkManifest: current?.hasWorkManifest ?? null,
+    },
+    settledShape.tenantId === tenantId ? settledShape.shape : null,
+  );
+  if (
+    !shapeLoading &&
+    (settledShape.tenantId !== tenantId || !sameSetupShape(settledShape.shape, computedShape))
+  ) {
+    setSettledShape({ tenantId, shape: computedShape });
+  }
+  const shapeHasFirstRun = computedShape?.hasFirstRun ?? null;
+  const shapeHasState = computedShape?.hasState ?? null;
+
   const value = useMemo<SetupProgressValue>(() => {
-    const current = facts !== null && facts.tenantId === tenantId ? facts : null;
     return {
       isLoading: current === null,
       stateCount: states.length,
@@ -130,9 +182,14 @@ export function SetupProgressProvider({ children }: { children: ReactNode }) {
       latestRun: current?.latestRun ?? null,
       linkedInstallation: current?.linkedInstallation ?? null,
       engineRun: current?.engineRun ?? null,
+      shape:
+        shapeHasFirstRun === null || shapeHasState === null
+          ? null
+          : { hasFirstRun: shapeHasFirstRun, hasState: shapeHasState },
       refresh,
+      revalidate,
     };
-  }, [facts, tenantId, states.length, refresh]);
+  }, [current, states.length, shapeHasFirstRun, shapeHasState, refresh, revalidate]);
 
   return <SetupProgressContext.Provider value={value}>{children}</SetupProgressContext.Provider>;
 }

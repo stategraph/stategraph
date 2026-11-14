@@ -48,12 +48,16 @@ module Tmpl = struct
         Snabela.of_template tmpl Transformers.[ money; compact_plan; plan_diff; minus_one ])
 
   let jinja = Terrat_brand.branded CCFun.id
-  let terrateam_comment_help = read [%blob "tmpl/terrateam_comment_help.tmpl"]
+  let terrateam_comment_help = jinja [%blob "tmpl/terrateam_comment_help.tmpl"]
 
   (* The same command list as [terrateam_comment_help], posted when the comment
      names a command we do not have.  It lives here, beside the help text it
      mirrors, so both go through the brand rewrite from one place. *)
   let terrateam_comment_unknown_action = jinja [%blob "tmpl/terrateam_comment_unknown_action.tmpl"]
+
+  (* The reply to a verb this system knows and does not run yet.  Like the
+     unknown-action text, it goes through the brand rewrite. *)
+  let terrateam_comment_not_a_run = jinja [%blob "tmpl/terrateam_comment_not_a_run.tmpl"]
 
   let apply_requirements_config_err_tag_query =
     read [%blob "tmpl/apply_requirements_config_err_tag_query.tmpl"]
@@ -131,6 +135,9 @@ module Tmpl = struct
   let auto_apply_running = read [%blob "tmpl/auto_apply_running.tmpl"]
   let bad_custom_branch_tag_pattern = read [%blob "tmpl/bad_custom_branch_tag_pattern.tmpl"]
   let bad_glob = read [%blob "tmpl/bad_glob.tmpl"]
+  let parameter_err_duplicate = jinja [%blob "tmpl/parameter_err_duplicate.tmpl"]
+  let parameter_err_undeclared = jinja [%blob "tmpl/parameter_err_undeclared.tmpl"]
+  let parameter_err_value_not_allowed = jinja [%blob "tmpl/parameter_err_value_not_allowed.tmpl"]
   let unlock_success = read [%blob "tmpl/unlock_success.tmpl"]
 
   let access_control_all_dirspaces_denied =
@@ -212,6 +219,16 @@ module Tmpl = struct
     read [%blob "tmpl/repo_config_err_drift_tag_query_err.tmpl"]
 
   let repo_config_err_glob_parse_err = read [%blob "tmpl/repo_config_err_glob_parse_err.tmpl"]
+
+  let repo_config_err_parameters_alias_shadows_verb_err =
+    jinja [%blob "tmpl/repo_config_err_parameters_alias_shadows_verb_err.tmpl"]
+
+  let repo_config_err_parameters_alias_unknown_parameter_err =
+    jinja [%blob "tmpl/repo_config_err_parameters_alias_unknown_parameter_err.tmpl"]
+
+  let repo_config_err_parameters_alias_value_not_allowed_err =
+    jinja [%blob "tmpl/repo_config_err_parameters_alias_value_not_allowed_err.tmpl"]
+
   let repo_config_err_bad_glob_err = jinja [%blob "tmpl/repo_config_err_bad_glob_err.tmpl"]
   let repo_config_err_pattern_parse_err = read [%blob "tmpl/repo_config_err_pattern_parse_err.tmpl"]
 

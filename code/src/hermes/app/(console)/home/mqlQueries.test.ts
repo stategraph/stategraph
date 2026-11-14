@@ -23,6 +23,14 @@ import {
   stategraphEnginePresenceQuery,
   mapRunRow,
   RECENT_RUNS_CAP,
+  HOME_ROWS_CAP,
+  activityByHourQuery,
+  failedRunsQuery,
+  attentionTransactionsQuery,
+  latestRunsQuery,
+  openPullRequestPlansQuery,
+  driftRunPresenceQuery,
+  repositoriesWithRunsQuery,
 } from './mqlQueries';
 
 let passed = 0;
@@ -192,6 +200,57 @@ check('an unavailable installation list starts setup',
 check('the engine presence probe reads the tenant-scoped step outputs for the stategraph plan step',
   stategraphEnginePresenceQuery() ===
     "select work_manifest from workflow_step_outputs where step = 'stategraph/plan' limit 1");
+
+// --- Home Orchestration dashboard queries ---
+
+const since = '2026-10-31T00:00:00.000Z';
+for (const p of ['github', 'gitlab'] as const) {
+  const hours = activityByHourQuery(p, since);
+  check(`${p}: hourly activity reads its own work manifests from the bound`,
+    hours.includes(`from ${p}_work_manifests as wm`) && hours.includes(`wm.created_at >= '${since}'`));
+  check(`${p}: hourly activity keeps plan and apply aliases only, as two kinds`,
+    hours.includes("'autoplan'") && hours.includes("'unsafe-apply'") &&
+    hours.includes("then 'apply' else 'plan'") && !hours.includes("'index'"));
+  check(`${p}: two kinds of 14 days of hours fit the cap`, 2 * 24 * 14 < HOME_ROWS_CAP &&
+    hours.endsWith(`limit ${HOME_ROWS_CAP}`));
+
+  const failedQ = failedRunsQuery(p, since);
+  check(`${p}: failed runs count only failed steps not marked ignore_errors`,
+    failedQ.includes('wso.success = false and wso.ignore_errors = false'));
+  check(`${p}: failed runs bound both the steps and the runs`,
+    failedQ.includes(`wso.created_at >= '${since}'`) && failedQ.includes(`wm.created_at >= '${since}'`));
+  check(`${p}: failed runs are one row per run, newest first`,
+    failedQ.includes('group by wm.id,') && failedQ.includes('order by wm.created_at desc'));
+
+  const latestQ = latestRunsQuery(p, since);
+  check(`${p}: the latest runs are keyed by repository, pull request, branch, run kind and run type`,
+    latestQ.includes('group by wm.repo_owner, wm.repo_name, wm.pull_number, wm.branch, wm.run_kind, wm.run_type') &&
+    latestQ.includes('max(wm.created_at) as latest'));
+
+  const plansQ = openPullRequestPlansQuery(p);
+  check(`${p}: stored plans come from open pull requests of the same provider`,
+    plansQ.includes(`inner join ${p}_work_manifests as wm on wm.id = p.work_manifest`) &&
+    plansQ.includes(`inner join ${p}_pull_requests as pr on pr.repository = wm.repository and pr.pull_number = wm.pull_number`) &&
+    plansQ.includes("pr.state = 'open'") && plansQ.includes('p.has_changes as has_changes'));
+
+  check(`${p}: the drift presence probe stops at one row`,
+    driftRunPresenceQuery(p) === `select wm.id as id from ${p}_work_manifests as wm where wm.run_kind = 'drift' limit 1`);
+  check(`${p}: the repository probe stops at two`,
+    repositoriesWithRunsQuery(p).endsWith('group by wm.repository limit 2'));
+}
+
+const openBefore = '2026-11-13T14:00:00.000Z';
+const txQ = attentionTransactionsQuery("t'1", { since, openBefore }, 50);
+check('attention transactions are scoped to the tenant, with the id escaped',
+  txQ.includes("transactions.tenant_id = 't''1' and ("));
+check('attention transactions cover failed and failed-committed from the bound',
+  txQ.includes(`(transactions.state in ('failed', 'failed-committed') and transactions.created_at >= '${since}')`));
+check('attention transactions cover open ones created before the open bound',
+  txQ.includes("transactions.completed_at is null") &&
+  txQ.includes("transactions.state not in ('committed', 'aborted', 'failed', 'failed-committed')") &&
+  txQ.includes(`transactions.created_at < '${openBefore}'`));
+check('attention transactions come newest first, up to the limit',
+  txQ.endsWith('order by transactions.created_at desc, transactions.id limit 50'));
 
 console.log(`\n📊 Results: ${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

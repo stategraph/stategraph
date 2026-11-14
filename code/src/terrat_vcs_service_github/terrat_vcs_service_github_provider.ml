@@ -108,6 +108,12 @@ module Db = struct
       end in
       CCFun.(P.of_yojson %> CCResult.to_opt)
 
+    (* The job holds the run parameters as one JSON object of parameter name to value, under
+       [params->'run_params'].  A run that sets no parameter has no object, thus its row is the
+       same as a row of a run that sets none.  A malformed object fails the query, as a malformed
+       [tag_query] does. *)
+    let params_of_json = CCFun.(Terrat_job_context.Job.Type_.Params.of_yojson %> CCResult.to_opt)
+
     let lock_policy =
       let open Terrat_base_repo_config_v1.Workflows.Entry.Lock_policy in
       function
@@ -185,6 +191,9 @@ module Db = struct
         //
         (* branch *)
         Ret.(option text)
+        //
+        (* params *)
+        Ret.(option (u json params_of_json))
         /^ select_work_manifests_batch_query
         /% Var.(str_array (uuid "ids")))
 
@@ -1326,6 +1335,7 @@ module Db = struct
                     environment
                     runs_on
                     branch
+                    params
                   ->
                   let changes =
                     CCOption.get_or ~default:[] (Hashtbl.find_opt dsf_tbl id) |> CCList.rev
@@ -1348,6 +1358,7 @@ module Db = struct
                       (match user with
                       | Some user -> Wm.Initiator.User user
                       | None -> Wm.Initiator.System);
+                    params = CCOption.get_or ~default:Sln_map.String.empty params;
                     run_id;
                     runs_on;
                     steps = [ run_type ];
@@ -1815,7 +1826,7 @@ module Db = struct
         Logs.err (fun m -> m "%s : ERROR : %a" request_id Pgsql_io.pp_err err);
         Abbs_fc.return_err `Error
 
-  let store_tf_operation_result ~request_id db work_manifest_id result =
+  let store_tf_operation_result ~request_id ~force_fail db work_manifest_id result =
     let module Rb = Terrat_api_components_work_manifest_tf_operation_result in
     let open Abb.Future.Infix_monad in
     Prmths.Counter.inc_one
@@ -1826,6 +1837,7 @@ module Db = struct
         let module Wmr = Terrat_api_components.Work_manifest_dirspace_result in
         CCList.iter
           (fun result ->
+            let success = result.Wmr.success && not force_fail in
             Logs.info (fun m ->
                 m
                   "%s : RESULT_STORE : id=%a : dir=%s : workspace=%s : result=%s"
@@ -1834,14 +1846,14 @@ module Db = struct
                   work_manifest_id
                   result.Wmr.path
                   result.Wmr.workspace
-                  (if result.Wmr.success then "SUCCESS" else "FAILURE")))
+                  (if success then "SUCCESS" else "FAILURE")))
           result.Rb.dirspaces;
         Abbs_fc.List_result.iter
           ~f:(fun chunk ->
             let work_manifest_id = CCList.replicate (CCList.length chunk) work_manifest_id in
             let dir = CCList.map (fun result -> result.Wmr.path) chunk in
             let workspace = CCList.map (fun result -> result.Wmr.workspace) chunk in
-            let success = CCList.map (fun result -> result.Wmr.success) chunk in
+            let success = CCList.map (fun result -> result.Wmr.success && not force_fail) chunk in
             Metrics.Psql_query_time.time
               (Metrics.psql_query_time "insert_github_work_manifest_result")
               (fun () ->
@@ -1904,7 +1916,7 @@ module Db = struct
               gates
         | Some _ | None -> Abbs_fc.return_ok ())
 
-  let store_tf_operation_result2 ~request_id db work_manifest_id result =
+  let store_tf_operation_result2 ~request_id ~force_fail db work_manifest_id result =
     let module R2 = Terrat_api_components_work_manifest_tf_operation_result2 in
     let open Abb.Future.Infix_monad in
     let steps_success steps =
@@ -1971,6 +1983,7 @@ module Db = struct
           in
           CCList.iter
             (fun ({ Terrat_dirspace.dir; workspace }, success) ->
+              let success = success && not force_fail in
               Logs.info (fun m ->
                   m
                     "%s : RESULT_STORE : id=%a : dir=%s : workspace=%s : result=%s"
@@ -1988,7 +2001,7 @@ module Db = struct
               let workspace =
                 CCList.map (fun ({ Terrat_dirspace.workspace; _ }, _) -> workspace) chunk
               in
-              let success = CCList.map (fun (_, success) -> success) chunk in
+              let success = CCList.map (fun (_, success) -> success && not force_fail) chunk in
               Metrics.Psql_query_time.time
                 (Metrics.psql_query_time "insert_github_work_manifest_result")
                 (fun () ->
@@ -3961,6 +3974,7 @@ module Comment = struct
       module Gcm = Terrat_vcs_comment.Make (Terrat_vcs_github_comment.S)
 
       let post_comment
+          ~fail_if_set
           request_id
           brand
           account_status
@@ -4011,6 +4025,7 @@ module Comment = struct
             stale;
             synthesized_config;
             work_manifest;
+            fail_if_set;
           }
         in
         let work_manifest_id = work_manifest.Terrat_work_manifest3.id in
@@ -4231,6 +4246,38 @@ module Comment = struct
              pull_request
              "GLOB_PARSE_ERR"
              (Tmpl.repo_config_err_glob_parse_err brand)
+             kv
+    | `Parameters_alias_shadows_verb_err alias ->
+        let kv = `Assoc [ ("alias", `String alias) ] in
+        Abbs_fc.Result.ignore
+        @@ Gcm_api.apply_template_and_publish_jinja
+             ~request_id
+             client
+             pull_request
+             "PARAMETERS_ALIAS_SHADOWS_VERB_ERR"
+             (Tmpl.repo_config_err_parameters_alias_shadows_verb_err brand)
+             kv
+    | `Parameters_alias_unknown_parameter_err (alias, name) ->
+        let kv = `Assoc [ ("alias", `String alias); ("name", `String name) ] in
+        Abbs_fc.Result.ignore
+        @@ Gcm_api.apply_template_and_publish_jinja
+             ~request_id
+             client
+             pull_request
+             "PARAMETERS_ALIAS_UNKNOWN_PARAMETER_ERR"
+             (Tmpl.repo_config_err_parameters_alias_unknown_parameter_err brand)
+             kv
+    | `Parameters_alias_value_not_allowed_err (alias, name, value) ->
+        let kv =
+          `Assoc [ ("alias", `String alias); ("name", `String name); ("value", `String value) ]
+        in
+        Abbs_fc.Result.ignore
+        @@ Gcm_api.apply_template_and_publish_jinja
+             ~request_id
+             client
+             pull_request
+             "PARAMETERS_ALIAS_VALUE_NOT_ALLOWED_ERR"
+             (Tmpl.repo_config_err_parameters_alias_value_not_allowed_err brand)
              kv
     | `Pattern_parse_err s ->
         let kv = Snabela.Kv.(Map.of_list [ ("pattern", string s) ]) in
@@ -5067,9 +5114,9 @@ module Comment = struct
              (Tmpl.gate_check_failure brand)
              kv
     | Msg.Help ->
-        let kv = Snabela.Kv.(Map.of_list []) in
+        let kv = `Assoc [] in
         Abbs_fc.Result.ignore
-        @@ Gcm_api.apply_template_and_publish
+        @@ Gcm_api.apply_template_and_publish_jinja
              ~request_id
              client
              pull_request
@@ -5283,6 +5330,34 @@ module Comment = struct
              msg_type
              tmpl
              (`Assoc (("request_id", `String request_id) :: extra))
+    | Msg.Parameter_err err ->
+        (* The reply names the parameter the comment wrote, so the person who wrote the
+           comment fixes the comment instead of the configuration. *)
+        let msg_type, tmpl, kv =
+          match err with
+          | `Duplicate name ->
+              ( "PARAMETER_DUPLICATE",
+                Tmpl.parameter_err_duplicate brand,
+                `Assoc [ ("name", `String name) ] )
+          | `Undeclared name ->
+              ( "PARAMETER_UNDECLARED",
+                Tmpl.parameter_err_undeclared brand,
+                `Assoc [ ("name", `String name) ] )
+          | `Value_not_allowed (name, value, allowed) ->
+              ( "PARAMETER_VALUE_NOT_ALLOWED",
+                Tmpl.parameter_err_value_not_allowed brand,
+                `Assoc
+                  [
+                    ("name", `String name);
+                    ("value", `String value);
+                    ("has_allowed", `Bool (allowed <> []));
+                    ( "allowed",
+                      `List (CCList.map (fun value -> `Assoc [ ("value", `String value) ]) allowed)
+                    );
+                  ] )
+        in
+        Abbs_fc.Result.ignore
+        @@ Gcm_api.apply_template_and_publish_jinja ~request_id client pull_request msg_type tmpl kv
     | Msg.Plan_all_changes_applied ->
         let kv = Snabela.Kv.(Map.of_list []) in
         Abbs_fc.Result.ignore
@@ -5654,8 +5729,17 @@ module Comment = struct
         let module N = V1.Notifications in
         let module R2 = Terrat_api_components.Work_manifest_tf_operation_result2 in
         let module Wm = Terrat_work_manifest3 in
+        (* The names the comment reports, and the verdict the visibility gate reads, come from one
+           derivation: a run whose parameter set forces it to fail shows the comment a failed run
+           shows. *)
+        let fail_if_set =
+          Terrat_vcs_event_evaluator2.Force_fail.fail_if_set
+            (V1.parameters repo_config)
+            work_manifest.Wm.params
+        in
         let post_classic () =
           Result.Publisher3.post_comment
+            ~fail_if_set
             request_id
             brand
             account_status
@@ -5700,10 +5784,11 @@ module Comment = struct
            ignore_errors. *)
         let module O = Terrat_api_components.Workflow_step_output in
         let success =
-          CCList.for_all
-            (fun { O.success; ignore_errors; payload = _; scope = _; step = _ } ->
-              success || ignore_errors)
-            result.R2.steps
+          CCList.is_empty fail_if_set
+          && CCList.for_all
+               (fun { O.success; ignore_errors; payload = _; scope = _; step = _ } ->
+                 success || ignore_errors)
+               result.R2.steps
         in
         (* A plan step whose payload carries no [has_changes] counts as having changes. *)
         let has_changes =
@@ -5797,6 +5882,26 @@ module Comment = struct
              pull_request
              "UNLOCK_SUCCESS"
              (Tmpl.unlock_success brand)
+             kv
+    | Msg.Unknown_command ->
+        let kv = `Assoc [] in
+        Abbs_fc.Result.ignore
+        @@ Gcm_api.apply_template_and_publish_jinja
+             ~request_id
+             client
+             pull_request
+             "UNKNOWN_COMMAND"
+             (Tmpl.terrateam_comment_unknown_action brand)
+             kv
+    | Msg.Not_a_run ->
+        let kv = `Assoc [] in
+        Abbs_fc.Result.ignore
+        @@ Gcm_api.apply_template_and_publish_jinja
+             ~request_id
+             client
+             pull_request
+             "NOT_A_RUN"
+             (Tmpl.terrateam_comment_not_a_run brand)
              kv
     | Msg.Work_manifest_run_failed { run_id } ->
         let kv = `Assoc [ ("run_id", `String run_id) ] in
@@ -7157,29 +7262,67 @@ module Job_context = struct
         CCOption.map (function O.Kind_drift { Kd.reconcile; restart_on_change; type_ = _ } ->
             K.Drift { reconcile; restart_on_change })
 
+      (* An empty map writes no object, so the JSON of a run with no parameters
+         stays byte-identical to what a build before the field wrote.  The read
+         side answers the empty map for an absent field for the same reason:
+         every row written before the field existed must still decode. *)
+      let run_params_to_json =
+        let module P = Terrat_job_type_run_params in
+        let module T = Terrat_job_context.Job.Type_.Params in
+        fun map ->
+          if T.equal map Sln_map.String.empty then None
+          else Some (P.make ~additional:map Json_schema.Empty_obj.t)
+
+      let run_params_of_json =
+        let module P = Terrat_job_type_run_params in
+        CCOption.map_or ~default:Sln_map.String.empty (fun p -> p.P.additional)
+
+      (* [force_fail] is written by [update_job_force_fail] after the job is inserted, and it is
+         read by [select_job_force_fail], so the domain type does not carry it: this codec writes
+         it as absent, so the bytes of a new job are unchanged, and drops it on the way back in.
+         The schema declares it so the strict decode of a row that holds it does not fail. *)
       let to_json =
         let module T = Terrat_job_context.Job.Type_ in
         let module Jt = Terrat_job_type in
         CCFun.(
           (function
-          | T.Apply { tag_query; kind; force } ->
+          | T.Apply { tag_query; kind; force; parameters } ->
               Jt.Type.Apply
                 {
                   Jt.Apply.type_ = `Apply;
                   tag_query = Some (Terrat_tag_query.to_string tag_query);
                   kind = kind_to_json kind;
                   force;
+                  force_fail = None;
+                  run_params = run_params_to_json parameters;
                 }
           | T.Autoapply ->
               Jt.Type.Apply
-                { Jt.Apply.type_ = `Apply; tag_query = None; kind = None; force = false }
-          | T.Autoplan -> Jt.Type.Plan { Jt.Plan.type_ = `Plan; tag_query = None; kind = None }
-          | T.Plan { tag_query; kind } ->
+                {
+                  Jt.Apply.type_ = `Apply;
+                  tag_query = None;
+                  kind = None;
+                  force = false;
+                  force_fail = None;
+                  run_params = None;
+                }
+          | T.Autoplan ->
+              Jt.Type.Plan
+                {
+                  Jt.Plan.type_ = `Plan;
+                  tag_query = None;
+                  kind = None;
+                  force_fail = None;
+                  run_params = None;
+                }
+          | T.Plan { tag_query; kind; parameters } ->
               Jt.Type.Plan
                 {
                   Jt.Plan.type_ = `Plan;
                   tag_query = Some (Terrat_tag_query.to_string tag_query);
                   kind = kind_to_json kind;
+                  force_fail = None;
+                  run_params = run_params_to_json parameters;
                 }
           | T.Gate_approval { tokens } ->
               Jt.Type.Gate_approval { Jt.Gate_approval.type_ = `Gate_approval; tokens }
@@ -7197,24 +7340,45 @@ module Job_context = struct
           Jt.Type.of_yojson
           %> CCResult.to_opt
           %> CCOption.flat_map (function
-            | Jt.Type.Apply { Jt.Apply.type_ = _; tag_query = Some tag_query; kind; force } ->
+            | Jt.Type.Apply
+                {
+                  Jt.Apply.type_ = _;
+                  tag_query = Some tag_query;
+                  kind;
+                  force;
+                  force_fail = _;
+                  run_params;
+                } ->
                 Some
                   (T.Apply
                      {
                        tag_query = CCResult.get_exn @@ Terrat_tag_query.of_string tag_query;
                        kind = json_to_kind kind;
                        force;
+                       parameters = run_params_of_json run_params;
                      })
-            | Jt.Type.Apply { Jt.Apply.type_ = _; tag_query = None; kind = _; force = _ } ->
-                Some T.Autoapply
-            | Jt.Type.Plan { Jt.Plan.type_ = _; tag_query = Some tag_query; kind } ->
+            | Jt.Type.Apply
+                {
+                  Jt.Apply.type_ = _;
+                  tag_query = None;
+                  kind = _;
+                  force = _;
+                  force_fail = _;
+                  run_params = _;
+                } -> Some T.Autoapply
+            | Jt.Type.Plan
+                { Jt.Plan.type_ = _; tag_query = Some tag_query; kind; force_fail = _; run_params }
+              ->
                 Some
                   (T.Plan
                      {
                        tag_query = CCResult.get_exn @@ Terrat_tag_query.of_string tag_query;
                        kind = json_to_kind kind;
+                       parameters = run_params_of_json run_params;
                      })
-            | Jt.Type.Plan { Jt.Plan.type_ = _; tag_query = None; kind = _ } -> Some T.Autoplan
+            | Jt.Type.Plan
+                { Jt.Plan.type_ = _; tag_query = None; kind = _; force_fail = _; run_params = _ } ->
+                Some T.Autoplan
             | Jt.Type.Repo_config { Jt.Repo_config.type_ = _ } -> Some T.Repo_config
             | Jt.Type.Unlock { Jt.Unlock.type_ = _; ids } -> Some (T.Unlock ids)
             | Jt.Type.Gate_approval { Jt.Gate_approval.type_ = _; tokens } ->
@@ -7243,7 +7407,7 @@ module Job_context = struct
         /^ insert_job_sql
         /% Var.uuid "context_id"
         /% Var.ud (Var.text "state") string_of_state
-        /% Var.ud (Var.json "parameters") Type_.to_json
+        /% Var.ud (Var.json "params") Type_.to_json
         /% Var.ud (Var.option (Var.text "initiator")) (CCOption.map string_of_initiator)
         /% Var.option (Var.uuid "continuation_of"))
 
@@ -7360,6 +7524,23 @@ module Job_context = struct
     let update_job_state =
       Pgsql_io.Typed_sql.(
         sql /^ update_job_state_sql /% Var.uuid "job" /% Var.ud (Var.text "state") string_of_state)
+
+    let update_job_force_fail_sql = Mql_sql.read [%blob "sql/update_job_force_fail.sql"]
+
+    let update_job_force_fail =
+      Pgsql_io.Typed_sql.(
+        sql /^ update_job_force_fail_sql /% Var.uuid "job" /% Var.boolean "force_fail")
+
+    let select_job_force_fail_sql = Mql_sql.read [%blob "sql/select_job_force_fail.sql"]
+
+    let select_job_force_fail =
+      Pgsql_io.Typed_sql.(
+        sql
+        //
+        (* force_fail *)
+        Ret.boolean
+        /^ select_job_force_fail_sql
+        /% Var.uuid "job")
 
     let abort_live_work_manifests_for_job_sql =
       Mql_sql.read [%blob "sql/abort_live_work_manifests_for_job.sql"]
@@ -7819,6 +8000,34 @@ module Job_context = struct
       | Ok () -> Abbs_fc.return_ok ()
       | Error (#Pgsql_io.err as err) ->
           Logs.err (fun m -> m "%s : JOB : UPDATE_STATE : %a" request_id Pgsql_io.pp_err err);
+          Abbs_fc.return_err `Error
+
+    let set_force_fail ~request_id db ~job_id ~force_fail =
+      let open Abb.Future.Infix_monad in
+      Pgsql_io.Prepared_stmt.execute db Sql.update_job_force_fail job_id force_fail
+      >>= function
+      | Ok () -> Abbs_fc.return_ok ()
+      | Error (#Pgsql_io.err as err) ->
+          Prmths.Counter.inc_one Metrics.pgsql_errors_total;
+          Logs.err (fun m -> m "%s : JOB : SET_FORCE_FAIL : %a" request_id Pgsql_io.pp_err err);
+          Abbs_fc.return_err `Error
+
+    let query_force_fail ~request_id db ~job_id =
+      let run =
+        let open Abbs_fc.Infix_result_monad in
+        Pgsql_io.Prepared_stmt.fetch db Sql.select_job_force_fail ~f:CCFun.id job_id
+        >>= fun rows ->
+        Abbs_fc.return_ok
+          (match rows with
+          | forced :: _ -> forced
+          | [] -> false)
+      in
+      let open Abb.Future.Infix_monad in
+      run
+      >>= function
+      | Ok _ as r -> Abb.Future.return r
+      | Error (#Pgsql_io.err as err) ->
+          Logs.err (fun m -> m "%s : JOB : QUERY_FORCE_FAIL : %a" request_id Pgsql_io.pp_err err);
           Abbs_fc.return_err `Error
 
     let add_work_manifest ~request_id db ~job_id ~work_manifest_id () =

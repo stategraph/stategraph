@@ -25,7 +25,9 @@
 
 import type { VcsProvider } from "@/lib/vcs/links";
 import { sqlLiteral } from "@/lib/mql/escape";
-import { asText } from "@/lib/mql/providers";
+import { MQL_MAX_LIMIT, asText } from "@/lib/mql/providers";
+import { DRIFT_APPLY_RUN_TYPES, DRIFT_PLAN_RUN_TYPES } from "@/lib/drift/state";
+import { FAILED_TRANSACTION_STATES, TERMINAL_TRANSACTION_STATES } from "./dashboard";
 
 function tsCte(stateId?: string): string {
   if (stateId) {
@@ -353,6 +355,117 @@ export function openPullRequestsQuery(provider: VcsProvider): string {
  *  count, unlike the display list which is capped. */
 export function runsSinceCountQuery(provider: VcsProvider, since: string): string {
   return `select count(*) as c from ${provider}_work_manifests where created_at >= ${sqlLiteral(since)}`;
+}
+
+const PLAN_RUN_TYPES_SQL = DRIFT_PLAN_RUN_TYPES.map(sqlLiteral).join(", ");
+const APPLY_RUN_TYPES_SQL = DRIFT_APPLY_RUN_TYPES.map(sqlLiteral).join(", ");
+
+/** Rows per provider of the Needs attention and activity queries. A provider returning exactly
+ *  this many rows was cut. */
+export const HOME_ROWS_CAP = MQL_MAX_LIMIT;
+
+/** Plan and apply runs per hour since a caller-computed ISO bound: `hour`, `kind` ('plan' or
+ *  'apply'), `c`. Two kinds of 14 days of hours stay under HOME_ROWS_CAP. */
+export function activityByHourQuery(provider: VcsProvider, since: string): string {
+  return (
+    `with r as (select date_trunc('hour', wm.created_at) as h, ` +
+    `case when wm.run_type in (${APPLY_RUN_TYPES_SQL}) then 'apply' else 'plan' end as kind ` +
+    `from ${provider}_work_manifests as wm ` +
+    `where wm.created_at >= ${sqlLiteral(since)} ` +
+    `and wm.run_type in (${PLAN_RUN_TYPES_SQL}, ${APPLY_RUN_TYPES_SQL})) ` +
+    `select r.h as hour, r.kind as kind, count(*) as c from r ` +
+    `group by r.h, r.kind order by r.h limit ${HOME_ROWS_CAP}`
+  );
+}
+
+const FAILED_RUN_COLUMNS = [
+  "id",
+  "state",
+  "run_type",
+  "run_kind",
+  "created_at",
+  "repo_owner",
+  "repo_name",
+  "pull_number",
+  "branch",
+] as const;
+
+/** Runs since a caller-computed ISO bound with a failed step, newest first. A failed step marked
+ *  ignore_errors does not count, as in failCountsQuery. A step row is written after its run is
+ *  created, so the bound on the step rows keeps every step of those runs. */
+export function failedRunsQuery(provider: VcsProvider, since: string): string {
+  const cols = FAILED_RUN_COLUMNS.map((c) => `wm.${c}`);
+  return (
+    `select ${FAILED_RUN_COLUMNS.map((c) => `wm.${c} as ${c}`).join(", ")} ` +
+    `from workflow_step_outputs as wso ` +
+    `inner join ${provider}_work_manifests as wm on wm.id = wso.work_manifest ` +
+    `where wso.success = false and wso.ignore_errors = false ` +
+    `and wso.created_at >= ${sqlLiteral(since)} and wm.created_at >= ${sqlLiteral(since)} ` +
+    `group by ${cols.join(", ")} order by wm.created_at desc limit ${HOME_ROWS_CAP}`
+  );
+}
+
+/** The newest run since a caller-computed ISO bound for each repository, pull request, branch,
+ *  run kind and run type: `repo_owner`, `repo_name`, `pull_number`, `branch`, `run_kind`,
+ *  `run_type`, `latest`. */
+export function latestRunsQuery(provider: VcsProvider, since: string): string {
+  const key = ["repo_owner", "repo_name", "pull_number", "branch", "run_kind", "run_type"];
+  return (
+    `select ${key.map((c) => `wm.${c} as ${c}`).join(", ")}, max(wm.created_at) as latest ` +
+    `from ${provider}_work_manifests as wm where wm.created_at >= ${sqlLiteral(since)} ` +
+    `group by ${key.map((c) => `wm.${c}`).join(", ")} limit ${HOME_ROWS_CAP}`
+  );
+}
+
+/** The stored plans of open pull requests, newest run first: one row per run and directory and
+ *  workspace, with `has_changes`. The engine deletes a stored plan with changes once it is applied
+ *  or older than 14 days, and keeps a plan without changes. */
+export function openPullRequestPlansQuery(provider: VcsProvider): string {
+  return (
+    `select wm.id as id, wm.created_at as created_at, wm.repo_owner as repo_owner, ` +
+    `wm.repo_name as repo_name, wm.pull_number as pull_number, pr.title as title, ` +
+    `p.path as path, p.workspace as workspace, p.has_changes as has_changes ` +
+    `from plans as p ` +
+    `inner join ${provider}_work_manifests as wm on wm.id = p.work_manifest ` +
+    `inner join ${provider}_pull_requests as pr ` +
+    `on pr.repository = wm.repository and pr.pull_number = wm.pull_number ` +
+    `where pr.state = 'open' and wm.run_kind = 'pr' ` +
+    `order by wm.created_at desc limit ${HOME_ROWS_CAP}`
+  );
+}
+
+/** The tenant's Stategraph transactions that failed since `since`, and those still open that were
+ *  created before `openBefore` (caller-computed ISO bounds), newest first. */
+export function attentionTransactionsQuery(
+  tenantId: string,
+  bounds: { since: string; openBefore: string },
+  limit: number,
+): string {
+  const states = (list: readonly string[]) => list.map(sqlLiteral).join(", ");
+  return (
+    `select transactions.id as id, transactions.state as state, ` +
+    `transactions.created_at as created_at, transactions.completed_at as completed_at ` +
+    `from transactions where transactions.tenant_id = ${sqlLiteral(tenantId)} ` +
+    `and ((transactions.state in (${states(FAILED_TRANSACTION_STATES)}) ` +
+    `and transactions.created_at >= ${sqlLiteral(bounds.since)}) ` +
+    `or (transactions.completed_at is null ` +
+    `and transactions.state not in (${states(TERMINAL_TRANSACTION_STATES)}) ` +
+    `and transactions.created_at < ${sqlLiteral(bounds.openBefore)})) ` +
+    `order by transactions.created_at desc, transactions.id limit ${limit}`
+  );
+}
+
+/** A returned row proves a drift run. */
+export function driftRunPresenceQuery(provider: VcsProvider): string {
+  return `select wm.id as id from ${provider}_work_manifests as wm where wm.run_kind = 'drift' limit 1`;
+}
+
+/** Up to two repositories with runs: enough to tell one from more than one. */
+export function repositoriesWithRunsQuery(provider: VcsProvider): string {
+  return (
+    `select wm.repository as repository from ${provider}_work_manifests as wm ` +
+    `group by wm.repository limit 2`
+  );
 }
 
 export interface RunRow {

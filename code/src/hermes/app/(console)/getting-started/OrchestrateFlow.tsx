@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/card";
 import { WizardShell } from "@/components/getting-started";
 import { OrchestrationUnavailable } from "@/components/orchestration";
-import { useTenant } from "@/contexts";
+import { useSetupProgress, useTenant } from "@/contexts";
 import { ENGINE_SETUP_HREF, STATE_SETUP_HREF } from "@/lib/getting-started/setup-progress";
 import { useDeepLinkRouter } from "@/hooks";
 import { pushGettingStartedEvent } from "@/lib/analytics";
@@ -81,6 +81,8 @@ function OrchestrateFlowForTenant({
   const searchKey = searchParams.toString();
   const initialOverrides = orchestrationOverridesFromSearchParams(searchParams);
   const [state, actions] = useOrchestrationState(tenantId, initialOverrides);
+  const { refresh: refreshSetupProgress } = useSetupProgress();
+  const [planDetected, setPlanDetected] = useState(false);
   const pendingCredentials = useRef<{
     step: OrchestrationStep;
     status: CredentialStatus;
@@ -185,6 +187,7 @@ function OrchestrateFlowForTenant({
 
   const reset = (): void => {
     pendingCredentials.current = null;
+    setPlanDetected(false);
     resetting.current = true;
     actions.reset();
     const params = resetOrchestrationSearchParams(new URLSearchParams(searchKey));
@@ -197,6 +200,17 @@ function OrchestrateFlowForTenant({
       repo: "",
       repositorySource: "own",
     });
+  };
+
+  const firstPlanDetected = (): void => {
+    pushGettingStartedEvent("getting_started_first_run_detected", {
+      path: "orchestrate",
+      vcs_provider: provider ?? undefined,
+      repository_source: repositorySource,
+    });
+    refreshSetupProgress();
+    setPlanDetected(true);
+    advance("done");
   };
 
   const setCredentials = (status: CredentialStatus): void => {
@@ -266,6 +280,7 @@ function OrchestrateFlowForTenant({
             provider={knownProvider}
             onBack={previousStep}
             onConfirm={() => advance("done")}
+            onDetected={firstPlanDetected}
           />
         );
       case "fork":
@@ -292,12 +307,14 @@ function OrchestrateFlowForTenant({
             }
             onBack={previousStep}
             onConfirm={() => advance("done")}
+            onDetected={firstPlanDetected}
           />
         );
       case "done":
         return (
           <DoneStep
             provider={knownProvider}
+            planDetected={planDetected}
             onSetUpState={() => router.push(STATE_SETUP_HREF)}
             onSwitchEngine={() => router.push(ENGINE_SETUP_HREF)}
             onConsole={() => router.push("/")}

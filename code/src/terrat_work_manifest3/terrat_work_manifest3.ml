@@ -78,6 +78,10 @@ type ('account, 'id, 'created_at, 'run_id, 'state, 'changes, 'denied_dirspaces, 
   environment : string option;
   id : 'id;
   initiator : Initiator.t;
+      (** The parameters the run sets, as parameter name to value, read from the job of the run
+          under [params->'run_params']. The empty map is a run that sets no parameter, and it is the
+          value of a work manifest whose job carries none. *)
+  params : string Sln_map.String.t;
   run_id : 'run_id;
   runs_on : Yojson.Safe.t option;
   state : 'state;

@@ -1,7 +1,7 @@
 ---
 title: tree_builder
 description: Reference for the tree_builder key in .stategraph/config.yml. Replace Git change detection with a script that lists files and their content IDs.
-order: 24
+order: 25
 ---
 
 

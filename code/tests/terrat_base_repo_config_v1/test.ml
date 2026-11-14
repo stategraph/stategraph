@@ -1797,6 +1797,38 @@ let test_prechecks_not_inherited_by_a_dir =
           Oth.Assert.List.empty when_modified.V1.When_modified.prechecks)
         dir.V1.Dirs.Dir.workspaces)
 
+(* The global [autoplan] is the default of every dir, including a dir that sets a [when_modified]
+   of its own: the dir inherits the keys it does not set.  A test that must see the run a comment
+   starts turns autoplan off this way, and an autoplan of the same pull request would otherwise plan
+   the dirspace first and answer the comment as already planned. *)
+let test_autoplan_off_reaches_a_dir_with_its_own_when_modified =
+  Oth.test ~name:"when_modified: a global autoplan false reaches every dir" (fun _ ->
+      let json =
+        `Assoc
+          [
+            ( "dirs",
+              `Assoc
+                [
+                  ( "database",
+                    `Assoc [ ("when_modified", `Assoc [ ("depends_on", `String "dir:base") ]) ] );
+                ] );
+            ("when_modified", `Assoc [ ("autoplan", `Bool false) ]);
+          ]
+      in
+      let cfg = config_of_json json in
+      Oth.Assert.Eq.bool ~expected:false ~actual:(V1.when_modified cfg).V1.When_modified.autoplan;
+      let dir =
+        Oth.Assert.some
+          ~fail_msg:"Expected a dir named database"
+          (Sln_map.String.find_opt "database" (V1.dirs cfg))
+      in
+      let workspaces = Sln_map.String.to_list dir.V1.Dirs.Dir.workspaces in
+      ignore (Oth.Assert.List.non_empty workspaces);
+      CCList.iter
+        (fun (_name, { V1.Dirs.Workspace.when_modified; _ }) ->
+          Oth.Assert.Eq.bool ~expected:false ~actual:when_modified.V1.When_modified.autoplan)
+        workspaces)
+
 (* A pull request that changes nothing the repository manages still has to satisfy a branch
    protection rule that keys on the apply check, so the completed check of a noop is on unless the
    configuration turns it off. *)
@@ -1867,6 +1899,383 @@ let test_automerge_require_explicit_apply_unknown_rejected =
       match V1.of_version_1_json (automerge_json (`String "layers")) with
       | Ok _ -> failwith "require_explicit_apply accepted an unknown string"
       | Error _ -> ())
+
+(* Tests for the [parameters] section: the schema shape decodes into the derived
+   [V1.Parameters] module, the defaults collapse, the schema and the decoder agree on
+   [values: null], a structurally valid but cross-field-invalid section still decodes, and the
+   section round-trips through Version_1. *)
+
+let parameters_json ?aliases ?names () =
+  let fields =
+    CCList.filter_map
+      CCFun.id
+      [
+        CCOption.map (fun a -> ("aliases", `Assoc a)) aliases;
+        CCOption.map (fun n -> ("names", `Assoc n)) names;
+      ]
+  in
+  `Assoc [ ("parameters", `Assoc fields) ]
+
+let parameters_of_json json = V1.parameters (config_of_json json)
+
+let test_parameters_absent_section_is_empty =
+  Oth.test ~name:"parameters: an absent section gives two empty maps" (fun _ ->
+      Oth.Assert.eq
+        ~eq:V1.Parameters.equal
+        ~pp:V1.Parameters.pp
+        (V1.Parameters.make ())
+        (parameters_of_json (`Assoc [])))
+
+let test_parameters_names_values_and_fail_if_set =
+  Oth.test ~name:"parameters: names values list and fail_if_set are read" (fun _ ->
+      let json =
+        parameters_json
+          ~names:
+            [
+              ( "mode",
+                `Assoc
+                  [
+                    ("fail_if_set", `Bool true);
+                    ("values", `List [ `String "DEBUG"; `String "RELEASE" ]);
+                  ] );
+            ]
+          ()
+      in
+      match Sln_map.String.find_opt "mode" (parameters_of_json json).V1.Parameters.names with
+      | Some p ->
+          Oth.Assert.Eq.bool ~expected:true ~actual:p.V1.Parameters.Parameter.fail_if_set;
+          Oth.Assert.Eq.string_list
+            ~expected:[ "DEBUG"; "RELEASE" ]
+            ~actual:
+              (match p.V1.Parameters.Parameter.values with
+              | Some values -> values
+              | None -> failwith "values absent")
+      | None -> failwith "parameter mode is missing")
+
+let test_parameters_empty_body_defaults =
+  Oth.test ~name:"parameters: an empty parameter body takes both defaults" (fun _ ->
+      let json = parameters_json ~names:[ ("mode", `Assoc []) ] () in
+      match Sln_map.String.find_opt "mode" (parameters_of_json json).V1.Parameters.names with
+      | Some p ->
+          Oth.Assert.Eq.bool ~expected:false ~actual:p.V1.Parameters.Parameter.fail_if_set;
+          Oth.Assert.none p.V1.Parameters.Parameter.values
+      | None -> failwith "parameter mode is missing")
+
+let test_parameters_values_null_reads_as_none =
+  Oth.test ~name:"parameters: values null reads as none, like an absent values" (fun _ ->
+      let json = parameters_json ~names:[ ("mode", `Assoc [ ("values", `Null) ]) ] () in
+      match Sln_map.String.find_opt "mode" (parameters_of_json json).V1.Parameters.names with
+      | Some p -> Oth.Assert.none p.V1.Parameters.Parameter.values
+      | None -> failwith "parameter mode is missing")
+
+let test_parameters_schema_decoder_agree =
+  Oth.test
+    ~name:"parameters: a values null next to a parallel_runs error names only parallel_runs"
+    (fun _ ->
+      let json =
+        `Assoc
+          [
+            ("parameters", `Assoc [ ("names", `Assoc [ ("mode", `Assoc [ ("values", `Null) ]) ]) ]);
+            ("parallel_runs", `String "abc");
+          ]
+      in
+      match Oth.Assert.error (V1.of_version_1_json json) with
+      | `Repo_config_schema_err errs ->
+          let shown = V1.show_of_version_1_json_err (`Repo_config_schema_err errs) in
+          Oth.Assert.str_contains ~haystack:shown ~needle:"parallel_runs";
+          Oth.Assert.str_doesnt_contain ~haystack:shown ~needle:"parameters"
+      | err -> failwith ("Expected Repo_config_schema_err, got " ^ V1.show_of_version_1_json_err err))
+
+let test_parameters_alias_params_are_read =
+  Oth.test ~name:"parameters: an alias with params is read" (fun _ ->
+      let json =
+        parameters_json
+          ~aliases:
+            [
+              ( "debug",
+                `Assoc
+                  [ ("action", `String "plan"); ("params", `Assoc [ ("mode", `String "DEBUG") ]) ]
+              );
+            ]
+          ~names:[ ("mode", `Assoc []) ]
+          ()
+      in
+      match Sln_map.String.find_opt "debug" (parameters_of_json json).V1.Parameters.aliases with
+      | Some a ->
+          Oth.Assert.Eq.bool
+            ~expected:true
+            ~actual:
+              (match a.V1.Parameters.Alias.action with
+              | `Plan -> true
+              | _ -> false);
+          Oth.Assert.Eq.string
+            ~expected:"DEBUG"
+            ~actual:(Sln_map.String.find "mode" a.V1.Parameters.Alias.params)
+      | None -> failwith "alias debug is missing")
+
+let test_parameters_alias_without_params =
+  Oth.test ~name:"parameters: an alias without params takes the empty map" (fun _ ->
+      let json = parameters_json ~aliases:[ ("debug", `Assoc [ ("action", `String "plan") ]) ] () in
+      match Sln_map.String.find_opt "debug" (parameters_of_json json).V1.Parameters.aliases with
+      | Some a -> Oth.Assert.true_ (Sln_map.String.is_empty a.V1.Parameters.Alias.params)
+      | None -> failwith "alias debug is missing")
+
+let test_parameters_alias_every_action_decodes =
+  Oth.test ~name:"parameters: an alias carrying each of the four run actions decodes" (fun _ ->
+      CCList.iter
+        (fun action ->
+          let json =
+            parameters_json ~aliases:[ ("debug", `Assoc [ ("action", `String action) ]) ] ()
+          in
+          match Sln_map.String.find_opt "debug" (parameters_of_json json).V1.Parameters.aliases with
+          | Some a ->
+              Oth.Assert.true_
+                ~fail_msg:("the action " ^ action ^ " did not decode")
+                (match a.V1.Parameters.Alias.action with
+                | `Apply -> CCString.equal action "apply"
+                | `Apply_autoapprove -> CCString.equal action "apply-autoapprove"
+                | `Apply_force -> CCString.equal action "apply-force"
+                | `Plan -> CCString.equal action "plan")
+          | None -> failwith "alias debug is missing")
+        [ "plan"; "apply"; "apply-force"; "apply-autoapprove" ])
+
+let test_parameters_structural_rejections =
+  Oth.test ~name:"parameters: structurally invalid sections are rejected" (fun _ ->
+      let cases =
+        [
+          ( "values holds a non-string",
+            Some [ ("mode", `Assoc [ ("values", `List [ `Int 1 ]) ]) ],
+            None );
+          ( "values is a bare string",
+            Some [ ("mode", `Assoc [ ("values", `String "DEBUG") ]) ],
+            None );
+          ("an alias has no action", None, Some [ ("debug", `Assoc [ ("params", `Assoc []) ]) ]);
+          ( "an action outside the enum",
+            None,
+            Some [ ("debug", `Assoc [ ("action", `String "destroy") ]) ] );
+          ( "an unknown key in a parameter",
+            Some [ ("mode", `Assoc [ ("bogus", `Bool true) ]) ],
+            None );
+        ]
+      in
+      CCList.iter
+        (fun (what, names, aliases) ->
+          match V1.of_version_1_json (parameters_json ?aliases ?names ()) with
+          | Ok _ -> failwith ("parameters: accepted " ^ what)
+          | Error (`Repo_config_schema_err _) -> ()
+          | Error err ->
+              failwith
+                ("parameters: unexpected error for "
+                ^ what
+                ^ ": "
+                ^ V1.show_of_version_1_json_err err))
+        cases)
+
+let test_parameters_round_trip =
+  Oth.test ~name:"parameters: a full section round-trips through Version_1" (fun _ ->
+      let json =
+        parameters_json
+          ~aliases:
+            [
+              ( "debug",
+                `Assoc
+                  [ ("action", `String "plan"); ("params", `Assoc [ ("mode", `String "DEBUG") ]) ]
+              );
+            ]
+          ~names:
+            [
+              ( "mode",
+                `Assoc
+                  [
+                    ("fail_if_set", `Bool true);
+                    ("values", `List [ `String "DEBUG"; `String "RELEASE" ]);
+                  ] );
+            ]
+          ()
+      in
+      let cfg = config_of_json json in
+      let round_tripped = config_of_json (Repo.Version_1.to_yojson (V1.to_version_1 cfg)) in
+      Oth.Assert.eq
+        ~eq:V1.Parameters.equal
+        ~pp:V1.Parameters.pp
+        (V1.parameters cfg)
+        (V1.parameters round_tripped))
+
+let test_parameters_absent_round_trips_absent =
+  Oth.test ~name:"parameters: a config without the key round-trips to no parameters" (fun _ ->
+      let cfg = config_of_json (`Assoc []) in
+      Oth.Assert.none (V1.to_version_1 cfg).Repo.Version_1.parameters)
+
+let test_parameters_round_trip_omits_absent_values =
+  Oth.test
+    ~name:"parameters: to_version_1 omits the values key of a parameter with no values"
+    (fun _ ->
+      let cfg =
+        config_of_json
+          (parameters_json ~names:[ ("mode", `Assoc [ ("fail_if_set", `Bool true) ]) ] ())
+      in
+      let encoded = Repo.Version_1.to_yojson (V1.to_version_1 cfg) in
+      let mode =
+        Yojson.Safe.Util.member
+          "mode"
+          (Yojson.Safe.Util.member "names" (Yojson.Safe.Util.member "parameters" encoded))
+      in
+      Oth.Assert.true_ (Yojson.Safe.Util.member "values" mode = `Null))
+
+(* Cross-field rules: [of_version_1] applies the alias rules after the schema check.  The shadow
+   rule wins over a bad [params] in the same alias, and the first failing alias in key order
+   names the error.  The reserved-name list is a copy of [V1.reserved_alias_names], which is not
+   exported; the duplication pins the ten words. *)
+
+let test_parameters_rule_alias_unknown_parameter_rejected =
+  Oth.test ~name:"parameters: an alias param naming an undeclared parameter is rejected" (fun _ ->
+      let json =
+        parameters_json
+          ~aliases:
+            [
+              ( "debug",
+                `Assoc
+                  [ ("action", `String "plan"); ("params", `Assoc [ ("mode", `String "DEBUG") ]) ]
+              );
+            ]
+          ()
+      in
+      match V1.of_version_1_json json with
+      | Ok _ -> failwith "parameters: accepted an alias param naming an undeclared parameter"
+      | Error (`Parameters_alias_unknown_parameter_err ("debug", "mode")) -> ()
+      | Error err -> failwith ("parameters: unexpected error " ^ V1.show_of_version_1_json_err err))
+
+let test_parameters_rule_value_not_allowed_rejected =
+  Oth.test ~name:"parameters: an alias param value outside values is rejected" (fun _ ->
+      let json =
+        parameters_json
+          ~aliases:
+            [
+              ( "debug",
+                `Assoc
+                  [ ("action", `String "plan"); ("params", `Assoc [ ("mode", `String "RELEASE") ]) ]
+              );
+            ]
+          ~names:[ ("mode", `Assoc [ ("values", `List [ `String "DEBUG" ]) ]) ]
+          ()
+      in
+      match V1.of_version_1_json json with
+      | Ok _ -> failwith "parameters: accepted a value outside values"
+      | Error (`Parameters_alias_value_not_allowed_err ("debug", "mode", "RELEASE")) -> ()
+      | Error err -> failwith ("parameters: unexpected error " ^ V1.show_of_version_1_json_err err))
+
+let test_parameters_rule_values_absent_accepts_any =
+  Oth.test ~name:"parameters: a parameter without values accepts any alias param value" (fun _ ->
+      let json =
+        parameters_json
+          ~aliases:
+            [
+              ( "debug",
+                `Assoc
+                  [
+                    ("action", `String "plan"); ("params", `Assoc [ ("mode", `String "ANYTHING") ]);
+                  ] );
+            ]
+          ~names:[ ("mode", `Assoc []) ]
+          ()
+      in
+      match V1.of_version_1_json json with
+      | Ok cfg -> (
+          match Sln_map.String.find_opt "debug" (V1.parameters cfg).V1.Parameters.aliases with
+          | Some alias ->
+              Oth.Assert.Eq.string
+                ~expected:"ANYTHING"
+                ~actual:(Sln_map.String.find "mode" alias.V1.Parameters.Alias.params)
+          | None -> failwith "alias debug is missing")
+      | Error err -> failwith ("parameters: unexpected error " ^ V1.show_of_version_1_json_err err))
+
+let test_parameters_rule_values_empty_accepts_none =
+  Oth.test ~name:"parameters: a parameter with an empty values list accepts no value" (fun _ ->
+      let json =
+        parameters_json
+          ~aliases:
+            [
+              ( "debug",
+                `Assoc
+                  [ ("action", `String "plan"); ("params", `Assoc [ ("mode", `String "DEBUG") ]) ]
+              );
+            ]
+          ~names:[ ("mode", `Assoc [ ("values", `List []) ]) ]
+          ()
+      in
+      match V1.of_version_1_json json with
+      | Ok _ -> failwith "parameters: accepted a value against an empty values list"
+      | Error (`Parameters_alias_value_not_allowed_err ("debug", "mode", "DEBUG")) -> ()
+      | Error err -> failwith ("parameters: unexpected error " ^ V1.show_of_version_1_json_err err))
+
+let test_parameters_rule_reserved_alias_names_rejected =
+  Oth.test ~name:"parameters: an alias named a command word is rejected" (fun _ ->
+      CCList.iter
+        (fun name ->
+          let json =
+            parameters_json ~aliases:[ (name, `Assoc [ ("action", `String "plan") ]) ] ()
+          in
+          match V1.of_version_1_json json with
+          | Ok _ -> failwith ("parameters: accepted the alias " ^ name)
+          | Error (`Parameters_alias_shadows_verb_err shadowed) ->
+              Oth.Assert.Eq.string ~expected:name ~actual:shadowed
+          | Error err ->
+              failwith
+                ("parameters: unexpected error for "
+                ^ name
+                ^ ": "
+                ^ V1.show_of_version_1_json_err err))
+        [
+          "unlock";
+          "plan";
+          "apply";
+          "apply-autoapprove";
+          "apply-force";
+          "help";
+          "feedback";
+          "repo-config";
+          "index";
+          "gate";
+        ])
+
+let test_parameters_rule_alias_name_is_case_sensitive =
+  Oth.test ~name:"parameters: an alias whose name only differs in case is accepted" (fun _ ->
+      let json = parameters_json ~aliases:[ ("Plan", `Assoc [ ("action", `String "plan") ]) ] () in
+      match V1.of_version_1_json json with
+      | Ok cfg -> (
+          match Sln_map.String.find_opt "Plan" (V1.parameters cfg).V1.Parameters.aliases with
+          | Some _ -> ()
+          | None -> failwith "alias Plan is missing")
+      | Error err -> failwith ("parameters: unexpected error " ^ V1.show_of_version_1_json_err err))
+
+let test_parameters_rule_shadow_wins_over_bad_params =
+  Oth.test ~name:"parameters: the shadow rule wins over a bad params of the same alias" (fun _ ->
+      let json =
+        parameters_json
+          ~aliases:
+            [
+              ( "apply",
+                `Assoc
+                  [ ("action", `String "plan"); ("params", `Assoc [ ("mode", `String "NOPE") ]) ] );
+            ]
+          ()
+      in
+      match V1.of_version_1_json json with
+      | Ok _ -> failwith "parameters: accepted an alias that shadows a command"
+      | Error (`Parameters_alias_shadows_verb_err "apply") -> ()
+      | Error err -> failwith ("parameters: unexpected error " ^ V1.show_of_version_1_json_err err))
+
+let test_parameters_rule_first_failing_alias_wins =
+  Oth.test ~name:"parameters: the first failing alias in key order names the error" (fun _ ->
+      let alias name =
+        ( name,
+          `Assoc [ ("action", `String "plan"); ("params", `Assoc [ ("mode", `String "NOPE") ]) ] )
+      in
+      let json = parameters_json ~aliases:[ alias "aaa"; alias "zzz" ] () in
+      match V1.of_version_1_json json with
+      | Ok _ -> failwith "parameters: accepted aliases naming an undeclared parameter"
+      | Error (`Parameters_alias_unknown_parameter_err ("aaa", "mode")) -> ()
+      | Error err -> failwith ("parameters: unexpected error " ^ V1.show_of_version_1_json_err err))
 
 let test =
   Oth.parallel
@@ -1960,12 +2369,33 @@ let test =
       test_prechecks_round_trip;
       test_prechecks_rejected_in_a_dir;
       test_prechecks_not_inherited_by_a_dir;
+      test_autoplan_off_reaches_a_dir_with_its_own_when_modified;
       test_apply_requirements_noop_check_default;
       test_apply_requirements_noop_check_off;
       test_automerge_require_explicit_apply_default;
       test_automerge_require_explicit_apply_values;
       test_automerge_require_explicit_apply_round_trip;
       test_automerge_require_explicit_apply_unknown_rejected;
+      test_parameters_absent_section_is_empty;
+      test_parameters_names_values_and_fail_if_set;
+      test_parameters_empty_body_defaults;
+      test_parameters_values_null_reads_as_none;
+      test_parameters_schema_decoder_agree;
+      test_parameters_alias_params_are_read;
+      test_parameters_alias_without_params;
+      test_parameters_alias_every_action_decodes;
+      test_parameters_structural_rejections;
+      test_parameters_round_trip;
+      test_parameters_absent_round_trips_absent;
+      test_parameters_round_trip_omits_absent_values;
+      test_parameters_rule_alias_unknown_parameter_rejected;
+      test_parameters_rule_value_not_allowed_rejected;
+      test_parameters_rule_values_absent_accepts_any;
+      test_parameters_rule_values_empty_accepts_none;
+      test_parameters_rule_reserved_alias_names_rejected;
+      test_parameters_rule_alias_name_is_case_sensitive;
+      test_parameters_rule_shadow_wins_over_bad_params;
+      test_parameters_rule_first_failing_alias_wins;
     ]
 
 let () =

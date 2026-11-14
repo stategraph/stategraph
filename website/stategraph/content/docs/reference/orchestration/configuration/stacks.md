@@ -1,7 +1,7 @@
 ---
 title: stacks
 description: Reference for the stacks key in .stategraph/config.yml. Group dirspaces into named stacks with shared variables and ordering rules.
-order: 20
+order: 21
 ---
 
 
@@ -139,17 +139,17 @@ stacks:
 stacks:
   names:
     shared:
-      tag_query: 'dir:shared/*'
+      tag_query: 'shared in dir'
 
     base:
-      tag_query: 'dir:base/*'
+      tag_query: 'base in dir'
       rules:
         modified_by:
           - shared
         # plan_after is implicitly set to [shared]
 
     services:
-      tag_query: 'dir:services/*'
+      tag_query: 'services in dir'
       rules:
         modified_by:
           - base

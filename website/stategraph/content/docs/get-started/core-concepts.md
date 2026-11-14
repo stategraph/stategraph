@@ -70,7 +70,7 @@ See [engine](/docs/reference/orchestration/configuration/engine) and [Use with O
 
 ## Tags and tag queries
 
-Tags label dirspaces. Each dirspace has `dir:<path>` and `workspace:<name>` tags. Add your own under `dirs`, or derive them from branch names with the top-level `tags` key. A tag query is a boolean expression over tags, such as `dir:prod/** and not deprecated`. It selects the dirspaces for a workflow, an access control rule, an apply requirement, a drift schedule, or a pull request command. See [Tag queries](/docs/reference/orchestration/configuration/tag-queries) and [The tag system](/docs/orchestration/workflows/advanced/tag-system).
+Tags label dirspaces. Each dirspace has `dir:<path>` and `workspace:<name>` tags. Add your own under `dirs`, or derive them from branch names with the top-level `tags` key. A tag query is a boolean expression over tags, such as `prod in dir and not deprecated`. It selects the dirspaces for a workflow, an access control rule, an apply requirement, a drift schedule, or a pull request command. See [Tag queries](/docs/reference/orchestration/configuration/tag-queries) and [The tag system](/docs/orchestration/workflows/advanced/tag-system).
 
 ## Stacks
 

@@ -1,7 +1,7 @@
 ---
 title: workflows
 description: The workflows key in .stategraph/config.yml sets the plan and apply steps, engine, environment, OIDC, gates, and scanners per directory.
-order: 28
+order: 29
 ---
 
 

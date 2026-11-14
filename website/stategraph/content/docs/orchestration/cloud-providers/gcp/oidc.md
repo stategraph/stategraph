@@ -144,7 +144,7 @@ To use one service account per environment, put the `oidc` step in [workflows](/
 
 ```yaml
 workflows:
-  - tag_query: "dir:terraform/production/**"
+  - tag_query: "terraform/production in dir"
     plan:
       - type: oidc
         provider: gcp
@@ -159,7 +159,7 @@ workflows:
         workload_identity_provider: "projects/123456789/locations/global/workloadIdentityPools/stategraph-pool/providers/stategraph-provider"
       - type: init
       - type: apply
-  - tag_query: "dir:terraform/staging/**"
+  - tag_query: "terraform/staging in dir"
     plan:
       - type: oidc
         provider: gcp
@@ -190,7 +190,7 @@ Google recommends [attribute conditions when you federate with GitHub](https://c
 
 ```yaml
 workflows:
-  - tag_query: "dir:terraform/production/**"
+  - tag_query: "terraform/production in dir"
     environment: production
     plan:
       - type: oidc

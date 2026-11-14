@@ -1130,6 +1130,10 @@ export interface components {
             config: Record<string, never>;
             id?: string;
             installation_id: string;
+            /** @description The parameters that the run sets, as parameter name to value. The runner sets each one as an environment variable of that name. The field is absent when the run sets no parameter. */
+            parameters?: {
+                [key: string]: string;
+            };
             protocol_version?: number;
             result_version: number;
             run_kind: string;
@@ -1238,6 +1242,10 @@ export interface components {
             dirspaces: components["schemas"]["work-manifest-dir"][];
             id?: string;
             installation_id: string;
+            /** @description The parameters that the run sets, as parameter name to value. The runner sets each one as an environment variable of that name. The field is absent when the run sets no parameter. */
+            parameters?: {
+                [key: string]: string;
+            };
             protocol_version?: number;
             result_version: number;
             run_kind: string;

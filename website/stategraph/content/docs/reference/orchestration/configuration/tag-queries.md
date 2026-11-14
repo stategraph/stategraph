@@ -1,7 +1,7 @@
 ---
 title: Tag Queries
 description: Reference for tag queries in .stategraph/config.yml. Define tags, combine them with and, or, not, and in, and target workflows and commands.
-order: 22
+order: 23
 ---
 
 
