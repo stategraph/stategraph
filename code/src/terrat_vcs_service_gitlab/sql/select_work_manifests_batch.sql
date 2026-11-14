@@ -17,6 +17,11 @@ select
     gwm.repo_name,
     gwm.environment,
     gwm.runs_on,
-    gwm.branch
+    gwm.branch,
+    jobs.params -> 'run_params' as params
 from gitlab_work_manifests as gwm
+left join job_work_manifests as jwm
+     on jwm.work_manifest = gwm.id
+left join jobs
+     on jobs.id = jwm.job_id
 where gwm.id = ANY($ids)

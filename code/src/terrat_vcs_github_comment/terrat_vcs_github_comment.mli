@@ -19,6 +19,9 @@ module S : sig
     stale : Terrat_vcs_provider2.Work_manifest_stale.t option;
         (** The commits of the run moved and its files changed (RFD 2356). The comment shows a
             warning, thus the user does not use a stale output. *)
+    fail_if_set : string list;
+        (** The names of this run's parameters that the configuration declares [fail_if_set]. The
+            provider computes them, because the comment library does not depend on the evaluator. *)
     synthesized_config : Terrat_change_match3.Config.t;
     work_manifest : (Api.Account.t, unit) Terrat_work_manifest3.Existing.t;
   }

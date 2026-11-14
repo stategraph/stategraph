@@ -1,4 +1,5 @@
 module Tmpl = Terrat_vcs_github_comment_templates.Tmpl
+module Gitlab_tmpl = Terrat_vcs_gitlab_comment_templates.Tmpl
 
 (* Every template is a function of the brand.  These helpers render the
    Stategraph text; the brand tests render a brand of their own. *)
@@ -522,10 +523,119 @@ let work_manifests_kv ~unlock_ids rows =
         ("unlock_ids", list (CCList.map (fun id -> Map.of_list [ ("id", string id) ]) unlock_ids));
       ])
 
-let render_snabela template kv =
-  match Snabela.apply (template Terrat_brand.Stategraph) kv with
+let render_snabela_brand brand template kv =
+  match Snabela.apply (template brand) kv with
   | Ok body -> body
   | Error (#Snabela.err as err) -> failwith (Snabela.show_err err)
+
+let render_snabela template kv = render_snabela_brand Terrat_brand.Stategraph template kv
+
+(* The kv the value-not-allowed reply renders: the allowed list rides beside the has_allowed
+   flag, which is what decides whether the template lists the values or says there are none. *)
+let parameter_err_value_not_allowed_kv ~allowed =
+  `Assoc
+    [
+      ("name", `String "mode");
+      ("value", `String "NOPE");
+      ("has_allowed", `Bool (allowed <> []));
+      ("allowed", `List (CCList.map (fun value -> `Assoc [ ("value", `String value) ]) allowed));
+    ]
+
+(* The comment-channel replies name the parameter the comment wrote, so the person who wrote
+   the comment can fix it without reading the configuration.  Each reply is rendered under both
+   brands: the Terrateam render carries the Terrateam docs host, not the Stategraph one. *)
+let test_parameter_err_undeclared =
+  Oth.test ~name:"Parameter err undeclared" (fun _ ->
+      let kv = `Assoc [ ("name", `String "nope") ] in
+      let body = render Tmpl.parameter_err_undeclared kv in
+      Oth.Assert.str_contains_all
+        ~haystack:body
+        ~needles:
+          [
+            "Unknown Parameter";
+            "`nope`";
+            "does not declare";
+            "The command starts no run";
+            "https://stategraph.com/docs/reference/orchestration/configuration/parameters";
+          ];
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"{{";
+      let terrateam = render_brand Terrat_brand.Terrateam Tmpl.parameter_err_undeclared kv in
+      Oth.Assert.str_contains ~haystack:terrateam ~needle:"terrateam.io";
+      Oth.Assert.str_doesnt_contain ~haystack:terrateam ~needle:"stategraph")
+
+let test_parameter_err_value_not_allowed =
+  Oth.test ~name:"Parameter err value not allowed" (fun _ ->
+      let kv = parameter_err_value_not_allowed_kv ~allowed:[ "DEBUG"; "RELEASE" ] in
+      let body = render Tmpl.parameter_err_value_not_allowed kv in
+      Oth.Assert.str_contains_all
+        ~haystack:body
+        ~needles:
+          [
+            "Parameter Value Not Allowed";
+            "`mode`";
+            "`NOPE`";
+            "- `DEBUG`";
+            "- `RELEASE`";
+            "The command starts no run";
+          ];
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"{{";
+      let terrateam = render_brand Terrat_brand.Terrateam Tmpl.parameter_err_value_not_allowed kv in
+      Oth.Assert.str_contains ~haystack:terrateam ~needle:"terrateam.io";
+      Oth.Assert.str_doesnt_contain ~haystack:terrateam ~needle:"stategraph")
+
+let test_parameter_err_value_not_allowed_no_values =
+  Oth.test ~name:"Parameter err value not allowed with no allowed values" (fun _ ->
+      let kv = parameter_err_value_not_allowed_kv ~allowed:[] in
+      let body = render Tmpl.parameter_err_value_not_allowed kv in
+      Oth.Assert.str_contains_all
+        ~haystack:body
+        ~needles:[ "`mode`"; "`NOPE`"; "accepts no value at all" ];
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"- `DEBUG`";
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"{{";
+      let terrateam = render_brand Terrat_brand.Terrateam Tmpl.parameter_err_value_not_allowed kv in
+      Oth.Assert.str_contains ~haystack:terrateam ~needle:"terrateam.io";
+      Oth.Assert.str_doesnt_contain ~haystack:terrateam ~needle:"stategraph")
+
+let test_parameter_err_duplicate =
+  Oth.test ~name:"Parameter err duplicate" (fun _ ->
+      let kv = `Assoc [ ("name", `String "mode") ] in
+      let body = render Tmpl.parameter_err_duplicate kv in
+      Oth.Assert.str_contains_all
+        ~haystack:body
+        ~needles:[ "Parameter Set Twice"; "`mode`"; "more than once"; "The command starts no run" ];
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"{{";
+      let terrateam = render_brand Terrat_brand.Terrateam Tmpl.parameter_err_duplicate kv in
+      Oth.Assert.str_contains ~haystack:terrateam ~needle:"terrateam.io";
+      Oth.Assert.str_doesnt_contain ~haystack:terrateam ~needle:"stategraph")
+
+(* The three parameter-error replies are twins, and nothing enforced it: a one-sided port, or two
+   ports that drifted textually, would pass both suites silently.  Render both libraries under both
+   brands and compare the bytes. *)
+let test_parameter_err_twin_parity =
+  Oth.test ~tags:[ "brand" ] ~name:"GitHub and GitLab parameter error replies agree" (fun _ ->
+      let cases =
+        [
+          ( Tmpl.parameter_err_duplicate,
+            Gitlab_tmpl.parameter_err_duplicate,
+            `Assoc [ ("name", `String "mode") ] );
+          ( Tmpl.parameter_err_undeclared,
+            Gitlab_tmpl.parameter_err_undeclared,
+            `Assoc [ ("name", `String "nope") ] );
+          ( Tmpl.parameter_err_value_not_allowed,
+            Gitlab_tmpl.parameter_err_value_not_allowed,
+            parameter_err_value_not_allowed_kv ~allowed:[ "DEBUG"; "RELEASE" ] );
+        ]
+      in
+      CCList.iter
+        (fun (github_tmpl, gitlab_tmpl, kv) ->
+          CCList.iter
+            (fun brand ->
+              Oth.Assert.Eq.string
+                ~expected:(render_brand brand github_tmpl kv)
+                ~actual:(render_brand brand gitlab_tmpl kv))
+            [ Terrat_brand.Stategraph; Terrat_brand.Terrateam ])
+        cases;
+      ())
 
 (* A workflow that never started stops any layered run it belonged to: the body names the later
    layers and the command that plans them. *)
@@ -677,6 +787,8 @@ let details_balance body =
 let apply_complete2_kv ?(summary_unified = false) ~compact_view ~applied ~num_dirspaces () =
   `Assoc
     [
+      ("parameters", `List []);
+      ("fail_if_set", `List []);
       ("overall_success", `Bool true);
       ("summary", `Bool true);
       ("summary_unified", `Bool summary_unified);
@@ -791,6 +903,66 @@ let test_unknown_action_brand =
         ~needles:[ "List of Terrateam commands:"; "`terrateam plan`"; "`terrateam apply`" ];
       Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"stategraph")
 
+(* The unknown-command reply carries a copy of the command list, so it must
+   state the parameter syntax too, or the two comments disagree. *)
+let test_unknown_action_parameters =
+  Oth.test ~tags:[ "brand" ] ~name:"Unknown action states the parameters syntax" (fun _ ->
+      let body = Tmpl.terrateam_comment_unknown_action Terrat_brand.Stategraph in
+      Oth.Assert.str_contains_all
+        ~haystack:body
+        ~needles:
+          [
+            "## Parameters";
+            "`name=value`";
+            "`stategraph mode=DEBUG plan`";
+            "https://stategraph.com/docs/reference/orchestration/configuration/parameters";
+          ];
+      let body = Tmpl.terrateam_comment_unknown_action Terrat_brand.Terrateam in
+      Oth.Assert.str_contains_all ~haystack:body ~needles:[ "`terrateam mode=DEBUG plan`" ];
+      Oth.Assert.String.doesnt_contain_any ~haystack:body ~needles:[ "stategraph"; "Stategraph" ];
+      ())
+
+(* The help comment is where a reader learns the parameter syntax and that an
+   administrator can add an alias.  It ships in the Stategraph wording and
+   reaches the Terrateam brand through the same rewrite as every other
+   template. *)
+let test_help_parameters =
+  Oth.test ~tags:[ "brand" ] ~name:"Help comment states the parameters syntax" (fun _ ->
+      let kv = `Assoc [] in
+      let body = render Tmpl.terrateam_comment_help kv in
+      Oth.Assert.str_contains_all
+        ~haystack:body
+        ~needles:
+          [
+            "## Parameters";
+            "`name=value`";
+            "`stategraph mode=DEBUG plan`";
+            "`stategraph debug dir:staging`";
+            "Only `plan`, `apply`, `apply-force` and `apply-autoapprove` accept parameters.";
+            "configuration file";
+            "alias";
+            "https://stategraph.com/docs/reference/orchestration/configuration/parameters";
+          ];
+      let body = render_brand Terrat_brand.Terrateam Tmpl.terrateam_comment_help kv in
+      Oth.Assert.str_contains_all
+        ~haystack:body
+        ~needles:[ "`terrateam mode=DEBUG plan`"; "`terrateam debug dir:staging`" ];
+      Oth.Assert.String.doesnt_contain_any ~haystack:body ~needles:[ "stategraph"; "Stategraph" ];
+      ())
+
+(* The two template libraries are twins and nothing enforced it before, so a
+   change to one help comment could silently leave the other behind. *)
+let test_help_twin_parity =
+  Oth.test ~tags:[ "brand" ] ~name:"GitHub and GitLab help comments agree" (fun _ ->
+      let kv = `Assoc [] in
+      CCList.iter
+        (fun brand ->
+          Oth.Assert.Eq.string
+            ~expected:(render_brand brand Tmpl.terrateam_comment_help kv)
+            ~actual:(render_brand brand Gitlab_tmpl.terrateam_comment_help kv))
+        [ Terrat_brand.Stategraph; Terrat_brand.Terrateam ];
+      ())
+
 (* #2038: a plan whose dirspaces all came back with no changes must not tell the
    reader to apply, and a layered run must say the next layer follows on its
    own. *)
@@ -833,6 +1005,8 @@ let plan_complete2_kv
   in
   `Assoc
     [
+      ("parameters", `List []);
+      ("fail_if_set", `List []);
       ("overall_success", `Bool true);
       ("summary", `Bool true);
       ("summary_unified", `Bool summary_unified);
@@ -1206,6 +1380,87 @@ let test_cycle_names_the_rule =
             "`d2:default` waits for `d1:default` because of `depends_on`";
           ])
 
+(* The three parameters configuration-error comments.  They are Jinja templates, rendered
+   through [apply_template_and_publish_jinja], so the kv is the JSON the provider builds for
+   each error, one key per template variable; unused keys are harmless, so one helper serves
+   all three. *)
+let parameters_alias_kv ?(name = "mode") ?(value = "DEBUG") alias =
+  `Assoc [ ("alias", `String alias); ("name", `String name); ("value", `String value) ]
+
+let test_parameters_alias_shadows_verb_err =
+  Oth.test ~name:"Repo config err: parameters alias shadows a verb" (fun _ ->
+      let body =
+        render Tmpl.repo_config_err_parameters_alias_shadows_verb_err (parameters_alias_kv "plan")
+      in
+      Oth.Assert.str_contains_all
+        ~haystack:body
+        ~needles:
+          [
+            "The alias `plan` has the same name as a command";
+            "`parameters.aliases`";
+            "## What to do?";
+          ];
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"{{";
+      (* The Terrateam render carries the Terrateam docs host, not the Stategraph one. *)
+      let terrateam =
+        render_brand
+          Terrat_brand.Terrateam
+          Tmpl.repo_config_err_parameters_alias_shadows_verb_err
+          (parameters_alias_kv "plan")
+      in
+      Oth.Assert.str_contains ~haystack:terrateam ~needle:"terrateam.io";
+      Oth.Assert.str_doesnt_contain ~haystack:terrateam ~needle:"stategraph")
+
+let test_parameters_alias_unknown_parameter_err =
+  Oth.test ~name:"Repo config err: parameters alias sets an undeclared parameter" (fun _ ->
+      let body =
+        render
+          Tmpl.repo_config_err_parameters_alias_unknown_parameter_err
+          (parameters_alias_kv "debug" ~name:"mode")
+      in
+      Oth.Assert.str_contains_all
+        ~haystack:body
+        ~needles:
+          [
+            "The alias `debug` sets the parameter `mode`";
+            "which the `parameters.names` section does not declare";
+            "## What to do?";
+          ];
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"{{";
+      let terrateam =
+        render_brand
+          Terrat_brand.Terrateam
+          Tmpl.repo_config_err_parameters_alias_unknown_parameter_err
+          (parameters_alias_kv "debug" ~name:"mode")
+      in
+      Oth.Assert.str_contains ~haystack:terrateam ~needle:"terrateam.io";
+      Oth.Assert.str_doesnt_contain ~haystack:terrateam ~needle:"stategraph")
+
+let test_parameters_alias_value_not_allowed_err =
+  Oth.test ~name:"Repo config err: parameters alias sets a value the parameter refuses" (fun _ ->
+      let body =
+        render
+          Tmpl.repo_config_err_parameters_alias_value_not_allowed_err
+          (parameters_alias_kv "debug" ~name:"mode" ~value:"NOPE")
+      in
+      Oth.Assert.str_contains_all
+        ~haystack:body
+        ~needles:
+          [
+            "The alias `debug` sets the parameter `mode` to `NOPE`";
+            "`values` key of the parameter `mode`";
+            "## What to do?";
+          ];
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"{{";
+      let terrateam =
+        render_brand
+          Terrat_brand.Terrateam
+          Tmpl.repo_config_err_parameters_alias_value_not_allowed_err
+          (parameters_alias_kv "debug" ~name:"mode" ~value:"NOPE")
+      in
+      Oth.Assert.str_contains ~haystack:terrateam ~needle:"terrateam.io";
+      Oth.Assert.str_doesnt_contain ~haystack:terrateam ~needle:"stategraph")
+
 (* The data of the stale message, rendered through the JSON the provider sends to the template, so
    the template and the record cannot disagree about a name.  See RFD 2356. *)
 let stale_kv
@@ -1470,6 +1725,257 @@ let test_plan_complete2_not_stale =
       Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"[!WARNING]";
       ())
 
+(* The publisher always adds the keys [parameters] and [fail_if_set] to the data of the run
+   output: the parameters of the run as name/value pairs, and the names the configuration
+   declares [fail_if_set]. Both are an empty list when there is nothing to show. *)
+let with_parameters parameters fail_if_set kv =
+  let parameters =
+    `List
+      (CCList.map
+         (fun (name, value) -> `Assoc [ ("name", `String name); ("value", `String value) ])
+         parameters)
+  in
+  let fail_if_set = `List (CCList.map (fun name -> `String name) fail_if_set) in
+  match kv with
+  | `Assoc fields ->
+      `Assoc
+        (CCList.filter (fun (k, _) -> k <> "parameters" && k <> "fail_if_set") fields
+        @ [ ("parameters", parameters); ("fail_if_set", fail_if_set) ])
+  | kv -> kv
+
+(* The parameters of the run render as one bold line, in the order the run set them, and no
+   admonition follows when no parameter is [fail_if_set]. *)
+let test_run_parameters_line =
+  Oth.test ~tags:[ "parameters" ] ~name:"Run output: the parameters line renders" (fun _ ->
+      let kv =
+        with_parameters
+          [ ("mode", "DEBUG") ]
+          []
+          (plan_complete2_kv ~changes:[ true ] ~is_layered_run:false ~num_more_layers:0 ())
+      in
+      let body = render Tmpl.plan_complete2 kv in
+      Oth.Assert.str_contains ~haystack:body ~needle:"**Parameters**: `mode=DEBUG`";
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"[!WARNING]";
+      let kv =
+        with_parameters
+          [ ("mode", "DEBUG") ]
+          []
+          (apply_complete2_kv ~compact_view:false ~applied:false ~num_dirspaces:1 ())
+      in
+      let body = render Tmpl.apply_complete2 kv in
+      Oth.Assert.str_contains ~haystack:body ~needle:"**Parameters**: `mode=DEBUG`";
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"[!WARNING]";
+      ())
+
+(* A parameter the configuration declares [fail_if_set] renders the admonition that the run
+   counts as failed. *)
+let test_run_parameters_fail_if_set_admonition =
+  Oth.test
+    ~tags:[ "parameters" ]
+    ~name:"Run output: a fail_if_set parameter renders the admonition"
+    (fun _ ->
+      let kv =
+        with_parameters
+          [ ("mode", "DEBUG") ]
+          [ "mode" ]
+          (plan_complete2_kv ~changes:[ true ] ~is_layered_run:false ~num_more_layers:0 ())
+      in
+      let body = render Tmpl.plan_complete2 kv in
+      Oth.Assert.str_contains_all
+        ~haystack:body
+        ~needles:
+          [
+            "> [!WARNING]";
+            "The configuration declares these parameters `fail_if_set`, so this run counts as \
+             failed";
+            "- `mode`";
+          ];
+      let kv =
+        with_parameters
+          [ ("mode", "DEBUG") ]
+          [ "mode" ]
+          (apply_complete2_kv ~compact_view:false ~applied:false ~num_dirspaces:1 ())
+      in
+      let body = render Tmpl.apply_complete2 kv in
+      Oth.Assert.str_contains_all
+        ~haystack:body
+        ~needles:
+          [
+            "> [!WARNING]";
+            "The configuration declares these parameters `fail_if_set`, so this run counts as \
+             failed";
+            "- `mode`";
+          ];
+      ())
+
+(* [forced kv] is the shape the publisher emits for a forced-failed run: [overall_success] false
+   and every dirspace failed.  The heading is the failure heading, the admonition still says why,
+   and the counts say every dirspace failed. *)
+let forced kv =
+  let set key value fields = CCList.Assoc.set ~eq:CCString.equal key value fields in
+  let fail_dirspace = function
+    | `Assoc ds -> `Assoc (set "success" (`Bool false) ds)
+    | d -> d
+  in
+  match kv with
+  | `Assoc fields -> (
+      let fields = set "overall_success" (`Bool false) fields in
+      match CCList.Assoc.get ~eq:CCString.equal "dirspaces" fields with
+      | Some (`List dirspaces) ->
+          `Assoc (set "dirspaces" (`List (CCList.map fail_dirspace dirspaces)) fields)
+      | Some _ | None -> `Assoc fields)
+  | kv -> kv
+
+let test_run_parameters_fail_if_set_failure_heading =
+  Oth.test
+    ~tags:[ "parameters" ]
+    ~name:"Run output: a fail_if_set parameter renders the failure heading"
+    (fun _ ->
+      let kv =
+        forced
+          (with_parameters
+             [ ("mode", "DEBUG") ]
+             [ "mode" ]
+             (plan_complete2_kv ~changes:[ true ] ~is_layered_run:false ~num_more_layers:0 ()))
+      in
+      let body = render Tmpl.plan_complete2 kv in
+      Oth.Assert.str_contains_all
+        ~haystack:body
+        ~needles:
+          [
+            "## Plans :heavy_multiplication_x:";
+            "The configuration declares these parameters `fail_if_set`, so this run counts as \
+             failed";
+            "- `mode`";
+          ];
+      let kv =
+        forced
+          (with_parameters
+             [ ("mode", "DEBUG") ]
+             [ "mode" ]
+             (apply_complete2_kv ~compact_view:false ~applied:false ~num_dirspaces:1 ()))
+      in
+      let body = render Tmpl.apply_complete2 kv in
+      Oth.Assert.str_contains_all
+        ~haystack:body
+        ~needles:
+          [
+            "## Applies :heavy_multiplication_x:";
+            "The configuration declares these parameters `fail_if_set`, so this run counts as \
+             failed";
+          ];
+      ())
+
+(* A run with no parameter and no fail_if_set name renders neither the parameters line nor
+   the admonition. *)
+let test_run_parameters_absent =
+  Oth.test
+    ~tags:[ "parameters" ]
+    ~name:"Run output: no parameters render no parameters block"
+    (fun _ ->
+      let body =
+        render
+          Tmpl.plan_complete2
+          (plan_complete2_kv ~changes:[ true ] ~is_layered_run:false ~num_more_layers:0 ())
+      in
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"**Parameters**";
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"so this run counts as failed";
+      let body =
+        render
+          Tmpl.apply_complete2
+          (apply_complete2_kv ~compact_view:false ~applied:false ~num_dirspaces:1 ())
+      in
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"**Parameters**";
+      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"so this run counts as failed";
+      ())
+
+(* Several parameters render in one line, in the order the run set them. *)
+let test_run_parameters_order =
+  Oth.test
+    ~tags:[ "parameters" ]
+    ~name:"Run output: several parameters render in one line"
+    (fun _ ->
+      let kv =
+        with_parameters
+          [ ("mode", "DEBUG"); ("region", "us-east-1") ]
+          []
+          (plan_complete2_kv ~changes:[ true ] ~is_layered_run:false ~num_more_layers:0 ())
+      in
+      Oth.Assert.str_contains
+        ~haystack:(render Tmpl.plan_complete2 kv)
+        ~needle:"**Parameters**: `mode=DEBUG`, `region=us-east-1`";
+      let kv =
+        with_parameters
+          [ ("mode", "DEBUG"); ("region", "us-east-1") ]
+          []
+          (apply_complete2_kv ~compact_view:false ~applied:false ~num_dirspaces:1 ())
+      in
+      Oth.Assert.str_contains
+        ~haystack:(render Tmpl.apply_complete2 kv)
+        ~needle:"**Parameters**: `mode=DEBUG`, `region=us-east-1`";
+      ())
+
+(* A failed run renders the parameters line and the admonition too: the admonition states the
+   fail_if_set rule, which holds whether or not the work succeeded. *)
+let test_run_parameters_failed_run =
+  Oth.test
+    ~tags:[ "parameters" ]
+    ~name:"Run output: a failed run renders the parameters block"
+    (fun _ ->
+      let set_failed = function
+        | `Assoc fields ->
+            `Assoc (CCList.Assoc.set ~eq:CCString.equal "overall_success" (`Bool false) fields)
+        | kv -> kv
+      in
+      let kv =
+        with_parameters
+          [ ("mode", "DEBUG") ]
+          [ "mode" ]
+          (plan_complete2_kv ~changes:[ true ] ~is_layered_run:false ~num_more_layers:0 ())
+        |> set_failed
+      in
+      let body = render Tmpl.plan_complete2 kv in
+      Oth.Assert.str_contains ~haystack:body ~needle:"**Parameters**: `mode=DEBUG`";
+      Oth.Assert.str_contains ~haystack:body ~needle:"so this run counts as failed";
+      let kv =
+        with_parameters
+          [ ("mode", "DEBUG") ]
+          [ "mode" ]
+          (apply_complete2_kv ~compact_view:false ~applied:false ~num_dirspaces:1 ())
+        |> set_failed
+      in
+      let body = render Tmpl.apply_complete2 kv in
+      Oth.Assert.str_contains ~haystack:body ~needle:"**Parameters**: `mode=DEBUG`";
+      Oth.Assert.str_contains ~haystack:body ~needle:"so this run counts as failed";
+      ())
+
+(* The macro names no brand, so the parameters block reads the same under both brands. *)
+let test_run_parameters_brand =
+  Oth.test
+    ~tags:[ "brand" ]
+    ~name:"Run output: the parameters block carries no brand words"
+    (fun _ ->
+      let kv =
+        with_parameters
+          [ ("mode", "DEBUG") ]
+          [ "mode" ]
+          (plan_complete2_kv ~changes:[ true ] ~is_layered_run:false ~num_more_layers:0 ())
+      in
+      let block body =
+        body
+        |> CCString.split_on_char '\n'
+        |> CCList.filter (fun l -> CCString.prefix ~pre:"**Parameters**" l)
+      in
+      let stategraph = block (render_brand Terrat_brand.Stategraph Tmpl.plan_complete2 kv) in
+      Oth.Assert.true_ (CCList.length stategraph = 1);
+      Oth.Assert.true_
+        (CCString.equal
+           (CCList.hd stategraph)
+           (CCList.hd (block (render_brand Terrat_brand.Terrateam Tmpl.plan_complete2 kv))));
+      Oth.Assert.str_doesnt_contain ~haystack:(CCList.hd stategraph) ~needle:"terrateam";
+      Oth.Assert.str_doesnt_contain ~haystack:(CCList.hd stategraph) ~needle:"stategraph";
+      ())
+
 let test =
   Oth.parallel
     [
@@ -1540,8 +2046,26 @@ let test =
       test_apply_complete2_details_many_dirspaces_applied;
       test_terrateam_brand_rewrite;
       test_unknown_action_brand;
+      test_unknown_action_parameters;
+      test_help_parameters;
+      test_help_twin_parity;
+      test_run_parameters_line;
+      test_run_parameters_fail_if_set_admonition;
+      test_run_parameters_fail_if_set_failure_heading;
+      test_run_parameters_absent;
+      test_run_parameters_order;
+      test_run_parameters_failed_run;
+      test_run_parameters_brand;
       test_depends_on_crosses_stack;
       test_cycle_names_the_rule;
+      test_parameters_alias_shadows_verb_err;
+      test_parameters_alias_unknown_parameter_err;
+      test_parameters_alias_value_not_allowed_err;
+      test_parameter_err_undeclared;
+      test_parameter_err_value_not_allowed;
+      test_parameter_err_value_not_allowed_no_values;
+      test_parameter_err_duplicate;
+      test_parameter_err_twin_parity;
     ]
 
 let () =

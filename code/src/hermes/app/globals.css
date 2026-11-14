@@ -103,6 +103,12 @@
   --sg-success: #16a34a;    /* Forest green, professional */
   --sg-success-bg: #16a34a15; /* 8% opacity green background for success */
 
+  /* Chart series: plans, applies, failures. Checked together for color-vision separation
+     against --sg-bg-1. */
+  --sg-chart-plan: #2563eb;
+  --sg-chart-apply: #0d9488;
+  --sg-chart-failed: #dc2626;
+
   /* Spacing */
   --sg-space-xs: 0.5rem;
   --sg-space-sm: 1rem;
@@ -199,6 +205,11 @@
   --sg-warning-bg: #ffaa0015; /* 8% opacity amber background for warnings */
   --sg-success: #00ff00;
   --sg-success-bg: #00ff0015; /* 8% opacity green background for success */
+
+  /* Chart series (dark mode) */
+  --sg-chart-plan: #3b82f6;
+  --sg-chart-apply: #0d9488;
+  --sg-chart-failed: #f43f5e;
 
   /* Status Badge Tokens (dark mode: faint bg, colored text) */
   --sg-status-healthy-bg: rgba(34, 197, 94, 0.12);

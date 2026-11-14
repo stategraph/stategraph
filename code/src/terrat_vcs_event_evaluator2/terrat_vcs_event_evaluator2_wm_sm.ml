@@ -710,6 +710,7 @@ struct
                  denied_dirspaces = _;
                  environment = _;
                  initiator = _;
+                 params = _;
                  run_id = _;
                  runs_on = _;
                  steps = _;

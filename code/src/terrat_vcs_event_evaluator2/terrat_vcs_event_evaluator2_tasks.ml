@@ -134,6 +134,19 @@ struct
           ~job_id
           Tjc.Job.State.Failed)
 
+  (* [write_end_state s job db] settles [job] with the verdict its run was recorded with when its
+     result was published.  The read runs inside the transaction that writes, so the verdict it
+     reads is the one the result comment was published with: one decision, one read.  A run that
+     recorded no verdict -- it carries no parameter, or its result was superseded and never
+     published -- completed. *)
+  let write_end_state s job db =
+    let request_id = Builder.log_id s in
+    let open Irm in
+    S.Job_context.Job.query_force_fail ~request_id db ~job_id:job.Tjc.Job.id
+    >>= function
+    | true -> update_job_state_failed s job.Tjc.Job.id db
+    | false -> update_job_state_completed s job.Tjc.Job.id db
+
   let add_work_manifest_keys work_manifest store =
     let module Wm = Terrat_work_manifest3 in
     let { Wm.id = _; account; target; _ } = work_manifest in
@@ -236,8 +249,7 @@ struct
       >>= function
       | (Ok () | Error `Noop) as ret ->
           let open Irm in
-          Builder.run_db s ~f:(fun db -> update_job_state_completed s job.Tjc.Job.id db)
-          >>? fun () -> ret
+          Builder.run_db s ~f:(fun db -> write_end_state s job db) >>? fun () -> ret
       (* [`Rerun] rides alongside [`Suspend_eval]: neither is a failure, and
          marking the job failed for one would be unrecoverable, because the next
          pass finds the job already in a terminal state and gives up. *)
@@ -597,7 +609,7 @@ struct
                same call chooses the operation below, thus the two answers cannot disagree. *)
             let force =
               match job.Tjc.Job.type_ with
-              | Tjc.Job.Type_.Plan { tag_query; kind = None }
+              | Tjc.Job.Type_.Plan { tag_query; kind = None; parameters = _ }
                 when Terrat_tag_query.selects_dirspaces_only tag_query ->
                   all_matches
                   |> CCList.flatten
@@ -628,9 +640,16 @@ struct
                dirspace of the run and nothing counts as applied, and [Work_set.make] below puts
                the run back together from its first layer.  The comment names no dirspace, thus
                [force] is empty and this is not the force path. *)
+            (* A continuation of a layered run is a [Plan] with the empty query too, so this arm
+               could fire for it.  It cannot: [reset] needs an empty [to_run], and this job exists
+               only because [Work_set.next_round_ready] answered true -- the head of
+               [all_unapplied_matches] gained a member that was not there before.  [Work_set.make]
+               keeps that member in [working_set_matches] because [any] matches every dirspace, so
+               [to_run] holds it.  A continuation therefore always has work, and the reset stays
+               the answer to a plain [terrateam plan] that found nothing. *)
             let reset =
               match job.Tjc.Job.type_ with
-              | Tjc.Job.Type_.Plan { tag_query; kind = None }
+              | Tjc.Job.Type_.Plan { tag_query; kind = None; parameters = _ }
                 when Terrat_tag_query.is_empty tag_query && CCList.is_empty to_run -> true
               | Tjc.Job.Type_.Plan _
               | Tjc.Job.Type_.Apply _
@@ -698,14 +717,15 @@ struct
                  of quietly becoming a layer plan. *)
               match job.Tjc.Job.type_ with
               | T.Apply _ | T.Autoapply -> Work_set.Op.Apply
-              | T.Plan { kind = Some (T.Kind.Drift _); tag_query = _ } -> Work_set.Op.Drift_plan
-              | T.Plan { kind = None; tag_query = _ }
+              | T.Plan { kind = Some (T.Kind.Drift _); tag_query = _; parameters = _ } ->
+                  Work_set.Op.Drift_plan
+              | T.Plan { kind = None; tag_query = _; parameters = _ }
                 when Terrat_tag_query.selects_dirspaces_only tag_query ->
                   (* Only a query which names dirspaces reaches a dirspace which is applied
                      already.  Any other query takes the layer which runs next, which is what a
                      plain [terrateam plan] does. *)
                   Work_set.Op.Explicit_plan
-              | T.Plan { kind = None; tag_query = _ }
+              | T.Plan { kind = None; tag_query = _; parameters = _ }
               | T.Autoplan
               | T.Gate_approval _
               | T.Help
@@ -813,8 +833,8 @@ struct
             let tag_query =
               let module T = Tjc.Job.Type_ in
               match job.Tjc.Job.type_ with
-              | T.Apply { tag_query; kind = _; force = _ } | T.Plan { tag_query; kind = _ } ->
-                  tag_query
+              | T.Apply { tag_query; kind = _; force = _; parameters = _ }
+              | T.Plan { tag_query; kind = _; parameters = _ } -> tag_query
               | T.Autoapply
               | T.Autoplan
               | T.Gate_approval _
@@ -3284,8 +3304,7 @@ struct
             | `Noop ->
                 let open Irm in
                 fetch Keys.job
-                >>= fun job ->
-                Builder.run_db s ~f:(fun db -> update_job_state_completed s job.Tjc.Job.id db)
+                >>= fun job -> Builder.run_db s ~f:(fun db -> write_end_state s job db)
             | `Suspend_eval _ | `Rerun _ | `Silent_failure -> Abbs_fc.return_ok ()
             | #Terrat_base_repo_config_v1.of_version_1_err
             | #Terrat_change_match3.synthesize_config_err
@@ -3753,6 +3772,7 @@ struct
                                    kind =
                                      Some
                                        Tjc.Job.Type_.Kind.(Drift { reconcile; restart_on_change });
+                                   parameters = Sln_map.String.empty;
                                  })
                               context
                               None))
@@ -4012,147 +4032,167 @@ struct
              this job is for a commit that the branch has left. *)
           fetch Keys.job
           >>= fun job ->
+          (* A run whose parameter set forces it to fail ends the chain here: the layers after it
+             wait for a new plan, the same way they wait when its work manifest fails.  The job is
+             already settled failed by the completion that reads the same verdict. *)
           Builder.run_db s ~f:(fun db ->
-              S.Db.query_job_restart ~request_id:(Builder.log_id s) ~job_id:job.Tjc.Job.id db
-              >>= CCOption.map_or ~default:(Abbs_fc.return_ok None) (fun restart_id ->
-                  S.Job_context.Job.query ~request_id:(Builder.log_id s) db ~job_id:restart_id))
-          >>= function
-          | Some
-              ({
-                 Tjc.Job.state = Tjc.Job.State.Running;
-                 completed_at = _;
-                 context = _;
-                 created_at = _;
-                 id = _;
-                 initiator = _;
-                 type_ = _;
-                 updated_at = _;
-               } as restart) ->
-              Logs.info (fun m ->
-                  m
-                    "%s : DRIFT : RUN_RESTART : job=%a"
-                    (Builder.log_id s)
-                    Uuidm.pp
-                    restart.Tjc.Job.id);
-              let s' =
-                s
-                |> Builder.State.orig_store
-                |> Keys.Key.add Keys.job restart
-                |> Keys.Key.add Keys.work_manifest_event None
-                |> Builder.State.forward_store_value Keys.context s
-                |> Tasks_base.forward_std_keys s
-                |> CCFun.flip Builder.State.set_orig_store s
-                |> Builder.State.set_log_id (Uuidm.to_string restart.Tjc.Job.id)
-              in
-              Builder.eval s' Keys.run_plan
-          | Some _ ->
-              (* The restart is already over, and it went on from there on its own. *)
-              Abbs_fc.return_ok ()
-          | None -> (
-              match job with
-              | {
-               Tjc.Job.type_ =
-                 Tjc.Job.Type_.Plan
-                   {
-                     kind =
-                       Some (Tjc.Job.Type_.Kind.Drift { reconcile = true; restart_on_change = _ })
-                       as kind;
-                     tag_query;
-                   };
-               id = plan_job_id;
-               context;
-               initiator;
-               _;
-              } ->
-                  (* If we've just finished a drift plan with reconciliation on,
+              S.Job_context.Job.query_force_fail
+                ~request_id:(Builder.log_id s)
+                db
+                ~job_id:job.Tjc.Job.id)
+          >>= fun force_fail ->
+          if force_fail then (
+            Logs.info (fun m ->
+                m
+                  "%s : FORCE_FAIL : STOP_LAYERS : job=%a"
+                  (Builder.log_id s)
+                  Uuidm.pp
+                  job.Tjc.Job.id);
+            Abbs_fc.return_ok ())
+          else
+            Builder.run_db s ~f:(fun db ->
+                S.Db.query_job_restart ~request_id:(Builder.log_id s) ~job_id:job.Tjc.Job.id db
+                >>= CCOption.map_or ~default:(Abbs_fc.return_ok None) (fun restart_id ->
+                    S.Job_context.Job.query ~request_id:(Builder.log_id s) db ~job_id:restart_id))
+            >>= function
+            | Some
+                ({
+                   Tjc.Job.state = Tjc.Job.State.Running;
+                   completed_at = _;
+                   context = _;
+                   created_at = _;
+                   id = _;
+                   initiator = _;
+                   type_ = _;
+                   updated_at = _;
+                 } as restart) ->
+                Logs.info (fun m ->
+                    m
+                      "%s : DRIFT : RUN_RESTART : job=%a"
+                      (Builder.log_id s)
+                      Uuidm.pp
+                      restart.Tjc.Job.id);
+                let s' =
+                  s
+                  |> Builder.State.orig_store
+                  |> Keys.Key.add Keys.job restart
+                  |> Keys.Key.add Keys.work_manifest_event None
+                  |> Builder.State.forward_store_value Keys.context s
+                  |> Tasks_base.forward_std_keys s
+                  |> CCFun.flip Builder.State.set_orig_store s
+                  |> Builder.State.set_log_id (Uuidm.to_string restart.Tjc.Job.id)
+                in
+                Builder.eval s' Keys.run_plan
+            | Some _ ->
+                (* The restart is already over, and it went on from there on its own. *)
+                Abbs_fc.return_ok ()
+            | None -> (
+                match job with
+                | {
+                 Tjc.Job.type_ =
+                   Tjc.Job.Type_.Plan
+                     {
+                       kind =
+                         Some (Tjc.Job.Type_.Kind.Drift { reconcile = true; restart_on_change = _ })
+                         as kind;
+                       tag_query;
+                       parameters;
+                     };
+                 id = plan_job_id;
+                 context;
+                 initiator;
+                 _;
+                } ->
+                    (* If we've just finished a drift plan with reconciliation on,
                  then time to run the apply *)
-                  Logs.info (fun m -> m "%s : DRIFT : RECONCILE" (Builder.log_id s));
-                  (* The apply continues the plan, thus it takes the place of the plan in a chain of
+                    Logs.info (fun m -> m "%s : DRIFT : RECONCILE" (Builder.log_id s));
+                    (* The apply continues the plan, thus it takes the place of the plan in a chain of
                      restarts, and a restart from the apply counts every restart before it. *)
-                  Builder.run_db s ~f:(fun db ->
-                      S.Job_context.Job.create
-                        ~request_id:(Builder.log_id s)
-                        ~continuation_of:plan_job_id
-                        db
-                        (Tjc.Job.Type_.Apply { tag_query; kind; force = false })
-                        context
-                        initiator
-                      >>= fun job ->
-                      S.Db.inherit_job_restart_of
-                        ~request_id:(Builder.log_id s)
-                        ~job_id:job.Tjc.Job.id
-                        ~from_job_id:plan_job_id
-                        db
-                      >>| fun () -> job)
-                  >>= fun job ->
-                  Logs.info (fun m ->
-                      m "%s : CREATE_JOB : new_job= %a" (Builder.log_id s) Uuidm.pp job.Tjc.Job.id);
-                  let s' =
-                    s
-                    |> Builder.State.orig_store
-                    |> Keys.Key.add Keys.job job
-                    |> Keys.Key.add Keys.work_manifest_event None
-                    |> Builder.State.forward_store_value Keys.context s
-                    |> Tasks_base.forward_std_keys s
-                    |> CCFun.flip Builder.State.set_orig_store s
-                    |> Builder.State.set_log_id (Uuidm.to_string job.Tjc.Job.id)
-                  in
-                  Builder.eval s' Keys.run_apply
-              | {
-               Tjc.Job.type_ = Tjc.Job.Type_.Plan { kind = Some (Tjc.Job.Type_.Kind.Drift _); _ };
-               _;
-              } ->
-                  Logs.info (fun m -> m "%s : DRIFT_COMPLETE" (Builder.log_id s));
-                  Abbs_fc.return_ok ()
-              | ( { Tjc.Job.type_ = Tjc.Job.Type_.Apply _; _ }
-                | { Tjc.Job.type_ = Tjc.Job.Type_.Autoapply; _ }
-                | { Tjc.Job.type_ = Tjc.Job.Type_.Autoplan; _ }
-                | { Tjc.Job.type_ = Tjc.Job.Type_.Plan _; _ } ) as job -> (
-                  fetch Keys.all_unapplied_matches
-                  >>= function
-                  | [] ->
-                      Logs.info (fun m -> m "%s : ALL_DIRSPACES_APPLIED" (Builder.log_id s));
-                      fetch Keys.maybe_create_completed_apply_check
-                      >>= fun () ->
-                      fetch Keys.finalize_unfinished_terrateam_checks
-                      >>= fun () ->
-                      (* The run is complete: the kept dirspaces get their checks and their
+                    Builder.run_db s ~f:(fun db ->
+                        S.Job_context.Job.create
+                          ~request_id:(Builder.log_id s)
+                          ~continuation_of:plan_job_id
+                          db
+                          (Tjc.Job.Type_.Apply { tag_query; kind; force = false; parameters })
+                          context
+                          initiator
+                        >>= fun job ->
+                        S.Db.inherit_job_restart_of
+                          ~request_id:(Builder.log_id s)
+                          ~job_id:job.Tjc.Job.id
+                          ~from_job_id:plan_job_id
+                          db
+                        >>| fun () -> job)
+                    >>= fun job ->
+                    Logs.info (fun m ->
+                        m "%s : CREATE_JOB : new_job= %a" (Builder.log_id s) Uuidm.pp job.Tjc.Job.id);
+                    let s' =
+                      s
+                      |> Builder.State.orig_store
+                      |> Keys.Key.add Keys.job job
+                      |> Keys.Key.add Keys.work_manifest_event None
+                      |> Builder.State.forward_store_value Keys.context s
+                      |> Tasks_base.forward_std_keys s
+                      |> CCFun.flip Builder.State.set_orig_store s
+                      |> Builder.State.set_log_id (Uuidm.to_string job.Tjc.Job.id)
+                    in
+                    Builder.eval s' Keys.run_apply
+                | {
+                 Tjc.Job.type_ = Tjc.Job.Type_.Plan { kind = Some (Tjc.Job.Type_.Kind.Drift _); _ };
+                 _;
+                } ->
+                    Logs.info (fun m -> m "%s : DRIFT_COMPLETE" (Builder.log_id s));
+                    Abbs_fc.return_ok ()
+                | ( { Tjc.Job.type_ = Tjc.Job.Type_.Apply _; _ }
+                  | { Tjc.Job.type_ = Tjc.Job.Type_.Autoapply; _ }
+                  | { Tjc.Job.type_ = Tjc.Job.Type_.Autoplan; _ }
+                  | { Tjc.Job.type_ = Tjc.Job.Type_.Plan _; _ } ) as job -> (
+                    fetch Keys.all_unapplied_matches
+                    >>= function
+                    | [] ->
+                        Logs.info (fun m -> m "%s : ALL_DIRSPACES_APPLIED" (Builder.log_id s));
+                        fetch Keys.maybe_create_completed_apply_check
+                        >>= fun () ->
+                        fetch Keys.finalize_unfinished_terrateam_checks
+                        >>= fun () ->
+                        (* The run is complete: the kept dirspaces get their checks and their
                          summary states here.  A dirspace the run output-pruned (RFD 2110) is
                          neither in the work manifests of the job nor unapplied, so it settles
                          applied in the unified summary comment. *)
-                      fetch Keys.kept_dirspace_checks >>= fun () -> fetch Keys.maybe_automerge
-                  | _ :: _ as all_unapplied_matches -> (
-                      fetch Keys.working_layer
-                      >>= fun working_layer ->
-                      fetch Keys.synthesized_config
-                      >>= fun config ->
-                      fetch Keys.work_manifests_for_job
-                      >>= fun work_manifests ->
-                      let just_ran =
-                        CCList.flat_map
-                          (fun {
-                                 Wm.changes;
-                                 account = _;
-                                 base_ref = _;
-                                 branch = _;
-                                 branch_ref = _;
-                                 completed_at = _;
-                                 created_at = _;
-                                 denied_dirspaces = _;
-                                 environment = _;
-                                 id = _;
-                                 initiator = _;
-                                 run_id = _;
-                                 runs_on = _;
-                                 state = _;
-                                 steps = _;
-                                 tag_query = _;
-                                 target = _;
-                               }
-                             -> CCList.map Terrat_change.Dirspaceflow.to_dirspace changes)
-                          work_manifests
-                      in
-                      (* Start another round only if this work manifest left
+                        fetch Keys.kept_dirspace_checks >>= fun () -> fetch Keys.maybe_automerge
+                    | _ :: _ as all_unapplied_matches -> (
+                        fetch Keys.working_layer
+                        >>= fun working_layer ->
+                        fetch Keys.synthesized_config
+                        >>= fun config ->
+                        fetch Keys.work_manifests_for_job
+                        >>= fun work_manifests ->
+                        let just_ran =
+                          CCList.flat_map
+                            (fun {
+                                   Wm.changes;
+                                   account = _;
+                                   base_ref = _;
+                                   branch = _;
+                                   branch_ref = _;
+                                   completed_at = _;
+                                   created_at = _;
+                                   denied_dirspaces = _;
+                                   environment = _;
+                                   id = _;
+                                   initiator = _;
+                                   params = _;
+                                   run_id = _;
+                                   runs_on = _;
+                                   state = _;
+                                   steps = _;
+                                   tag_query = _;
+                                   target = _;
+                                 }
+                               -> CCList.map Terrat_change.Dirspaceflow.to_dirspace changes)
+                            work_manifests
+                        in
+                        (* Start another round only if this work manifest left
                      something ready that was not ready before.
 
                      "Did the first layer gain a member" is the test, not "is
@@ -4167,112 +4207,121 @@ struct
                      the same layer over and over -- and it also holds for a
                      partial apply, which frees nobody and must not set another
                      plan going. *)
-                      if Work_set.next_round_ready ~config ~all_unapplied_matches ~just_ran then (
-                        let { Tjc.Job.context; initiator; type_; _ } = job in
-                        let job_type =
-                          match type_ with
-                          | Tjc.Job.Type_.(
-                              ( Plan { tag_query; kind = Some _ as kind }
-                              | Apply { tag_query; kind = Some _ as kind; force = _ } )) ->
-                              Tjc.Job.Type_.(Plan { tag_query; kind })
-                          | Tjc.Job.Type_.Apply _
-                          | Tjc.Job.Type_.Autoapply
-                          | Tjc.Job.Type_.Autoplan
-                          | Tjc.Job.Type_.Gate_approval _
-                          | Tjc.Job.Type_.Help
-                          | Tjc.Job.Type_.Index
-                          | Tjc.Job.Type_.Plan _
-                          | Tjc.Job.Type_.Push
-                          | Tjc.Job.Type_.Repo_config
-                          | Tjc.Job.Type_.Unlock _ -> Tjc.Job.Type_.Autoplan
-                        in
-                        Builder.run_db s ~f:(fun db ->
-                            S.Job_context.Job.create
-                              ~request_id:(Builder.log_id s)
-                              ~continuation_of:job.Tjc.Job.id
-                              db
-                              job_type
-                              context
-                              initiator)
-                        >>= fun job ->
-                        Logs.info (fun m ->
-                            m
-                              "%s : CREATE_JOB : new_job= %a"
-                              (Builder.log_id s)
-                              Uuidm.pp
-                              job.Tjc.Job.id);
-                        let s' =
-                          s
-                          |> Builder.State.orig_store
-                          |> Keys.Key.add Keys.job job
-                          |> Keys.Key.add Keys.work_manifest_event None
-                          |> Builder.State.forward_store_value Keys.context s
-                          |> Tasks_base.forward_std_keys s
-                          |> CCFun.flip Builder.State.set_orig_store s
-                          |> Builder.State.set_log_id (Uuidm.to_string job.Tjc.Job.id)
-                        in
-                        Builder.eval s' Keys.run_plan)
-                      else
-                        match job with
-                        | { Tjc.Job.type_ = Tjc.Job.Type_.Apply _; _ } -> Abbs_fc.return_ok ()
-                        | { Tjc.Job.type_ = Tjc.Job.Type_.(Plan _ | Autoplan); _ }
-                          when can_stack_auto_apply working_layer ->
-                            let { Tjc.Job.context; initiator; _ } = job in
-                            Builder.run_db s ~f:(fun db ->
-                                S.Job_context.Job.create
-                                  ~request_id:(Builder.log_id s)
-                                  ~continuation_of:job.Tjc.Job.id
-                                  db
-                                  Tjc.Job.Type_.Autoapply
-                                  context
-                                  initiator)
-                            >>= fun job ->
-                            Logs.info (fun m ->
-                                m
-                                  "%s : CREATE_JOB : new_job= %a"
-                                  (Builder.log_id s)
-                                  Uuidm.pp
-                                  job.Tjc.Job.id);
-                            let s' =
-                              s
-                              |> Builder.State.orig_store
-                              |> Keys.Key.add Keys.job job
-                              |> Keys.Key.add Keys.work_manifest_event None
-                              |> Builder.State.forward_store_value Keys.context s
-                              |> Tasks_base.forward_std_keys s
-                              |> CCFun.flip Builder.State.set_orig_store s
-                              |> Builder.State.set_log_id (Uuidm.to_string job.Tjc.Job.id)
-                            in
-                            Builder.eval s' Keys.run_apply
-                        | { Tjc.Job.type_ = Tjc.Job.Type_.(Plan _ | Autoplan); _ } ->
-                            Abbs_fc.return_ok ()
-                        | {
-                         Tjc.Job.type_ =
-                           Tjc.Job.Type_.(
-                             ( Autoapply
-                             | Gate_approval _
-                             | Help
-                             | Index
-                             | Repo_config
-                             | Unlock _
-                             | Push ));
-                         _;
-                        } -> Abbs_fc.return_ok ()))
-              | { Tjc.Job.type_ = Tjc.Job.Type_.Gate_approval _; _ }
-              | { Tjc.Job.type_ = Tjc.Job.Type_.Help; _ }
-              | { Tjc.Job.type_ = Tjc.Job.Type_.Index; _ }
-              | { Tjc.Job.type_ = Tjc.Job.Type_.Repo_config; _ }
-              | { Tjc.Job.type_ = Tjc.Job.Type_.Unlock _; _ }
-              | {
-                  Tjc.Job.type_ = Tjc.Job.Type_.Push;
-                  completed_at = _;
-                  context = _;
-                  created_at = _;
-                  id = _;
-                  initiator = _;
-                  state = _;
-                  updated_at = _;
-                } -> Abbs_fc.return_ok ()))
+                        if Work_set.next_round_ready ~config ~all_unapplied_matches ~just_ran then (
+                          let { Tjc.Job.context; initiator; type_; _ } = job in
+                          let job_type =
+                            match type_ with
+                            | Tjc.Job.Type_.(
+                                ( Plan { tag_query; kind = Some _ as kind; parameters }
+                                | Apply { tag_query; kind = Some _ as kind; force = _; parameters }
+                                  )) -> Tjc.Job.Type_.(Plan { tag_query; kind; parameters })
+                            | Tjc.Job.Type_.(
+                                ( Apply { tag_query = _; parameters; kind = None; force = _ }
+                                | Plan { parameters; kind = None; tag_query = _ } )) ->
+                                (* The next layer is the same run, thus it carries the run's
+                                 parameters.  [any] leaves the job a layer plan and keeps [force]
+                                 empty, because both decisions read
+                                 {!Terrat_tag_query.selects_dirspaces_only}, which answers false
+                                 for [any].  The work manifest and the plan payload then stamp the
+                                 parameters, which an [Autoplan] cannot carry. *)
+                                Tjc.Job.Type_.(
+                                  Plan { tag_query = Terrat_tag_query.any; kind = None; parameters })
+                            | Tjc.Job.Type_.Autoapply
+                            | Tjc.Job.Type_.Autoplan
+                            | Tjc.Job.Type_.Gate_approval _
+                            | Tjc.Job.Type_.Help
+                            | Tjc.Job.Type_.Index
+                            | Tjc.Job.Type_.Push
+                            | Tjc.Job.Type_.Repo_config
+                            | Tjc.Job.Type_.Unlock _ -> Tjc.Job.Type_.Autoplan
+                          in
+                          Builder.run_db s ~f:(fun db ->
+                              S.Job_context.Job.create
+                                ~request_id:(Builder.log_id s)
+                                ~continuation_of:job.Tjc.Job.id
+                                db
+                                job_type
+                                context
+                                initiator)
+                          >>= fun job ->
+                          Logs.info (fun m ->
+                              m
+                                "%s : CREATE_JOB : new_job= %a"
+                                (Builder.log_id s)
+                                Uuidm.pp
+                                job.Tjc.Job.id);
+                          let s' =
+                            s
+                            |> Builder.State.orig_store
+                            |> Keys.Key.add Keys.job job
+                            |> Keys.Key.add Keys.work_manifest_event None
+                            |> Builder.State.forward_store_value Keys.context s
+                            |> Tasks_base.forward_std_keys s
+                            |> CCFun.flip Builder.State.set_orig_store s
+                            |> Builder.State.set_log_id (Uuidm.to_string job.Tjc.Job.id)
+                          in
+                          Builder.eval s' Keys.run_plan)
+                        else
+                          match job with
+                          | { Tjc.Job.type_ = Tjc.Job.Type_.Apply _; _ } -> Abbs_fc.return_ok ()
+                          | { Tjc.Job.type_ = Tjc.Job.Type_.(Plan _ | Autoplan); _ }
+                            when can_stack_auto_apply working_layer ->
+                              let { Tjc.Job.context; initiator; _ } = job in
+                              Builder.run_db s ~f:(fun db ->
+                                  S.Job_context.Job.create
+                                    ~request_id:(Builder.log_id s)
+                                    ~continuation_of:job.Tjc.Job.id
+                                    db
+                                    Tjc.Job.Type_.Autoapply
+                                    context
+                                    initiator)
+                              >>= fun job ->
+                              Logs.info (fun m ->
+                                  m
+                                    "%s : CREATE_JOB : new_job= %a"
+                                    (Builder.log_id s)
+                                    Uuidm.pp
+                                    job.Tjc.Job.id);
+                              let s' =
+                                s
+                                |> Builder.State.orig_store
+                                |> Keys.Key.add Keys.job job
+                                |> Keys.Key.add Keys.work_manifest_event None
+                                |> Builder.State.forward_store_value Keys.context s
+                                |> Tasks_base.forward_std_keys s
+                                |> CCFun.flip Builder.State.set_orig_store s
+                                |> Builder.State.set_log_id (Uuidm.to_string job.Tjc.Job.id)
+                              in
+                              Builder.eval s' Keys.run_apply
+                          | { Tjc.Job.type_ = Tjc.Job.Type_.(Plan _ | Autoplan); _ } ->
+                              Abbs_fc.return_ok ()
+                          | {
+                           Tjc.Job.type_ =
+                             Tjc.Job.Type_.(
+                               ( Autoapply
+                               | Gate_approval _
+                               | Help
+                               | Index
+                               | Repo_config
+                               | Unlock _
+                               | Push ));
+                           _;
+                          } -> Abbs_fc.return_ok ()))
+                | { Tjc.Job.type_ = Tjc.Job.Type_.Gate_approval _; _ }
+                | { Tjc.Job.type_ = Tjc.Job.Type_.Help; _ }
+                | { Tjc.Job.type_ = Tjc.Job.Type_.Index; _ }
+                | { Tjc.Job.type_ = Tjc.Job.Type_.Repo_config; _ }
+                | { Tjc.Job.type_ = Tjc.Job.Type_.Unlock _; _ }
+                | {
+                    Tjc.Job.type_ = Tjc.Job.Type_.Push;
+                    completed_at = _;
+                    context = _;
+                    created_at = _;
+                    id = _;
+                    initiator = _;
+                    state = _;
+                    updated_at = _;
+                  } -> Abbs_fc.return_ok ()))
 
     let complete_no_change_dirspaces =
       run ~name:"complete_no_change_dirspaces" (fun s { Bs.Fetcher.fetch } ->

@@ -13,7 +13,8 @@ import {
   type HostedHomeDestination,
 } from './home/mqlQueries';
 import { WelcomePanel } from './home/WelcomePanel';
-import { useCapabilities, useDeepLinkRouter, useStateSelection } from '@/hooks';
+import { HomeSetupCard } from './home/HomeSetupCard';
+import { useDeepLinkRouter, useFirstRunSetup, useStateSelection } from '@/hooks';
 import { PageHeader } from '@/components/page/PageHeader';
 import { BootstrapLoader } from '@/components/layout/bootstrap-loader';
 import {
@@ -27,7 +28,8 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/auth';
 import { useTenant } from '@/contexts/TenantContext';
 import { useStates } from '@/contexts/StateContext';
-import { useLicense, useSetupProgress } from '@/contexts';
+import { useSetupProgress } from '@/contexts';
+import { homeLayout } from '@/lib/getting-started/setup-progress';
 import {
   START_INTENT_PARAM,
   clearStartIntent,
@@ -35,11 +37,7 @@ import {
   setupDestination,
   stashStartIntent,
 } from '@/lib/getting-started/start-intent';
-import {
-  firstRunSetupEnabled,
-  hasSeenFirstRun,
-  markFirstRunSeen,
-} from '@/lib/getting-started/first-run';
+import { hasSeenFirstRun, markFirstRunSeen } from '@/lib/getting-started/first-run';
 import { StateFilter } from '@/components/filters';
 import {
   ControlPlaneStatus,
@@ -48,8 +46,13 @@ import {
   ControlPlaneInsightsGrid,
   LoadingSkeleton,
   AnalyticsSkeleton,
+  StateOverviewSkeleton,
 } from './home/components';
 import { HomeOrchestrationBand } from '@/components/home/HomeOrchestrationBand';
+import { HomeHelpFooter } from '@/components/home/HomeHelpFooter';
+import { NeedsAttention } from '@/components/home/NeedsAttention';
+import { NextSteps } from '@/components/home/NextSteps';
+import { useHomeOrchestration } from '@/components/home/useHomeOrchestration';
 
 function HomePageContent() {
   const router = useDeepLinkRouter();
@@ -57,14 +60,10 @@ function HomePageContent() {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
   const { currentTenant, tenants, isLoading: tenantLoading } = useTenant();
   const { states, isLoading: statesLoading } = useStates();
-  const { mode, isLoading: licenseLoading } = useLicense();
-  const { capabilities } = useCapabilities();
   const progress = useSetupProgress();
-  const firstRunSetup = firstRunSetupEnabled({
-    modeLoading: licenseLoading,
-    mode,
-    orchestrationEnabled: capabilities ? capabilities.orchestration.enabled : null,
-  });
+  const firstRunSetup = useFirstRunSetup();
+  const layout = homeLayout(firstRunSetup, progress.shape);
+  const stateSections = layout.stateSections;
 
   // The website's Start buttons name the product on the landing URL. Keep it
   // for the redirect below, which happens after the facts load.
@@ -135,6 +134,7 @@ function HomePageContent() {
     // resolving or about to redirect. A tenant with run history resolves to
     // Home and loads the dashboard normally.
     if (homeOnboardingDestination !== "home") return;
+    if (!stateSections) return;
 
     const tenantId = currentTenant.id;
     const stateId = isAllStates ? undefined : currentState?.id;
@@ -167,7 +167,7 @@ function HomePageContent() {
 
     fetchData();
     return () => { cancelled = true; };
-  }, [isAuthenticated, currentTenant, isAllStates, currentState, homeOnboardingDestination, reloadKey]);
+  }, [isAuthenticated, currentTenant, isAllStates, currentState, homeOnboardingDestination, stateSections, reloadKey]);
 
   // Retry just the analytics phase (the scalars above it stay put).
   const retryAnalytics = useCallback(() => {
@@ -204,23 +204,79 @@ function HomePageContent() {
     router.replace(homeRedirectHref);
   }, [currentTenant, homeRedirectHref, router]);
 
+  // The page chrome renders immediately and only the content area swaps
+  // skeleton → (empty | data). `bootstrapping` covers every pre-content state
+  // (tenant resolving, states loading, or a pending migrate redirect) so we show
+  // the in-place skeleton instead of a full-screen swap, and the empty state can
+  // only appear once tenant + states have truly settled.
+  const bootstrapping =
+    tenantLoading ||
+    statesLoading ||
+    homeOnboardingDestination !== "home" ||
+    (!currentTenant && tenants.length > 0);
+
+  const orchestration = useHomeOrchestration({
+    tenantId: currentTenant?.id ?? "",
+    enabled:
+      isAuthenticated && !bootstrapping && !!currentTenant && (layout.orchestration || layout.attention),
+    includeTransactions: layout.attention && stateSections,
+    reloadKey,
+  });
+
   // Until auth resolves (or while we bounce an unauthenticated user to login)
   // show ONE calm loader and no console chrome — never a flash of protected UI.
   if (authLoading || !isAuthenticated) {
     return <BootstrapLoader />;
   }
 
-  // Authenticated: the page chrome below renders immediately and only the
-  // content area swaps skeleton → (empty | data). `bootstrapping` covers every
-  // pre-content state (tenant resolving, states loading, or a pending migrate
-  // redirect) so we show the in-place skeleton instead of a full-screen swap,
-  // and the empty state can only appear once tenant + states have truly settled.
-  const bootstrapping =
-    tenantLoading ||
-    statesLoading ||
-    homeOnboardingDestination !== "home" ||
-    (!currentTenant && tenants.length > 0);
-  const refreshing = loading;
+  const refreshing = stateSections && loading;
+
+  const band =
+    layout.orchestration && orchestration ? (
+      <HomeOrchestrationBand data={orchestration} wide={!layout.columns} />
+    ) : null;
+
+  const stateOverview = !stateSections ? null : scalars ? (
+    <div className="space-y-8">
+      {/* CONTROL PLANE STATUS (scalar phase) */}
+      <ControlPlaneStatus data={scalars} />
+
+      {/* STATE STRUCTURE — infra-as-a-db, demoted below orchestration */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-semibold text-[var(--sg-text)] uppercase tracking-wide">
+            State Structure
+          </h2>
+        </div>
+        <HeroMetricsStrip data={scalars} />
+      </div>
+    </div>
+  ) : (
+    <StateOverviewSkeleton />
+  );
+
+  // Graph analytics stream in after the scalars.
+  const stateAnalytics = !stateSections ? null : !scalars ? (
+    <AnalyticsSkeleton />
+  ) : analytics ? (
+    <>
+      <RiskRow data={analytics} router={router} />
+      <ControlPlaneInsightsGrid data={{ ...scalars, ...analytics }} />
+    </>
+  ) : analyticsError ? (
+    <div className="flex items-center gap-3 px-4 py-3 rounded-lg border bg-[var(--sg-bg-1)] border-[var(--sg-border)]">
+      <AlertCircle className="h-5 w-5 text-[var(--sg-error)]" />
+      <div className="flex-1">
+        <div className="font-medium text-[var(--sg-text)]">Analytics unavailable</div>
+        <div className="text-sm text-[var(--sg-text-muted)]">{analyticsError}</div>
+      </div>
+      <Button variant="outline" size="sm" onClick={retryAnalytics}>
+        Retry
+      </Button>
+    </div>
+  ) : (
+    <AnalyticsSkeleton />
+  );
 
   // Render main content (chrome always present, content area swaps in place)
   return (
@@ -231,44 +287,48 @@ function HomePageContent() {
         subtitle="Infrastructure state and orchestration activity at a glance"
       >
         <div className="flex flex-wrap items-center gap-2">
-          <StateFilter
-            value={selectedStateId}
-            onChange={setSelectedStateId}
-            showAllOption
-            className="w-full sm:w-auto sm:min-w-[200px]"
-          />
-          <div className="hidden lg:block h-6 w-px bg-[var(--sg-border)] mx-1" />
-          <Button
-            variant="default"
-            size="sm"
-            {...router.nav('/graph-explorer')}
-            aria-label="Graph Explorer"
-            title="Graph Explorer"
-          >
-            <Network className="w-4 h-4 lg:mr-2" />
-            <span className="hidden lg:inline">Graph Explorer</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            {...router.nav('/search')}
-            aria-label="Search Resources"
-            title="Search Resources"
-          >
-            <Search className="w-4 h-4 lg:mr-2" />
-            <span className="hidden lg:inline">Search Resources</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            {...router.nav('/instances')}
-            aria-label="Inventory"
-            title="Inventory"
-          >
-            <Box className="w-4 h-4 lg:mr-2" />
-            <span className="hidden lg:inline">Inventory</span>
-          </Button>
-          <div className="hidden lg:block h-6 w-px bg-[var(--sg-border)] mx-1" />
+          {stateSections ? (
+            <>
+              <StateFilter
+                value={selectedStateId}
+                onChange={setSelectedStateId}
+                showAllOption
+                className="w-full sm:w-auto sm:min-w-[200px]"
+              />
+              <div className="hidden lg:block h-6 w-px bg-[var(--sg-border)] mx-1" />
+              <Button
+                variant="default"
+                size="sm"
+                {...router.nav('/graph-explorer')}
+                aria-label="Graph Explorer"
+                title="Graph Explorer"
+              >
+                <Network className="w-4 h-4 lg:mr-2" />
+                <span className="hidden lg:inline">Graph Explorer</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                {...router.nav('/search')}
+                aria-label="Search Resources"
+                title="Search Resources"
+              >
+                <Search className="w-4 h-4 lg:mr-2" />
+                <span className="hidden lg:inline">Search Resources</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                {...router.nav('/instances')}
+                aria-label="Inventory"
+                title="Inventory"
+              >
+                <Box className="w-4 h-4 lg:mr-2" />
+                <span className="hidden lg:inline">Inventory</span>
+              </Button>
+              <div className="hidden lg:block h-6 w-px bg-[var(--sg-border)] mx-1" />
+            </>
+          ) : null}
           <Button
             variant="outline"
             size="sm"
@@ -277,6 +337,7 @@ function HomePageContent() {
               setError(null);
               setAnalyticsError(null);
               setReloadKey((k) => k + 1);
+              progress.revalidate();
             }}
             disabled={refreshing}
             aria-label="Refresh"
@@ -289,9 +350,9 @@ function HomePageContent() {
       </PageHeader>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 max-w-[1600px] w-full mx-auto px-6 py-6 pb-12">
+      <div className="@container flex-1 max-w-[1600px] w-full mx-auto px-6 py-6 pb-12">
         {/* Error Alert */}
-        {error && (
+        {stateSections && error && (
           <div className="mb-6">
             <div className="flex items-center gap-3 px-4 py-3 rounded-lg border bg-[var(--sg-bg-1)] border-[var(--sg-error)]">
               <AlertCircle className="h-5 w-5 text-[var(--sg-error)]" />
@@ -314,60 +375,44 @@ function HomePageContent() {
           </div>
         )}
 
-        {/* ORCHESTRATION — the front door leads with runs/PRs/drift. Rendered
-            OUTSIDE the states branch: a pure-orchestration tenant (runs and PRs
-            but no imported stategraph state) must still see its activity, not
-            just the import welcome. Hides itself when the server has no
-            orchestration or there is no activity. */}
-        {!bootstrapping && firstRunSetup === true ? <WelcomePanel /> : null}
-
-        {!bootstrapping && currentTenant ? (
-          <HomeOrchestrationBand key={`${currentTenant.id}:${reloadKey}`} />
-        ) : null}
-
         {bootstrapping ? (
           <LoadingSkeleton />
-        ) : scalars ? (
+        ) : (
           <div className="space-y-8">
-            {/* SECTION 1: CONTROL PLANE STATUS (scalar phase) */}
-            <ControlPlaneStatus data={scalars} />
+            {layout.welcome ? <WelcomePanel /> : null}
 
-            {/* SECTION 2: STATE STRUCTURE — infra-as-a-db, demoted below orchestration */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-semibold text-[var(--sg-text)] uppercase tracking-wide">
-                  State Structure
-                </h2>
-              </div>
-              <HeroMetricsStrip data={scalars} />
-            </div>
+            {layout.card === "orchestration" ? <HomeSetupCard kind="orchestration" /> : null}
 
-            {/* SECTIONS 2 & 3: graph analytics — streams in after the scalars */}
-            {analytics ? (
-              <>
-                {/* SECTION 2: RISK ROW */}
-                <RiskRow data={analytics} router={router} />
+            {layout.attention && orchestration ? (
+              <NeedsAttention
+                attention={orchestration.attention}
+                failedProviders={orchestration.attentionFailed}
+                transactionsFailed={orchestration.transactionsFailed}
+              />
+            ) : null}
 
-                {/* SECTION 3: CONTROL PLANE INSIGHTS GRID */}
-                <ControlPlaneInsightsGrid data={{ ...scalars, ...analytics }} />
-              </>
-            ) : analyticsError ? (
-              <div className="flex items-center gap-3 px-4 py-3 rounded-lg border bg-[var(--sg-bg-1)] border-[var(--sg-border)]">
-                <AlertCircle className="h-5 w-5 text-[var(--sg-error)]" />
-                <div className="flex-1">
-                  <div className="font-medium text-[var(--sg-text)]">Analytics unavailable</div>
-                  <div className="text-sm text-[var(--sg-text-muted)]">{analyticsError}</div>
-                </div>
-                <Button variant="outline" size="sm" onClick={retryAnalytics}>
-                  Retry
-                </Button>
+            {/* The Orchestration activity renders apart from the state sections: a
+                tenant with runs and no imported state still sees its activity. */}
+            {layout.columns ? (
+              <div className="grid gap-8 xl:grid-cols-2 xl:items-start">
+                <div className="min-w-0">{band}</div>
+                <div className="@container min-w-0">{stateOverview}</div>
               </div>
             ) : (
-              <AnalyticsSkeleton />
+              <>
+                {band}
+                {stateOverview}
+              </>
             )}
+
+            {layout.nextSteps && currentTenant ? <NextSteps tenantId={currentTenant.id} /> : null}
+
+            {stateAnalytics}
+
+            {layout.card === "state" ? <HomeSetupCard kind="state" /> : null}
+
+            {layout.helpFooter ? <HomeHelpFooter /> : null}
           </div>
-        ) : (
-          <LoadingSkeleton />
         )}
       </div>
 

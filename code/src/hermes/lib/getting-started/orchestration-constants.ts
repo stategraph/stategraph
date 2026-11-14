@@ -213,6 +213,42 @@ export const ORCHESTRATION_COPY = {
       gitlab: "I opened a merge request",
     },
   },
+  firstPlan: {
+    checking: "Checking for a plan.",
+    waiting: {
+      github: "Waiting for the plan comment on your pull request.",
+      gitlab: "Waiting for the plan comment on your merge request.",
+    },
+    running: {
+      github:
+        "Stategraph started the plan. The comment appears on the pull request when the run finishes.",
+      gitlab:
+        "Stategraph started the plan. The comment appears on the merge request when the run finishes.",
+    },
+    stopped: {
+      github:
+        "The plan run stopped before it finished. Its run under Orchestration shows why. Push a commit to the pull request to plan again.",
+      gitlab:
+        "The plan run stopped before it finished. Its run under Orchestration shows why. Push a commit to the merge request to plan again.",
+    },
+    arrived: {
+      github: "The plan is on your pull request.",
+      gitlab: "The plan is on your merge request.",
+    },
+    existing: {
+      github:
+        "A plan already ran in this tenant. Continue when the plan comment is on your pull request.",
+      gitlab:
+        "A plan already ran in this tenant. Continue when the plan comment is on your merge request.",
+    },
+    error: {
+      github:
+        "This page cannot check for the plan. Continue when the plan comment is on your pull request.",
+      gitlab:
+        "This page cannot check for the plan. Continue when the plan comment is on your merge request.",
+    },
+    skip: "Continue without waiting",
+  },
   done: {
     pill: "Orchestration is set up",
     title: {
@@ -224,6 +260,12 @@ export const ORCHESTRATION_COPY = {
         "The plan comment appears on the pull request within a minute. From now on, every pull request that changes Terraform gets one. Comment stategraph apply to apply.",
       gitlab:
         "The plan comment appears on the merge request within a minute. From now on, every merge request that changes Terraform gets one. Comment stategraph apply to apply.",
+    },
+    leadDetected: {
+      github:
+        "The plan comment is on your pull request. From now on, every pull request that changes Terraform gets one. Comment stategraph apply to apply.",
+      gitlab:
+        "The plan comment is on your merge request. From now on, every merge request that changes Terraform gets one. Comment stategraph apply to apply.",
     },
     nextEyebrow: "Next",
     iaadTitle: "Run your plans through Stategraph Infrastructure as a Database",

@@ -43,9 +43,25 @@
 >
 > [How Stategraph handles commits that move during a run](https://stategraph.com/docs/orchestration/workflows/stale-runs)
 {%- endmacro -%}
+{%- macro run_parameters(parameters, fail_if_set) -%}
+{%- if parameters %}
+
+**Parameters**: {% for p in parameters %}`{{ p.name }}={{ p.value }}`{% if not loop.last %}, {% endif %}{% endfor %}
+{%- endif %}
+{%- if fail_if_set %}
+
+> [!WARNING]
+> The configuration declares these parameters `fail_if_set`, so this run counts as failed:
+>
+{%- for name in fail_if_set %}
+> - `{{ name }}`
+{%- endfor %}
+{%- endif %}
+{%- endmacro -%}
 {%- if overall_success %}
 ## Applies :white_check_mark:
 {%- if stale is defined and stale %}{{ stale_warning(stale) }}{{ "\n" }}{% endif %}
+{{- run_parameters(parameters, fail_if_set) }}
   {%- if summary and dirspaces %}
 {%- set failed = dirspaces | rejectattr("success") | list %}
 {%- set applied = dirspaces | selectattr("success") | list %}
@@ -112,6 +128,7 @@ Not all [dirspaces](https://stategraph.com/docs/get-started/core-concepts#reposi
 
 ## Applies :heavy_multiplication_x:
 {%- if stale is defined and stale %}{{ stale_warning(stale) }}{{ "\n" }}{% endif %}
+{{- run_parameters(parameters, fail_if_set) }}
   {%- if summary and dirspaces %}
 {%- set failed = dirspaces | rejectattr("success") | list %}
 {%- set applied = dirspaces | selectattr("success") | list %}

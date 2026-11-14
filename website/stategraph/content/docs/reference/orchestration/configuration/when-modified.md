@@ -1,7 +1,7 @@
 ---
 title: when_modified
 description: The when_modified key in .stategraph/config.yml sets file patterns, autoplan, autoapply, prechecks, and the depends_on order of directories.
-order: 26
+order: 27
 ---
 
 

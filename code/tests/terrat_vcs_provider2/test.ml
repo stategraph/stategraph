@@ -214,6 +214,7 @@ let wm ~target =
     environment = None;
     id = Uuidm.nil;
     initiator = Terrat_work_manifest3.Initiator.System;
+    params = Sln_map.String.empty;
     run_id = None;
     runs_on = None;
     state = Terrat_work_manifest3.State.Queued;

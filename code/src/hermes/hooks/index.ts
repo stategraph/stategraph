@@ -9,6 +9,7 @@ export { useTenantCostRange } from "./useTenantCostRange";
 export { useTenantHistoryGrouping } from "./useTenantHistoryGrouping";
 export type { TenantHistoryGroupBy } from "./useTenantHistoryGrouping";
 export { useCapabilities } from "./useCapabilities";
+export { useFeatureNavLock, useFirstRunSetup, useSetupRecheck } from "./useFeatureNavLock";
 export { useCostAvailability, useDedicatedAvailability } from "./useCostAvailability";
 export { useSecurityAvailability } from "./useSecurityAvailability";
 export { useCostBasis } from "./useCostBasis";

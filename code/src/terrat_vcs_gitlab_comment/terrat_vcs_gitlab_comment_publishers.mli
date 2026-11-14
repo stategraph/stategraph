@@ -53,6 +53,7 @@ module Publisher_tools : sig
     summary:bool ->
     pull_request_ref:(Api.Repo.t * int) option ->
     dirspace_run_urls:(Terrat_dirspace.t * string) list ->
+    fail_if_set:string list ->
     string ->
     [< `Active | `Disabled | `Expired | `Trial_ending of int64 > `Trial_ending ] ->
     Terrat_tier.Check.runs_per_month option ->

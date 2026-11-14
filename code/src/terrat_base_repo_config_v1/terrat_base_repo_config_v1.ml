@@ -1281,6 +1281,30 @@ module Notifications = struct
           | Visible_on.Never -> false)
 end
 
+module Parameters = struct
+  module Alias = struct
+    type t = {
+      action : Terrat_repo_config_parameter_alias.Action.t;
+      params : string Sln_map.String.t; [@default Sln_map.String.empty]
+    }
+    [@@deriving make, show, yojson, eq]
+  end
+
+  module Parameter = struct
+    type t = {
+      fail_if_set : bool; [@default false]
+      values : string list option; [@default None]
+    }
+    [@@deriving make, show, yojson, eq]
+  end
+
+  type t = {
+    aliases : Alias.t Sln_map.String.t; [@default Sln_map.String.empty]
+    names : Parameter.t Sln_map.String.t; [@default Sln_map.String.empty]
+  }
+  [@@deriving make, show, yojson, eq]
+end
+
 module Stacks = struct
   module Rules = struct
     type t = {
@@ -1540,6 +1564,7 @@ module View = struct
     lock_policy : Workflows.Entry.Lock_policy.t; [@default Workflows.Entry.Lock_policy.Strict]
     notifications : Notifications.t; [@default Notifications.make ()]
     parallel_runs : int; [@default 3]
+    parameters : Parameters.t; [@default Parameters.make ()]
     stacks : Stacks.t; [@default Stacks.make ()]
     storage : Storage.t; [@default Storage.make ()]
     tags : Tags.t; [@default Tags.make ()]
@@ -1600,6 +1625,9 @@ type of_version_1_err =
   | `Drift_tag_query_err of string * string
   | `Glob_parse_err of string * string
   | `Notification_policy_tag_query_err of string * string
+  | `Parameters_alias_shadows_verb_err of string
+  | `Parameters_alias_unknown_parameter_err of string * string
+  | `Parameters_alias_value_not_allowed_err of string * string * string
   | `Pattern_parse_err of string
   | `Stack_config_tag_query_err of string * string
   | `Window_parse_timezone_err of string
@@ -3174,6 +3202,90 @@ let of_version_1_workflows default_engine default_integrations default_lock_poli
            ()))
     (CCList.mapi (fun idx entry -> (idx, entry)) workflows)
 
+(* The alias names a configuration may not use: the ten command words [Terrat_comment.parse]
+   dispatches on (code/src/terrat_comment/terrat_comment.ml).  A comment that names one of these
+   words always runs the command, so an alias with such a name could never run.  The list is a
+   local copy because the parser module is rewritten by a later phase, and the parser must keep
+   the same ten words. *)
+let reserved_alias_names =
+  [
+    "unlock";
+    "plan";
+    "apply";
+    "apply-autoapprove";
+    "apply-force";
+    "help";
+    "feedback";
+    "repo-config";
+    "index";
+    "gate";
+  ]
+
+(* [of_version_1_parameters_names] converts the generated names map.  [CCOption.flatten]
+   collapses the generated nullable [values] double option, so absent and explicit [null] both
+   read as [None]. *)
+let of_version_1_parameters_names { Terrat_repo_config_parameters.names; _ } =
+  let module G = Terrat_repo_config_parameters in
+  let module Nm = Terrat_repo_config_parameter_name in
+  CCOption.map_or
+    ~default:Sln_map.String.empty
+    (fun { G.Names.additional; _ } ->
+      Sln_map.String.map
+        (fun { Nm.fail_if_set; values } ->
+          { Parameters.Parameter.fail_if_set; values = CCOption.flatten values })
+        additional)
+    names
+
+(* [of_version_1_parameters_alias] converts one alias and applies the alias rules: an alias may
+   not shadow a command name, and every entry of its [params] must name a declared parameter and
+   set one of the values the parameter allows.  [values] absent accepts any value, and [values]
+   an empty list accepts none.  [Sln_map.String.to_list] reads the entries in ascending key
+   order, so the first failing entry is the first one written. *)
+let of_version_1_parameters_alias names name { Terrat_repo_config_parameter_alias.action; params } =
+  let open CCResult.Infix in
+  let module Al = Terrat_repo_config_parameter_alias in
+  if CCList.mem ~eq:CCString.equal name reserved_alias_names then
+    Error (`Parameters_alias_shadows_verb_err name)
+  else
+    CCOption.map_or
+      ~default:Sln_map.String.empty
+      (fun { Al.Params.additional; _ } -> additional)
+      params
+    |> Sln_map.String.to_list
+    |> CCResult.map_l (fun (parameter, value) ->
+        match Sln_map.String.find_opt parameter names with
+        | None -> Error (`Parameters_alias_unknown_parameter_err (name, parameter))
+        | Some { Parameters.Parameter.values; _ } -> (
+            match CCOption.map_or ~default:true (CCList.mem ~eq:CCString.equal value) values with
+            | true -> Ok (parameter, value)
+            | false -> Error (`Parameters_alias_value_not_allowed_err (name, parameter, value))))
+    >>= fun params -> Ok { Parameters.Alias.action; params = Sln_map.String.of_list params }
+
+(* [of_version_1_parameters_aliases] converts the aliases map.  [CCResult.map_l] fails on the
+   first alias in ascending key order, so the error names the first alias written that breaks a
+   rule. *)
+let of_version_1_parameters_aliases names { Terrat_repo_config_parameters.aliases; _ } =
+  let open CCResult.Infix in
+  let module G = Terrat_repo_config_parameters in
+  match aliases with
+  | None -> Ok Sln_map.String.empty
+  | Some { G.Aliases.additional; _ } ->
+      additional
+      |> Sln_map.String.to_list
+      |> CCResult.map_l (fun (name, alias) ->
+          of_version_1_parameters_alias names name alias
+          |> CCResult.map (fun alias -> (name, alias)))
+      >>= fun aliases -> Ok (Sln_map.String.of_list aliases)
+
+(* [of_version_1_parameters] applies the schema defaults, unwraps the generated
+   [Additional_properties] wrappers, and applies the cross-field rules: an alias may not shadow
+   a command name, and its [params] may only set declared parameters to allowed values. *)
+let of_version_1_parameters generated =
+  let open CCResult.Infix in
+  let names = of_version_1_parameters_names generated in
+  of_version_1_parameters_aliases names generated
+  >>= fun aliases -> Ok { Parameters.aliases; names }
+
 let of_version_1 v1 =
   let {
     V1.access_control;
@@ -3198,6 +3310,7 @@ let of_version_1 v1 =
     lock_policy;
     notifications;
     parallel_runs;
+    parameters;
     stacks;
     storage;
     tags;
@@ -3237,6 +3350,8 @@ let of_version_1 v1 =
   >>= fun hooks ->
   map_opt of_version_1_indexer indexer
   >>= fun indexer ->
+  map_opt of_version_1_parameters parameters
+  >>= fun parameters ->
   map_opt of_version_1_integrations integrations
   >>= fun integrations ->
   map_opt of_version_1_stacks stacks
@@ -3274,6 +3389,7 @@ let of_version_1 v1 =
        ~lock_policy
        ?notifications
        ~parallel_runs
+       ?parameters
        ?stacks
        ?storage
        ?tags
@@ -4251,6 +4367,36 @@ let to_version_1_workflows_op =
           }
     | Workflows.Entry.Op.Gates gates -> Op.Items.Hook_op_gates (to_version_1_hooks_op_gates gates))
 
+(* [CCOption.pure] rebuilds the nullable [values] double option the generator made, so a [None]
+   value stays an absent key and [Some []] becomes [] instead of null. *)
+let to_version_1_parameters { Parameters.aliases; names } =
+  let module Al = Terrat_repo_config_parameter_alias in
+  let module G = Terrat_repo_config_parameters in
+  let module Nm = Terrat_repo_config_parameter_name in
+  {
+    G.aliases =
+      Some
+        (G.Aliases.make
+           ~additional:
+             (Sln_map.String.map
+                (fun { Parameters.Alias.action; params } ->
+                  {
+                    Al.action;
+                    params = Some (Al.Params.make ~additional:params Json_schema.Empty_obj.t);
+                  })
+                aliases)
+           Json_schema.Empty_obj.t);
+    names =
+      Some
+        (G.Names.make
+           ~additional:
+             (Sln_map.String.map
+                (fun { Parameters.Parameter.fail_if_set; values } ->
+                  { Nm.fail_if_set; values = CCOption.map CCOption.pure values })
+                names)
+           Json_schema.Empty_obj.t);
+  }
+
 let to_version_1_workflows =
   CCList.map (fun entry ->
       let module E = Terrat_repo_config.Workflow_entry in
@@ -4307,6 +4453,7 @@ let to_version_1 t =
     lock_policy;
     notifications;
     parallel_runs;
+    parameters;
     stacks;
     storage;
     tags;
@@ -4378,6 +4525,11 @@ let to_version_1 t =
         to_version_1_notifications
         notifications;
     parallel_runs;
+    parameters =
+      map_opt_if_true
+        CCFun.(Parameters.equal (Parameters.make ()) %> not)
+        to_version_1_parameters
+        parameters;
     stacks = map_opt_if_true CCFun.(Stacks.equal (Stacks.make ()) %> not) to_version_1_stacks stacks;
     storage =
       map_opt_if_true CCFun.(Storage.equal (Storage.make ()) %> not) to_version_1_storage storage;
@@ -4758,6 +4910,7 @@ let integrations t = t.View.integrations
 let lock_policy t = t.View.lock_policy
 let notifications t = t.View.notifications
 let parallel_runs t = t.View.parallel_runs
+let parameters t = t.View.parameters
 let stacks t = t.View.stacks
 let storage t = t.View.storage
 let tags t = t.View.tags

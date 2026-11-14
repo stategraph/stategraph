@@ -1,0 +1,14 @@
+## Parameter Value Not Allowed :heavy_multiplication_x:
+
+The command sets the parameter `{{ name }}` to `{{ value }}`, which is not one of the values the configuration allows.  The command starts no run.
+
+{% if has_allowed -%}
+The parameter `{{ name }}` accepts these values:
+
+{% for allowed_value in allowed -%}
+- `{{ allowed_value.value }}`
+{% endfor -%}
+{% else -%}
+The parameter `{{ name }}` accepts no value at all, so no command can set it.
+{% endif %}
+The declared parameters and the values they accept are in the [parameters reference](https://stategraph.com/docs/reference/orchestration/configuration/parameters).

@@ -670,6 +670,10 @@ module Make (P : Terrat_vcs_provider2_github.S) = struct
         } -> (
         match Terrat_comment.parse comment_body with
         | Ok comment ->
+            (match comment with
+            | Terrat_comment.Alias _ ->
+                Prmths.Counter.inc_one (Metrics.comment_events_total "alias")
+            | _ -> ());
             Logs.info (fun m ->
                 m
                   "%s : COMMENT_CREATED_EVENT : owner=%s : repo=%s : pull_number=%d : sender=%s : \

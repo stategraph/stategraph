@@ -26,11 +26,22 @@ module Job = struct
       [@@deriving show, eq]
     end
 
+    (* The parameters of the run, resolved to their values.  The map rides on
+       the job so that every task of the evaluation, and every job a run
+       continues, reads the same values.  A run that a comment starts is a
+       [Plan] or an [Apply], and so is every later layer of it, because a
+       continuation carries the map forward.  [Autoapply] and [Autoplan] carry
+       no map: the system starts them, and no comment chose their parameters. *)
+    module Params = struct
+      type t = string Sln_map.String.t [@@deriving yojson, show, eq]
+    end
+
     type t =
       | Apply of {
           tag_query : Terrat_tag_query.t;
           kind : Kind.t option;
           force : bool;
+          parameters : Params.t;
         }
       | Autoapply
       | Autoplan
@@ -40,6 +51,7 @@ module Job = struct
       | Plan of {
           tag_query : Terrat_tag_query.t;
           kind : Kind.t option;
+          parameters : Params.t;
         }
       | Push
       | Repo_config

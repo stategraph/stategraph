@@ -109,6 +109,7 @@ struct
             environment = None;
             id = ();
             initiator;
+            params = Sln_map.String.empty;
             run_id = ();
             runs_on = None;
             state = ();

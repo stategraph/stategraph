@@ -1340,6 +1340,67 @@
       },
       "type": "object"
     },
+    "parameter-alias": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "apply",
+            "apply-autoapprove",
+            "apply-force",
+            "plan"
+          ],
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "type": "object"
+    },
+    "parameter-name": {
+      "additionalProperties": false,
+      "properties": {
+        "fail_if_set": {
+          "default": false,
+          "type": "boolean"
+        },
+        "values": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "additionalProperties": {
+            "$ref": "#/definitions/parameter-alias"
+          },
+          "type": "object"
+        },
+        "names": {
+          "additionalProperties": {
+            "$ref": "#/definitions/parameter-name"
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
     "permission": {
       "items": {
         "additionalProperties": false,
@@ -1850,6 +1911,9 @@
         "parallel_runs": {
           "default": 3,
           "type": "integer"
+        },
+        "parameters": {
+          "$ref": "#/definitions/parameters"
         },
         "stacks": {
           "$ref": "#/definitions/stacks"

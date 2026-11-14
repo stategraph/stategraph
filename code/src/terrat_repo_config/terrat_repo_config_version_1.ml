@@ -210,6 +210,7 @@ type t = {
   lock_policy : Lock_policy.t; [@default `Strict]
   notifications : Terrat_repo_config_notifications.t option; [@default None]
   parallel_runs : int; [@default 3]
+  parameters : Terrat_repo_config_parameters.t option; [@default None]
   stacks : Terrat_repo_config_stacks.t option; [@default None]
   storage : Storage.t option; [@default None]
   tags : Terrat_repo_config_custom_tags.t option; [@default None]

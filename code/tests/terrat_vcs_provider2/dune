@@ -3,6 +3,7 @@
  (libraries
   containers
   oth
+  sln
   terrat_api
   terrat_tag_query
   terrat_vcs_provider2

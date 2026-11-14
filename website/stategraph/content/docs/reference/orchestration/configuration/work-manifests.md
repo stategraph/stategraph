@@ -1,7 +1,7 @@
 ---
 title: work_manifests
 description: Reference for work_manifests in .stategraph/config.yml. Bound how many runs one job runs at the same time and how long a run may take to start and run.
-order: 27
+order: 28
 ---
 
 

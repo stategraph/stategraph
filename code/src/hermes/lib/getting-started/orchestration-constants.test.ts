@@ -73,8 +73,15 @@ const tests: Array<{ name: string; run: () => void }> = [
         copy.wait.title,
         copy.wait.lead,
         copy.wait.confirm,
+        copy.firstPlan.waiting,
+        copy.firstPlan.running,
+        copy.firstPlan.stopped,
+        copy.firstPlan.arrived,
+        copy.firstPlan.existing,
+        copy.firstPlan.error,
         copy.done.title,
         copy.done.lead,
+        copy.done.leadDetected,
         copy.done.iaadBody,
       ];
       for (const pair of pairs) {
@@ -88,6 +95,20 @@ const tests: Array<{ name: string; run: () => void }> = [
       assert.equal(copy.actions.steps.length, 3);
       assert.match(copy.connect.ciAction, /Infrastructure as a Database/);
       assert.match(copy.done.iaadTitle, /Infrastructure as a Database/);
+    },
+  },
+  {
+    name: "the detected Done lead changes only the first sentence of the manual lead",
+    run: () => {
+      const { lead, leadDetected } = constants.ORCHESTRATION_COPY.done;
+      assert.ok(leadDetected.github.startsWith("The plan comment is on your pull request. "));
+      assert.ok(leadDetected.gitlab.startsWith("The plan comment is on your merge request. "));
+      assert.ok(lead.github.startsWith("The plan comment appears on the pull request within a minute. "));
+      assert.ok(lead.gitlab.startsWith("The plan comment appears on the merge request within a minute. "));
+      for (const provider of ["github", "gitlab"] as const) {
+        const rest = (text: string): string => text.slice(text.indexOf(". ") + 2);
+        assert.equal(rest(leadDetected[provider]), rest(lead[provider]));
+      }
     },
   },
   {

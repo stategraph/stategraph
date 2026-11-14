@@ -1,7 +1,7 @@
 ---
 title: tags
 description: Reference for the top-level tags key in .stategraph/config.yml. Derive dest_branch and branch tags from branch names with Lua patterns.
-order: 23
+order: 24
 ---
 
 

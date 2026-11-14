@@ -1,7 +1,9 @@
 (tests
  (names
   test
+  test_comment_resolve
   test_ee2_fc
+  test_force_fail
   test_status_checks
   test_staleness
   test_wake_pending_compute
@@ -16,10 +18,12 @@
   terrat_base_repo_config_v1
   terrat_change
   terrat_change_match3
+  terrat_comment
   terrat_data
   terrat_dirspace
   terrat_job_context
   terrat_output_diff
+  terrat_repo_config
   terrat_tag_query
   terrat_vcs_event_evaluator2
   terrat_vcs_provider2

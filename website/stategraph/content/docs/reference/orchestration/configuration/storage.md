@@ -1,7 +1,7 @@
 ---
 title: storage
 description: Reference for the storage key in .stategraph/config.yml. Keep plan files in the server database, an S3 bucket, custom commands, or nowhere.
-order: 21
+order: 22
 ---
 
 

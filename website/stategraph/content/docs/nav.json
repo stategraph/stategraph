@@ -991,6 +991,10 @@
                   "label": "parallel_runs"
                 },
                 {
+                  "page": "/docs/reference/orchestration/configuration/parameters",
+                  "label": "parameters"
+                },
+                {
                   "page": "/docs/reference/orchestration/configuration/stacks",
                   "label": "stacks"
                 },

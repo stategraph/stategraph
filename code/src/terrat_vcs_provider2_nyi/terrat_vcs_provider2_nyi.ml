@@ -33,8 +33,12 @@ module Db = struct
   let store_dirspaceflows ~request_id ~base_ref ~branch_ref ~lock_policy db repo dirspaceflows =
     raise (Failure "nyi")
 
-  let store_tf_operation_result ~request_id db work_manifest_id result = raise (Failure "nyi")
-  let store_tf_operation_result2 ~request_id db work_manifest_id result = raise (Failure "nyi")
+  let store_tf_operation_result ~request_id ~force_fail db work_manifest_id result =
+    raise (Failure "nyi")
+
+  let store_tf_operation_result2 ~request_id ~force_fail db work_manifest_id result =
+    raise (Failure "nyi")
+
   let store_drift_schedule ~request_id db repo ~branch drift = raise (Failure "nyi")
 
   let migrate_default_branch_drift_schedule ~request_id db repo ~branch ~name =
@@ -293,6 +297,8 @@ module Job_context = struct
     let query_explicit_plan_exists ~request_id db ~context_id () = raise (Failure "nyi")
     let query_by_work_manifest_id ~request_id db ~work_manifest_id () = raise (Failure "nyi")
     let update_state ~request_id db ~job_id state = raise (Failure "nyi")
+    let set_force_fail ~request_id:_ _db ~job_id:_ ~force_fail:_ = raise (Failure "nyi")
+    let query_force_fail ~request_id:_ _db ~job_id:_ = raise (Failure "nyi")
     let add_work_manifest ~request_id db ~job_id ~work_manifest_id () = raise (Failure "nyi")
     let query_work_manifests ~request_id db ~job_id () = raise (Failure "nyi")
   end

@@ -5,7 +5,10 @@ import { useSetupProgress } from "@/contexts";
 import { DeepLink } from "@/components/navigation";
 import { SlackIcon } from "@/components/ui/brand-icons";
 import {
+  HELP_DOCS_HREF,
+  HELP_SLACK_HREF,
   ORCHESTRATION_SETUP_HREF,
+  SETUP_COPY,
   orchestrationStatus,
   stateStatus,
 } from "@/lib/getting-started/setup-progress";
@@ -31,7 +34,7 @@ export function WelcomePanel() {
   const action = orchestration === "started" ? "Continue setup" : "Get started";
 
   return (
-    <section className="mb-8 flex items-center gap-6 rounded-[var(--sg-card-radius)] border border-[var(--sg-accent)]/20 bg-[var(--sg-accent-bg)] p-6 sm:p-8">
+    <section className="flex items-center gap-6 rounded-[var(--sg-card-radius)] border border-[var(--sg-accent)]/20 bg-[var(--sg-accent-bg)] p-6 sm:p-8">
       <div className="min-w-0 flex-1 space-y-4">
         <div className="space-y-2">
           <h2 className="text-2xl font-semibold text-[var(--sg-text)] sm:text-3xl">Welcome to Stategraph</h2>
@@ -42,13 +45,13 @@ export function WelcomePanel() {
             <ArrowRight className="h-4 w-4" />
             {action}
           </DeepLink>
-          <a href="https://stategraph.com/docs" target="_blank" rel="noopener noreferrer" className={ROW}>
+          <a href={HELP_DOCS_HREF} target="_blank" rel="noopener noreferrer" className={ROW}>
             <BookOpen className="h-4 w-4" />
-            Getting started guide
+            {SETUP_COPY.help.docs}
           </a>
-          <a href="https://stategraph.com/slack" target="_blank" rel="noopener noreferrer" className={ROW}>
+          <a href={HELP_SLACK_HREF} target="_blank" rel="noopener noreferrer" className={ROW}>
             <SlackIcon className="h-4 w-4" />
-            Join our Slack
+            {SETUP_COPY.help.slack}
           </a>
         </div>
       </div>

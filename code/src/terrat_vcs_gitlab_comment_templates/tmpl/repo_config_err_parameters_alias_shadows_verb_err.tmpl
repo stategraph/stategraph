@@ -1,0 +1,11 @@
+# Repository Configuration Error
+
+## What is the error?
+
+The alias `{{ alias }}` has the same name as a command.  A comment that names a command always runs the command, so the alias `{{ alias }}` can never run.
+
+## What to do?
+
+Rename the alias in the `parameters.aliases` section of the `.terrateam/config.yml` file, then commit the change.
+
+See the [documentation](https://stategraph.com/docs/reference/orchestration/configuration/parameters) for the parameters configuration.

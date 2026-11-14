@@ -11,6 +11,14 @@ module Config = struct
   type t = Yojson.Safe.t [@@deriving yojson { strict = false; meta = true }, show, eq]
 end
 
+module Parameters = struct
+  module Additional = struct
+    type t = string [@@deriving yojson { strict = false; meta = true }, show, eq]
+  end
+
+  include Json_schema.Additional_properties.Make (Json_schema.Empty_obj) (Additional)
+end
+
 module Run_kind_data = struct
   type t = Run_kind_data_pull_request of Terrat_api_components_run_kind_data_pull_request.t
   [@@deriving show, eq]
@@ -49,6 +57,7 @@ type t = {
   config : Config.t;
   id : string option; [@default None]
   installation_id : string;
+  parameters : Parameters.t option; [@default None]
   protocol_version : int option; [@default None]
   result_version : int;
   run_kind : string;

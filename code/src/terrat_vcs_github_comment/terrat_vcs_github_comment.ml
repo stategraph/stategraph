@@ -97,6 +97,7 @@ module S = struct
     result : Terrat_api_components_work_manifest_tf_operation_result2.t;
     repo_config : Terrat_base_repo_config_v1.derived Terrat_base_repo_config_v1.t;
     stale : Terrat_vcs_provider2.Work_manifest_stale.t option;
+    fail_if_set : string list;
     synthesized_config : Terrat_change_match3.Config.t;
     (* Curr Work M that is finished! *)
     work_manifest : (Api.Account.t, unit) Terrat_work_manifest3.Existing.t;
@@ -329,6 +330,7 @@ module S = struct
         ~summary_unified
         ~pull_request_ref
         ~dirspace_run_urls
+        ~fail_if_set:t.fail_if_set
         ~dirspace_applied
         t.request_id
         t.account_status
@@ -362,6 +364,7 @@ module S = struct
             ~summary_unified
             ~pull_request_ref
             ~dirspace_run_urls
+            ~fail_if_set:t.fail_if_set
             ~dirspace_applied
             t.request_id
             t.account_status
@@ -392,6 +395,7 @@ module S = struct
                 ~summary_unified
                 ~pull_request_ref
                 ~dirspace_run_urls
+                ~fail_if_set:t.fail_if_set
                 ~dirspace_applied
                 t.request_id
                 t.account_status
@@ -438,6 +442,7 @@ module S = struct
         ~summary_unified
         ~pull_request_ref
         ~dirspace_run_urls
+        ~fail_if_set:t.fail_if_set
         ~dirspace_applied
         t.request_id
         t.account_status

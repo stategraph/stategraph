@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Check,
   Cloud,
   ExternalLink,
+  Info,
+  Loader2,
   Settings,
   Users,
 } from "lucide-react";
@@ -22,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { CodeBlock } from "@/components/getting-started";
 import { useSetupProgress, useStates } from "@/contexts";
 import { SETUP_COPY } from "@/lib/getting-started/setup-progress";
+import { cn } from "@/lib/utils";
 import type { VcsProvider } from "@/lib/vcs/links";
 import {
   CREDENTIAL_CARDS,
@@ -34,6 +38,11 @@ import {
   GITLAB_PIPELINE_YAML,
   ORCHESTRATION_COPY,
 } from "@/lib/getting-started/orchestration-constants";
+import {
+  FIRST_PLAN_ADVANCE_MS,
+  useFirstPlanWatch,
+  type FirstPlanStatus,
+} from "./useFirstPlanWatch";
 
 const COPY = ORCHESTRATION_COPY;
 
@@ -191,11 +200,14 @@ export function FirstChangeStep({
   editUrl,
   onBack,
   onConfirm,
+  onDetected,
 }: {
   provider: VcsProvider;
   editUrl?: string;
   onBack: () => void;
   onConfirm: () => void;
+  /** Given, the step watches for the first plan and calls this when it arrives. */
+  onDetected?: () => void;
 }) {
   const open =
     editUrl ? (
@@ -223,11 +235,20 @@ export function FirstChangeStep({
       <StepHeading title={COPY.change.title} lead={COPY.change.lead[provider]} />
       <NumberedList items={items} />
       <WhatHappens provider={provider} />
-      <StepFooter onBack={onBack}>
-        <Button onClick={onConfirm}>
-          {COPY.change.confirm[provider]} <ArrowRight className="h-4 w-4" />
-        </Button>
-      </StepFooter>
+      {onDetected ? (
+        <FirstPlanFooter
+          provider={provider}
+          onBack={onBack}
+          onSkip={onConfirm}
+          onDetected={onDetected}
+        />
+      ) : (
+        <StepFooter onBack={onBack}>
+          <Button onClick={onConfirm}>
+            {COPY.change.confirm[provider]} <ArrowRight className="h-4 w-4" />
+          </Button>
+        </StepFooter>
+      )}
     </div>
   );
 }
@@ -337,26 +358,118 @@ export function PullRequestStep({
   provider,
   onBack,
   onConfirm,
+  onDetected,
 }: {
   provider: VcsProvider;
   onBack: () => void;
   onConfirm: () => void;
+  /** Given, the step watches for the first plan and calls this when it arrives. */
+  onDetected?: () => void;
 }) {
   return (
     <div className="space-y-6">
       <StepHeading title={COPY.wait.title[provider]} lead={COPY.wait.lead[provider]} />
       <WhatHappens provider={provider} withRuns />
-      <StepFooter onBack={onBack}>
-        <Button onClick={onConfirm}>
-          {COPY.wait.confirm[provider]} <ArrowRight className="h-4 w-4" />
-        </Button>
-      </StepFooter>
+      {onDetected ? (
+        <FirstPlanFooter
+          provider={provider}
+          onBack={onBack}
+          onSkip={onConfirm}
+          onDetected={onDetected}
+        />
+      ) : (
+        <StepFooter onBack={onBack}>
+          <Button onClick={onConfirm}>
+            {COPY.wait.confirm[provider]} <ArrowRight className="h-4 w-4" />
+          </Button>
+        </StepFooter>
+      )}
     </div>
+  );
+}
+
+function firstPlanMessage(status: FirstPlanStatus, provider: VcsProvider): string {
+  return status === "checking" ? COPY.firstPlan.checking : COPY.firstPlan[status][provider];
+}
+
+function FirstPlanFooter({
+  provider,
+  onBack,
+  onSkip,
+  onDetected,
+}: {
+  provider: VcsProvider;
+  onBack: () => void;
+  onSkip: () => void;
+  onDetected: () => void;
+}) {
+  const status = useFirstPlanWatch(provider);
+  const latestOnDetected = useRef(onDetected);
+  const fired = useRef(false);
+
+  useEffect(() => {
+    latestOnDetected.current = onDetected;
+  }, [onDetected]);
+
+  // Both the timer and the button can finish an arrival; only the first counts.
+  const finish = useCallback((): void => {
+    if (fired.current) return;
+    fired.current = true;
+    latestOnDetected.current();
+  }, []);
+
+  useEffect(() => {
+    if (status !== "arrived") return;
+    const id = window.setTimeout(finish, FIRST_PLAN_ADVANCE_MS);
+    return () => window.clearTimeout(id);
+  }, [status, finish]);
+
+  const watching =
+    status === "checking" || status === "waiting" || status === "running" || status === "stopped";
+  const tone =
+    status === "arrived"
+      ? "border-[var(--sg-success)]/30 bg-[var(--sg-success)]/10 text-[var(--sg-text)]"
+      : status === "stopped" || status === "error"
+        ? "border-[var(--sg-warning)]/30 bg-[var(--sg-warning)]/10 text-[var(--sg-text)]"
+        : "border-[var(--sg-border)] bg-[var(--sg-bg-2)] text-[var(--sg-text-muted)]";
+  const icon =
+    status === "arrived" ? (
+      <Check className="h-4 w-4 shrink-0 text-[var(--sg-success)]" aria-hidden="true" />
+    ) : status === "stopped" || status === "error" ? (
+      <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--sg-warning)]" aria-hidden="true" />
+    ) : status === "existing" ? (
+      <Info className="h-4 w-4 shrink-0" aria-hidden="true" />
+    ) : (
+      <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
+    );
+
+  return (
+    <>
+      <div
+        role="status"
+        className={cn("flex items-start gap-2 rounded-md border px-3 py-2 text-sm", tone)}
+      >
+        {icon}
+        <span>{firstPlanMessage(status, provider)}</span>
+      </div>
+      <StepFooter onBack={onBack}>
+        {watching ? (
+          <Button variant="outline" onClick={onSkip}>
+            {COPY.firstPlan.skip}
+          </Button>
+        ) : (
+          <Button onClick={status === "arrived" ? finish : onSkip}>
+            {COPY.common.continue} <ArrowRight className="h-4 w-4" />
+          </Button>
+        )}
+      </StepFooter>
+    </>
   );
 }
 
 export function DoneStep({
   provider,
+  planDetected = false,
   summary,
   onSetUpState,
   onSwitchEngine,
@@ -364,6 +477,8 @@ export function DoneStep({
   onManageUsers,
 }: {
   provider: VcsProvider;
+  /** True when this wizard saw the plan arrive, so the comment is already posted. */
+  planDetected?: boolean;
   summary?: ReactNode;
   onSetUpState: () => void;
   onSwitchEngine: () => void;
@@ -379,7 +494,10 @@ export function DoneStep({
       <div className="inline-flex items-center gap-1.5 rounded-full bg-[var(--sg-success)]/10 px-3 py-1 text-xs font-medium text-[var(--sg-success)]">
         <Check className="h-3.5 w-3.5" /> {COPY.done.pill}
       </div>
-      <StepHeading title={COPY.done.title[provider]} lead={COPY.done.lead[provider]} />
+      <StepHeading
+        title={COPY.done.title[provider]}
+        lead={planDetected ? COPY.done.leadDetected[provider] : COPY.done.lead[provider]}
+      />
       {summary}
       {offerState ? (
         <Card className="gap-3 border-2">

@@ -88,7 +88,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  *  network error itself). Any 4xx is deterministic — TABLE_ACCESS_ERR (the
  *  orchestration schema being off), a rejected query, a settled 401 — and
  *  would fail identically. */
-function transientFailure(e: unknown): boolean {
+export function transientFailure(e: unknown): boolean {
   if (orchestrationUnavailable(e)) return false;
   const status = (e as { status?: unknown } | null)?.status;
   return typeof status !== "number" || status >= 500;

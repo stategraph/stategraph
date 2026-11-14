@@ -1,5 +1,6 @@
 import assert from "node:assert";
 import {
+  firstPlanQuery,
   gitlabBaseUrl,
   gitlabInstallationLinkQuery,
   gitlabInstallationStateQuery,
@@ -18,6 +19,14 @@ function test(name: string, fn: () => void) {
     console.error(`FAIL - ${name}\n  ${e instanceof Error ? e.message : e}`);
   }
 }
+
+test("firstPlanQuery counts pull request plan runs by state on the provider's table", () => {
+  assert.equal(
+    firstPlanQuery("github"),
+    "select state, count(*) as c from github_work_manifests where run_kind = 'pr' and run_type in ('plan', 'autoplan') group by state",
+  );
+  assert.match(firstPlanQuery("gitlab"), / from gitlab_work_manifests /);
+});
 
 test("state query targets gitlab_installations by id", () => {
   assert.equal(

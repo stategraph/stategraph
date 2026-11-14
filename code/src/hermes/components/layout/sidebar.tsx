@@ -3,11 +3,20 @@
 import { usePathname } from "next/navigation";
 import { DeepLink } from "@/components/navigation";
 import { cn } from "@/lib/utils";
-import { mainNav, accountNav, navEntryActive, navForMode, type Product } from "@/config/products";
-import { Building2, LogOut, X } from "lucide-react";
+import {
+  mainNav,
+  accountNav,
+  isStateAreaNav,
+  navEntryActive,
+  navForMode,
+  type Product,
+} from "@/config/products";
+import { Building2, Lock, LogOut, X } from "lucide-react";
 import { logout } from "@/lib/api/client";
 import { trackLogout } from "@/lib/analytics";
 import { useVersion, useLicense, useTenant } from "@/contexts";
+import { useCapabilities, useFeatureNavLock, useSetupRecheck } from "@/hooks";
+import { featureNavLockTarget } from "@/lib/getting-started/setup-progress";
 import { SidebarTenantSelector } from "@/components/tenant/SidebarTenantSelector";
 import { TenantSelector } from "@/components/tenant/TenantSelector";
 import { SlackIcon } from "@/components/ui/brand-icons";
@@ -27,6 +36,12 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   // In COMMUNISM mode users don't self-upgrade, so suppress the settings
   // update dot just like the upgrade banner.
   const showUpdateDot = mode !== "COMMUNISM" && updateAvailable;
+  const featureLock = useFeatureNavLock();
+  useSetupRecheck(featureLock !== "unlocked");
+  const { capabilities } = useCapabilities();
+  const featureOff = (id: string) =>
+    (id === "costs" && capabilities?.costs?.enabled === false) ||
+    (id === "security" && capabilities?.security?.enabled === false);
 
   return (
     <aside
@@ -118,6 +133,21 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           screens as indented child rows so each is a one-click destination */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {navForMode(mainNav, mode).map((entry) => {
+          if (featureLock !== "unlocked" && isStateAreaNav(entry)) {
+            const target = featureNavLockTarget(
+              featureLock,
+              entry.product.href,
+              featureOff(entry.product.id),
+            );
+            return (
+              <LockedNavLink
+                key={entry.product.id}
+                product={entry.product}
+                href={target.href}
+                hint={target.hint}
+              />
+            );
+          }
           const active = navEntryActive(entry, pathname);
           return (
             <div key={entry.product.id}>
@@ -227,6 +257,26 @@ function NavLink({ product, active = false, showBadge = false }: NavLinkProps) {
   );
 }
 
+/** An area the tenant cannot use yet: greyed and never expanded. */
+function LockedNavLink({ product, href, hint }: { product: Product; href: string; hint: string }) {
+  return (
+    <DeepLink
+      href={href}
+      aria-label={`${product.label}: ${hint}`}
+      className="group relative flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors duration-150 hover:bg-[var(--sg-bg-2)]"
+    >
+      <NavIconChip icon={product.icon} active={false} muted />
+      <span className="flex-1 min-w-0">
+        <span className="block text-[0.95rem] font-medium leading-tight whitespace-nowrap overflow-hidden text-ellipsis text-[var(--sg-text-dim)]">
+          {product.label}
+        </span>
+        <span className="block text-xs leading-tight mt-0.5 text-balance text-[var(--sg-text-dim)]">{hint}</span>
+      </span>
+      <Lock aria-hidden="true" className="h-3.5 w-3.5 flex-shrink-0 text-[var(--sg-text-dim)]" />
+    </DeepLink>
+  );
+}
+
 /** Indented sub-screen row shown under its area while the area is active. */
 function ChildNavLink({ product, active }: { product: Product; active: boolean }) {
   const Icon = product.icon;
@@ -290,17 +340,20 @@ function UtilityLink({ href, icon: Icon, label, active = false, onClick }: Utili
 interface NavIconChipProps {
   icon: React.ComponentType<{ className?: string }>;
   active: boolean;
+  muted?: boolean;
 }
 
 /** Icon chip at the head of every sidebar row — each nav item reads as a product. */
-function NavIconChip({ icon: Icon, active }: NavIconChipProps) {
+function NavIconChip({ icon: Icon, active, muted = false }: NavIconChipProps) {
   return (
     <span
       className={cn(
         "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border transition-colors duration-150",
         active
           ? "border-[var(--sg-accent)]/30 bg-[var(--sg-accent-bg)] text-[var(--sg-accent)]"
-          : "border-[var(--sg-border)] bg-[var(--sg-bg-2)] text-[var(--sg-text-dim)] group-hover:text-[var(--sg-text-muted)]"
+          : muted
+            ? "border-[var(--sg-border)] bg-transparent text-[var(--sg-text-dim)] opacity-60"
+            : "border-[var(--sg-border)] bg-[var(--sg-bg-2)] text-[var(--sg-text-dim)] group-hover:text-[var(--sg-text-muted)]"
       )}
     >
       <Icon className="h-[18px] w-[18px]" />

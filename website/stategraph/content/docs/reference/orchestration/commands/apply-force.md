@@ -15,10 +15,30 @@ With [access control](/docs/reference/orchestration/configuration/access-control
 ## Usage
 
 ```text
-stategraph apply-force [tag-query]
+stategraph [name=value ...] apply-force [tag-query]
 ```
 
 A [tag query](/docs/reference/orchestration/configuration/tag-queries) filters by `dir:<path>`, `workspace:<name>`, or tag name, with `and`, `or`, and `not`.
+
+## Parameters
+
+A comment sets a parameter as a `name=value` token before the verb:
+
+```text
+stategraph mode=DEBUG apply-force dir:staging
+```
+
+A parameter is a name declared under `parameters.names` in `.stategraph/config.yml`, and its value is one of the `values` of that name. Orchestration passes each parameter to the run as an environment variable, with the name unchanged.
+
+An alias name replaces the verb, and takes the arguments of the action it maps to:
+
+```text
+stategraph debug dir:staging
+```
+
+The configuration is the administrator's. An undeclared name, or a value outside `values`, posts an error comment and starts no run.
+
+See [parameters](/docs/reference/orchestration/configuration/parameters) for the configuration.
 
 ## Examples
 

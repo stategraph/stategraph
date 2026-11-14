@@ -27,6 +27,10 @@ import type { useDeepLinkRouter } from "@/hooks";
 import type { HomeOverviewData, HomeScalarsData, HomeAnalyticsData } from './loader';
 import type { ResourceTypeData, ProviderDistribution } from './loader';
 
+/** The four-card rows of the state overview. Sized by the nearest `@container`, so the rows also
+ *  fit the half-width column next to the Orchestration activity. */
+const OVERVIEW_GRID = 'grid grid-cols-1 @md:grid-cols-2 @3xl:grid-cols-4 gap-4';
+
 // ============================================================================
 // SHARED TOOLTIP COMPONENT
 // ============================================================================
@@ -58,7 +62,7 @@ export function ControlPlaneStatus({ data }: ControlPlaneStatusProps) {
           Control Plane Status
         </h2>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={OVERVIEW_GRID}>
         <ActiveTransactionsCard data={data.activeTransactions} />
         <LastTransactionOutcomeCard data={data.lastTransactionOutcome} />
         <RecentChangesCard data={data.recentStability} />
@@ -229,7 +233,7 @@ interface HeroMetricsStripProps {
 
 export function HeroMetricsStrip({ data }: HeroMetricsStripProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className={OVERVIEW_GRID}>
       <HeroMetricCard
         icon={Package}
         label="Resources"
@@ -1000,13 +1004,14 @@ export function AnalyticsSkeleton() {
   );
 }
 
-export function LoadingSkeleton() {
+/** Control Plane Status and State Structure, in place while the scalars load. */
+export function StateOverviewSkeleton() {
   return (
     <div className="space-y-8 animate-pulse">
       {/* Control Plane Status */}
       <div className="space-y-3">
         <div className="h-6 w-48 rounded bg-[var(--sg-bg-2)]" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className={OVERVIEW_GRID}>
           {[...Array(4)].map((_, i) => (
             <div key={`status-${i}`} className="h-[120px] rounded-lg bg-[var(--sg-bg-2)]" />
           ))}
@@ -1016,26 +1021,21 @@ export function LoadingSkeleton() {
       {/* State Structure */}
       <div className="space-y-3">
         <div className="h-6 w-56 rounded bg-[var(--sg-bg-2)]" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className={OVERVIEW_GRID}>
           {[...Array(4)].map((_, i) => (
             <div key={`hero-${i}`} className="h-[120px] rounded-lg bg-[var(--sg-bg-2)]" />
           ))}
         </div>
       </div>
+    </div>
+  );
+}
 
-      {/* Risk row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {[...Array(3)].map((_, i) => (
-          <div key={`risk-${i}`} className="h-[160px] rounded-lg bg-[var(--sg-bg-2)]" />
-        ))}
-      </div>
-
-      {/* Insights grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {[...Array(6)].map((_, i) => (
-          <div key={`insight-${i}`} className="h-[160px] rounded-lg bg-[var(--sg-bg-2)]" />
-        ))}
-      </div>
+export function LoadingSkeleton() {
+  return (
+    <div className="space-y-8">
+      <StateOverviewSkeleton />
+      <AnalyticsSkeleton />
     </div>
   );
 }

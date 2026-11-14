@@ -113,6 +113,7 @@ let wm ~created_at dirspaces =
     environment = None;
     id = ();
     initiator = Terrat_work_manifest3.Initiator.System;
+    params = Sln_map.String.empty;
     run_id = ();
     runs_on = None;
     state = ();

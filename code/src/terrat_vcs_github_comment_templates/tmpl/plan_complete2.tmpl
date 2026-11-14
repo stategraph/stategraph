@@ -43,9 +43,25 @@
 >
 > [How Stategraph handles commits that move during a run](https://stategraph.com/docs/orchestration/workflows/stale-runs)
 {%- endmacro -%}
+{%- macro run_parameters(parameters, fail_if_set) -%}
+{%- if parameters %}
+
+**Parameters**: {% for p in parameters %}`{{ p.name }}={{ p.value }}`{% if not loop.last %}, {% endif %}{% endfor %}
+{%- endif %}
+{%- if fail_if_set %}
+
+> [!WARNING]
+> The configuration declares these parameters `fail_if_set`, so this run counts as failed:
+>
+{%- for name in fail_if_set %}
+> - `{{ name }}`
+{%- endfor %}
+{%- endif %}
+{%- endmacro -%}
 {% if overall_success %}
 ## Plans :thumbsup:
 {%- if stale is defined and stale %}{{ stale_warning(stale) }}{{ "\n" }}{% endif %}
+{{- run_parameters(parameters, fail_if_set) }}
   {%- if summary and dirspaces %}
 {%- set failed = dirspaces | rejectattr("success") | list %}
 {%- set changed = dirspaces | selectattr("success") | selectattr("has_changes") | list %}
@@ -176,6 +192,7 @@ A gate is satisfied only when all conditions are met. See [documentation](https:
 {%- else %}
 ## Plans :heavy_multiplication_x:
 {%- if stale is defined and stale %}{{ stale_warning(stale) }}{{ "\n" }}{% endif %}
+{{- run_parameters(parameters, fail_if_set) }}
   {%- if summary and dirspaces %}
 {%- set failed = dirspaces | rejectattr("success") | list %}
 {%- set changed = dirspaces | selectattr("success") | selectattr("has_changes") | list %}

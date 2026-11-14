@@ -78,7 +78,7 @@ Set the engine globally or per workflow. For some directories only:
 
 ```yaml
 workflows:
-  - tag_query: dir:services/**
+  - tag_query: "services in dir"
     engine:
       name: stategraph
 ```

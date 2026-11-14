@@ -6,7 +6,7 @@ insert into jobs (
   continuation_of
 ) values (
   $context_id,
-  $parameters,
+  $params,
   $state,
   $initiator,
   $continuation_of

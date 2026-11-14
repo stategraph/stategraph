@@ -156,6 +156,7 @@ export function ConnectGitlab({
   const { user } = useAuth();
   const router = useDeepLinkRouter();
   const { refresh: refreshSetupProgress } = useSetupProgress();
+  const [planDetected, setPlanDetected] = useState(false);
   const [step, setStep] = useState<Step>("group");
   const [gitlabUrl, setGitlabUrl] = useState("https://gitlab.com");
   const [groupId, setGroupId] = useState("");
@@ -209,6 +210,17 @@ export function ConnectGitlab({
     }
     setError(null);
     setStep(to);
+  };
+
+  const firstPlanDetected = (from: Step): void => {
+    pushGettingStartedEvent("getting_started_first_run_detected", {
+      path: "gitlab",
+      vcs_provider: "gitlab",
+      repository_source: demoSelected ? "demo" : "own",
+    });
+    refreshSetupProgress();
+    setPlanDetected(true);
+    advance(from, "done");
   };
 
   const back = (to: Step): void => {
@@ -1048,6 +1060,7 @@ export function ConnectGitlab({
               provider="gitlab"
               onBack={() => back("credentials")}
               onConfirm={() => advance("wait", "done")}
+              onDetected={() => firstPlanDetected("wait")}
             />
           </CardContent>
         </Card>
@@ -1061,6 +1074,7 @@ export function ConnectGitlab({
               editUrl={repoUrl ? `${repoUrl}/-/edit/main/${COPY.change.editPath}` : undefined}
               onBack={() => back("variables")}
               onConfirm={() => advance("change", "done")}
+              onDetected={() => firstPlanDetected("change")}
             />
           </CardContent>
         </Card>
@@ -1071,6 +1085,7 @@ export function ConnectGitlab({
           <CardContent className="pt-6">
             <DoneStep
               provider="gitlab"
+              planDetected={planDetected}
               summary={
                 <div className="space-y-2">
                   <div className="p-3 rounded-lg bg-[var(--sg-success)]/10 border border-[var(--sg-success)]/30 space-y-2">
