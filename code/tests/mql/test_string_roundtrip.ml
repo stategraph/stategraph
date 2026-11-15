@@ -1587,6 +1587,51 @@ let test =
              Mql.Ast.of_string ~features:[ Mql.Feature.Ddl ] sql >>= Mql.Ast.to_string);
           assert_parse_error sql;
           ());
+      Oth.test ~name:"Partition DDL round-trips" (fun _ ->
+          let features = Mql.Feature.all in
+          let roundtrip sql =
+            let open CCResult.Infix in
+            Mql.Ast.of_string ~features sql >>= fun ast -> Mql.Ast.to_string ast
+          in
+          (* The left side is a fixture, the right side the canonical
+             rendering: the printer puts no blank before a parenthesis that
+             follows a name or a keyword not in its blank list, so [range(a)]
+             and [to(10)] come back without one. *)
+          CCList.iter
+            (fun (sql, expected) ->
+              Oth.Assert.eq
+                ~eq:String_result.equal
+                ~pp:String_result.pp
+                (Ok expected)
+                (roundtrip (build_str [ sql ])))
+            [
+              ( "create table foo (a integer, b text) partition by range (a)",
+                "create table foo(a integer, b text) partition by range(a)" );
+              ( "create table foo (a integer, b text) partition by list (b)",
+                "create table foo(a integer, b text) partition by list(b)" );
+              (* The render order is the parse order: PostgreSQL puts PARTITION
+                 BY ahead of ON COMMIT in the CREATE TABLE synopsis. *)
+              ( "create temp table foo (a integer) partition by range (a) on commit drop",
+                "create temp table foo(a integer) partition by range(a) on commit drop" );
+              ( "create table foo_p partition of foo for values from (0) to (10)",
+                "create table foo_p partition of foo for values from (0) to(10)" );
+              ( "create table foo_p partition of foo for values in ('a', 'b')",
+                "create table foo_p partition of foo for values in ('a', 'b')" );
+              ( "create table foo_p partition of foo default",
+                "create table foo_p partition of foo default" );
+              ( "alter table foo attach partition foo_p for values from (0) to (10)",
+                "alter table foo attach partition foo_p for values from (0) to(10)" );
+              ( "alter table foo attach partition foo_p default",
+                "alter table foo attach partition foo_p default" );
+              (* [hash] is not a keyword: a table with that name keeps lexing as
+                 an identifier. *)
+              ("create table hash (id int)", "create table hash(id int)");
+            ];
+          ());
+      Oth.test ~name:"Partition keywords are reserved" (fun _ ->
+          (* Reserved like the other DDL keywords: as bare names each one fails
+             to parse, and a column with one of those names needs quotes. *)
+          assert_parse_error @@ build_str [ "select attach, range, list from foo" ]);
       Oth.test ~name:"Non-reserved keywords stay usable as names" (fun _ ->
           (* PostgreSQL does not reserve these and they are real columns here --
              [resources.type], [revision_hashes.key].  The schema statements

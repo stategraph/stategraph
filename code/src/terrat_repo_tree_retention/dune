@@ -1,0 +1,19 @@
+(library
+ (name terrat_repo_tree_retention)
+ (wrapped false)
+ (libraries
+  abb
+  abbs
+  containers
+  logs
+  mql
+  mql_sql
+  pgsql_io
+  pgsql_pool
+  terrat_config
+  terrat_metrics
+  terrat_storage)
+ (preprocessor_deps
+  (glob_files sql/*.sql))
+ (preprocess
+  (pps ppx_blob)))

@@ -10,6 +10,7 @@ let base_url_of_env ~getenv key =
 let default_telemetry_uri = Uri.of_string "https://telemetry.terrateam.io"
 let default_terrateam_web_base_url = base_url_of_string "https://app.terrateam.io"
 let default_vcs_call_timeout = 20.0
+let default_repo_tree_retention_days = 7
 
 module Github = struct
   let default_github_api_base_url = Uri.of_string "https://api.github.com"
@@ -135,6 +136,7 @@ type t = {
   nginx_status_uri : Uri.t option;
   port : int;
   python_exec : string;
+  repo_tree_retention_days : int;
   session_cookie_name : string;
   stategraph_ui_base : Uri.t option;
   statement_timeout : string;
@@ -328,6 +330,20 @@ let load_session_cookie_name ~getenv =
   | Some name when CCString.for_all is_cookie_name_char name -> Ok name
   | Some _ -> Error (`Key_error "TERRAT_SESSION_COOKIE_NAME: must be a valid cookie name")
 
+(* The floor is one day, so zero would keep nothing. *)
+let load_repo_tree_retention_days ~getenv =
+  match getenv "TERRAT_REPO_TREE_RETENTION_DAYS" with
+  | None | Some "" -> Ok default_repo_tree_retention_days
+  | Some days ->
+      let open CCResult.Infix in
+      of_opt
+        (`Key_error "TERRAT_REPO_TREE_RETENTION_DAYS: must be an integer of at least 1")
+        (CCInt.of_string days)
+      >>= fun days ->
+      of_opt
+        (`Key_error "TERRAT_REPO_TREE_RETENTION_DAYS: must be an integer of at least 1")
+        (if days >= 1 then Some days else None)
+
 let load_gc ~getenv =
   let dynamic_gc' () =
     let open CCOption.Infix in
@@ -409,6 +425,8 @@ let of_env getenv =
     (`Key_error "TERRAT_EVENT_EVALUATOR_SLOTS")
     (CCInt.of_string (CCOption.get_or ~default:"20" (getenv "TERRAT_EVENT_EVALUATOR_SLOTS")))
   >>= fun event_evaluator_slots ->
+  load_repo_tree_retention_days ~getenv
+  >>= fun repo_tree_retention_days ->
   infracost ~getenv
   >>= fun infracost ->
   let nginx_status_uri = CCOption.map Uri.of_string (getenv "NGINX_STATUS_URI") in
@@ -462,6 +480,7 @@ let of_env getenv =
       nginx_status_uri;
       port;
       python_exec;
+      repo_tree_retention_days;
       session_cookie_name;
       stategraph_ui_base;
       statement_timeout;
@@ -491,6 +510,7 @@ let infracost t = t.infracost
 let nginx_status_uri t = t.nginx_status_uri
 let port t = t.port
 let python_exec t = t.python_exec
+let repo_tree_retention_days t = t.repo_tree_retention_days
 let session_cookie_name t = t.session_cookie_name
 let statement_timeout t = t.statement_timeout
 let telemetry t = t.telemetry

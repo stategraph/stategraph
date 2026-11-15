@@ -141,11 +141,40 @@ struct
      published -- completed. *)
   let write_end_state s job db =
     let request_id = Builder.log_id s in
+    let module Wm = Terrat_work_manifest3 in
     let open Irm in
     S.Job_context.Job.query_force_fail ~request_id db ~job_id:job.Tjc.Job.id
     >>= function
     | true -> update_job_state_failed s job.Tjc.Job.id db
-    | false -> update_job_state_completed s job.Tjc.Job.id db
+    | false -> (
+        (* Two evaluations of one job can reach this at once: one creates a work manifest, and the
+           other finds nothing left to do for the dirspaces it reads.  That one must not complete
+           the job, because a result of a work manifest of a completed job answers nothing, thus
+           the work manifest that still runs would never publish its result, and
+           [abort_live_work_manifests_for_job] would abort it where it stands.  A live work
+           manifest is the steady state of a job whose result has not come back, thus this stops
+           no completion: the last result completes the job. *)
+        S.Job_context.Job.query_work_manifests ~request_id db ~job_id:job.Tjc.Job.id ()
+        >>= fun work_manifests ->
+        match
+          CCList.find_opt
+            (fun wm ->
+              match wm.Wm.state with
+              | Wm.State.(Queued | Running) -> true
+              | Wm.State.(Completed | Aborted) -> false)
+            work_manifests
+        with
+        | Some wm ->
+            Logs.info (fun m ->
+                m
+                  "%s : JOB : KEEP_RUNNING : job=%a : running_work_manifest=%a"
+                  request_id
+                  Uuidm.pp
+                  job.Tjc.Job.id
+                  Uuidm.pp
+                  wm.Wm.id);
+            Abbs_fc.return_ok ()
+        | None -> update_job_state_completed s job.Tjc.Job.id db)
 
   let add_work_manifest_keys work_manifest store =
     let module Wm = Terrat_work_manifest3 in
@@ -4391,273 +4420,146 @@ struct
        because another job runs it now, is not written.  The combined apply check follows the
        unapplied dirspaces. *)
     let kept_dirspace_checks =
-      run ~name:"kept_dirspace_checks" (fun s { Bs.Fetcher.fetch } ->
+      run ~name:"kept_dirspace_checks" (fun s ({ Bs.Fetcher.fetch } as fetcher) ->
           let module Wm = Terrat_work_manifest3 in
-          let module Dc = Terrat_change_match3.Dirspace_config in
+          let module K = Tasks_base.Kept in
           let module Status = Terrat_commit_check.Status in
           let open Irm in
-          fetch Keys.context
+          K.query s fetcher
           >>= function
-          | {
-              Tjc.Context.scope = Tjc.Context.Scope.Branch _;
-              created_at = _;
-              id = _;
-              updated_at = _;
-            } -> Abbs_fc.return_ok ()
-          | {
-              Tjc.Context.scope = Tjc.Context.Scope.Pull_request _;
-              created_at = _;
-              id = _;
-              updated_at = _;
-            } as context -> (
-              fetch Keys.pull_request
-              >>= fun pull_request ->
-              match S.Api.Pull_request.state pull_request with
-              | Terrat_pull_request.State.Closed -> Abbs_fc.return_ok ()
-              | Terrat_pull_request.State.(Open | Merged _) -> (
-                  fetch Keys.work_manifests_for_job
-                  >>= fun work_manifests ->
-                  let job_dirspaces =
-                    work_manifests
-                    |> CCList.flat_map (fun wm ->
-                        CCList.map Terrat_change.Dirspaceflow.to_dirspace wm.Wm.changes)
-                    |> Terrat_data.Dirspace_set.of_list
-                  in
-                  let not_in_job dirspace =
-                    not (Terrat_data.Dirspace_set.mem dirspace job_dirspaces)
-                  in
-                  fetch Keys.matches
-                  >>= fun {
-                            Keys.Matches.all_matches;
-                            already_planned_matches;
-                            plan_in_progress_matches;
-                            all_unapplied_matches;
-                            _;
-                          }
-                        ->
-                  let dirspaces_of = CCList.map (fun dc -> dc.Dc.dirspace) in
-                  let unapplied =
-                    Terrat_data.Dirspace_set.of_list
-                      (dirspaces_of (CCList.flatten all_unapplied_matches))
-                  in
-                  let kept =
-                    all_matches
-                    |> CCList.flatten
-                    |> dirspaces_of
-                    |> CCList.filter not_in_job
-                    |> CCList.sort_uniq ~cmp:Terrat_dirspace.compare
-                  in
-                  let kept_applied =
-                    CCList.filter
-                      (fun dirspace -> not (Terrat_data.Dirspace_set.mem dirspace unapplied))
-                      kept
-                  in
-                  (* A dirspace whose plan is in flight lands in [kept_planned] too: this
-                     evaluation serves a noop job that made no work manifest, so [job_dirspaces]
-                     is empty and [not_in_job] keeps every [already_planned_matches] dirspace.
-                     That is what keeps the dirspace reported as planned while its plan runs, in
-                     the summaries below.  The plan arm of [checks_of] holds the dirspace's own
-                     check back until that plan says what it found. *)
-                  let kept_planned =
-                    already_planned_matches
-                    |> dirspaces_of
-                    |> CCList.filter not_in_job
-                    |> CCList.append kept_applied
-                    |> CCList.sort_uniq ~cmp:Terrat_dirspace.compare
-                  in
-                  let plan_in_flight =
-                    plan_in_progress_matches |> dirspaces_of |> Terrat_data.Dirspace_set.of_list
-                  in
-                  (* [kept] is a subset of the matched dirspaces, thus their runs come from the
-                     shared read of all matched dirspaces, filtered to [kept]. *)
-                  fetch Keys.matched_dirspace_runs
-                  >>= fun matched_runs ->
-                  let kept_set = Terrat_data.Dirspace_set.of_list kept in
-                  let runs =
-                    CCList.filter
-                      (fun runs ->
-                        Terrat_data.Dirspace_set.mem
-                          runs.Terrat_vcs_provider2.Dirspace_runs.state
-                            .Terrat_intra_pr_hash.Dirspace_state.dirspace
-                          kept_set)
-                      matched_runs
-                  in
-                  let failed_of is_failed =
-                    runs
-                    |> CCList.filter is_failed
-                    |> CCList.map (fun runs ->
-                        runs.Terrat_vcs_provider2.Dirspace_runs.state
-                          .Terrat_intra_pr_hash.Dirspace_state.dirspace)
-                    |> Terrat_data.Dirspace_set.of_list
-                  in
-                  let failed_plans =
-                    failed_of (fun runs -> runs.Terrat_vcs_provider2.Dirspace_runs.plan_failed)
-                  in
-                  let failed_applies =
-                    failed_of (fun runs -> runs.Terrat_vcs_provider2.Dirspace_runs.apply_failed)
-                  in
-                  (* What the newest successful plan of each kept dirspace found.  A dirspace with no
-                     such plan is absent. *)
-                  let plan_changes =
-                    runs
-                    |> CCList.filter_map (fun runs ->
-                        let module Ds = Terrat_intra_pr_hash.Dirspace_state in
-                        let module P = Terrat_intra_pr_hash.Plan in
-                        match runs.Terrat_vcs_provider2.Dirspace_runs.state with
-                        | {
-                         Ds.last_plan = Some { P.has_changes = true; run = _ };
-                         dirspace;
-                         last_apply = _;
-                        } -> Some (dirspace, `Changes)
-                        | {
-                         Ds.last_plan = Some { P.has_changes = false; run = _ };
-                         dirspace;
-                         last_apply = _;
-                        } -> Some (dirspace, `No_changes)
-                        | { Ds.last_plan = None; dirspace = _; last_apply = _ } -> None)
-                    |> Terrat_data.Dirspace_map.of_list
-                  in
-                  fetch Keys.branch_ref
-                  >>= fun branch_ref ->
-                  (* The summary comment shows the same states as the checks. *)
-                  let summaries =
-                    CCList.filter_map
-                      (fun dirspace ->
-                        Terrat_vcs_event_evaluator2_staleness.Summary.decide
-                          ~applied:(Terrat_data.Dirspace_set.of_list kept_applied)
-                          ~planned:(Terrat_data.Dirspace_set.of_list kept_planned)
-                          ~failed:(Terrat_data.Dirspace_set.union failed_plans failed_applies)
-                          dirspace
-                        |> CCOption.map (fun state -> (dirspace, state)))
-                      kept
-                  in
-                  Builder.run_db s ~f:(fun db ->
-                      S.Db.store_dirspace_summaries
-                        ~request_id:(Builder.log_id s)
-                        db
-                        context
-                        ~sha:branch_ref
-                        ~work_manifest:None
-                        summaries)
-                  >>= fun () ->
-                  fetch Keys.account
-                  >>= fun account ->
-                  fetch Keys.repo
-                  >>= fun repo ->
-                  fetch Keys.repo_config
-                  >>= fun repo_config ->
-                  fetch Keys.status_checks_enabled
-                  >>= fun status_checks_enabled ->
-                  fetch Keys.commit_checks
-                  >>= fun commit_checks ->
-                  (* A newest run which failed says more than a run which stands, thus it decides the
+          | None -> Abbs_fc.return_ok ()
+          | Some kept -> (
+              fetch Keys.matches
+              >>= fun { Keys.Matches.all_unapplied_matches; _ } ->
+              fetch Keys.branch_ref
+              >>= fun branch_ref ->
+              (* The states of the kept dirspaces are stored before the checks because a plan
+                 comment of a push carries the plans that still count, and the render reads those
+                 states.  The checks read the live list of the forge, thus their order against the
+                 store does not matter. *)
+              K.store s fetcher kept ~sha:branch_ref
+              >>= fun () ->
+              fetch Keys.account
+              >>= fun account ->
+              fetch Keys.repo
+              >>= fun repo ->
+              fetch Keys.repo_config
+              >>= fun repo_config ->
+              fetch Keys.status_checks_enabled
+              >>= fun status_checks_enabled ->
+              fetch Keys.commit_checks
+              >>= fun commit_checks ->
+              let kept_planned = K.kept_planned kept in
+              let kept_applied = K.kept_applied kept in
+              let failed_plans = K.failed_plans kept in
+              let failed_applies = K.failed_applies kept in
+              let plan_changes = K.plan_changes kept in
+              let plan_in_flight = K.plan_in_flight kept in
+              (* A newest run which failed says more than a run which stands, thus it decides the
                      status of the check. *)
-                  let checks_of ~run ~step ~failed ~completed dirspaces =
-                    let dirspaces =
-                      CCList.sort_uniq
-                        ~cmp:Terrat_dirspace.compare
-                        (dirspaces @ Terrat_data.Dirspace_set.to_list failed)
-                    in
-                    if status_checks_enabled ~run then
-                      CCList.map
-                        (fun dirspace ->
-                          let status, description =
-                            if Terrat_data.Dirspace_set.mem dirspace failed then
-                              (Status.Failed, "Failed")
-                            else (Status.Completed, completed dirspace)
-                          in
-                          S.Commit_check.make_dirspace
-                            ~config:(Builder.State.config s)
-                            ~description
-                            ~run_type:(Wm.Step.to_string step)
-                            ~dirspace
-                            ~status
-                            ~repo
-                            ~account
-                            ())
-                        dirspaces
-                    else []
-                  in
-                  (* [needed] reads only the forge's live check list, never the database.  The
+              let checks_of ~run ~step ~failed ~completed dirspaces =
+                let dirspaces =
+                  CCList.sort_uniq
+                    ~cmp:Terrat_dirspace.compare
+                    (dirspaces @ Terrat_data.Dirspace_set.to_list failed)
+                in
+                if status_checks_enabled ~run then
+                  CCList.map
+                    (fun dirspace ->
+                      let status, description =
+                        if Terrat_data.Dirspace_set.mem dirspace failed then
+                          (Status.Failed, "Failed")
+                        else (Status.Completed, completed dirspace)
+                      in
+                      S.Commit_check.make_dirspace
+                        ~config:(Builder.State.config s)
+                        ~description
+                        ~run_type:(Wm.Step.to_string step)
+                        ~dirspace
+                        ~status
+                        ~repo
+                        ~account
+                        ())
+                    dirspaces
+                else []
+              in
+              (* [needed] reads only the forge's live check list, never the database.  The
                      plan arm holds back the dirspaces whose plan is still queued or running, so
                      a kept dirspace whose plan is in flight waits for that plan's own verdict
                      even when this read runs before the plan's [Queued] check is visible. *)
-                  let needed { Terrat_commit_check.title; status; details_url = _; description = _ }
-                      =
-                    CCOption.for_all
-                      (function
-                        | {
-                            Terrat_commit_check.status = Status.(Queued | Running);
+              let needed { Terrat_commit_check.title; status; details_url = _; description = _ } =
+                CCOption.for_all
+                  (function
+                    | {
+                        Terrat_commit_check.status = Status.(Queued | Running);
+                        details_url = _;
+                        description = _;
+                        title = _;
+                      } -> false
+                    | {
+                        Terrat_commit_check.status = existing;
+                        details_url = _;
+                        description = _;
+                        title = _;
+                      } -> not (Status.equal existing status))
+                  (CCList.find_opt
+                     (fun {
+                            Terrat_commit_check.title = existing;
                             details_url = _;
                             description = _;
-                            title = _;
-                          } -> false
-                        | {
-                            Terrat_commit_check.status = existing;
-                            details_url = _;
-                            description = _;
-                            title = _;
-                          } -> not (Status.equal existing status))
-                      (CCList.find_opt
-                         (fun {
-                                Terrat_commit_check.title = existing;
-                                details_url = _;
-                                description = _;
-                                status = _;
-                              }
-                            -> CCString.equal existing title)
-                         commit_checks)
-                  in
-                  let checks =
-                    CCList.filter
-                      needed
-                      (checks_of
-                         ~run:`Plan
-                         ~step:Wm.Step.Plan
-                         ~failed:failed_plans
-                         ~completed:(CCFun.const "Completed")
-                         (CCList.filter
-                            (fun dirspace ->
-                              not (Terrat_data.Dirspace_set.mem dirspace plan_in_flight))
-                            kept_planned)
-                      @ checks_of
-                          ~run:`Apply
-                          ~step:Wm.Step.Apply
-                          ~failed:failed_applies
-                          ~completed:(fun dirspace ->
-                            match Terrat_data.Dirspace_map.find_opt dirspace plan_changes with
-                            | Some plan_changes -> Tasks_base.apply_check_description plan_changes
-                            | None -> Tasks_base.apply_check_description `Not_run)
-                          kept_applied)
-                  in
-                  Logs.info (fun m ->
-                      m
-                        "%s : KEPT_DIRSPACE_CHECKS : planned=%d : applied=%d : failed=%d : \
-                         written=%d"
-                        (Builder.log_id s)
-                        (CCList.length kept_planned)
-                        (CCList.length kept_applied)
-                        (Terrat_data.Dirspace_set.cardinal
-                           (Terrat_data.Dirspace_set.union failed_plans failed_applies))
-                        (CCList.length checks));
-                  fetch Keys.create_commit_checks
-                  >>= fun create_commit_checks ->
-                  create_commit_checks' create_commit_checks branch_ref checks
-                  >>= fun () ->
-                  match CCList.flatten all_unapplied_matches with
-                  | [] -> fetch Keys.maybe_create_completed_apply_check
-                  | _ :: _ as unapplied_matches ->
-                      create_commit_checks'
-                        create_commit_checks
-                        branch_ref
-                        (Tasks_base.pending_apply_check
-                           ~config:(Builder.State.config s)
-                           ~account
-                           ~repo
-                           ~apply_requirements:
-                             (Terrat_base_repo_config_v1.apply_requirements repo_config)
-                           ~commit_checks
-                           unapplied_matches))))
+                            status = _;
+                          }
+                        -> CCString.equal existing title)
+                     commit_checks)
+              in
+              let checks =
+                CCList.filter
+                  needed
+                  (checks_of
+                     ~run:`Plan
+                     ~step:Wm.Step.Plan
+                     ~failed:failed_plans
+                     ~completed:(CCFun.const "Completed")
+                     (CCList.filter
+                        (fun dirspace -> not (Terrat_data.Dirspace_set.mem dirspace plan_in_flight))
+                        kept_planned)
+                  @ checks_of
+                      ~run:`Apply
+                      ~step:Wm.Step.Apply
+                      ~failed:failed_applies
+                      ~completed:(fun dirspace ->
+                        match Terrat_data.Dirspace_map.find_opt dirspace plan_changes with
+                        | Some plan_changes -> Tasks_base.apply_check_description plan_changes
+                        | None -> Tasks_base.apply_check_description `Not_run)
+                      kept_applied)
+              in
+              Logs.info (fun m ->
+                  m
+                    "%s : KEPT_DIRSPACE_CHECKS : planned=%d : applied=%d : failed=%d : written=%d"
+                    (Builder.log_id s)
+                    (CCList.length kept_planned)
+                    (CCList.length kept_applied)
+                    (Terrat_data.Dirspace_set.cardinal
+                       (Terrat_data.Dirspace_set.union failed_plans failed_applies))
+                    (CCList.length checks));
+              fetch Keys.create_commit_checks
+              >>= fun create_commit_checks ->
+              create_commit_checks' create_commit_checks branch_ref checks
+              >>= fun () ->
+              match CCList.flatten all_unapplied_matches with
+              | [] -> fetch Keys.maybe_create_completed_apply_check
+              | _ :: _ as unapplied_matches ->
+                  create_commit_checks'
+                    create_commit_checks
+                    branch_ref
+                    (Tasks_base.pending_apply_check
+                       ~config:(Builder.State.config s)
+                       ~account
+                       ~repo
+                       ~apply_requirements:
+                         (Terrat_base_repo_config_v1.apply_requirements repo_config)
+                       ~commit_checks
+                       unapplied_matches)))
   end
 
   let default_tasks () =

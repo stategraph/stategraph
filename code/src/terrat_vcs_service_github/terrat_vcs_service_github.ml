@@ -367,6 +367,7 @@ struct
     type vcs_config = Provider.Api.Config.vcs_config
 
     let one_hour = Duration.to_f (Duration.of_hour 1)
+    let one_day = Duration.to_f (Duration.of_day 1)
 
     type t = {
       config : Provider.Api.Config.t;
@@ -375,8 +376,8 @@ struct
       flow_state_cleanup : unit Abb.Future.t;
       plan_cleanup : unit Abb.Future.t;
       repo_config_cleanup : unit Abb.Future.t;
-      repo_tree_cleanup : unit Abb.Future.t;
       stale_work_manifest_cleanup : unit Abb.Future.t;
+      repo_tree_retention : unit Abb.Future.t;
       exec : Terrat_vcs_event_evaluator2.Exec.t;
     }
 
@@ -403,12 +404,6 @@ struct
         (Evaluator2.run_repo_config_cleanup ~request_id:(Ouuid.to_string (Ouuid.v4 ())) ~storage ())
       >>= fun () -> Abb.Sys.sleep one_hour >>= fun () -> repo_config_cleanup config storage
 
-    let rec repo_tree_cleanup config storage =
-      let open Abb.Future.Infix_monad in
-      Abbs_fc.ignore
-        (Evaluator2.run_repo_tree_cleanup ~request_id:(Ouuid.to_string (Ouuid.v4 ())) ~storage ())
-      >>= fun () -> Abb.Sys.sleep one_hour >>= fun () -> repo_tree_cleanup config storage
-
     let rec stale_work_manifest_cleanup config storage exec =
       let open Abb.Future.Infix_monad in
       Abbs_fc.ignore
@@ -421,37 +416,59 @@ struct
       >>= fun () ->
       Abb.Sys.sleep one_hour >>= fun () -> stale_work_manifest_cleanup config storage exec
 
+    (* The repo-tree partition retention: one run at start, then one per day, so a restart is a
+       maintenance run. *)
+    let rec repo_tree_retention config storage =
+      let open Abb.Future.Infix_monad in
+      Abbs_fc.ignore (Terrat_repo_tree_retention.run config storage)
+      >>= fun () -> Abb.Sys.sleep one_day >>= fun () -> repo_tree_retention config storage
+
     let name _ = "github"
 
     let start config vcs_config storage exec =
       let open Abb.Future.Infix_monad in
+      (* The provider config shadows the terrat config below; the retention task runs on the
+         terrat one. *)
+      let terrat_config = config in
       let config = Provider.Api.Config.make ~config ~vcs_config () in
+      (* Each loop runs under [start_loop]: the forks are never awaited, so an exception that
+         settled one loop dead would go unseen and the task would never run again. *)
       Abb.Future.Infix_app.(
         (fun drift
              flow_state_cleanup
              plan_cleanup
              repo_config_cleanup
-             repo_tree_cleanup
              stale_work_manifest_cleanup
+             repo_tree_retention
            ->
           ( drift,
             flow_state_cleanup,
             plan_cleanup,
             repo_config_cleanup,
-            repo_tree_cleanup,
-            stale_work_manifest_cleanup ))
-        <$> Abb.Future.fork (drift config storage exec)
-        <*> Abb.Future.fork (flow_state_cleanup config storage)
-        <*> Abb.Future.fork (plan_cleanup config storage)
-        <*> Abb.Future.fork (repo_config_cleanup config storage)
-        <*> Abb.Future.fork (repo_tree_cleanup config storage)
-        <*> Abb.Future.fork (stale_work_manifest_cleanup config storage exec))
+            stale_work_manifest_cleanup,
+            repo_tree_retention ))
+        <$> Abb.Future.fork
+              (Terrat_vcs_service.start_loop "drift" (fun () -> drift config storage exec))
+        <*> Abb.Future.fork
+              (Terrat_vcs_service.start_loop "flow_state_cleanup" (fun () ->
+                   flow_state_cleanup config storage))
+        <*> Abb.Future.fork
+              (Terrat_vcs_service.start_loop "plan_cleanup" (fun () -> plan_cleanup config storage))
+        <*> Abb.Future.fork
+              (Terrat_vcs_service.start_loop "repo_config_cleanup" (fun () ->
+                   repo_config_cleanup config storage))
+        <*> Abb.Future.fork
+              (Terrat_vcs_service.start_loop "stale_work_manifest_cleanup" (fun () ->
+                   stale_work_manifest_cleanup config storage exec))
+        <*> Abb.Future.fork
+              (Terrat_vcs_service.start_loop "repo_tree_retention" (fun () ->
+                   repo_tree_retention terrat_config storage)))
       >>= fun ( drift,
                 flow_state_cleanup,
                 plan_cleanup,
                 repo_config_cleanup,
-                repo_tree_cleanup,
-                stale_work_manifest_cleanup )
+                stale_work_manifest_cleanup,
+                repo_tree_retention )
             ->
       Abbs_fc.return_ok
         {
@@ -461,8 +478,8 @@ struct
           flow_state_cleanup;
           plan_cleanup;
           repo_config_cleanup;
-          repo_tree_cleanup;
           stale_work_manifest_cleanup;
+          repo_tree_retention;
           exec;
         }
 
@@ -476,9 +493,8 @@ struct
       >>= fun () ->
       Abb.Future.abort t.repo_config_cleanup
       >>= fun () ->
-      Abb.Future.abort t.repo_tree_cleanup
-      >>= fun () ->
-      Abb.Future.abort t.stale_work_manifest_cleanup >>= fun () -> Abb.Future.return ()
+      Abb.Future.abort t.stale_work_manifest_cleanup
+      >>= fun () -> Abb.Future.abort t.repo_tree_retention >>= fun () -> Abb.Future.return ()
 
     let routes t = Routes.routes t.config t.storage t.exec
 

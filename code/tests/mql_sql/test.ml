@@ -104,7 +104,7 @@ let test =
       Oth.test ~name:"Write a statement the builder made" (fun _ ->
           Oth.Assert.Eq.string
             ~expected:"drop table if exists foo"
-            ~actual:(Mql_sql.write_exn (Mql.Build.drop_table_if_exists "foo"));
+            ~actual:(Mql_sql.write_exn (Mql.Build.drop_table ~if_exists:true "foo"));
           Oth.Assert.Eq.string
             ~expected:"analyze foo"
             ~actual:(Mql_sql.write_exn (Mql.Build.analyze_table "foo"));

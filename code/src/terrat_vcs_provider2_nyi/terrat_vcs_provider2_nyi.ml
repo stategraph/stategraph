@@ -136,7 +136,6 @@ module Db = struct
   let cleanup_repo_configs ~request_id db = raise (Failure "nyi")
   let cleanup_flow_states ~request_id db = raise (Failure "nyi")
   let cleanup_plans ~request_id db = raise (Failure "nyi")
-  let cleanup_repo_trees ~request_id db = raise (Failure "nyi")
   let cleanup_stale_work_manifests ~request_id db = raise (Failure "nyi")
   let unlock ~request_id db repo unlock_id = raise (Failure "nyi")
   let query_plan ~request_id db work_manifest_id dirspace = raise (Failure "nyi")

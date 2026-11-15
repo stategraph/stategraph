@@ -322,6 +322,13 @@ let rec token ~variables buf =
   | "cast" | "CAST" -> T.CAST
   | "substring" | "SUBSTRING" -> T.SUBSTRING
   | "position" | "POSITION" -> T.POSITION
+  (* Partitioning.  Reserved like the other DDL keywords: each is structural
+     rather than a value, and a column named one of them is still reachable by
+     quoting.  [hash] deliberately stays unreserved -- a table or a column with
+     that name keeps lexing as an identifier. *)
+  | "attach" | "ATTACH" -> T.ATTACH
+  | "range" | "RANGE" -> T.RANGE
+  | "list" | "LIST" -> T.LIST
   | "partition" | "PARTITION" -> T.PARTITION
   | "true" | "TRUE" -> T.TRUE
   | "false" | "FALSE" -> T.FALSE

@@ -1216,6 +1216,77 @@ struct
                        work_manifest;
                      })))
       in
+      (* Store the state of every dirspace of the pull request at [check_ref].  The states of this
+         result decide the dirspaces the run touched.  [Terrat_vcs_event_evaluator2_tasks_base.Kept]
+         decides the dirspaces this job does not run, which keep the plan and the apply they already
+         have (RFD 2356).  The comment of a plan or of an apply carries the output of the plans that
+         still count, and the render reads that output from these states, thus the caller stores the
+         states before it publishes the comment. *)
+      let store_dirspace_summaries
+          s
+          ({ Bs.Fetcher.fetch } as fetcher)
+          work_manifest
+          work_manifest_result
+          ~run
+          ~decision
+          ~check_ref =
+        let module Wmr = P2.Work_manifest_result in
+        let open Irm in
+        let stale = Staleness.Pr_result.stale_dirspaces decision (dirspaces_of_wm work_manifest) in
+        fetch Keys.context
+        >>= fun context ->
+        (match run with
+          | `Apply -> Abbs_fc.return_ok Terrat_data.Dirspace_set.empty
+          | `Plan ->
+              Builder.run_db s ~f:(fun db ->
+                  Tasks_base.query_dirspace_runs_for_context
+                    s
+                    db
+                    context
+                    (CCList.map fst work_manifest_result.Wmr.dirspaces_success))
+              >>| fun runs ->
+              runs
+              |> CCList.filter_map
+                   (fun
+                     {
+                       P2.Dirspace_runs.state =
+                         { Terrat_intra_pr_hash.Dirspace_state.dirspace; last_plan; last_apply = _ };
+                       plan_failed = _;
+                       apply_failed = _;
+                       in_progress_plan = _;
+                     }
+                   ->
+                     CCOption.return_if
+                       (CCOption.exists
+                          (fun { Terrat_intra_pr_hash.Plan.has_changes; run = _ } ->
+                            not has_changes)
+                          last_plan)
+                       dirspace)
+              |> Terrat_data.Dirspace_set.of_list)
+        >>= fun no_changes ->
+        Builder.run_db s ~f:(fun db ->
+            S.Db.store_dirspace_summaries
+              ~request_id:(Builder.log_id s)
+              db
+              context
+              ~sha:check_ref
+              ~work_manifest:(Some work_manifest.Wm.id)
+              (CCList.map
+                 (fun (dirspace, success) ->
+                   (dirspace, Staleness.Summary.of_result ~run ~stale ~no_changes dirspace success))
+                 work_manifest_result.Wmr.dirspaces_success))
+        >>= fun () ->
+        (* The dirspaces this job does not run keep the plans they have, and the comment of the run
+           that plans carries their output.  An apply comment carries it too, and the plan of the
+           same pull request stored the states before it, thus an apply does not repeat the work. *)
+        match run with
+        | `Apply -> Abbs_fc.return_ok ()
+        | `Plan -> (
+            Tasks_base.Kept.query s fetcher
+            >>= function
+            | None -> Abbs_fc.return_ok ()
+            | Some kept -> Tasks_base.Kept.store s fetcher kept ~sha:check_ref)
+      in
       let report () =
         let open Irm in
         superseded ()
@@ -1232,13 +1303,39 @@ struct
             result_staleness s fetcher work_manifest
             >>= fun (impact, compared) ->
             let decision = Staleness.Pr_result.decide impact in
+            (* The refs and the states of the dirspaces come before the comment: the comment of a
+               plan or of an apply carries the output of the plans that still count, and the render
+               reads that output from the states at the head. *)
+            check_refs fetcher work_manifest ~run_ref:compared.from_ref decision
+            >>= fun (check_ref, stale) ->
+            let run =
+              if
+                CCOption.exists
+                  (function
+                    | Wm.Step.(Apply | Unsafe_apply) -> true
+                    | Wm.Step.(Build_config | Build_tree | Index | Plan) -> false)
+                  (CCList.last_opt work_manifest.Wm.steps)
+              then `Apply
+              else `Plan
+            in
+            (match work_manifest.Wm.target with
+              | P2.Target.Pr _ ->
+                  or_default s work_manifest ~what:"DIRSPACE_SUMMARIES_ERR" ~default:()
+                  @@ store_dirspace_summaries
+                       s
+                       fetcher
+                       work_manifest
+                       work_manifest_result
+                       ~run
+                       ~decision
+                       ~check_ref
+              | P2.Target.Drift _ -> Abbs_fc.return_ok ())
+            >>= fun () ->
             (* A drift has no pull request to comment on. *)
             (match work_manifest.Wm.target with
               | P2.Target.Pr _ -> publish_output compared decision
               | P2.Target.Drift _ -> Abbs_fc.return_ok ())
             >>= fun () ->
-            check_refs fetcher work_manifest ~run_ref:compared.from_ref decision
-            >>= fun (check_ref, stale) ->
             fetch Keys.repo
             >>= fun repo ->
             fetch Keys.create_commit_checks
@@ -1259,73 +1356,9 @@ struct
             >>= fun () ->
             match work_manifest.Wm.target with
             | P2.Target.Pr _ ->
-                (* The summary comment shows the result at the head of the pull request, where the
-                   checks of the fresh dirspaces go.  A stale dirspace waits for a new plan. *)
-                fetch Keys.context
-                >>= fun context ->
-                let stale =
-                  Staleness.Pr_result.stale_dirspaces decision (dirspaces_of_wm work_manifest)
-                in
-                let run =
-                  if
-                    CCOption.exists
-                      (function
-                        | Wm.Step.(Apply | Unsafe_apply) -> true
-                        | Wm.Step.(Build_config | Build_tree | Index | Plan) -> false)
-                      (CCList.last_opt work_manifest.Wm.steps)
-                  then `Apply
-                  else `Plan
-                in
-                let module Wmr = P2.Work_manifest_result in
-                (* The result is stored before the report, thus the most recent good plan of a
-                   dirspace is the plan of this result, and it is the plan the selection reads. *)
-                or_default s work_manifest ~what:"DIRSPACE_SUMMARIES_ERR" ~default:()
-                @@ ((match run with
-                      | `Apply -> Abbs_fc.return_ok Terrat_data.Dirspace_set.empty
-                      | `Plan ->
-                          Builder.run_db s ~f:(fun db ->
-                              Tasks_base.query_dirspace_runs_for_context
-                                s
-                                db
-                                context
-                                (CCList.map fst work_manifest_result.Wmr.dirspaces_success))
-                          >>| fun runs ->
-                          runs
-                          |> CCList.filter_map
-                               (fun
-                                 {
-                                   P2.Dirspace_runs.state =
-                                     {
-                                       Terrat_intra_pr_hash.Dirspace_state.dirspace;
-                                       last_plan;
-                                       last_apply = _;
-                                     };
-                                   plan_failed = _;
-                                   apply_failed = _;
-                                   in_progress_plan = _;
-                                 }
-                               ->
-                                 CCOption.return_if
-                                   (CCOption.exists
-                                      (fun { Terrat_intra_pr_hash.Plan.has_changes; run = _ } ->
-                                        not has_changes)
-                                      last_plan)
-                                   dirspace)
-                          |> Terrat_data.Dirspace_set.of_list)
-                   >>= fun no_changes ->
-                   Builder.run_db s ~f:(fun db ->
-                       S.Db.store_dirspace_summaries
-                         ~request_id:(Builder.log_id s)
-                         db
-                         context
-                         ~sha:check_ref
-                         ~work_manifest:(Some work_manifest.Wm.id)
-                         (CCList.map
-                            (fun (dirspace, success) ->
-                              ( dirspace,
-                                Staleness.Summary.of_result ~run ~stale ~no_changes dirspace success
-                              ))
-                            work_manifest_result.Wmr.dirspaces_success)))
+                (* The states of the dirspaces of the pull request were stored before the
+                   comment, because the comment carries the plans that still count. *)
+                Abbs_fc.return_ok ()
             | P2.Target.Drift _ -> (
                 let decision = Staleness.Drift_result.decide impact in
                 Logs.info (fun m ->

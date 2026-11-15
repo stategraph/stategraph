@@ -25,8 +25,7 @@
 -- repository config schema rejects a value outside the range, so a row the
 -- server wrote always casts.
 --
--- The batch is bounded, as in delete_old_repo_trees.sql: a sweep that cannot keep up leaves the
--- rest to the run of the next hour.
+-- The batch is bounded: a sweep that cannot keep up leaves the rest to the run of the next hour.
 with
 stale_work_manifests as (
     select gwm.id

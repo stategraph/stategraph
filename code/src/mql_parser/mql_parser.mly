@@ -27,6 +27,7 @@ let merge_opt a b =
 %token CONSTRAINTS DEFERRED IMMEDIATE
 %token PRIMARY FOREIGN REFERENCES UNIQUE CHECK IF TEMP TEMPORARY CONCURRENTLY
 %token CASCADE RESTRICT RENAME TO TYPE COMMENT TRUNCATE ANALYZE REPLACE ONLY KEY_KW
+%token ATTACH RANGE LIST
 %token LOCK_TABLE
 %token <Mql_ast.lock_table_mode> LOCK_MODE
 %token WITH_TIME_ZONE WITHOUT_TIME_ZONE NO_ACTION PRECISION VARYING
@@ -604,8 +605,8 @@ foreign_options:
     [@name foreign_option_more]
 
 table_constraint:
-  | PRIMARY KEY_KW LPAREN cs = using_cols RPAREN
-    { M.Tbl_primary_key cs }
+  | PRIMARY KEY_KW LPAREN cs = using_cols RPAREN inc = index_include_opt
+    { M.Tbl_primary_key { columns = cs; include_ = inc } }
     [@name tbl_primary_key]
   /* Change an index that is already present to a constraint. */
   | PRIMARY KEY_KW USING INDEX i = ident
@@ -614,8 +615,8 @@ table_constraint:
   | UNIQUE USING INDEX i = ident
     { M.Tbl_unique_using_index i }
     [@name tbl_unique_using_index]
-  | UNIQUE LPAREN cs = using_cols RPAREN
-    { M.Tbl_unique cs }
+  | UNIQUE LPAREN cs = using_cols RPAREN inc = index_include_opt
+    { M.Tbl_unique { columns = cs; include_ = inc } }
     [@name tbl_unique]
   | CHECK LPAREN e = expr RPAREN
     { M.Tbl_check e }
@@ -641,6 +642,43 @@ table_options:
   | os = table_options COMMA o = table_option
     { os @ [ o ] }
     [@name table_option_more]
+
+/* How a partitioned table splits its rows. */
+partition_strategy:
+  | RANGE
+    { M.Ps_range }
+    [@name partition_strategy_range]
+  | LIST
+    { M.Ps_list }
+    [@name partition_strategy_list]
+
+/* [PARTITION BY strategy (key)] -- the clause of a partitioned table. */
+table_partition:
+  | PARTITION BY s = partition_strategy LPAREN es = expr_list RPAREN
+    { { M.strategy = s; key = es } }
+    [@name table_partition]
+
+table_partition_opt:
+  | /* empty */
+    { None }
+    [@name no_table_partition]
+  | p = table_partition
+    { Some p }
+    [@name yes_table_partition]
+
+/* The slice of the parent's values that one partition holds.  The bound is
+   mandatory: [PARTITION OF] with no bound is not a form this repository
+   writes. */
+partition_bound:
+  | FOR VALUES FROM LPAREN lo = expr_list RPAREN TO LPAREN hi = expr_list RPAREN
+    { M.Pb_range (lo, hi) }
+    [@name bound_range]
+  | FOR VALUES IN LPAREN es = expr_list RPAREN
+    { M.Pb_in es }
+    [@name bound_in]
+  | DEFAULT
+    { M.Pb_default }
+    [@name bound_default]
 
 alter_action:
   | ADD COLUMN e = if_not_exists c = column_def
@@ -679,6 +717,10 @@ alter_action:
   | SET LPAREN os = table_options RPAREN
     { M.Set_options os }
     [@name set_options]
+  /* A partition that already holds rows joins the partitioned table. */
+  | ATTACH PARTITION n = table_name b = partition_bound
+    { M.Attach_partition { name = n; bound = b } }
+    [@name attach_partition]
 
 alter_column_action:
   | SET NOT NULL
@@ -1100,22 +1142,30 @@ statement:
     { q }
     [@name stmt_query]
   | CREATE tmp = temp_opt TABLE e = if_not_exists n = table_name LPAREN is = table_items RPAREN
-    oc = on_commit_drop_opt
+    p = table_partition_opt oc = on_commit_drop_opt
     { M.Create_table { if_not_exists = e; temp = tmp; name = n; body = M.Table_items is;
-                       on_commit_drop = oc } }
+                       partition = p; on_commit_drop = oc } }
     [@name create_table_stmt]
   /* [CREATE TABLE t AS SELECT ...] -- the query gives the contents of the table. */
   | CREATE tmp = temp_opt TABLE e = if_not_exists n = table_name oc = on_commit_drop_opt
     AS q = insert_query
     { M.Create_table { if_not_exists = e; temp = tmp; name = n; body = M.Table_as_query q;
-                       on_commit_drop = oc } }
+                       partition = None; on_commit_drop = oc } }
     [@name create_table_as_stmt]
+  /* A partition of a partitioned table: the parent gives the columns and the
+     bound gives the slice of its values. */
+  | CREATE tmp = temp_opt TABLE e = if_not_exists n = table_name PARTITION OF
+    parent = table_name b = partition_bound
+    { M.Create_table { if_not_exists = e; temp = tmp; name = n;
+                       body = M.Table_partition_of { parent = parent; bound = b };
+                       partition = None; on_commit_drop = false } }
+    [@name create_table_partition_of_stmt]
   /* A table that is in another database. */
   | CREATE FOREIGN TABLE e = if_not_exists n = table_name LPAREN is = table_items RPAREN
     SERVER srv = ident OPTIONS LPAREN os = foreign_options RPAREN
     { M.Create_table { if_not_exists = e; temp = false; name = n;
                        body = M.Table_foreign { items = is; server = srv; options = os };
-                       on_commit_drop = false } }
+                       partition = None; on_commit_drop = false } }
     [@name create_foreign_table_stmt]
   | CREATE u = unique_opt INDEX c = concurrently_opt e = if_not_exists nm = index_name_opt
     ON t = table_name m = index_method_opt LPAREN es = index_elements RPAREN

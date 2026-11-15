@@ -218,11 +218,11 @@ module Server = struct
            otherwise drop it and handle the request again against the rest. *)
         verify_conn c
         >>= function
-        | Some conn -> deliver_chan req (Ok conn) >>= fun _ -> loop { t with conns = cs } chan
+        | Some conn -> hand_off t chan req conn cs
         | None ->
             handle_msg { t with num_conns = t.num_conns - 1; conns = cs } chan (Ok (Msg.Get req)))
     | ({ Conn.conn; last_used = _; uses = _ } as c) :: cs when Pgsql_io.connected conn ->
-        deliver_chan req (Ok c) >>= fun _ -> loop { t with conns = cs } chan
+        hand_off t chan req c cs
     | _ :: _ ->
         (* If one connection is disconnected, maybe all of them are, so verify all
            the connections before handing out the next one.
@@ -253,7 +253,10 @@ module Server = struct
         Abb.Sys.monotonic ()
         >>= fun last_used ->
         let c = { Conn.conn; last_used; uses = 0 } in
-        deliver_chan req (Ok c) >>= fun _ -> loop { t with num_conns = t.num_conns + 1 } chan
+        (* The connection exists whether or not the caller still listens: [num_conns] counts it on
+           both branches, and a closed chan leaves it in the idle list for the next request.  No
+           idle connection is left behind, so [cs] is empty. *)
+        hand_off { t with num_conns = t.num_conns + 1 } chan req c []
     | `Ok (Error (#Pgsql_io.create_err as err)) ->
         Logs.err (fun m -> m "ERROR : %s" (Pgsql_io.show_create_err err));
         deliver_chan req (Error ()) >>= fun _ -> loop t chan
@@ -327,6 +330,25 @@ module Server = struct
     match Queue.take_opt t.waiting with
     | Some { Waiting.req } -> handle_msg t chan (Ok (Msg.Get req))
     | None -> loop t chan
+
+  (* Hand a live connection to [req], whose connection has already left [t.conns].  A closed reply
+     chan means the caller aborted (its own timeout fired) while the connection was in hand: the
+     connection is live, so it goes to the next waiter or back to the idle list.  It must never be
+     dropped.  The handoff does not count as a use: [max_uses] is enforced on the return path only. *)
+  and hand_off t chan req conn cs =
+    let open Abb.Future.Infix_monad in
+    deliver_chan req (Ok conn)
+    >>= function
+    | `Sent -> loop { t with conns = cs } chan
+    | `Closed -> (
+        let t = { t with conns = cs } in
+        hand_to_next_waiter t conn
+        >>= function
+        | `Handed_off t -> loop t chan
+        | `No_waiters (t, conn) ->
+            Abb.Sys.monotonic ()
+            >>= fun last_used ->
+            loop { t with conns = { conn with Conn.last_used } :: t.conns } chan)
 
   (* Periodically shrink the pool: close connections idle longer than
      [conn_timeout_check], giving an intense burst's connections back to the

@@ -149,8 +149,9 @@ module Build : sig
 
   (** {1 Schema statements} *)
 
-  (** [drop_table_if_exists n] builds [DROP TABLE IF EXISTS n]. *)
-  val drop_table_if_exists : string -> Mql_ast.t
+  (** [drop_table ?if_exists n] builds [DROP TABLE [IF EXISTS] n]; [if_exists] defaults to false,
+      the plain statement. *)
+  val drop_table : ?if_exists:bool -> string -> Mql_ast.t
 
   (** [analyze_table n] builds [ANALYZE n] over one table. It takes one name and not a list, so that
       a call cannot make the [ANALYZE] of every table of the database. *)
@@ -159,4 +160,24 @@ module Build : sig
   (** [create_temp_table_as ?on_commit_drop n q] builds [CREATE TEMP TABLE n AS q], with
       [ON COMMIT DROP] between the name and [AS] when [on_commit_drop] is true. *)
   val create_temp_table_as : ?on_commit_drop:bool -> string -> Mql_ast.t -> Mql_ast.t
+
+  (** [lock_table ?mode n] builds [LOCK TABLE n IN <mode> MODE]. [mode] defaults to
+      [Lock_mode_access_exclusive], the strongest mode. A caller that needs less names the mode it
+      takes. *)
+  val lock_table : ?mode:Mql_ast.lock_table_mode -> string -> Mql_ast.t
+
+  (** [range_bound ~from ~to_] builds [FOR VALUES FROM ('from') TO ('to')], the bound of one range
+      partition; both bounds go in as string literals. *)
+  val range_bound : from:string -> to_:string -> Mql_ast.partition_bound
+
+  (** [create_table_partition_of ?if_not_exists ~parent ~bound n] builds
+      [CREATE [IF NOT EXISTS] TABLE n PARTITION OF parent bound]. *)
+  val create_table_partition_of :
+    ?if_not_exists:bool -> parent:string -> bound:Mql_ast.partition_bound -> string -> Mql_ast.t
+
+  (** [delete_where ~where n] builds [DELETE FROM n WHERE where]. *)
+  val delete_where : where:Mql_ast.expr -> string -> Mql_ast.t
+
+  (** [insert_select ~query n] builds [INSERT INTO n query]. *)
+  val insert_select : query:Mql_ast.t -> string -> Mql_ast.t
 end

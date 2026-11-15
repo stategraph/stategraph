@@ -1,10 +1,11 @@
-insert into repo_trees (sha, path, changed, id, installation)
+insert into repo_trees (sha, path, changed, id, installation, cache_day)
 select
         x.sha,
         x.path,
         x.changed,
         x.id,
-        gim.core_id
+        gim.core_id,
+        current_date
 from unnest(
   $installation_ids,
   $shas,
@@ -14,7 +15,7 @@ from unnest(
 ) as x(installation_id, sha, path, changed, id)
 inner join gitlab_installations_map as gim
       on gim.installation_id = x.installation_id
-on conflict on constraint repo_trees_pkey
+on conflict (installation, sha, cache_day, path)
 do update set (
    changed,
    id
