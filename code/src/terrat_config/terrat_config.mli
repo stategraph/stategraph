@@ -135,6 +135,7 @@ val make :
   ?nginx_status_uri:Uri.t ->
   port:int ->
   python_exec:string ->
+  repo_tree_retention_days:int ->
   session_cookie_name:string ->
   ?stategraph_ui_base:Uri.t ->
   statement_timeout:string ->
@@ -162,6 +163,13 @@ val infracost : t -> Infracost.t option
 val nginx_status_uri : t -> Uri.t option
 val port : t -> int
 val python_exec : t -> string
+
+(** TERRAT_REPO_TREE_RETENTION_DAYS (default 7): the days of repo-tree partitions and rows the daily
+    retention task keeps -- at least [N] days, up to [N+1] day bounds, because the partitions are
+    whole days and the horizon cannot land mid-day. A value that is not an integer, or one smaller
+    than 1, is a config error. An empty value reads as the default: the horizon cannot be disabled,
+    so there is no [None] for the empty string to mean. *)
+val repo_tree_retention_days : t -> int
 
 (** TERRAT_SESSION_COOKIE_NAME (default "session"): the name of the browser session cookie. It must
     differ from the name of any other auth cookie on the same origin, or each login overwrites the

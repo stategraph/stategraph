@@ -543,6 +543,19 @@ module Db = struct
         /% Var.text "sha"
         /% Var.(option (text "base_sha")))
 
+    let promote_repo_tree_sql = Mql_sql.read [%blob "sql/promote_repo_tree.sql"]
+
+    let promote_repo_tree =
+      Pgsql_io.Typed_sql.(
+        sql
+        //
+        (* sha *)
+        Ret.text
+        /^ promote_repo_tree_sql
+        /% Var.bigint "installation_id"
+        /% Var.text "sha"
+        /% Var.(option (text "base_sha")))
+
     let select_repo_tree_build_sql = Mql_sql.read [%blob "sql/select_repo_tree_build.sql"]
 
     let select_repo_tree_build =
@@ -1150,16 +1163,6 @@ module Db = struct
         Ret.integer
         /^ delete_old_plans_sql)
 
-    let delete_old_repo_trees_sql = Mql_sql.read [%blob "sql/delete_old_repo_trees.sql"]
-
-    let delete_old_repo_trees =
-      Pgsql_io.Typed_sql.(
-        sql
-        //
-        (* count *)
-        Ret.integer
-        /^ delete_old_repo_trees_sql)
-
     let abort_stale_work_manifests_sql = Mql_sql.read [%blob "sql/abort_stale_work_manifests.sql"]
 
     let abort_stale_work_manifests =
@@ -1738,40 +1741,47 @@ module Db = struct
   let store_repo_tree ~request_id ~built_by_script db account ref_ files =
     let module I = Terrat_api_components.Work_manifest_build_tree_result.Files.Items in
     let open Abb.Future.Infix_monad in
-    Abbs_fc.List_result.iter
-      ~f:(fun chunk ->
-        Metrics.Psql_query_time.time (Metrics.psql_query_time "insert_repo_tree") (fun () ->
-            Pgsql_io.Prepared_stmt.execute
-              db
-              Sql.insert_repo_tree
-              (CCList.replicate (CCList.length chunk) (Int64.of_int @@ Api.Account.id account))
-              (CCList.replicate (CCList.length chunk) (Api.Ref.to_string ref_))
-              (CCList.map (fun { I.path; _ } -> path) chunk)
-              (CCList.map (fun { I.changed; _ } -> changed) chunk)
-              (CCList.map (fun { I.id; _ } -> id) chunk)))
-      (CCList.chunks not_a_bad_chunk_size files)
+    (* The tree rows and the build row of one store join the evaluation pass's transaction, and
+       every row carries [current_date] as its cache_day: [current_date] is frozen at the start
+       of the transaction, so the rows of one store land in one day partition even when the two
+       insert statements run apart, and a re-store of a tree moves the whole tree to today.  The
+       store opens no transaction of its own: every caller runs on the connection the evaluator
+       holds inside [Pgsql_io.tx], and [Pgsql_io.tx] raises on a connection that is already in
+       one. *)
+    let store =
+      let open Abbs_fc.Infix_result_monad in
+      Abbs_fc.List_result.iter
+        ~f:(fun chunk ->
+          Metrics.Psql_query_time.time (Metrics.psql_query_time "insert_repo_tree") (fun () ->
+              Pgsql_io.Prepared_stmt.execute
+                db
+                Sql.insert_repo_tree
+                (CCList.replicate (CCList.length chunk) (Int64.of_int @@ Api.Account.id account))
+                (CCList.replicate (CCList.length chunk) (Api.Ref.to_string ref_))
+                (CCList.map (fun { I.path; _ } -> path) chunk)
+                (CCList.map (fun { I.changed; _ } -> changed) chunk)
+                (CCList.map (fun { I.id; _ } -> id) chunk)))
+        (CCList.chunks not_a_bad_chunk_size files)
+      >>= fun () ->
+      (* Record the build itself.  An empty tree stores no rows, so this is
+         the only way to tell a built-but-empty tree apart from one that was
+         never built. *)
+      Metrics.Psql_query_time.time (Metrics.psql_query_time "insert_repo_tree_build") (fun () ->
+          Pgsql_io.Prepared_stmt.execute
+            db
+            Sql.insert_repo_tree_build
+            (CCInt64.of_int @@ Api.Account.id account)
+            (Api.Ref.to_string ref_)
+            built_by_script)
+    in
+    store
     >>= function
-    | Ok () -> (
-        (* Record the build itself.  An empty tree stores no rows, so this is
-           the only way to tell a built-but-empty tree apart from one that was
-           never built. *)
-        Metrics.Psql_query_time.time (Metrics.psql_query_time "insert_repo_tree_build") (fun () ->
-            Pgsql_io.Prepared_stmt.execute
-              db
-              Sql.insert_repo_tree_build
-              (CCInt64.of_int @@ Api.Account.id account)
-              (Api.Ref.to_string ref_)
-              built_by_script)
-        >>= function
-        | Ok () -> Abbs_fc.return_ok ()
-        | Error (#Pgsql_io.err as err) ->
-            Prmths.Counter.inc_one Metrics.pgsql_errors_total;
-            Logs.err (fun m -> m "%s : ERROR : %a" request_id Pgsql_io.pp_err err);
-            Abbs_fc.return_err `Error)
+    | Ok () -> Abbs_fc.return_ok ()
     | Error (#Pgsql_io.err as err) ->
         Prmths.Counter.inc_one Metrics.pgsql_errors_total;
         Logs.err (fun m -> m "%s : ERROR : %a" request_id Pgsql_io.pp_err err);
         Abbs_fc.return_err `Error
+    | Error `Error -> Abbs_fc.return_err `Error
 
   let store_flow_state ~request_id db work_manifest_id data =
     let open Abb.Future.Infix_monad in
@@ -2184,46 +2194,74 @@ module Db = struct
   let query_repo_tree ?base_ref ~request_id db account ref_ =
     let module I = Terrat_api_components.Work_manifest_build_tree_result.Files.Items in
     let open Abb.Future.Infix_monad in
-    Metrics.Psql_query_time.time (Metrics.psql_query_time "select_repo_tree") (fun () ->
-        Pgsql_io.Prepared_stmt.fetch
-          db
-          Sql.select_repo_tree
-          ~f:(fun path changed ->
-            (* We are being a bit lazy here and re-using the tree result object
-               for the response from the database.  We are setting [id] to
-               [None] because the query directly tells us if [changed] is true
-               or false. *)
-            { I.changed; path; id = None })
-          (CCInt64.of_int @@ Api.Account.id account)
-          (Api.Ref.to_string ref_)
-          (CCOption.map Api.Ref.to_string base_ref))
+    let account_id = CCInt64.of_int @@ Api.Account.id account in
+    let sha = Api.Ref.to_string ref_ in
+    let base_sha = CCOption.map Api.Ref.to_string base_ref in
+    let read () =
+      Metrics.Psql_query_time.time (Metrics.psql_query_time "select_repo_tree") (fun () ->
+          Pgsql_io.Prepared_stmt.fetch
+            db
+            Sql.select_repo_tree
+            ~f:(fun path changed ->
+              (* We are being a bit lazy here and re-using the tree result object
+                 for the response from the database.  We are setting [id] to
+                 [None] because the query directly tells us if [changed] is true
+                 or false. *)
+              { I.changed; path; id = None })
+            account_id
+            sha
+            base_sha)
+    in
+    (* The read answers only the rows of today, so a tree whose newest stored day is earlier
+       reads as not-there.  The promotion lifts the newest stored day of the sha -- and of every
+       sha the base lookup may fall back to -- to [current_date], and the re-read then answers
+       the promoted rows. *)
+    let promote () =
+      Metrics.Psql_query_time.time (Metrics.psql_query_time "promote_repo_tree") (fun () ->
+          Pgsql_io.Prepared_stmt.fetch db Sql.promote_repo_tree ~f:CCFun.id account_id sha base_sha)
+    in
+    (* No rows is ambiguous: either the tree was built and is empty, or it was never built.
+       [repo_tree_builds] tells the two apart. *)
+    let built () =
+      Metrics.Psql_query_time.time (Metrics.psql_query_time "select_repo_tree_build") (fun () ->
+          Pgsql_io.Prepared_stmt.fetch
+            db
+            Sql.select_repo_tree_build
+            ~f:CCFun.id
+            account_id
+            sha
+            (* This reads the tree that is stored, whoever made it.  Which producer answers is a
+               question for the caller that decides whether to build. *)
+            false)
+    in
+    let err e =
+      Prmths.Counter.inc_one Metrics.pgsql_errors_total;
+      Logs.err (fun m -> m "%s : ERROR : %a" request_id Pgsql_io.pp_err e);
+      Abbs_fc.return_err `Error
+    in
+    read ()
     >>= function
+    | Ok (_ :: _ as files) -> Abbs_fc.return_ok (Some files)
     | Ok [] -> (
-        (* No rows is ambiguous: either the tree was built and is empty, or it
-           was never built.  [repo_tree_builds] tells the two apart. *)
-        Metrics.Psql_query_time.time (Metrics.psql_query_time "select_repo_tree_build") (fun () ->
-            Pgsql_io.Prepared_stmt.fetch
-              db
-              Sql.select_repo_tree_build
-              ~f:CCFun.id
-              (CCInt64.of_int @@ Api.Account.id account)
-              (Api.Ref.to_string ref_)
-              (* This reads the tree that is stored, whoever made it.  Which producer answers is a
-                 question for the caller that decides whether to build. *)
-              false)
+        promote ()
         >>= function
-        | Ok (_ :: _) -> Abbs_fc.return_ok (Some [])
-        | Ok [] -> Abbs_fc.return_ok None
-        | Error (#Pgsql_io.err as err) ->
-            Prmths.Counter.inc_one Metrics.pgsql_errors_total;
-            Logs.err (fun m -> m "%s : ERROR : %a" request_id Pgsql_io.pp_err err);
-            Abbs_fc.return_err `Error)
-    | Ok files -> Abbs_fc.return_ok (Some files)
-    | Error (#Pgsql_io.err as err) ->
-        Prmths.Counter.inc_one Metrics.pgsql_errors_total;
-        Logs.err (fun m -> m "%s : ERROR : %a" request_id Pgsql_io.pp_err err);
-        Abbs_fc.return_err `Error
+        | Ok (_ :: _) -> (
+            read ()
+            >>= function
+            | Ok files -> Abbs_fc.return_ok (Some files)
+            | Error (#Pgsql_io.err as e) -> err e)
+        | Ok [] -> (
+            built ()
+            >>= function
+            | Ok (_ :: _) -> Abbs_fc.return_ok (Some [])
+            | Ok [] -> Abbs_fc.return_ok None
+            | Error (#Pgsql_io.err as e) -> err e)
+        | Error (#Pgsql_io.err as e) -> err e)
+    | Error (#Pgsql_io.err as e) -> err e
 
+  (* The built check promotes the day that answers it: the statement copies the answering
+     day's build row and the whole sha's tree rows to the current day, so the tree reads, which
+     answer only the current day's rows, keep finding the tree. *)
   let query_repo_tree_built ~request_id ~script_only db account ref_ =
     let open Abb.Future.Infix_monad in
     Metrics.Psql_query_time.time (Metrics.psql_query_time "select_repo_tree_build") (fun () ->
@@ -3197,19 +3235,6 @@ module Db = struct
     | Ok [] -> assert false
     | Ok (count :: _) ->
         Logs.info (fun m -> m "%s : PLAN_CLEANUP : %d" request_id (Int32.to_int count));
-        Abbs_fc.return_ok ()
-    | Error (#Pgsql_io.err as err) ->
-        Logs.err (fun m -> m "%s : %a" request_id Pgsql_io.pp_err err);
-        Abbs_fc.return_err `Error
-
-  let cleanup_repo_trees ~request_id db =
-    let open Abb.Future.Infix_monad in
-    Metrics.Psql_query_time.time (Metrics.psql_query_time "delete_old_repo_trees") (fun () ->
-        Pgsql_io.Prepared_stmt.fetch db Sql.delete_old_repo_trees ~f:CCFun.id)
-    >>= function
-    | Ok [] -> assert false
-    | Ok (count :: _) ->
-        Logs.info (fun m -> m "%s : REPO_TREE_CLEANUP : %d" request_id (Int32.to_int count));
         Abbs_fc.return_ok ()
     | Error (#Pgsql_io.err as err) ->
         Logs.err (fun m -> m "%s : %a" request_id Pgsql_io.pp_err err);

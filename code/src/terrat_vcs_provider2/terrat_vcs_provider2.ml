@@ -778,7 +778,10 @@ module type Shared = sig
       (unit, [> `Error ]) result Abb.Future.t
 
     (** Store the tree of a commit. [built_by_script] says the tree builder script made it; a tree
-        read from the forge did not, and the ids of the two do not compare. *)
+        read from the forge did not, and the ids of the two do not compare. The store writes every
+        row at [cache_day] of today: the day a row was last stored is its retention clock, so a
+        re-store of a tree extends the lifetime of the whole tree, whatever [created_at] its first
+        build row carries. *)
     val store_repo_tree :
       request_id:string ->
       built_by_script:bool ->
@@ -885,6 +888,15 @@ module type Shared = sig
       stale_min:int ->
       (Yojson.Safe.t option, [> `Error ]) result Abb.Future.t
 
+    (** The stored tree of the ref: one row per path, with whether the file changed against
+        [base_ref] when one is given.
+
+        The read answers only the rows of [current_date]: [cache_day] is the day a row was last
+        stored, and a tree whose newest stored day is earlier reads as never stored. A read that
+        answers nothing lifts the newest stored day of the sha -- and of every sha the base lookup
+        may fall back to -- to [current_date] and reads again, so a sha evaluated again inside the
+        retention horizon keeps its tree however old its store is: the read extends the lifetime of
+        the day that answers it. *)
     val query_repo_tree :
       ?base_ref:Api.Ref.t ->
       request_id:string ->
@@ -896,7 +908,12 @@ module type Shared = sig
 
     (** Whether a tree is stored for this ref. It tells a tree which was built and is empty apart
         from a tree which was never built, which the rows alone cannot. With [script_only], only a
-        tree the tree builder script made answers. *)
+        tree the tree builder script made answers.
+
+        The read extends the lifetime of the day that answered it: when the build that answers lives
+        at an older [cache_day], the read promotes that whole day -- the build row and the tree rows
+        of the sha -- to the current day, so the tree reads, which answer only the current day's
+        rows, keep finding the tree. *)
     val query_repo_tree_built :
       request_id:string ->
       script_only:bool ->
@@ -908,6 +925,9 @@ module type Shared = sig
     (** The paths whose contents are not the same at [base_ref] as they are at the given ref. A path
         which only one of the two trees holds is one of them, and so is a path whose id is not
         known, because a tree which is not there must mean "run it" and never "skip it".
+
+        Each tree answers at the newest day its sha holds, so a path which the newest stored tree no
+        longer holds is not answered out of an older stored day of the same sha.
 
         The cost follows the number of paths which changed, and not the number of files of the
         repository, thus this is what makes the intra-pull-request hash check cheap. *)
@@ -1236,7 +1256,6 @@ module type Shared = sig
     val cleanup_repo_configs : request_id:string -> t -> (unit, [> `Error ]) result Abb.Future.t
     val cleanup_flow_states : request_id:string -> t -> (unit, [> `Error ]) result Abb.Future.t
     val cleanup_plans : request_id:string -> t -> (unit, [> `Error ]) result Abb.Future.t
-    val cleanup_repo_trees : request_id:string -> t -> (unit, [> `Error ]) result Abb.Future.t
 
     val cleanup_stale_work_manifests :
       request_id:string -> t -> (unit, [> `Error ]) result Abb.Future.t

@@ -433,6 +433,179 @@ struct
               from_stored);
         Abbs_fc.return_ok None)
 
+  module Kept = struct
+    type t = {
+      kept_planned : Terrat_dirspace.t list;
+      kept_applied : Terrat_dirspace.t list;
+      failed_plans : Terrat_data.Dirspace_set.t;
+      failed_applies : Terrat_data.Dirspace_set.t;
+      plan_changes : [ `Changes | `No_changes ] Terrat_data.Dirspace_map.t;
+      plan_in_flight : Terrat_data.Dirspace_set.t;
+      summaries : (Terrat_dirspace.t * Terrat_vcs_provider2.Dirspace_summary.t) list;
+    }
+
+    let kept_planned { kept_planned; _ } = kept_planned
+    let kept_applied { kept_applied; _ } = kept_applied
+    let failed_plans { failed_plans; _ } = failed_plans
+    let failed_applies { failed_applies; _ } = failed_applies
+    let plan_changes { plan_changes; _ } = plan_changes
+    let plan_in_flight { plan_in_flight; _ } = plan_in_flight
+
+    (* [not_in_job] is what keeps the dirspaces this job runs out of the answer: they have their own
+       state, written from their own result.  A dirspace whose plan is in flight lands in
+       [kept_planned] too, because the job that runs it has not stored its state yet, and the
+       summary must show it as planned while the plan runs. *)
+    let query s { Builder.Bs.Fetcher.fetch } =
+      let module Wm = Terrat_work_manifest3 in
+      let module Dc = Terrat_change_match3.Dirspace_config in
+      let module Ds = Terrat_intra_pr_hash.Dirspace_state in
+      let module P = Terrat_intra_pr_hash.Plan in
+      let module Tjc = Terrat_job_context in
+      let open Abbs_fc.Infix_result_monad in
+      fetch Keys.context
+      >>= fun context ->
+      match context.Tjc.Context.scope with
+      | Tjc.Context.Scope.Branch _ -> Abbs_fc.return_ok None
+      | Tjc.Context.Scope.Pull_request _ -> (
+          fetch Keys.pull_request
+          >>= fun pull_request ->
+          match S.Api.Pull_request.state pull_request with
+          | Terrat_pull_request.State.Closed -> Abbs_fc.return_ok None
+          | Terrat_pull_request.State.(Open | Merged _) ->
+              fetch Keys.work_manifests_for_job
+              >>= fun work_manifests ->
+              let job_dirspaces =
+                work_manifests
+                |> CCList.flat_map (fun wm ->
+                    CCList.map Terrat_change.Dirspaceflow.to_dirspace wm.Wm.changes)
+                |> Terrat_data.Dirspace_set.of_list
+              in
+              let not_in_job dirspace = not (Terrat_data.Dirspace_set.mem dirspace job_dirspaces) in
+              fetch Keys.matches
+              >>= fun {
+                        Keys.Matches.all_matches;
+                        already_planned_matches;
+                        plan_in_progress_matches;
+                        all_unapplied_matches;
+                        _;
+                      }
+                    ->
+              let dirspaces_of = CCList.map (fun dc -> dc.Dc.dirspace) in
+              let unapplied =
+                Terrat_data.Dirspace_set.of_list
+                  (dirspaces_of (CCList.flatten all_unapplied_matches))
+              in
+              let kept =
+                all_matches
+                |> CCList.flatten
+                |> dirspaces_of
+                |> CCList.filter not_in_job
+                |> CCList.sort_uniq ~cmp:Terrat_dirspace.compare
+              in
+              let kept_applied =
+                CCList.filter
+                  (fun dirspace -> not (Terrat_data.Dirspace_set.mem dirspace unapplied))
+                  kept
+              in
+              let kept_planned =
+                already_planned_matches
+                |> dirspaces_of
+                |> CCList.filter not_in_job
+                |> CCList.append kept_applied
+                |> CCList.sort_uniq ~cmp:Terrat_dirspace.compare
+              in
+              let plan_in_flight =
+                plan_in_progress_matches |> dirspaces_of |> Terrat_data.Dirspace_set.of_list
+              in
+              (* [kept] is a subset of the matched dirspaces, thus their runs come from the shared
+                 read of all matched dirspaces, filtered to [kept]. *)
+              fetch Keys.matched_dirspace_runs
+              >>= fun matched_runs ->
+              let kept_set = Terrat_data.Dirspace_set.of_list kept in
+              let runs =
+                CCList.filter
+                  (fun runs ->
+                    Terrat_data.Dirspace_set.mem
+                      runs.Terrat_vcs_provider2.Dirspace_runs.state.Ds.dirspace
+                      kept_set)
+                  matched_runs
+              in
+              let failed_of is_failed =
+                runs
+                |> CCList.filter is_failed
+                |> CCList.map (fun runs ->
+                    runs.Terrat_vcs_provider2.Dirspace_runs.state.Ds.dirspace)
+                |> Terrat_data.Dirspace_set.of_list
+              in
+              let failed_plans =
+                failed_of (fun runs -> runs.Terrat_vcs_provider2.Dirspace_runs.plan_failed)
+              in
+              let failed_applies =
+                failed_of (fun runs -> runs.Terrat_vcs_provider2.Dirspace_runs.apply_failed)
+              in
+              let plan_changes =
+                runs
+                |> CCList.filter_map (fun runs ->
+                    match runs.Terrat_vcs_provider2.Dirspace_runs.state with
+                    | {
+                     Ds.last_plan = Some { P.has_changes = true; run = _ };
+                     dirspace;
+                     last_apply = _;
+                    } -> Some (dirspace, `Changes)
+                    | {
+                     Ds.last_plan = Some { P.has_changes = false; run = _ };
+                     dirspace;
+                     last_apply = _;
+                    } -> Some (dirspace, `No_changes)
+                    | { Ds.last_plan = None; dirspace = _; last_apply = _ } -> None)
+                |> Terrat_data.Dirspace_map.of_list
+              in
+              let summaries =
+                CCList.filter_map
+                  (fun dirspace ->
+                    Terrat_vcs_event_evaluator2_staleness.Summary.decide
+                      ~applied:(Terrat_data.Dirspace_set.of_list kept_applied)
+                      ~planned:(Terrat_data.Dirspace_set.of_list kept_planned)
+                      ~failed:(Terrat_data.Dirspace_set.union failed_plans failed_applies)
+                      dirspace
+                    |> CCOption.map (fun state -> (dirspace, state)))
+                  kept
+              in
+              Logs.info (fun m ->
+                  m
+                    "%s : KEPT_DIRSPACES : planned=%d : applied=%d : failed=%d"
+                    (Builder.log_id s)
+                    (CCList.length kept_planned)
+                    (CCList.length kept_applied)
+                    (Terrat_data.Dirspace_set.cardinal
+                       (Terrat_data.Dirspace_set.union failed_plans failed_applies)));
+              Abbs_fc.return_ok
+                (Some
+                   {
+                     kept_planned;
+                     kept_applied;
+                     failed_plans;
+                     failed_applies;
+                     plan_changes;
+                     plan_in_flight;
+                     summaries;
+                   }))
+
+    let store s ({ Builder.Bs.Fetcher.fetch } as _fetcher) (kept : t) ~sha =
+      let { summaries; _ } = kept in
+      let open Abbs_fc.Infix_result_monad in
+      fetch Keys.context
+      >>= fun context ->
+      Builder.run_db s ~f:(fun db ->
+          S.Db.store_dirspace_summaries
+            ~request_id:(Builder.log_id s)
+            db
+            context
+            ~sha
+            ~work_manifest:None
+            summaries)
+  end
+
   let pending_apply_check ~config ~account ~repo ~apply_requirements ~commit_checks matches =
     let module Ar = Terrat_base_repo_config_v1.Apply_requirements in
     let apply_check_exists =

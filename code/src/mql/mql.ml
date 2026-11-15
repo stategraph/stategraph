@@ -246,8 +246,16 @@ module Ast = struct
         @ features_order_by_opt order_by
         @ features_expr_opt offset
         @ features_expr_opt limit
-    | Create_table { body; if_not_exists = _; temp = _; name = _; on_commit_drop = _ } ->
-        Feature.Ddl :: features_create_table_body body
+    | Create_table { body; if_not_exists = _; temp = _; name = _; partition; on_commit_drop = _ } ->
+        Feature.Ddl
+        :: (features_create_table_body body
+           @
+           (* A [partition by] key expression is feature-checked like any other
+               expression: the key itself carries no tag, but an embedded subquery
+               does, and the walk must see it. *)
+           match partition with
+           | None -> []
+           | Some { Mql_ast.strategy = _; key } -> CCList.concat_map features_expr key)
     | Create_index
         {
           columns;
@@ -471,7 +479,15 @@ module Ast = struct
     match body with
     | Table_items items | Table_foreign { items; server = _; options = _ } ->
         CCList.concat_map features_table_item items
+    | Table_partition_of { parent = _; bound } -> Feature.Ddl :: features_partition_bound bound
     | Table_as_query q -> features_used q
+
+  and features_partition_bound bound =
+    let open Mql_ast in
+    match bound with
+    | Pb_range (lo, hi) -> CCList.concat_map features_expr (lo @ hi)
+    | Pb_in es -> CCList.concat_map features_expr es
+    | Pb_default -> []
 
   and features_table_item item =
     let open Mql_ast in
@@ -515,7 +531,8 @@ module Ast = struct
             | Set_default e -> features_expr e
             | Set_type { using; type_ = _ } -> features_expr_opt using)
         | Add_constraint tc | Add_constraint_not_valid tc -> features_table_constraint tc
-        | Set_options opts -> CCList.concat_map (fun (_, e) -> features_expr e) opts)
+        | Set_options opts -> CCList.concat_map (fun (_, e) -> features_expr e) opts
+        | Attach_partition { name = _; bound } -> features_partition_bound bound)
       actions
 
   let check_features ~features t =
@@ -660,6 +677,9 @@ module Ast = struct
       method visit_LANGUAGE = "language"
       method visit_LOCAL = "local"
       method visit_OF = "of"
+      method visit_ATTACH = "attach"
+      method visit_RANGE = "range"
+      method visit_LIST = "list"
       method visit_PARALLEL = "parallel"
       method visit_RETURNS = "returns"
       method visit_ROW = "row"
@@ -1119,6 +1139,22 @@ module Ast = struct
 
     and mk_on_commit_drop b = if b then D.on_commit_drop () else D.no_on_commit_drop ()
 
+    and mk_partition_strategy = function
+      | M.Ps_range -> D.partition_strategy_range ()
+      | M.Ps_list -> D.partition_strategy_list ()
+
+    and mk_table_partition { M.strategy; key } =
+      D.table_partition (mk_partition_strategy strategy) (mk_expr_list key)
+
+    and mk_table_partition_opt = function
+      | None -> D.no_table_partition ()
+      | Some p -> D.yes_table_partition (mk_table_partition p)
+
+    and mk_partition_bound = function
+      | M.Pb_range (lo, hi) -> D.bound_range (mk_expr_list lo) (mk_expr_list hi)
+      | M.Pb_in es -> D.bound_in (mk_expr_list es)
+      | M.Pb_default -> D.bound_default ()
+
     and mk_foreign_options = function
       | [] -> raise (Render_exn "a foreign table with no option")
       | (n, v) :: rest ->
@@ -1476,34 +1512,70 @@ module Ast = struct
       | _ -> statement_other_dcst t
 
     and statement_other_dcst = function
-      | M.Create_table { if_not_exists; temp; name; body = M.Table_items items; on_commit_drop } ->
+      | M.Create_table
+          { if_not_exists; temp; name; body = M.Table_items items; partition; on_commit_drop } ->
           D.create_table_stmt
             (if temp then D.temp () else D.no_temp ())
             (mk_if_not_exists if_not_exists)
             (mk_table_name name)
             (mk_table_items items)
+            (mk_table_partition_opt partition)
             (mk_on_commit_drop on_commit_drop)
-      | M.Create_table { if_not_exists; temp; name; body = M.Table_as_query q; on_commit_drop } ->
-          D.create_table_as_stmt
-            (if temp then D.temp () else D.no_temp ())
-            (mk_if_not_exists if_not_exists)
-            (mk_table_name name)
-            (mk_on_commit_drop on_commit_drop)
-            (insert_query_dcst q)
+      | M.Create_table
+          { if_not_exists; temp; name; body = M.Table_as_query q; partition; on_commit_drop } -> (
+          match partition with
+          (* The grammar cannot produce a partition clause on a query table, so
+             this is a guard for the renderer's own callers. *)
+          | Some _ -> raise (Render_exn "a table as query takes no partition clause")
+          | None ->
+              D.create_table_as_stmt
+                (if temp then D.temp () else D.no_temp ())
+                (mk_if_not_exists if_not_exists)
+                (mk_table_name name)
+                (mk_on_commit_drop on_commit_drop)
+                (insert_query_dcst q))
+      | M.Create_table
+          {
+            if_not_exists;
+            temp;
+            name;
+            body = M.Table_partition_of { parent; bound };
+            partition;
+            on_commit_drop = _;
+          } -> (
+          match partition with
+          (* The grammar cannot produce a partition clause on a partition, so this is a guard for
+             the renderer's own callers.  The write path ([Mql_sql.write]) skips the parity check
+             the read path runs, so a dropped clause would execute as SQL that silently differs
+             from the tree. *)
+          | Some _ -> raise (Render_exn "a partition takes no partition clause")
+          | None ->
+              D.create_table_partition_of_stmt
+                (if temp then D.temp () else D.no_temp ())
+                (mk_if_not_exists if_not_exists)
+                (mk_table_name name)
+                (mk_table_name parent)
+                (mk_partition_bound bound))
       | M.Create_table
           {
             if_not_exists;
             temp = _;
             name;
             body = M.Table_foreign { items; server; options };
+            partition;
             on_commit_drop = _;
-          } ->
-          D.create_foreign_table_stmt
-            (mk_if_not_exists if_not_exists)
-            (mk_table_name name)
-            (mk_table_items items)
-            (mk_ident server)
-            (mk_foreign_options options)
+          } -> (
+          match partition with
+          (* The grammar cannot produce a partition clause on a foreign table, so
+             this is a guard for the renderer's own callers. *)
+          | Some _ -> raise (Render_exn "a foreign table takes no partition clause")
+          | None ->
+              D.create_foreign_table_stmt
+                (mk_if_not_exists if_not_exists)
+                (mk_table_name name)
+                (mk_table_items items)
+                (mk_ident server)
+                (mk_foreign_options options))
       | M.Create_index
           {
             unique;
@@ -1773,10 +1845,20 @@ module Ast = struct
         (mk_column_constraints col_constraints)
 
     and mk_table_constraint = function
-      | M.Tbl_primary_key cs -> D.tbl_primary_key (mk_using_cols cs)
+      | M.Tbl_primary_key { columns; include_ } ->
+          D.tbl_primary_key
+            (mk_using_cols columns)
+            (match include_ with
+            | [] -> D.no_index_include ()
+            | cs -> D.index_include (mk_using_cols cs))
       | M.Tbl_primary_key_using_index i -> D.tbl_primary_key_using_index (mk_ident i)
       | M.Tbl_unique_using_index i -> D.tbl_unique_using_index (mk_ident i)
-      | M.Tbl_unique cs -> D.tbl_unique (mk_using_cols cs)
+      | M.Tbl_unique { columns; include_ } ->
+          D.tbl_unique
+            (mk_using_cols columns)
+            (match include_ with
+            | [] -> D.no_index_include ()
+            | cs -> D.index_include (mk_using_cols cs))
       | M.Tbl_check e -> D.tbl_check (mk_expr e)
       | M.Tbl_foreign_key (cs, r) -> D.tbl_foreign_key (mk_using_cols cs) (mk_references r)
       | M.Tbl_named_constraint (n, c) -> D.tbl_named_constraint n (mk_table_constraint c)
@@ -1814,6 +1896,8 @@ module Ast = struct
       | M.Rename_to n -> D.rename_to n
       | M.Rename_column (a, b) -> D.rename_column a b
       | M.Set_options os -> D.set_options (mk_table_options os)
+      | M.Attach_partition { name; bound } ->
+          D.attach_partition (mk_table_name name) (mk_partition_bound bound)
 
     and mk_alter_actions = function
       | [] -> raise (Render_exn "ALTER TABLE with no actions")
@@ -2326,13 +2410,15 @@ module Build = struct
 
   (* Schema statement builders. The statement comes from the tree and not from pasted text, thus
      a name that data gives goes in as an identifier and the writer renders it. *)
-  let drop_table_if_exists name =
+  (* [drop_table ?if_exists n] builds [DROP TABLE [IF EXISTS] n]; [if_exists] defaults to false,
+     the plain statement. *)
+  let drop_table ?(if_exists = false) name =
     M.Drop
       {
         object_ = [ ident "table" ];
         concurrently = false;
         empty_args = false;
-        if_exists = true;
+        if_exists;
         names = [ { M.qualifier = None; base = ident name } ];
         on_table = None;
         behavior = None;
@@ -2347,6 +2433,46 @@ module Build = struct
         temp = true;
         name = { M.qualifier = None; base = ident name };
         body = M.Table_as_query query;
+        partition = None;
         on_commit_drop;
+      }
+
+  (* [LOCK TABLE t IN <mode> MODE], ACCESS EXCLUSIVE unless the caller names another mode. The
+     default is the strongest mode, so a caller that does not think about lock strength cannot
+     quietly take a weaker lock. *)
+  let lock_table ?(mode = M.Lock_mode_access_exclusive) name =
+    M.Lock_table { name = { M.qualifier = None; base = ident name }; mode = Some mode }
+
+  (* [FOR VALUES FROM ('<from>') TO ('<to>')] -- the bound of one range partition. *)
+  let range_bound ~from ~to_ = M.Pb_range ([ string from ], [ string to_ ])
+
+  let create_table_partition_of ?(if_not_exists = false) ~parent ~bound name =
+    M.Create_table
+      {
+        if_not_exists;
+        temp = false;
+        name = { M.qualifier = None; base = ident name };
+        body = M.Table_partition_of { parent = { M.qualifier = None; base = ident parent }; bound };
+        partition = None;
+        on_commit_drop = false;
+      }
+
+  let delete_where ~where name =
+    M.Delete
+      {
+        table = { M.table_qualifier = None; name = ident name; alias = None };
+        using = [];
+        where = Some where;
+        returning = None;
+      }
+
+  let insert_select ~query name =
+    M.Insert
+      {
+        table = { M.table_qualifier = None; name = ident name; alias = None };
+        columns = [];
+        source = M.Insert_query query;
+        on_conflict = None;
+        returning = None;
       }
 end

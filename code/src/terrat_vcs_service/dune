@@ -2,6 +2,7 @@
  (name terrat_vcs_service)
  (libraries
   brtl
+  logs
   ppx_deriving
   terrat_config
   terrat_storage

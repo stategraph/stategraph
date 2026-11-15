@@ -149,6 +149,66 @@ let test_github_of_stored_bad_pem =
       | Ok _ -> Oth.Assert.false_ "a bad PEM decoded"
       | Error err -> Oth.Assert.false_ (Terrat_config.show_err err))
 
+let retention_key_error = "TERRAT_REPO_TREE_RETENTION_DAYS: must be an integer of at least 1"
+
+(* [config] reads the process environment, so the variable stays set for the tests that
+   follow: each one sets it explicitly, and no test runs after this block. *)
+let retention_config () =
+  config
+    ~stategraph_ui_base:"https://app.stategraph.cloud"
+    ~terrat_ui_base:"https://app.terrateam.io"
+    ~terrat_web_base_url:"https://legacy.example.com"
+
+let assert_retention_key_error () =
+  match Terrat_config.create () with
+  | Error (`Key_error msg) -> Oth.Assert.Eq.string ~expected:retention_key_error ~actual:msg
+  | Ok _ -> Oth.Assert.false_ "an invalid retention day count was accepted"
+  | Error err -> Oth.Assert.false_ (Terrat_config.show_err err)
+
+let test_retention_days_empty =
+  Oth.test
+    ~tags:[ "retention" ]
+    ~name:"an empty TERRAT_REPO_TREE_RETENTION_DAYS reads as unset"
+    (fun _ ->
+      Unix.putenv "TERRAT_REPO_TREE_RETENTION_DAYS" unset;
+      Oth.Assert.Eq.int
+        ~expected:7
+        ~actual:(Terrat_config.repo_tree_retention_days (retention_config ())))
+
+let test_retention_days_passthrough =
+  Oth.test
+    ~tags:[ "retention" ]
+    ~name:"a valid TERRAT_REPO_TREE_RETENTION_DAYS passes through"
+    (fun _ ->
+      Unix.putenv "TERRAT_REPO_TREE_RETENTION_DAYS" "8";
+      Oth.Assert.Eq.int
+        ~expected:8
+        ~actual:(Terrat_config.repo_tree_retention_days (retention_config ())))
+
+let test_retention_days_zero =
+  Oth.test
+    ~tags:[ "retention" ]
+    ~name:"a TERRAT_REPO_TREE_RETENTION_DAYS of 0 is a config error"
+    (fun _ ->
+      Unix.putenv "TERRAT_REPO_TREE_RETENTION_DAYS" "0";
+      assert_retention_key_error ())
+
+let test_retention_days_negative =
+  Oth.test
+    ~tags:[ "retention" ]
+    ~name:"a TERRAT_REPO_TREE_RETENTION_DAYS of -4 is a config error"
+    (fun _ ->
+      Unix.putenv "TERRAT_REPO_TREE_RETENTION_DAYS" "-4";
+      assert_retention_key_error ())
+
+let test_retention_days_not_an_integer =
+  Oth.test
+    ~tags:[ "retention" ]
+    ~name:"a TERRAT_REPO_TREE_RETENTION_DAYS that is not an integer is a config error"
+    (fun _ ->
+      Unix.putenv "TERRAT_REPO_TREE_RETENTION_DAYS" "abc";
+      assert_retention_key_error ())
+
 let test_with_github =
   Oth.test ~tags:[ "github_app" ] ~name:"with_github puts the stored App in the config" (fun _ ->
       let config =
@@ -175,6 +235,11 @@ let test =
       test_github_of_stored;
       test_github_of_stored_bad_pem;
       test_with_github;
+      test_retention_days_empty;
+      test_retention_days_passthrough;
+      test_retention_days_zero;
+      test_retention_days_negative;
+      test_retention_days_not_an_integer;
     ]
 
 let () =

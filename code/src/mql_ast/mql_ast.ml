@@ -23,6 +23,9 @@ and t =
       (* [ON COMMIT DROP] -- a temporary table that PostgreSQL deletes at the end
          of the transaction. *)
       on_commit_drop : bool;
+      (* [PARTITION BY strategy (key)] -- how the table splits its rows across
+         its partitions.  Absent for an unpartitioned table. *)
+      partition : table_partition option;
     }
   | Create_index of {
       unique : bool;
@@ -342,6 +345,24 @@ and column_def = {
   col_constraints : column_constraint list;
 }
 
+(* How a partitioned table splits its rows: by value ranges or by value lists. *)
+and partition_strategy =
+  | Ps_range
+  | Ps_list
+
+(* The slice of the parent's values that one partition holds: a range with a
+   lower and an upper bound, a list of values, or the catch-all default. *)
+and partition_bound =
+  | Pb_range of (expr list * expr list)
+  | Pb_in of expr list
+  | Pb_default
+
+(* [PARTITION BY strategy (key)]. *)
+and table_partition = {
+  strategy : partition_strategy;
+  key : expr list;
+}
+
 (* What a CREATE TABLE gives to the table: a list of columns and constraints,
    or the rows of a query. *)
 and create_table_body =
@@ -353,6 +374,13 @@ and create_table_body =
       items : table_item list;
       server : ident;
       options : (ident * string) list;
+    }
+  (* [CREATE TABLE ... PARTITION OF parent FOR VALUES ...] -- a partition of a
+     partitioned table.  The parent gives the columns; the bound gives the
+     slice of its values. *)
+  | Table_partition_of of {
+      parent : table_name;
+      bound : partition_bound;
     }
 
 and column_constraint =
@@ -387,12 +415,21 @@ and ref_act =
   | Ract_no_action
 
 and table_constraint =
-  | Tbl_primary_key of ident list
+  | Tbl_primary_key of {
+      columns : ident list;
+      (* [INCLUDE (a, b)] -- columns the constraint's index holds but does not
+         sort on, so a read that projects them stays index-only.  PostgreSQL 11
+         and later. *)
+      include_ : ident list;
+    }
   (* [PRIMARY KEY USING INDEX i] and [UNIQUE USING INDEX i] -- change an index that
      is already present to a constraint. *)
   | Tbl_primary_key_using_index of ident
   | Tbl_unique_using_index of ident
-  | Tbl_unique of ident list
+  | Tbl_unique of {
+      columns : ident list;
+      include_ : ident list;
+    }
   | Tbl_check of expr
   | Tbl_foreign_key of (ident list * references)
   | Tbl_named_constraint of (ident * table_constraint)
@@ -428,6 +465,12 @@ and alter_action =
     }
   | Rename_to of ident
   | Rename_column of (ident * ident)
+  (* [ALTER TABLE ... ATTACH PARTITION t FOR VALUES ...] -- a table that already
+     holds rows joins a partitioned table. *)
+  | Attach_partition of {
+      name : table_name;
+      bound : partition_bound;
+    }
 
 and alter_column_action =
   | Set_not_null

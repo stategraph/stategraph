@@ -1880,6 +1880,51 @@ struct
                   fetch Keys.create_commit_checks
                   >>= fun create_commit_checks ->
                   create_commit_checks' create_commit_checks working_branch_ref checks)
+          | { Tjc.Job.type_ = Tjc.Job.Type_.Autoplan; _ } -> (
+              let module Wm = Terrat_work_manifest3 in
+              (* A push runs an autoplan.  When no dirspace of the pull request waits for a plan,
+                 the job makes no work manifest, and without this arm the push gets no answer at
+                 all.  Only the case where every dirspace is applied answers here: its text names
+                 no dirspace, thus nobody can read it as a run.  A push which leaves a plan in
+                 flight or a dirspace in a later layer stays silent, because its table names
+                 dirspaces, and a run is what opens the plan check of one.
+
+                 A job is evaluated again for every work manifest event, and each evaluation
+                 reaches this task, thus the answer waits for the work manifests of the job to
+                 settle: one answer per push, and not one per evaluation. *)
+              fetch Keys.work_manifests_for_job
+              >>= fun work_manifests ->
+              let live =
+                CCList.exists
+                  (fun wm ->
+                    match wm.Wm.state with
+                    | Wm.State.(Queued | Running) -> true
+                    | Wm.State.(Completed | Aborted) -> false)
+                  work_manifests
+              in
+              if live then Abbs_fc.return_ok ()
+              else
+                fetch Keys.working_set_matches
+                >>= function
+                | _ :: _ -> Abbs_fc.return_ok ()
+                | [] -> (
+                    fetch Keys.all_unapplied_matches
+                    >>= fun all_unapplied_matches ->
+                    fetch Keys.already_planned_matches
+                    >>= fun already_planned_matches ->
+                    fetch Keys.plan_in_progress_matches
+                    >>= fun plan_in_progress_matches ->
+                    match
+                      ( CCList.flatten all_unapplied_matches,
+                        already_planned_matches,
+                        plan_in_progress_matches )
+                    with
+                    | [], [], [] ->
+                        fetch Keys.publish_comment
+                        >>= fun publish_comment ->
+                        publish_comment' publish_comment Msg.Plan_all_changes_applied
+                        >>? fun () -> Error `Noop
+                    | _ -> Abbs_fc.return_ok ()))
           | _ -> Abbs_fc.return_ok ())
 
     let check_dirspaces_to_apply =

@@ -68,7 +68,7 @@ let api_routes ~infracost config storage =
       [
         (* Ops *)
         (`GET, Rt.health_check () --> Terrat_ep_health_check.get storage);
-        (`GET, Rt.metrics () --> Terrat_ep_metrics.get);
+        (`GET, Rt.metrics () --> Terrat_ep_metrics.get storage);
         (* Tenv *)
         (`GET, Rt.tenv_rt () --> Terrat_ep_tenv.get config storage);
         (* Access token *)

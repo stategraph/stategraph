@@ -107,6 +107,7 @@ A missing or invalid sign-in variable stops the server at start, with the reason
 | `TERRAT_DEFAULT_TIER` | `unlimited` | Default tier of a new installation |
 | `TERRAT_EVENT_EVALUATOR_SLOTS` | `20` | Concurrent event evaluations |
 | `TERRAT_STATEMENT_TIMEOUT` | `5s` | Statement timeout for the Orchestration database |
+| `TERRAT_REPO_TREE_RETENTION_DAYS` | `7` | Days of repo-tree history the daily retention task keeps: at least N days, up to N+1 day bounds, because the partitions are whole days. It must be an integer of at least 1: another value stops Orchestration at start |
 | `GITHUB_WORKFLOW_PATH_OVERRIDE` | unset | Path of the GitHub Actions workflow file that Orchestration dispatches, in place of the default |
 | `TERRATUNNEL_API_ENDPOINT` | unset | Development only: `TERRAT_API_BASE` comes from a tunnel |
 | `INFRACOST_PRICING_API_ENDPOINT` / `SELF_HOSTED_INFRACOST_API_KEY` | empty | Infracost pricing API endpoint and key, for cost estimation in pull requests. See [Cost estimation in pull requests](/docs/orchestration/external-tools/infracost) |

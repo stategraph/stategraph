@@ -155,6 +155,36 @@ let add_gitlab_token_from_config { Migrate.config; storage = _; tx = db } =
       >>| fun () -> `Sync
   | None -> Abbs_fc.return_ok `Sync
 
+(* The repo tree tables become daily range partitions on [cache_day].  This migration is
+   [run_sql] for its static schema -- drop the two views, drop and recreate the two parents and
+   their default partitions, recreate the views -- and an OCaml body around it, because the two
+   day partitions it seeds are named by a rule it shares with the daily retention task
+   ([Terrat_repo_tree_retention_partitions]): the migration body issues the transaction guards first --
+   [set local timezone = 'UTC'], under which the day bounds render, and [set local lock_timeout],
+   the operator's [DB_LOCK_TIMEOUT] ([Terrat_config.db_lock_timeout]) and the cap the DDL waits on
+   a conflicting holder -- then runs the schema above, whose statements must not re-set them
+   ([set local] is transaction-scoped and last-writer-wins), then seeds the current day and the
+   next for both parents with
+   [if not exists], so a re-run over a database that already carries them is a no-op.  The body
+   runs inside the transaction [Migrate.tx] opened: [now()] is transaction-stable, so the bounds
+   and the DDL agree. *)
+let add_repo_tree_partitions mig =
+  let open Abbs_fc.Infix_result_monad in
+  Terrat_repo_tree_retention_partitions.set_transaction_guards
+    mig.Migrate.tx
+    ~lock_timeout:(Terrat_config.db_lock_timeout mig.Migrate.config)
+  >>= fun () ->
+  run_sql [%blob "migrations/2026-11-07-add-repo-tree-partitions.sql"] mig
+  >>= fun (`Sync | `Async _) ->
+  Terrat_repo_tree_retention_partitions.ensure_horizon_partitions
+    mig.Migrate.tx
+    ~parent:"repo_trees"
+  >>= fun _ ->
+  Terrat_repo_tree_retention_partitions.ensure_horizon_partitions
+    mig.Migrate.tx
+    ~parent:"repo_tree_builds"
+  >>| fun _ -> `Sync
+
 let migrations =
   [
     ("initial-tables", run_sql [%blob "migrations/2021-12-03-initial-tables.sql"]);
@@ -357,6 +387,7 @@ let migrations =
     ("add-job-continuation-of", run_sql [%blob "migrations/2026-11-04-add-job-continuation-of.sql"]);
     ( "add-drift-schedule-restart-on-change",
       run_sql [%blob "migrations/2026-11-06-add-drift-schedule-restart-on-change.sql"] );
+    ("add-repo-tree-partitions", add_repo_tree_partitions);
   ]
 
 let run config storage = Mig.run { Migrate.config; storage; tx = () } migrations

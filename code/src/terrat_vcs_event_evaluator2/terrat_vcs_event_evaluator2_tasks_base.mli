@@ -154,6 +154,50 @@ module Make
     to_ref:S.Api.Ref.t ->
     (Terrat_data.Dirspace_set.t option, Builder.err) result Abb.Future.t
 
+  (** The dirspaces of the pull request that the job of the state does not run, and the state of
+      each (RFD 2356).
+
+      A push to an open pull request keeps the dirspaces whose files did not change, and runs
+      nothing for them. Nothing else writes their state on the new head, thus this module computes
+      the states, and {!store} writes them. A plan comment of a push carries the output of the plans
+      that still count, and the render reads those states, thus a caller that publishes a comment
+      stores the states first.
+
+      {!query} answers [None] when the states do not apply: the context is a branch, which has no
+      pull request, or the pull request is closed. *)
+  module Kept : sig
+    type t
+
+    val query :
+      Builder.Bs.state -> Builder.Bs.Fetcher.t -> (t option, Builder.err) result Abb.Future.t
+
+    (** Write the states of the dirspaces at [sha], the head of the pull request. A state which is
+        already there keeps it, thus two callers of one head agree. *)
+    val store :
+      Builder.Bs.state ->
+      Builder.Bs.Fetcher.t ->
+      t ->
+      sha:S.Api.Ref.t ->
+      (unit, Builder.err) result Abb.Future.t
+
+    (** The dirspaces whose newest plan still stands, and those which are applied. A dirspace whose
+        plan is in flight is in {!val:kept_planned} too: it shows as planned while its plan runs. *)
+    val kept_planned : t -> Terrat_dirspace.t list
+
+    val kept_applied : t -> Terrat_dirspace.t list
+
+    (** The dirspaces whose newest plan, and whose newest apply, failed. *)
+    val failed_plans : t -> Terrat_data.Dirspace_set.t
+
+    val failed_applies : t -> Terrat_data.Dirspace_set.t
+
+    (** What the newest successful plan of each dirspace found, for the dirspaces which have one. *)
+    val plan_changes : t -> [ `Changes | `No_changes ] Terrat_data.Dirspace_map.t
+
+    (** The dirspaces with a plan that is queued or running now. *)
+    val plan_in_flight : t -> Terrat_data.Dirspace_set.t
+  end
+
   (** [pending_apply_check ~config ~account ~repo ~apply_requirements ~commit_checks matches] is the
       waiting [terrateam apply] check, when the repository asks for one and [commit_checks] has no
       [terrateam apply] check yet. The check holds the pull request until it is applied. A run that

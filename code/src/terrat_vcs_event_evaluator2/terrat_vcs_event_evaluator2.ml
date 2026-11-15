@@ -754,19 +754,6 @@ module Make (S : Terrat_vcs_provider2.S) = struct
         Logs.err (fun m -> m "%s : PLAN_CLEANUP : %a" request_id Pgsql_pool.pp_err err);
         Fc.return_err `Error
 
-  let run_repo_tree_cleanup ~request_id ~storage () =
-    let open Abb.Future.Infix_monad in
-    Logs.info (fun m -> m "%s : REPO_TREE_CLEANUP : START" request_id);
-    Abbs_time_it.run
-      (fun t -> Logs.info (fun m -> m "%s : REPO_TREE_CLEANUP : END : time=%f" request_id t))
-      (fun () -> with_conn storage ~f:(fun db -> S.Db.cleanup_repo_trees ~request_id db))
-    >>= function
-    | Ok () -> Fc.return_ok ()
-    | Error `Error -> Fc.return_err `Error
-    | Error (#Pgsql_pool.err as err) ->
-        Logs.err (fun m -> m "%s : REPO_TREE_CLEANUP : %a" request_id Pgsql_pool.pp_err err);
-        Fc.return_err `Error
-
   let run_flow_state_cleanup ~request_id ~storage () =
     let open Abb.Future.Infix_monad in
     Logs.info (fun m -> m "%s : FLOW_STATE_CLEANUP" request_id);

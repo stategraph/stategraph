@@ -178,7 +178,14 @@ end
     alternatives, where each alternative is a comma-separated list of tags that must {i all} be
     present. So [OTH_TAGS="foo,bar baz,zoom"] selects the tests tagged ([foo] and [bar]) or ([baz]
     and [zoom]), and the comma-free [OTH_TAGS="foo bar"] keeps its familiar meaning of [foo] or
-    [bar]. Exclude takes priority over include. *)
+    [bar]. Exclude takes priority over include.
+
+    A summary line of [Tests passed: 0/0] means the expression selected no test in that process. The
+    runner does not fail such a run. Under a per-package runner ([dune runtest], which
+    [make test-unit] and [make test-terrat] use) that is normal for every package that does not own
+    the tag. A single-registry suite (integration, e2e, system) that prints [0/0] means the tag
+    names no registered test, so the tag is wrong. A criterion that must not pass vacuously has to
+    assert its count. *)
 module Tag : sig
   (** Whether a test carrying [tags] would run under the current [OTH_TAGS] / [OTH_EXCLUDE_TAGS]
       environment -- exactly the filter the runner applies to each test. Combine with

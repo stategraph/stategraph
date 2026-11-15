@@ -101,9 +101,6 @@ module Make (S : Terrat_vcs_provider2.S) : sig
   val run_plan_cleanup :
     request_id:string -> storage:Terrat_storage.t -> unit -> (unit, [> `Error ]) result Abb.Future.t
 
-  val run_repo_tree_cleanup :
-    request_id:string -> storage:Terrat_storage.t -> unit -> (unit, [> `Error ]) result Abb.Future.t
-
   val run_flow_state_cleanup :
     request_id:string -> storage:Terrat_storage.t -> unit -> (unit, [> `Error ]) result Abb.Future.t
 

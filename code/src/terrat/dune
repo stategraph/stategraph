@@ -39,6 +39,7 @@
   terrat_migrations_ex
   terrat_pull_request
   terrat_repo_config
+  terrat_repo_tree_retention
   terrat_session
   terrat_storage
   terrat_tag_query
