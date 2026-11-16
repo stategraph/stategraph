@@ -256,7 +256,13 @@ type create_err =
 
     The session uses the UTF8 client encoding. Text parameters and results are UTF8, whatever the
     default encoding of the server is. [Var.array] needs this: its text array format is safe only in
-    an encoding where no multibyte character has a byte that is a backslash or a double quote. *)
+    an encoding where no multibyte character has a byte that is a backslash or a double quote.
+
+    [notice_response] is called once for each [NoticeResponse] frame the connection reads, with the
+    fields of that frame, in arrival order. The call runs inline in the operation that reads the
+    frame, so the function must not block and must not call functions of this connection. A notice
+    does not change the result of the operation: a [NoticeResponse] before an [ErrorResponse] is
+    reported, then the operation fails as it would without the callback. *)
 val create :
   ?tls_config:[ `Require of Otls.Tls_config.t | `Prefer of Otls.Tls_config.t ] ->
   ?passwd:string ->

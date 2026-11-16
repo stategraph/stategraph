@@ -392,6 +392,25 @@ module Io = struct
     (* All other SQLSTATE codes *)
     | _ -> `Pgsql_err pgsql_err
 
+  (* The frames that carry no answer to the operation in flight, at any position in a response.
+     PostgreSQL reports a changed [GUC_REPORT] setting with a [ParameterStatus], and a [RAISE NOTICE]
+     with a [NoticeResponse].  Either frame can come before the [CommandComplete] of the statement,
+     and either can come between it and the [ReadyForQuery].  One response arrives as one list of
+     frames ([wait_for_frames]), so a matcher that lists these classes arm by arm lets a sibling
+     tail reject a frame that its own phase matcher accepts.  One predicate keyed on the frame type
+     is the one place that says which classes are tolerable.  The [NoticeResponse] arm hands its
+     message list to [conn.notice_response] before it answers [true], so a frame this predicate
+     accepts is reported exactly once and then dropped.
+
+     [ErrorResponse] is not here.  It ends the operation, drains the wire to [ReadyForQuery], and
+     mutates the connection state, so no boolean predicate can express it. *)
+  let skip_or_report_frame conn = function
+    | Pgsql_codec.Frame.Backend.ParameterStatus _ -> true
+    | Pgsql_codec.Frame.Backend.NoticeResponse { msgs } ->
+        conn.notice_response msgs;
+        true
+    | _ -> false
+
   let rec consume_matching ?(skip_leading_unmatched = false) conn fs =
     let open Abbs_fc.Infix_result_monad in
     wait_for_frames conn
@@ -402,12 +421,11 @@ module Io = struct
     | [], _ -> Abbs_fc.return_ok received_fs
     | _, [] -> consume_matching ~skip_leading_unmatched conn fs
     | f :: fs, r_f :: r_fs when f r_f -> match_frames ~skip_leading_unmatched:false conn fs r_fs
-    | _, Pgsql_codec.Frame.Backend.NoticeResponse { msgs } :: rfs ->
-        conn.notice_response msgs;
-        match_frames ~skip_leading_unmatched conn fs rfs
     | _, (Pgsql_codec.Frame.Backend.ErrorResponse { msgs } :: _ as r_fs) ->
         let open Abb.Future.Infix_monad in
         error_response conn r_fs >>= fun _ -> Abbs_fc.return_err (handle_err_frame msgs)
+    | _, r_f :: r_fs when skip_or_report_frame conn r_f ->
+        match_frames ~skip_leading_unmatched conn fs r_fs
     | _, _ :: r_fs when skip_leading_unmatched -> match_frames ~skip_leading_unmatched conn fs r_fs
     | _, _ ->
         let open Abb.Future.Infix_monad in
@@ -423,10 +441,10 @@ module Io = struct
   (* Pop the oldest queued notification, or -- if the queue is empty -- block
      reading from the connection (enqueueing every NotificationResponse via
      [dispatch_notifications]) until one arrives, then return it.
-     [`Disconnected] if the connection drops.  Any non-notification frame -- which
-     should not occur on a connection used solely for listening -- resets and
-     reports [`Unmatching_frame].  Takes no timeout: callers wrap it in
-     [Abbs_fc.timeout].
+     [`Disconnected] if the connection drops.  A notice or a reported GUC change
+     answers nothing, so it is dropped and the wait continues; any other
+     non-notification frame resets and reports [`Unmatching_frame].  Takes no
+     timeout: callers wrap it in [Abbs_fc.timeout].
 
      Abort safety (a wrapping [timeout] aborts this future as a notification may be
      arriving): the only suspension point is the [Abbs_io_buffered.read] below.
@@ -466,7 +484,13 @@ module Io = struct
                 | Ok n ->
                     backend_msg_sync conn n conn.buf
                     >>= fun ret -> wait_for_notification_frames conn ret)
-            | fs -> reset conn >>= fun _ -> Abbs_fc.return_err (`Unmatching_frame fs)))
+            | fs -> (
+                (* A notice or a reported GUC change answers nothing, so it is dropped and the wait
+                   continues: [reset] would send a [Sync] this wait never asked for and fail the
+                   caller with the frame it was handed. *)
+                match CCList.filter (fun fr -> not (skip_or_report_frame conn fr)) fs with
+                | [] -> wait_for_notification conn
+                | fs -> reset conn >>= fun _ -> Abbs_fc.return_err (`Unmatching_frame fs))))
 end
 
 type frame_err =
@@ -998,9 +1022,7 @@ module Cursor = struct
     | Pgsql_codec.Frame.Backend.ErrorResponse { msgs } :: _ as fs ->
         let open Abb.Future.Infix_monad in
         Io.error_response conn fs >>= fun _ -> Abbs_fc.return_err (Io.handle_err_frame msgs)
-    | Pgsql_codec.Frame.Backend.NoticeResponse { msgs } :: fs ->
-        conn.notice_response msgs;
-        consume_exec_frames conn row_func st fs
+    | frame :: fs when Io.skip_or_report_frame conn frame -> consume_exec_frames conn row_func st fs
     | fs ->
         let open Abb.Future.Infix_monad in
         Io.reset conn >>= fun _ -> Abbs_fc.return_err (`Unmatching_frame fs)
@@ -1013,6 +1035,9 @@ module Cursor = struct
     | Pgsql_codec.Frame.Backend.ErrorResponse { msgs } :: _ as fs ->
         let open Abb.Future.Infix_monad in
         Io.error_response conn fs >>= fun _ -> Abbs_fc.return_err (Io.handle_err_frame msgs)
+    (* A frame that answers nothing follows the [CommandComplete], so the tail carries two frames
+       and the singleton arm above cannot match it. *)
+    | frame :: fs when Io.skip_or_report_frame conn frame -> consume_exec_end conn row_func st fs
     | fs ->
         let open Abb.Future.Infix_monad in
         Io.reset conn >>= fun _ -> Abbs_fc.return_err (`Unmatching_frame fs)
@@ -1047,8 +1072,7 @@ module Cursor = struct
     | Pgsql_codec.Frame.Backend.ErrorResponse { msgs } :: _ as fs ->
         let open Abb.Future.Infix_monad in
         Io.error_response conn fs >>= fun _ -> Abbs_fc.return_err (Io.handle_err_frame msgs)
-    | Pgsql_codec.Frame.Backend.NoticeResponse { msgs } :: fs ->
-        conn.notice_response msgs;
+    | frame :: fs when Io.skip_or_report_frame conn frame ->
         consume_fetch_frames conn row_func st fs
     | fs ->
         let open Abb.Future.Infix_monad in
@@ -1091,6 +1115,9 @@ module Cursor = struct
     | Pgsql_codec.Frame.Backend.ErrorResponse { msgs } :: _ as fs ->
         let open Abb.Future.Infix_monad in
         Io.error_response conn fs >>= fun _ -> Abbs_fc.return_err (Io.handle_err_frame msgs)
+    (* A frame that answers nothing follows the [CommandComplete], so the tail carries two frames
+       and the singleton arm above cannot match it. *)
+    | frame :: fs when Io.skip_or_report_frame conn frame -> consume_fetch_end conn row_func st fs
     | fs ->
         let open Abb.Future.Infix_monad in
         Io.reset conn >>= fun _ -> Abbs_fc.return_err (`Unmatching_frame fs)
@@ -1741,7 +1768,8 @@ and create_sm_process_login_frames ?passwd ~user t =
           Io.send_frame t Pgsql_codec.Frame.Frontend.(PasswordMessage { password })
           >>= fun () -> create_sm_process_login_frames ?passwd ~user t fs
       | None -> Abbs_fc.return_err `Connect_missing_password_err)
-  | ParameterStatus _ :: fs -> create_sm_process_login_frames ?passwd ~user t fs
+  | frame :: fs when Io.skip_or_report_frame t frame ->
+      create_sm_process_login_frames ?passwd ~user t fs
   | BackendKeyData { pid; secret_key } :: fs ->
       let t = { t with backend_key_data = Backend_key_data.{ pid; secret_key } } in
       create_sm_process_login_frames ?passwd ~user t fs
@@ -2027,9 +2055,7 @@ and consume_copy_frames conn = function
   | Pgsql_codec.Frame.Backend.ErrorResponse { msgs } :: _ as fs ->
       let open Abb.Future.Infix_monad in
       Io.error_response conn fs >>= fun _ -> Abbs_fc.return_err (Io.handle_err_frame msgs)
-  | Pgsql_codec.Frame.Backend.NoticeResponse { msgs } :: fs ->
-      conn.notice_response msgs;
-      consume_copy_frames conn fs
+  | frame :: fs when Io.skip_or_report_frame conn frame -> consume_copy_frames conn fs
   | fs ->
       let open Abb.Future.Infix_monad in
       Io.reset conn >>= fun _ -> Abbs_fc.return_err (`Unmatching_frame fs)
@@ -2041,9 +2067,12 @@ and consume_copy_end conn tag = function
   | Pgsql_codec.Frame.Backend.ReadyForQuery _ :: _ ->
       let n = Scanf.sscanf tag "COPY %d" Fun.id in
       Abbs_fc.return_ok n
-  | Pgsql_codec.Frame.Backend.NoticeResponse { msgs } :: fs ->
-      conn.notice_response msgs;
-      consume_copy_end conn tag fs
+  | Pgsql_codec.Frame.Backend.ErrorResponse { msgs } :: _ as fs ->
+      let open Abb.Future.Infix_monad in
+      Io.error_response conn fs >>= fun _ -> Abbs_fc.return_err (Io.handle_err_frame msgs)
+  (* A reported GUC change made while the COPY ran is reported after its [CommandComplete], so it
+     reaches this tail and not the phase matcher above. *)
+  | frame :: fs when Io.skip_or_report_frame conn frame -> consume_copy_end conn tag fs
   | fs ->
       let open Abb.Future.Infix_monad in
       Io.reset conn >>= fun _ -> Abbs_fc.return_err (`Unmatching_frame fs)
