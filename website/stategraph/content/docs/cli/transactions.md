@@ -191,7 +191,7 @@ stategraph tx holds list
 stategraph tx holds release --tx <transaction-id>
 ```
 
-Releases the hold of an applied transaction. Orchestration releases the holds of a pull request itself when it merges, is closed or is unlocked; this command is the way out when it cannot, for a repository it no longer sees, or when a release failed. A no-op on a transaction without a hold.
+Releases the hold of an applied transaction. It takes the apply capability over the resources the transaction changed, the same right the apply itself took: the user who ran the apply has it, and so does an admin of the tenant. Without it the command is refused and says what is missing, as a denied apply does. Orchestration releases the holds of a pull request itself when it merges, is closed or is unlocked; this command is the way out when it cannot, for a repository it no longer sees, or when a release failed. A no-op on a transaction without a hold.
 
 ### Example
 

@@ -241,6 +241,11 @@ module Make
       Changes" too. *)
   val apply_check_description : [< `Changes | `No_changes | `Not_run ] -> string
 
+  (** [autoplans ~is_draft_pr dirspace] answers whether an autoplan plans [dirspace]: its
+      [when_modified] enables [autoplan], and also [autoplan_draft_pr] when the pull request is a
+      draft. *)
+  val autoplans : is_draft_pr:bool -> Terrat_change_match3.Dirspace_config.t -> bool
+
   (** The most recent successful plan and the most recent successful apply of each given dirspace of
       the context, timed and logged. *)
   val query_dirspace_runs_for_context :

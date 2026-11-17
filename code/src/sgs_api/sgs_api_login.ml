@@ -3,6 +3,7 @@ module Initiate = struct
     type t = {
       provider : string;
       rd : string option; [@default None]
+      screen_hint : string option; [@default None]
     }
     [@@deriving make, show, eq]
   end
@@ -10,7 +11,13 @@ module Initiate = struct
   let route () =
     let open Brtl_rtng.Route.Query in
     let open Brtl_rtng.Route in
-    rel / "api" / "v1" / "login" /% Path.string /? option (string "rd")
+    rel
+    / "api"
+    / "v1"
+    / "login"
+    /% Path.string
+    /? option (string "rd")
+    /? option (string "screen_hint")
 
   module Responses = struct
     module Found = struct end
@@ -44,7 +51,10 @@ module Initiate = struct
       ~query_params:
         (let open Openapi.Request.Var in
          let open Parameters in
-         [ ("rd", Var (params.rd, Option String)) ])
+         [
+           ("rd", Var (params.rd, Option String));
+           ("screen_hint", Var (params.screen_hint, Option String));
+         ])
       ~url
       ~responses:Responses.t
       `Get

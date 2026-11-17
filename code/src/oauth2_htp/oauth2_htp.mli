@@ -78,7 +78,12 @@ type t
     account is checked against the Admin SDK. *)
 val create : Config.t -> (t, [> err ]) result Abb.Future.t
 
-(** Start a sign-in. The [rd] parameter of the request is where the callback returns to. *)
+(** [screen_hint v] is [Some v] when [v] is a screen hint the provider's sign-in URL carries:
+    [signup], on which an IdP such as Auth0 opens its sign-up screen. Any other value is [None]. *)
+val screen_hint : string -> string option
+
+(** Start a sign-in. The [rd] parameter of the request is where the callback returns to. A
+    [screen_hint] parameter that {!screen_hint} accepts goes on to the provider's sign-in URL. *)
 val oauth_start :
   now:float -> t -> Oauth2_htp_request.t -> (Start_result.t, [> err ]) result Abb.Future.t
 

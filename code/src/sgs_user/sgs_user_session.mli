@@ -211,6 +211,9 @@ module Caps : sig
   val denied_body : denial_reason list -> string
 end
 
+(** [with_user ~caps ~f] is {!with_session} for an endpoint that needs only the acting user: the
+    same two checks, the same answers when one fails, and [f] receives the session's stored user in
+    place of the session. *)
 val with_user :
   caps:Caps.t ->
   f:
@@ -220,6 +223,18 @@ val with_user :
   (string, 'a) Brtl_ctx.t ->
   (string, Brtl_rspnc.t) Brtl_ctx.t Abb.Future.t
 
+(** [with_session ~caps ~f] is an endpoint body that lets [f] run only for a request that is
+    authenticated and authorized. Two checks are done in sequence:
+
+    {b Authentication.} The request must carry a session: a session cookie or a bearer token that
+    this installation signed, that has not expired, whose user still exists and, when it stands for
+    an access token, whose access token still exists and has not expired.
+
+    {b Authorization.} [caps] is judged against the capabilities the session resolved to and the
+    user acting through it.
+
+    When both checks pass, [f] receives the session, with its stored user and resolved capabilities,
+    and the request context; its response is the endpoint's. *)
 val with_session :
   caps:Caps.t ->
   f:

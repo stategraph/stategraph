@@ -304,7 +304,7 @@ WORKDIR /tmp
 # When this layer is reused cached, new packages may seem missing.
 # When you hit that (package published on more recent opam snapshot), bump the date here to re-run this layer.
 # Note that the date has no impact on `opam`. It's just a mean to trigger rebuilding of this layer.
-ARG OPAM_INDEX_DATE=2026-11-09
+ARG OPAM_INDEX_DATE=2026-11-16
 RUN echo "opam-repository index refreshed ${OPAM_INDEX_DATE}" && \
     opam init -ay --disable-sandboxing --bare
 # [[[end]]]
@@ -312,7 +312,7 @@ RUN echo "opam-repository index refreshed ${OPAM_INDEX_DATE}" && \
 # rebuild the switch.
 COPY opam /tmp/mono/opam
 COPY vendor /tmp/mono/vendor
-COPY code/opam.pins /tmp/mono/code/
+COPY code/opam.pins code/transitive.pins /tmp/mono/code/
 # [[[cog emit("opam-switch") ]]]
 RUN eval $(opam env) && \
     opam switch create -y 5.5.1 && \
@@ -323,8 +323,7 @@ RUN eval $(opam env) && \
 # [[[end]]]
 # [[[cog emit("opam-install") ]]]
 RUN eval $(opam env) && cd mono/code && \
-    opam install -j$(nproc --all) -y --no-depexts dune.3.24.2 menhir && \
-    cat opam.pins | xargs opam install -j$(nproc --all) -y --no-depexts
+    cat opam.pins transitive.pins | xargs opam install -j$(nproc --all) -y --no-depexts
 # [[[end]]]
 
 # ---------------------------------------------------------------------------

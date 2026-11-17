@@ -3,7 +3,8 @@
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { checkAuth, initializeAuth, getSetupStatus, setSessionExpiredHandler } from '@/lib/api/client';
-import { identifyUser, pushSignupEvent } from '@/lib/analytics';
+import { SERVER_STARTING_MESSAGE, untilServerAnswers } from '@/lib/api/serverUnavailable';
+import { identifyUser, linkWebsiteVisitor, pushSignupEvent } from '@/lib/analytics';
 import { BootstrapLoader } from '@/components/layout/bootstrap-loader';
 import type { paths } from '@/lib/api/types-generated';
 
@@ -38,6 +39,25 @@ function consumeSignupFlag(): boolean {
   return true;
 }
 
+// stategraph.com adds its PostHog id (`ph_did`) to links here, and `signup=1` to its Start links.
+// Both ride through /login and the OAuth round trip in the return path. Once the user is signed
+// in, return the id and strip both, so a reload or a copied URL carries neither.
+function consumeWebsiteParams(): string | null {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has('ph_did') && !params.has('signup')) return null;
+  const distinctId = params.get('ph_did');
+  params.delete('ph_did');
+  params.delete('signup');
+  const qs = params.toString();
+  window.history.replaceState(
+    null,
+    '',
+    window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash
+  );
+  return distinctId && /^[0-9A-Za-z-]{8,64}$/.test(distinctId) ? distinctId : null;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
@@ -46,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<WhoAmIResponse | null>(null);
   const [mounted, setMounted] = useState(false);
   const [checkingSetup, setCheckingSetup] = useState(true);
+  const [serverStarting, setServerStarting] = useState(false);
 
   // Ensure we only run client-side code after mount
   useEffect(() => {
@@ -53,7 +74,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (user) identifyUser(user);
+    if (!user) return;
+    identifyUser(user);
+    const websiteVisitor = consumeWebsiteParams();
+    if (websiteVisitor) linkWebsiteVisitor(websiteVisitor);
   }, [user]);
 
   // Mirror `authenticated` into a ref so the session-expiry handler can read the latest value
@@ -96,7 +120,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // 0. First, check if setup/registration is needed
         try {
-          const status = await getSetupStatus();
+          const status = await untilServerAnswers(getSetupStatus, {
+            onUnavailable: () => setServerStarting(true),
+          });
           if (status.needs_setup && status.mode !== 'COMMUNISM') {
             console.log('[AuthProvider] Setup needed - redirecting to /register');
             // Preserve session token for after registration
@@ -194,7 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // One calm loading visual while we resolve setup/auth, so the pre-chrome
   // gate matches every other bootstrap state instead of being a distinct screen.
   if (checkingSetup) {
-    return <BootstrapLoader />;
+    return <BootstrapLoader message={serverStarting ? SERVER_STARTING_MESSAGE : undefined} />;
   }
 
   return (

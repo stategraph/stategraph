@@ -213,6 +213,7 @@ For the dependency rules and guarantees across states, see [Multi-state transact
 | `STATEGRAPH_TX_TAGS` | Default for `--tx-tags` (a JSON object) |
 | `STATEGRAPH_DIAGNOSTICS` | Default for `--diagnostics` (`tf plan` only) |
 | `STATEGRAPH_TX_BATCH_SIZE` | Default for `--batch-size` |
+| `STATEGRAPH_TELEMETRY_ENDPOINT` | `0` turns [telemetry](/docs/cli#telemetry) off |
 | `STATEGRAPH_TX_PARALLEL_BATCHES` | Default for `--parallel-batches` |
 | `STATEGRAPH_ACTUATOR_RUN_DIR` | Directory where the CLI keeps the exact Terraform tree it planned, per run, under `preview/<timestamp>/` |
 

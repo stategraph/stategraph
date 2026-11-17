@@ -147,6 +147,36 @@ stategraph user tenants list
 
 For what a token can do, see [Access tokens and capabilities](/docs/admin/access-control/access-tokens).
 
+### Telemetry
+
+After each command, the CLI sends one event to `https://telemetry.terrateam.io/v1/sgc_events`. The event holds:
+
+| Field | Value |
+|-------|-------|
+| `sgc_version` | The CLI version. |
+| `subcommand` | The command names, for example `["tf", "plan"]`. Arguments and flag values are not part of it. |
+| `return_code` | The exit code of the command. |
+| `error_variant` | `Ok`, or the name of the error. |
+| `tenant_id` | The tenant ID from `STATEGRAPH_TENANT_ID` or `--tenant`, when the command takes one. |
+| `group_id` | The group ID from `--group` or `stategraph.json`. |
+| `user_id`, `user_email` | The user that `/api/v1/whoami` returns for `STATEGRAPH_API_KEY`. |
+
+The send has a limit of 1.5 seconds. A failed send does not change the output or the exit code of the command.
+
+`STATEGRAPH_TELEMETRY_ENDPOINT` controls where the event goes:
+
+| Value | Effect |
+|-------|--------|
+| `0` or `disabled` | The CLI sends no event. |
+| A URL | The CLI sends the event to that URL. |
+| A path that starts with `/` | The CLI appends the event to that file, one JSON object per line. |
+
+To turn telemetry off:
+
+```bash
+export STATEGRAPH_TELEMETRY_ENDPOINT=0
+```
+
 ## Command Structure
 
 ```text

@@ -1889,6 +1889,10 @@ struct
                  flight or a dirspace in a later layer stays silent, because its table names
                  dirspaces, and a run is what opens the plan check of one.
 
+                 The answer needs a dirspace of the pull request that the autoplan plans.  A pull
+                 request that matches no dirspace, or whose dirspaces all have autoplan off, stays
+                 silent.
+
                  A job is evaluated again for every work manifest event, and each evaluation
                  reaches this task, thus the answer waits for the work manifests of the job to
                  settle: one answer per push, and not one per evaluation. *)
@@ -1908,6 +1912,10 @@ struct
                 >>= function
                 | _ :: _ -> Abbs_fc.return_ok ()
                 | [] -> (
+                    fetch Keys.is_draft_pr
+                    >>= fun is_draft_pr ->
+                    fetch Keys.all_matches
+                    >>= fun all_matches ->
                     fetch Keys.all_unapplied_matches
                     >>= fun all_unapplied_matches ->
                     fetch Keys.already_planned_matches
@@ -1915,11 +1923,14 @@ struct
                     fetch Keys.plan_in_progress_matches
                     >>= fun plan_in_progress_matches ->
                     match
-                      ( CCList.flatten all_unapplied_matches,
+                      ( CCList.exists
+                          (Tasks_base.autoplans ~is_draft_pr)
+                          (CCList.flatten all_matches),
+                        CCList.flatten all_unapplied_matches,
                         already_planned_matches,
                         plan_in_progress_matches )
                     with
-                    | [], [], [] ->
+                    | true, [], [], [] ->
                         fetch Keys.publish_comment
                         >>= fun publish_comment ->
                         publish_comment' publish_comment Msg.Plan_all_changes_applied

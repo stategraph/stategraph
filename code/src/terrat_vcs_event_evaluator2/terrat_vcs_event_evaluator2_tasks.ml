@@ -905,18 +905,7 @@ struct
                 fetch Keys.is_draft_pr
                 >>= fun is_draft_pr ->
                 let working_set_matches =
-                  CCList.filter
-                    (fun {
-                           Terrat_change_match3.Dirspace_config.when_modified =
-                             {
-                               Terrat_base_repo_config_v1.When_modified.autoplan;
-                               autoplan_draft_pr;
-                               _;
-                             };
-                           _;
-                         }
-                       -> autoplan && ((not is_draft_pr) || autoplan_draft_pr))
-                    working_set_matches
+                  CCList.filter (Tasks_base.autoplans ~is_draft_pr) working_set_matches
                 in
                 (* Which dirspaces still need a plan is the question
                    [intra_pr_selection] answers, and the filter above this match

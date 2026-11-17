@@ -630,6 +630,15 @@ struct
     | `Changes | `Not_run -> "Completed"
     | `No_changes -> "No Changes"
 
+  let autoplans
+      ~is_draft_pr
+      {
+        Terrat_change_match3.Dirspace_config.when_modified =
+          { Terrat_base_repo_config_v1.When_modified.autoplan; autoplan_draft_pr; _ };
+        _;
+      } =
+    autoplan && ((not is_draft_pr) || autoplan_draft_pr)
+
   let query_dirspace_runs_for_context s db context dirspaces =
     time_it
       s

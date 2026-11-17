@@ -3,6 +3,7 @@
 
 import type { components } from "./types-generated";
 import { parseLinkHeader, hasNextPage } from "./pagination";
+import { fetchFromServer } from "./serverUnavailable";
 
 // ============================================================================
 // SCHEMA TYPES (re-exported from generated types)
@@ -368,7 +369,7 @@ export type SetupStatusResponse = components["schemas"]["setup-status-response"]
 
 /** GET /api/v1/setup/status - Check if initial setup/registration is needed */
 export async function getSetupStatus(): Promise<SetupStatusResponse> {
-  const response = await fetch(`${getApiBase()}/api/v1/setup/status`, {
+  const response = await fetchFromServer(`${getApiBase()}/api/v1/setup/status`, {
     credentials: 'include',
   });
   if (!response.ok) {
@@ -389,7 +390,7 @@ export type LoginOptionsResponse = components["schemas"]["login-options"];
  * If options array is empty, we're in local auth mode (password-based)
  */
 export async function getLoginOptions(): Promise<LoginOptionsResponse> {
-  const response = await fetch(`${getApiBase()}/api/v1/login/options`, {
+  const response = await fetchFromServer(`${getApiBase()}/api/v1/login/options`, {
     credentials: 'include',
   });
   if (!response.ok) {
