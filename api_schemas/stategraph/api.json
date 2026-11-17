@@ -7132,6 +7132,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "`signup` asks the identity provider to open on its sign-up screen; any other value is ignored",
+            "in": "query",
+            "name": "screen_hint",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -11870,6 +11879,16 @@
             }
           },
           "401": {},
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "capability-denied.json#/definitions/response"
+                }
+              }
+            },
+            "description": "The caller lacks the apply capability over a resource the transaction modified: releasing a hold asks for what the apply asked for. The body names what is missing."
+          },
           "404": {
             "description": "The transaction does not exist, or the caller is not a member of its tenant. The two are deliberately indistinguishable."
           }

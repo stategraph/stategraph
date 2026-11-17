@@ -27,11 +27,11 @@ opam pin add -n ISO8601 vendor/ISO8601 --no-depexts
 opam pin add -n cohttp vendor/cohttp --no-depexts
 ```
 
-Install dune and menhir, then everything pinned in `code/opam.pins`:
+Install everything pinned in `code/opam.pins` (the direct dependencies) and
+`code/transitive.pins` (the packages they pull in):
 
 ```shell
-opam install -j$(nproc --all) -y --no-depexts dune.3.24.2 menhir
-xargs -a code/opam.pins opam install -j$(nproc --all) -y --no-depexts
+cat code/opam.pins code/transitive.pins | xargs opam install -j$(nproc --all) -y --no-depexts
 ```
 
 For an IDE-friendly setup, also install the LSP server and formatter:

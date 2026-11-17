@@ -107,11 +107,25 @@ export function identifyUser(user: User) {
   );
 }
 
-/** Attach the selected tenant to every later event. */
+/**
+ * Merge the stategraph.com visitor who followed a link here into the signed-in user, so the
+ * website visit and the sign-up it led to are one person. Call after `identifyUser`.
+ */
+export function linkWebsiteVisitor(distinctId: string) {
+  withPostHog((posthog) => posthog.alias(distinctId));
+}
+
+/** Attach the selected tenant to every later event, as a property and as the `tenant` group. */
 export function setAnalyticsTenant(tenantId: string | undefined) {
-  withPostHog((posthog) =>
-    tenantId ? posthog.register({ tenant_id: tenantId }) : posthog.unregister("tenant_id")
-  );
+  withPostHog((posthog) => {
+    if (tenantId) {
+      posthog.register({ tenant_id: tenantId });
+      posthog.group("tenant", tenantId);
+    } else {
+      posthog.unregister("tenant_id");
+      posthog.resetGroups();
+    }
+  });
 }
 
 /** Record the logout and forget the user, before the page navigates away. */

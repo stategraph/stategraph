@@ -216,7 +216,7 @@ WORKDIR /tmp
 # When this layer is reused cached, new packages may seem missing.
 # When you hit that (package published on more recent opam snapshot), bump the date here to re-run this layer.
 # Note that the date has no impact on `opam`. It's just a mean to trigger rebuilding of this layer.
-ARG OPAM_INDEX_DATE=2026-11-09
+ARG OPAM_INDEX_DATE=2026-11-16
 RUN echo "opam-repository index refreshed ${OPAM_INDEX_DATE}" && \
     opam init -ay --disable-sandboxing --bare
 # endregion:opam-init
@@ -284,14 +284,13 @@ FROM ocaml-sandbox AS ocaml-sandbox-production
 
 FROM ocaml-sandbox-${DEPLOYMENT_KIND} AS ocaml-deps
 
-# opam.pins is the authoritative list of opam packages the stategraph build
-# needs, one `<name>.<version>` per line - the shape `opam install` accepts as-is.
-COPY --chown=${USERNAME}:${USERNAME} ./code/opam.pins /tmp/mono/code/
+# opam.pins is the authoritative list of opam packages the stategraph build needs,
+# and transitive.pins the packages they pull in
+COPY --chown=${USERNAME}:${USERNAME} ./code/opam.pins ./code/transitive.pins /tmp/mono/code/
 
 # region:opam-install
 RUN eval $(opam env) && cd mono/code && \
-    opam install -j$(nproc --all) -y --no-depexts dune.3.24.2 menhir && \
-    cat opam.pins | xargs opam install -j$(nproc --all) -y --no-depexts
+    cat opam.pins transitive.pins | xargs opam install -j$(nproc --all) -y --no-depexts
 # endregion:opam-install
 
 WORKDIR /home/${USERNAME}

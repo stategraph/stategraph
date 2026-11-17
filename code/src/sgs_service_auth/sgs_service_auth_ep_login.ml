@@ -159,8 +159,13 @@ let logout config rd =
       Abb.Future.return (Brtl_ctx.set_response (Brtl_rspnc.create ~status:`Found ~headers "") ctx))
 
 (* GET /api/v1/login/{provider} - Initiate OAuth2 login flow *)
-let run config oauth2 provider rd =
+let run config oauth2 provider rd screen_hint =
   let rd = CCOption.get_or ~default:"/" rd in
+  let screen_hint =
+    match CCOption.flat_map Oauth2_htp.screen_hint screen_hint with
+    | Some hint -> [ ("screen_hint", [ hint ]) ]
+    | None -> []
+  in
   Brtl_ep.run ~content_type:"text/html" ~f:(fun ctx ->
       let rd =
         match Sgs_redirect.url ~ui_base:(Sgs_config.ui_base config) rd with
@@ -181,7 +186,7 @@ let run config oauth2 provider rd =
             Uri.to_string
               (Uri.make
                  ~path:(Printf.sprintf "/oauth2/%s/start" provider)
-                 ~query:[ ("rd", [ rd ]) ]
+                 ~query:(("rd", [ rd ]) :: screen_hint)
                  ())
           in
 

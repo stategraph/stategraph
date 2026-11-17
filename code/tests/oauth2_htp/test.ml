@@ -346,6 +346,39 @@ let oauth_start_test =
       Oth_abb.Assert.str_contains ~haystack:(state_of res) ~needle:":https://app.test/x";
       Abb.Future.return ())
 
+let screen_hint_test =
+  Oth_abb.test ~name:"oauth2_htp.screen_hint" (fun () ->
+      let eq = Oth_abb.Assert.Eq.option ~eq:CCString.equal ~pp:CCFormat.string in
+      eq ~expected:(Some "signup") ~actual:(Oauth2_htp.screen_hint "signup");
+      CCList.iter
+        (fun v -> eq ~expected:None ~actual:(Oauth2_htp.screen_hint v))
+        [ ""; "login"; "Signup"; "signup " ];
+      Abb.Future.return ())
+
+let oauth_start_screen_hint_test =
+  Oth_abb.test ~name:"oauth2_htp.oauth_start_screen_hint" (fun () ->
+      let open Abb.Future.Infix_monad in
+      create ()
+      >>= fun t ->
+      let screen_hint query =
+        Oauth2_htp.oauth_start t ~now (request ("/oauth2/google/start?rd=%2F" ^ query))
+        >>| Oth_abb.Assert.ok_pp ~pp:Oauth2_htp.pp_err
+        >>| fun res ->
+        Oauth2_htp_values.get
+          "screen_hint"
+          (Uri.query (Uri.of_string res.Oauth2_htp.Start_result.login_url))
+      in
+      screen_hint "&screen_hint=signup"
+      >>= fun hint ->
+      Oth_abb.Assert.Eq.string ~expected:"signup" ~actual:hint;
+      screen_hint "&screen_hint=login"
+      >>= fun hint ->
+      Oth_abb.Assert.Eq.string ~expected:"" ~actual:hint;
+      screen_hint ""
+      >>= fun hint ->
+      Oth_abb.Assert.Eq.string ~expected:"" ~actual:hint;
+      Abb.Future.return ())
+
 let oauth_callback_rejects_test =
   Oth_abb.test ~name:"oauth2_htp.oauth_callback_rejects" (fun () ->
       let open Abb.Future.Infix_monad in
@@ -419,5 +452,7 @@ let () =
           validator_test;
           csrf_test;
           oauth_start_test;
+          screen_hint_test;
+          oauth_start_screen_hint_test;
           oauth_callback_rejects_test;
         ])

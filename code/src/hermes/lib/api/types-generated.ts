@@ -5244,6 +5244,8 @@ export interface operations {
             query?: {
                 /** @description Redirect destination after login */
                 rd?: string;
+                /** @description `signup` asks the identity provider to open on its sign-up screen; any other value is ignored */
+                screen_hint?: string;
             };
             header?: never;
             path: {
@@ -9405,6 +9407,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description The caller lacks the apply capability over a resource the transaction modified: releasing a hold asks for what the apply asked for. The body names what is missing. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["response"];
+                };
             };
             /** @description The transaction does not exist, or the caller is not a member of its tenant. The two are deliberately indistinguishable. */
             404: {

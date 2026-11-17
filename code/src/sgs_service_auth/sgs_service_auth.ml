@@ -7,7 +7,12 @@ module Rt = struct
 
   (* Login endpoints. The provider is a literal segment. *)
   let login provider =
-    Brtl_rtng.Route.(api_v1 () / "login" / provider /? Query.(option (string "rd")))
+    Brtl_rtng.Route.(
+      api_v1 ()
+      / "login"
+      / provider
+      /? Query.(option (string "rd"))
+      /? Query.(option (string "screen_hint")))
 
   let set_cookie () =
     Brtl_rtng.Route.(

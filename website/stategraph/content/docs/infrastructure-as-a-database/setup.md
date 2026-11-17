@@ -216,6 +216,7 @@ stategraph config tfvar ephemeral remove '*_token'
 | `STATEGRAPH_TENANT_ID` | Tenant ID, or use `--tenant`. |
 | `STATEGRAPH_WORKSPACE` | Workspace name, or use `--workspace`. |
 | `TF_CMD` | Path to the Terraform or OpenTofu binary. Default: `tofu`, then `terraform`, whichever the CLI finds first. |
+| `STATEGRAPH_TELEMETRY_ENDPOINT` | `0` turns [telemetry](/docs/cli#telemetry) off. |
 
 All flags are in [Terraform commands](/docs/cli/tf), including `--skip-refresh`, `--tx-tags`, `--detailed-exitcode`, and the cost and security preview options.
 

@@ -186,11 +186,18 @@ module Release_hold = struct
     end
 
     module Unauthorized = struct end
+
+    module Forbidden = struct
+      type t = Sgs_capability_denied_response.t
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
     module Not_found = struct end
 
     type t =
       [ `OK of OK.t
       | `Unauthorized
+      | `Forbidden of Forbidden.t
       | `Not_found
       ]
     [@@deriving show, eq]
@@ -199,6 +206,7 @@ module Release_hold = struct
       [
         ("200", Openapi.of_json_body (fun v -> `OK v) OK.of_yojson);
         ("401", fun _ -> Ok `Unauthorized);
+        ("403", Openapi.of_json_body (fun v -> `Forbidden v) Forbidden.of_yojson);
         ("404", fun _ -> Ok `Not_found);
       ]
   end

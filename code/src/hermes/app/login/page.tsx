@@ -7,26 +7,21 @@ import { Input } from "@/components/ui/input";
 import {
   checkAuth,
   getApiBase,
+  getLoginOptions,
   getSetupStatus,
   loginWithPassword,
   initializeAuth,
+  type LoginOption,
 } from "@/lib/api/client";
+import { SERVER_STARTING_MESSAGE, untilServerAnswers } from "@/lib/api/serverUnavailable";
 import {
   markAutoForwarded,
   recentlyAutoForwarded,
   shouldAutoForward,
 } from "@/lib/auth/loginAutoForward";
 import { loginErrorMessage } from "@/lib/auth/loginError";
-
-interface LoginOption {
-  name: string;
-  display_name: string;
-  url: string;
-}
-
-interface LoginOptionsResponse {
-  options: LoginOption[];
-}
+import { signupRequested, withSignupHint } from "@/lib/auth/signupHint";
+import { withWebsiteVisitor } from "@/lib/auth/websiteVisitor";
 
 function LoginContent() {
   const router = useRouter();
@@ -35,6 +30,7 @@ function LoginContent() {
   const [loading, setLoading] = useState(true);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [mode, setMode] = useState<string | null>(null);
+  const [serverStarting, setServerStarting] = useState(false);
 
   // Local auth state
   const [isLocalAuth, setIsLocalAuth] = useState(false);
@@ -53,7 +49,9 @@ function LoginContent() {
       // First check if initial registration is needed (unless just registered)
       if (!justRegistered) {
         try {
-          const status = await getSetupStatus();
+          const status = await untilServerAnswers(getSetupStatus, {
+            onUnavailable: () => setServerStarting(true),
+          });
           setMode(status.mode ?? null);
           if (status.needs_setup && status.mode !== "COMMUNISM") {
             router.push("/register");
@@ -68,7 +66,7 @@ function LoginContent() {
       // Then check if already authenticated
       const user = await checkAuth();
       if (user) {
-        router.push(safeNext(searchParams.get("next")));
+        router.push(landing(searchParams));
       } else {
         setCheckingAuth(false);
       }
@@ -80,10 +78,9 @@ function LoginContent() {
   useEffect(() => {
     async function fetchProviders() {
       try {
-        const response = await fetch(`${getApiBase()}/api/v1/login/options`, {
-          credentials: "include",
+        const data = await untilServerAnswers(getLoginOptions, {
+          onUnavailable: () => setServerStarting(true),
         });
-        const data: LoginOptionsResponse = await response.json();
         setProviders(data.options || []);
         // If no providers, we're in local auth mode
         setIsLocalAuth(data.options.length === 0);
@@ -98,16 +95,19 @@ function LoginContent() {
     }
   }, [checkingAuth]);
 
-  const handleLogin = useCallback((providerUrl: string) => {
+  const handleLogin = useCallback((providerUrl: string, providerName: string) => {
     const apiBase = getApiBase();
     // In development, use full origin (frontend on :3000, backend on :8080)
     // In production, use relative path to avoid port number issues with reverse proxies
-    const next = safeNext(searchParams.get("next"));
+    const next = landing(searchParams);
     const redirectPath = process.env.NODE_ENV === 'development'
       ? window.location.origin + next
       : next;
-    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- backend endpoint, not a Next.js page: full-page navigation is required
-    window.location.href = `${apiBase}${providerUrl}?rd=${encodeURIComponent(redirectPath)}`;
+    const start = `${apiBase}${providerUrl}?rd=${encodeURIComponent(redirectPath)}`;
+    // Only a generic OIDC broker (Auth0) has a sign-up screen to open on.
+    const url =
+      providerName === "oidc" && signupRequested(searchParams) ? withSignupHint(start) : start;
+    window.location.href = url;
   }, [searchParams]);
 
   // Auto-forward straight to the identity provider (#1774). The loop guard is read once per mount:
@@ -124,7 +124,7 @@ function LoginContent() {
   useEffect(() => {
     if (autoForwardUrl === null) return;
     markAutoForwarded(Date.now());
-    handleLogin(autoForwardUrl);
+    handleLogin(autoForwardUrl, "oidc");
   }, [autoForwardUrl, handleLogin]);
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
@@ -141,7 +141,7 @@ function LoginContent() {
       // Verify and redirect
       const user = await checkAuth();
       if (user) {
-        router.push(safeNext(searchParams.get("next")));
+        router.push(landing(searchParams));
       } else {
         throw new Error("Login failed");
       }
@@ -155,7 +155,9 @@ function LoginContent() {
   };
 
   if (checkingAuth) {
-    return <LoadingState message="Checking authentication..." />;
+    return (
+      <LoadingState message={serverStarting ? SERVER_STARTING_MESSAGE : "Checking authentication..."} />
+    );
   }
 
   if (autoForwardUrl !== null) {
@@ -194,7 +196,7 @@ function LoginContent() {
         {/* Login options */}
         <div className="space-y-4">
           {loading ? (
-            <LoadingState message="Loading login options..." />
+            <LoadingState message={serverStarting ? SERVER_STARTING_MESSAGE : "Loading login options..."} />
           ) : isLocalAuth ? (
             // Local auth mode: show email/password form
             <form onSubmit={handlePasswordLogin} className="space-y-4">
@@ -251,7 +253,7 @@ function LoginContent() {
                 variant="default"
                 size="lg"
                 className="w-full"
-                onClick={() => handleLogin(provider.url)}
+                onClick={() => handleLogin(provider.url, provider.name)}
               >
                 Sign in with {provider.display_name}
               </Button>
@@ -291,6 +293,11 @@ function LoadingState({ message }: { message: string }) {
       <p className="text-[var(--sg-text-muted)]">{message}</p>
     </div>
   );
+}
+
+/** `next`, made safe, with the website visitor id from this page's own query. */
+function landing(params: URLSearchParams): string {
+  return withWebsiteVisitor(safeNext(params.get("next")), params);
 }
 
 /**

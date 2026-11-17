@@ -125,7 +125,7 @@ let create config =
 let encode_state ~nonce ~redirect = nonce ^ ":" ^ redirect
 let decode_state state = CCOption.to_result `Invalid_state (CCString.Split.left ~by:":" state)
 
-let login_url t ~state =
+let login_url t ~state ~screen_hint =
   let base =
     Uri.of_string
       (match t.provider with
@@ -138,6 +138,7 @@ let login_url t ~state =
       (fun params (k, v) -> Values.add k v params)
       (Uri.query base)
       (t.config.Config.login_params
+      @ CCOption.map_or ~default:[] (fun hint -> [ ("screen_hint", hint) ]) screen_hint
       @ [
           ("redirect_uri", t.config.Config.redirect_url);
           ("scope", t.config.Config.scope);
@@ -160,6 +161,10 @@ let safe_redirect t redirect =
   | true -> redirect
   | false -> "/"
 
+let screen_hint = function
+  | "signup" as hint -> Some hint
+  | _ -> None
+
 let oauth_start ~now t req =
   let csrf = Csrf.create () in
   let state =
@@ -167,9 +172,11 @@ let oauth_start ~now t req =
       ~nonce:(Csrf.hashed_state csrf)
       ~redirect:(safe_redirect t (Request.form_value "rd" req))
   in
+  let screen_hint = screen_hint (Request.form_value "screen_hint" req) in
   Abb.Future.return
     (CCResult.map
-       (fun cookie -> { Start_result.login_url = login_url t ~state; set_cookies = [ cookie ] })
+       (fun cookie ->
+         { Start_result.login_url = login_url t ~state ~screen_hint; set_cookies = [ cookie ] })
        (Csrf.set_cookie
           ~now
           ~secret:t.config.Config.cookie_secret

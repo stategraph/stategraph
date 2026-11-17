@@ -6,11 +6,13 @@
 val options : Sgs_config.t -> Brtl_rtng.Handler.t
 
 (** GET /api/v1/login/\{provider\} - Initiate OAuth2 login [provider] is the OAuth provider name.
-    [rd] is the redirect destination after login (defaults to "/") *)
+    [rd] is the redirect destination after login (defaults to "/"). A [screen_hint] that
+    {!Oauth2_htp.screen_hint} accepts is passed on to the OAuth2 start. *)
 val run :
   Sgs_config.t ->
   Sgs_service_oauth2.Provider.t option ->
   string ->
+  string option ->
   string option ->
   Brtl_rtng.Handler.t
 
