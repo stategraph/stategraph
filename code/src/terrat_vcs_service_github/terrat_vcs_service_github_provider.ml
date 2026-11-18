@@ -4022,6 +4022,9 @@ module Comment = struct
         Tier.runs_usage ~request_id work_manifest.Terrat_work_manifest3.account db
         >>= fun tier_runs ->
         let tier_runs = CCResult.get_or ~default:None tier_runs in
+        Terrat_broadcast.active ~request_id ~vcs:`Github db
+        >>= fun broadcasts ->
+        let broadcasts = CCResult.get_or ~default:[] broadcasts in
         let pull_request = Api.Pull_request.set_diff () pull_request in
         let work_manifest = { work_manifest with Terrat_work_manifest3.target = () } in
         let by_scope = By_scope.group result.R2.steps in
@@ -4048,6 +4051,7 @@ module Comment = struct
             repo_config;
             result;
             stale;
+            broadcasts;
             synthesized_config;
             work_manifest;
             fail_if_set;

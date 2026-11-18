@@ -380,6 +380,7 @@ end
 module Publisher_tools = struct
   let create_run_output
       ?stale
+      ?(broadcasts = [])
       ~brand
       ~view
       ~compacted_dirspaces
@@ -549,6 +550,7 @@ module Publisher_tools = struct
                    ~default:`Null
                    Terrat_vcs_provider2.Work_manifest_stale.to_yojson
                    stale );
+               ("broadcasts", Terrat_broadcast.to_kv broadcasts);
                ("num_more_layers", `Int num_remaining_layers);
                ("overall_success", `Bool overall_success);
                ( "pre_hooks",

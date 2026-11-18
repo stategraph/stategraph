@@ -12,6 +12,7 @@
   pgsql_pagination
   sln
   terrat_brand
+  terrat_broadcast
   terrat_code_idx
   terrat_comment
   terrat_intra_pr_hash

@@ -1688,6 +1688,218 @@ let test_plan_complete2_stale_failed =
 
 (* Each stale message links to the documentation of stale runs, in the name and on the site of its
    brand. *)
+(* The publisher adds the active broadcasts to the data of the output comment as the key
+   [broadcasts]. *)
+let with_broadcasts broadcasts = function
+  | `Assoc fields ->
+      `Assoc
+        (CCList.Assoc.set
+           ~eq:CCString.equal
+           "broadcasts"
+           (Terrat_broadcast.to_kv broadcasts)
+           fields)
+  | kv -> kv
+
+let rename_broadcast =
+  {
+    Terrat_broadcast.level = Terrat_broadcast.Level.Warning;
+    message =
+      "The GitHub App `terrateam-action` is renamed.\r\n\
+       \r\n\
+       Comments come from `stategraph[bot]`.\n\n";
+  }
+
+let rename_alert =
+  "> [!WARNING]\n\
+   > The GitHub App `terrateam-action` is renamed.\n\
+   >\n\
+   > Comments come from `stategraph[bot]`.\n"
+
+(* The lines of the alert [alert] in [body]: from [> [!alert]] to the first blank line. *)
+let alert_lines ~alert body =
+  CCString.lines body
+  |> CCList.drop_while (fun line -> not (CCString.equal line ("> [!" ^ alert ^ "]")))
+  |> CCList.take_while (fun line -> not (CCString.is_empty line))
+
+(* Every line of the alert is in the quote, else the forge shows the rest as normal text. *)
+let assert_alert ~alert body =
+  let lines = alert_lines ~alert body in
+  Oth.Assert.not_true (CCList.is_empty lines);
+  Oth.Assert.true_ (CCList.for_all (CCString.prefix ~pre:">") lines)
+
+let failed = function
+  | `Assoc fields ->
+      `Assoc (CCList.Assoc.set ~eq:CCString.equal "overall_success" (`Bool false) fields)
+  | kv -> kv
+
+let plan_kv () = plan_complete2_kv ~changes:[ true ] ~is_layered_run:false ~num_more_layers:0 ()
+let apply_kv () = apply_complete2_kv ~compact_view:false ~applied:false ~num_dirspaces:1 ()
+
+let test_plan_complete2_broadcast =
+  Oth.test ~tags:[ "broadcast" ] ~name:"Plan complete: a broadcast is under the heading" (fun _ ->
+      let body = render Tmpl.plan_complete2 (with_broadcasts [ rename_broadcast ] (plan_kv ())) in
+      Oth.Assert.str_contains
+        ~haystack:body
+        ~needle:("## Plans :thumbsup:\n\n" ^ rename_alert ^ "\n");
+      assert_alert ~alert:"WARNING" body;
+      ())
+
+let test_plan_complete2_broadcast_failed =
+  Oth.test ~tags:[ "broadcast" ] ~name:"Plan complete: a failed plan shows the broadcast" (fun _ ->
+      let body =
+        render Tmpl.plan_complete2 (with_broadcasts [ rename_broadcast ] (failed (plan_kv ())))
+      in
+      Oth.Assert.str_contains
+        ~haystack:body
+        ~needle:("## Plans :heavy_multiplication_x:\n\n" ^ rename_alert);
+      ())
+
+let test_apply_complete2_broadcast =
+  Oth.test ~tags:[ "broadcast" ] ~name:"Apply complete: a broadcast is under the heading" (fun _ ->
+      let body = render Tmpl.apply_complete2 (with_broadcasts [ rename_broadcast ] (apply_kv ())) in
+      Oth.Assert.str_contains
+        ~haystack:body
+        ~needle:("## Applies :white_check_mark:\n\n" ^ rename_alert ^ "\n");
+      let depth, min_depth = details_balance body in
+      Oth.Assert.true_ (depth = 0);
+      Oth.Assert.true_ (min_depth >= 0);
+      ())
+
+let test_apply_complete2_broadcast_failed =
+  Oth.test
+    ~tags:[ "broadcast" ]
+    ~name:"Apply complete: a failed apply shows the broadcast"
+    (fun _ ->
+      let body =
+        render Tmpl.apply_complete2 (with_broadcasts [ rename_broadcast ] (failed (apply_kv ())))
+      in
+      Oth.Assert.str_contains
+        ~haystack:body
+        ~needle:("## Applies :heavy_multiplication_x:\n\n" ^ rename_alert);
+      ())
+
+(* Each broadcast is an alert of its own, in the order of the list, with the alert of its level. *)
+let test_plan_complete2_broadcasts_levels =
+  Oth.test ~tags:[ "broadcast" ] ~name:"Plan complete: one alert for each broadcast" (fun _ ->
+      let module B = Terrat_broadcast in
+      let body =
+        render
+          Tmpl.plan_complete2
+          (with_broadcasts
+             [
+               { B.level = B.Level.Info; message = "Info text." };
+               { B.level = B.Level.Critical; message = "Critical text." };
+             ]
+             (plan_kv ()))
+      in
+      Oth.Assert.str_contains
+        ~haystack:body
+        ~needle:"> [!NOTE]\n> Info text.\n\n> [!CAUTION]\n> Critical text.\n";
+      assert_alert ~alert:"NOTE" body;
+      assert_alert ~alert:"CAUTION" body;
+      ())
+
+(* The broadcast comes first, then the stale warning; both stay complete alerts. *)
+let test_plan_complete2_broadcast_and_stale =
+  Oth.test
+    ~tags:[ "broadcast"; "stale" ]
+    ~name:"Plan complete: a broadcast and a stale warning"
+    (fun _ ->
+      let body =
+        render
+          Tmpl.plan_complete2
+          (with_stale
+             (stale_kv ~is_plan:true [ ("tf", "default") ])
+             (with_broadcasts
+                [ { Terrat_broadcast.level = Terrat_broadcast.Level.Info; message = "Info text." } ]
+                (plan_kv ())))
+      in
+      Oth.Assert.str_contains
+        ~haystack:body
+        ~needle:
+          "## Plans :thumbsup:\n\n\
+           > [!NOTE]\n\
+           > Info text.\n\n\n\
+           > [!WARNING]\n\
+           > **Commits moved during this plan.**";
+      assert_alert ~alert:"NOTE" body;
+      assert_warning ~needles:[ "This plan is stale." ] body;
+      ())
+
+(* Without broadcasts the comment is the same as before the key existed. *)
+let test_plan_complete2_no_broadcasts =
+  Oth.test ~tags:[ "broadcast" ] ~name:"Plan complete: no broadcasts, no alert" (fun _ ->
+      let without = render Tmpl.plan_complete2 (plan_kv ()) in
+      Oth.Assert.eq
+        ~eq:CCString.equal
+        ~pp:CCFormat.string
+        without
+        (render Tmpl.plan_complete2 (with_broadcasts [] (plan_kv ())));
+      Oth.Assert.eq
+        ~eq:CCString.equal
+        ~pp:CCFormat.string
+        (render Tmpl.apply_complete2 (apply_kv ()))
+        (render Tmpl.apply_complete2 (with_broadcasts [] (apply_kv ())));
+      Oth.Assert.str_doesnt_contain ~haystack:without ~needle:"> [!";
+      ())
+
+(* The message is operator text: no brand rewrite touches it. *)
+let test_broadcast_brand_verbatim =
+  Oth.test ~tags:[ "broadcast" ] ~name:"Broadcast text is the same in both brands" (fun _ ->
+      CCList.iter
+        (fun brand ->
+          let body =
+            render_brand
+              brand
+              Tmpl.plan_complete2
+              (with_broadcasts [ rename_broadcast ] (plan_kv ()))
+          in
+          Oth.Assert.str_contains ~haystack:body ~needle:rename_alert)
+        [ Terrat_brand.Stategraph; Terrat_brand.Terrateam ];
+      ())
+
+let test_gitlab_broadcast =
+  Oth.test ~tags:[ "broadcast" ] ~name:"GitLab plan and apply comments show the broadcast" (fun _ ->
+      let plan =
+        render Gitlab_tmpl.plan_complete2 (with_broadcasts [ rename_broadcast ] (plan_kv ()))
+      in
+      let apply =
+        render Gitlab_tmpl.apply_complete2 (with_broadcasts [ rename_broadcast ] (apply_kv ()))
+      in
+      Oth.Assert.str_contains ~haystack:plan ~needle:("## Plans :thumbsup:\n\n" ^ rename_alert);
+      Oth.Assert.str_contains
+        ~haystack:apply
+        ~needle:("## Applies :white_check_mark:\n\n" ^ rename_alert);
+      ())
+
+let test_broadcast_to_kv =
+  Oth.test ~tags:[ "broadcast" ] ~name:"Broadcast template data" (fun _ ->
+      let module B = Terrat_broadcast in
+      let kv =
+        B.to_kv
+          [
+            { B.level = B.Level.Info; message = "a\r\nb\n\nc\n\n" };
+            { B.level = B.Level.Warning; message = "w" };
+            { B.level = B.Level.Critical; message = "c" };
+          ]
+      in
+      let expected =
+        `List
+          [
+            `Assoc
+              [
+                ("alert", `String "NOTE");
+                ("lines", `List [ `String "a"; `String "b"; `String ""; `String "c" ]);
+              ];
+            `Assoc [ ("alert", `String "WARNING"); ("lines", `List [ `String "w" ]) ];
+            `Assoc [ ("alert", `String "CAUTION"); ("lines", `List [ `String "c" ]) ];
+          ]
+      in
+      Oth.Assert.true_ (Yojson.Safe.equal expected kv);
+      Oth.Assert.true_ (B.Level.of_string "warning" = Some B.Level.Warning);
+      Oth.Assert.true_ (B.Level.of_string "urgent" = None);
+      ())
+
 let test_stale_docs_link =
   Oth.test ~tags:[ "stale" ] ~name:"Stale messages link to the documentation" (fun _ ->
       let link brand = CCString.drop 2 (stale_docs_link brand) in
@@ -1990,6 +2202,16 @@ let test =
       test_stale_docs_link;
       test_apply_complete2_stale_layer;
       test_plan_complete2_stale_failed;
+      test_plan_complete2_broadcast;
+      test_plan_complete2_broadcast_failed;
+      test_apply_complete2_broadcast;
+      test_apply_complete2_broadcast_failed;
+      test_plan_complete2_broadcasts_levels;
+      test_plan_complete2_broadcast_and_stale;
+      test_plan_complete2_no_broadcasts;
+      test_broadcast_brand_verbatim;
+      test_gitlab_broadcast;
+      test_broadcast_to_kv;
       test_plan_complete2_not_stale;
       test_plan_complete2_no_changes_more_layers;
       test_plan_complete2_no_changes_last_layer;

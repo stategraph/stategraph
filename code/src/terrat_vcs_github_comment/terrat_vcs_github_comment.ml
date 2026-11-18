@@ -97,6 +97,7 @@ module S = struct
     result : Terrat_api_components_work_manifest_tf_operation_result2.t;
     repo_config : Terrat_base_repo_config_v1.derived Terrat_base_repo_config_v1.t;
     stale : Terrat_vcs_provider2.Work_manifest_stale.t option;
+    broadcasts : Terrat_broadcast.t list;
     fail_if_set : string list;
     synthesized_config : Terrat_change_match3.Config.t;
     (* Curr Work M that is finished! *)
@@ -323,6 +324,7 @@ module S = struct
     let body =
       Publisher_tools.create_run_output
         ?stale:t.stale
+        ~broadcasts:t.broadcasts
         ~brand:t.brand
         ~view:(if compact then `Compact else `Full)
         ~compacted_dirspaces
@@ -357,6 +359,7 @@ module S = struct
         let body =
           Publisher_tools.create_run_output
             ?stale:t.stale
+            ~broadcasts:t.broadcasts
             ~brand:t.brand
             ~view:`Compact
             ~compacted_dirspaces:(CCList.map (fun { dirspace; _ } -> dirspace) els)
@@ -388,6 +391,7 @@ module S = struct
             let body =
               Publisher_tools.create_run_output
                 ?stale:t.stale
+                ~broadcasts:t.broadcasts
                 ~brand:t.brand
                 ~view:`Compact
                 ~compacted_dirspaces:(CCList.map (fun { dirspace; _ } -> dirspace) els)
@@ -435,6 +439,7 @@ module S = struct
     let body =
       Publisher_tools.create_run_output
         ?stale:t.stale
+        ~broadcasts:t.broadcasts
         ~brand:t.brand
         ~view:(if compact then `Compact else `Full)
         ~compacted_dirspaces
