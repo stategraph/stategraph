@@ -159,12 +159,12 @@ jobs:
         uses: depot/setup-action@v1
 
       # The persistent layer cache would otherwise serve the runtime stages' `apk upgrade`
-      # from whenever it last ran. The ISO week (e.g. 2026-W45) as its cache key makes the
-      # first release of a week pick up the packages fixed since, and lets the rest of the
-      # week's releases reuse the layer, so the packages are at most a week old.
+      # from whenever it last ran. The date as its cache key makes the first release of a
+      # day pick up that day's package fixes, and lets the rest of the day's releases reuse
+      # the layer.
       - name: Set the OS refresh key
         run: |
-          echo "OS_REFRESH=$(date -u +%G-W%V)" >> "$GITHUB_ENV"
+          echo "OS_REFRESH=$(date -u +%F)" >> "$GITHUB_ENV"
 
       # provenance: false keeps each image a plain manifest, which scripts/create_manifest
       # merges into the multi-arch one and sign-images walks.
