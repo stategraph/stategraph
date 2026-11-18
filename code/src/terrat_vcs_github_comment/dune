@@ -10,6 +10,7 @@
   pgsql_pool
   sln
   terrat_brand
+  terrat_broadcast
   terrat_comment
   terrat_github
   terrat_plan_diff

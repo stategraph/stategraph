@@ -43,6 +43,15 @@
 >
 > [How Stategraph handles commits that move during a run](https://stategraph.com/docs/orchestration/workflows/stale-runs)
 {%- endmacro -%}
+{%- macro broadcasts_block(broadcasts) %}
+{%- for b in broadcasts %}
+
+> [!{{ b.alert }}]
+{%- for line in b.lines %}
+>{% if line %} {{ line }}{% endif %}
+{%- endfor %}
+{%- endfor %}
+{%- endmacro -%}
 {%- macro run_parameters(parameters, fail_if_set) -%}
 {%- if parameters %}
 
@@ -60,6 +69,7 @@
 {%- endmacro -%}
 {%- if overall_success %}
 ## Applies :white_check_mark:
+{%- if broadcasts is defined and broadcasts %}{{ broadcasts_block(broadcasts) }}{{ "\n" }}{% endif %}
 {%- if stale is defined and stale %}{{ stale_warning(stale) }}{{ "\n" }}{% endif %}
 {{- run_parameters(parameters, fail_if_set) }}
   {%- if summary and dirspaces %}
@@ -127,6 +137,7 @@ Not all [dirspaces](https://stategraph.com/docs/get-started/core-concepts#reposi
 {%- else %}
 
 ## Applies :heavy_multiplication_x:
+{%- if broadcasts is defined and broadcasts %}{{ broadcasts_block(broadcasts) }}{{ "\n" }}{% endif %}
 {%- if stale is defined and stale %}{{ stale_warning(stale) }}{{ "\n" }}{% endif %}
 {{- run_parameters(parameters, fail_if_set) }}
   {%- if summary and dirspaces %}
