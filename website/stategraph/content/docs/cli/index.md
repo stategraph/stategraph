@@ -267,7 +267,7 @@ stategraph import tf --overwrite \
   terraform.tfstate
 ```
 
-For a guided import, see [Import your Terraform state](/docs/get-started/quickstart/import-state). For the full workflow, with plan and apply, see [Set up Infrastructure as a Database](/docs/infrastructure-as-a-database/setup).
+For a guided import, see [Import your Terraform state](/docs/infrastructure-as-a-database/import-state). For the full workflow, with plan and apply, see [Set up Infrastructure as a Database](/docs/infrastructure-as-a-database/setup).
 
 ### Run an SQL query
 

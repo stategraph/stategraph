@@ -1,11 +1,11 @@
 ---
 title: Import your state
 description: Import a Terraform or OpenTofu state into Stategraph with the CLI, then run your first scoped plan and apply.
-order: 5
+order: 3
 ---
 
 
-Import a Terraform or OpenTofu state into Infrastructure as a Database, which stores it as a graph in PostgreSQL. Then run a first scoped plan, which plans only what your change touches. You need a server: [Stategraph Cloud](https://app.stategraph.cloud) or a [self-hosted](/docs/get-started/quickstart/self-hosted) one.
+Import a Terraform or OpenTofu state into Infrastructure as a Database, which stores it as a graph in PostgreSQL. Then run a first scoped plan, which plans only what your change touches. You need a server: [Stategraph Cloud](https://app.stategraph.cloud) or a [self-hosted](/docs/admin/self-hosting) one.
 
 ## 1. Install the CLI
 

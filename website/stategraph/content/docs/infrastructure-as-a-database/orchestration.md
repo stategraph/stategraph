@@ -118,5 +118,5 @@ Use Orchestration as usual. The runner calls `stategraph tf plan` and `stategrap
 ## Next steps
 
 - [Setup](/docs/infrastructure-as-a-database/setup): the `stategraph` CLI in detail.
-- [Enable Orchestration](/docs/admin/self-hosting/orchestration): on a self-hosted server.
+- [Connect GitHub or GitLab](/docs/admin/self-hosting/orchestration): on a self-hosted server.
 - [Pull request workflow](/docs/orchestration/workflows): plan, review, and apply.

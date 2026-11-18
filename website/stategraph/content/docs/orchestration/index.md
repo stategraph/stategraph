@@ -5,7 +5,7 @@ order: 1
 ---
 
 
-Stategraph Orchestration runs your infrastructure changes through pull requests on GitHub and GitLab. The Open Source edition is [free to self-host](/docs/get-started/quickstart/self-hosted). Enterprise adds governance, and Stategraph Cloud runs Orchestration for you. See [Editions and pricing](/docs/get-started/editions).
+Stategraph Orchestration runs your infrastructure changes through pull requests on GitHub and GitLab. The Open Source edition is [free to self-host](/docs/admin/self-hosting). Enterprise adds governance, and Stategraph Cloud runs Orchestration for you. See [Editions and pricing](/docs/get-started/editions).
 
 ## What it does
 
@@ -30,11 +30,13 @@ Plans and applies run on your GitHub Actions or GitLab CI runners, so your cloud
 
 ## Get started
 
-1. Choose where Orchestration runs: [Stategraph Cloud](/docs/get-started/quickstart/cloud), or [self-hosted](/docs/get-started/quickstart/self-hosted), Open Source or Enterprise.
+1. Choose where Orchestration runs: [Stategraph Cloud](/docs/get-started/quickstart/cloud), or [self-hosted](/docs/admin/self-hosting), Open Source or Enterprise.
 2. Connect GitHub or GitLab, and add the workflow file to your repository. The quickstarts show both steps.
 3. Open a pull request that changes a `.tf` file, and read the plan comment.
 
 Without a configuration file, Orchestration uses defaults. To change workflows, policies, or other settings, add `.stategraph/config.yml`. See [Configuration](/docs/orchestration/configuration).
+
+To move from another tool, follow its migration guide: [Terraform Cloud](/docs/orchestration/migration/terraform-cloud), [Digger](/docs/orchestration/migration/digger), [Atlantis](/docs/orchestration/migration/atlantis), [Spacelift](/docs/orchestration/migration/spacelift), or [env0](/docs/orchestration/migration/env0).
 
 ## In this section
 
@@ -48,3 +50,4 @@ Without a configuration file, Orchestration uses defaults. To change workflows, 
 | [Cloud providers](/docs/orchestration/cloud-providers/aws) | AWS, GCP, Azure, and other providers |
 | [IaC tools](/docs/orchestration/iac-tools/terraform) | Terraform, OpenTofu, Terragrunt, Pulumi, and CDKTF |
 | [External tools](/docs/orchestration/external-tools/opa) | OPA, Infracost, webhooks, AI integrations, and packages on the runner |
+| [Migration](/docs/orchestration/migration) | Moving from Terraform Cloud, Digger, Atlantis, Spacelift, or env0 |

@@ -5,7 +5,7 @@ order: 11
 ---
 
 
-These endpoints link GitHub App and GitLab installations to a tenant for Stategraph Orchestration. They also read and manage the repositories, pull requests, dirspaces, and work manifests of each installation. See [Enable orchestration](/docs/admin/self-hosting/orchestration) for the server-side setup.
+These endpoints link GitHub App and GitLab installations to a tenant for Stategraph Orchestration. They also read and manage the repositories, pull requests, dirspaces, and work manifests of each installation. See [Connect GitHub or GitLab](/docs/admin/self-hosting/orchestration) for the server-side setup.
 
 ## Tenant installations
 

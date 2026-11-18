@@ -21,9 +21,19 @@ type t =
   | Reason_capability_denied of Sgs_actuator_run_result_reason_capability_denied.t
   | Reason_tx_conflict of Sgs_actuator_run_result_reason_tx_conflict.t
   | Reason_tx_invalid_state of Sgs_actuator_run_result_reason_tx_invalid_state.t
-  | Reason_state_schema_behind of Sgs_actuator_run_result_reason_state_schema_behind.t
   | Reason_remote_state_address_unresolved of
       Sgs_actuator_run_result_reason_remote_state_address_unresolved.t
+  | Reason_tx_schema_version_mismatch of Sgs_actuator_run_result_reason_tx_schema_version_mismatch.t
+  | Reason_state_schema_placeholder_present of
+      Sgs_actuator_run_result_reason_state_schema_placeholder_present.t
+  | Reason_state_schema_remote_module_missing of
+      Sgs_actuator_run_result_reason_state_schema_remote_module_missing.t
+  | Reason_state_schema_upgrade_failed of
+      Sgs_actuator_run_result_reason_state_schema_upgrade_failed.t
+  | Reason_state_schema_upgrade_rounds_exhausted of
+      Sgs_actuator_run_result_reason_state_schema_upgrade_rounds_exhausted.t
+  | Reason_state_schema_upgrade_timeout of
+      Sgs_actuator_run_result_reason_state_schema_upgrade_timeout.t
 [@@deriving show, eq]
 
 let of_yojson =
@@ -102,12 +112,32 @@ let of_yojson =
            (Sgs_actuator_run_result_reason_tx_invalid_state.of_yojson v));
        (fun v ->
          map
-           (fun v -> Reason_state_schema_behind v)
-           (Sgs_actuator_run_result_reason_state_schema_behind.of_yojson v));
-       (fun v ->
-         map
            (fun v -> Reason_remote_state_address_unresolved v)
            (Sgs_actuator_run_result_reason_remote_state_address_unresolved.of_yojson v));
+       (fun v ->
+         map
+           (fun v -> Reason_tx_schema_version_mismatch v)
+           (Sgs_actuator_run_result_reason_tx_schema_version_mismatch.of_yojson v));
+       (fun v ->
+         map
+           (fun v -> Reason_state_schema_placeholder_present v)
+           (Sgs_actuator_run_result_reason_state_schema_placeholder_present.of_yojson v));
+       (fun v ->
+         map
+           (fun v -> Reason_state_schema_remote_module_missing v)
+           (Sgs_actuator_run_result_reason_state_schema_remote_module_missing.of_yojson v));
+       (fun v ->
+         map
+           (fun v -> Reason_state_schema_upgrade_failed v)
+           (Sgs_actuator_run_result_reason_state_schema_upgrade_failed.of_yojson v));
+       (fun v ->
+         map
+           (fun v -> Reason_state_schema_upgrade_rounds_exhausted v)
+           (Sgs_actuator_run_result_reason_state_schema_upgrade_rounds_exhausted.of_yojson v));
+       (fun v ->
+         map
+           (fun v -> Reason_state_schema_upgrade_timeout v)
+           (Sgs_actuator_run_result_reason_state_schema_upgrade_timeout.of_yojson v));
      ])
 
 let to_yojson = function
@@ -134,6 +164,17 @@ let to_yojson = function
   | Reason_capability_denied v -> Sgs_actuator_run_result_reason_capability_denied.to_yojson v
   | Reason_tx_conflict v -> Sgs_actuator_run_result_reason_tx_conflict.to_yojson v
   | Reason_tx_invalid_state v -> Sgs_actuator_run_result_reason_tx_invalid_state.to_yojson v
-  | Reason_state_schema_behind v -> Sgs_actuator_run_result_reason_state_schema_behind.to_yojson v
   | Reason_remote_state_address_unresolved v ->
       Sgs_actuator_run_result_reason_remote_state_address_unresolved.to_yojson v
+  | Reason_tx_schema_version_mismatch v ->
+      Sgs_actuator_run_result_reason_tx_schema_version_mismatch.to_yojson v
+  | Reason_state_schema_placeholder_present v ->
+      Sgs_actuator_run_result_reason_state_schema_placeholder_present.to_yojson v
+  | Reason_state_schema_remote_module_missing v ->
+      Sgs_actuator_run_result_reason_state_schema_remote_module_missing.to_yojson v
+  | Reason_state_schema_upgrade_failed v ->
+      Sgs_actuator_run_result_reason_state_schema_upgrade_failed.to_yojson v
+  | Reason_state_schema_upgrade_rounds_exhausted v ->
+      Sgs_actuator_run_result_reason_state_schema_upgrade_rounds_exhausted.to_yojson v
+  | Reason_state_schema_upgrade_timeout v ->
+      Sgs_actuator_run_result_reason_state_schema_upgrade_timeout.to_yojson v

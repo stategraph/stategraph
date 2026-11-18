@@ -1,11 +1,11 @@
 ---
 title: Kubernetes
-description: Deploy Stategraph on Kubernetes with the Helm chart, and set up the ingress, an external PostgreSQL, the health probes, and replicas.
+description: Deploy Stategraph Orchestration on Kubernetes with the Helm chart, connect GitHub or GitLab, and set up the ingress, an external PostgreSQL, the health probes, and replicas.
 order: 3
 ---
 
 
-The [Stategraph Helm chart](https://github.com/stategraph/helm-charts) deploys [Stategraph](/docs/admin/self-hosting) on Kubernetes, with an ingress, health probes, and a bundled or external PostgreSQL.
+The [Stategraph Helm chart](https://github.com/stategraph/helm-charts) deploys [Stategraph Orchestration](/docs/admin/self-hosting) on Kubernetes, with an ingress, health probes, and a bundled or external PostgreSQL.
 
 The chart installs the Open Source image, `ghcr.io/stategraph/stategraph-server-oss`. For [Enterprise](/docs/get-started/editions), set `stategraph.edition=enterprise`: the chart then installs `ghcr.io/stategraph/stategraph-server`. Enterprise needs a license key, in `stategraph.license.key` or `stategraph.license.existingSecret`, or entered on the setup screen. Each chart version pins a server release, and `stategraph.image.tag` overrides it.
 
@@ -32,6 +32,8 @@ For a local trial, forward the service, and create the first admin account on th
 kubectl port-forward -n stategraph svc/stategraph 8080:80
 ```
 
+Stategraph Orchestration is on. To connect GitHub or GitLab, Stategraph needs a public HTTPS URL: see [Production installation](#production-installation).
+
 !!! note "Cookie security follows the URL"
     An `https://` URL in `STATEGRAPH_UI_BASE` sets the `Secure` cookie flag, and an `http://` URL does not. So `stategraph.ui.base=http://myserver:8080` allows sign-in over plain HTTP, for a port-forward or an internal network.
 
@@ -54,6 +56,8 @@ helm install stategraph stategraph/stategraph \
   --set ingress.annotations."cert-manager\.io/cluster-issuer"="letsencrypt-prod"
 ```
 
+Open `https://stategraph.example.com`, create the first admin account on the setup screen, then [connect GitHub or GitLab](#connect-github-or-gitlab).
+
 ## Configuration
 
 `helm show values stategraph/stategraph` lists all chart values. The common ones:
@@ -66,6 +70,7 @@ helm install stategraph stategraph/stategraph \
 | `stategraph.replicaCount` | Number of server pods | `1` |
 | `stategraph.ui.base` | Public URL (`STATEGRAPH_UI_BASE`) | `http://localhost:8080` |
 | `stategraph.ui.oauthRedirectBase` | OAuth callback base (`STATEGRAPH_OAUTH_REDIRECT_BASE`) | unset |
+| `stategraph.orchestration.enabled` | Stategraph Orchestration | `true` |
 | `postgresql.enabled` | Run the bundled PostgreSQL | `true` |
 | `postgresql.auth.existingSecret` | Secret with the database password | `""` |
 | `postgresql.persistence.size` | Database volume | `10Gi` |
@@ -85,10 +90,6 @@ Then roll out the change:
 ```bash
 helm upgrade stategraph stategraph/stategraph -n stategraph -f values.yaml
 ```
-
-### More than one replica
-
-With Google or OIDC sign-in and a `stategraph.replicaCount` above `1`, set `STATEGRAPH_OAUTH_COOKIE_SECRET` to the same value on each pod, with 16, 24, or 32 characters. Otherwise each process makes a random cookie secret, replicas do not share sessions, and a sign-in fails when its callback goes to another replica. Replicas that start together migrate safely: see [Upgrades](/docs/admin/operations/upgrades).
 
 ## Using external PostgreSQL
 
@@ -113,7 +114,7 @@ kubectl create secret generic external-db-secret \
   -n stategraph
 ```
 
-Create the `stategraph` database before the first start.
+Create the `stategraph` database before the first start. For the rights of the database user, see [Databases](/docs/admin/self-hosting#databases). Without `CREATEDB` and `CREATEROLE`, set `stategraph.orchestration.provisionDatabase=false`: the chart's install notes then list the statements to run.
 
 ## Authentication
 
@@ -131,7 +132,7 @@ helm install stategraph stategraph/stategraph \
   --set stategraph.oauth.clientSecret="your-client-secret"
 ```
 
-In your provider, register `https://stategraph.example.com/oauth2/google/callback` or `/oauth2/oidc/callback` as the redirect URI. To limit sign-in to your domain, set `STATEGRAPH_OAUTH_EMAIL_DOMAIN`. See [Access control](/docs/admin/access-control).
+In your provider, register `https://stategraph.example.com/oauth2/google/callback` or `/oauth2/oidc/callback` as the redirect URI. To limit sign-in to your domain, set `STATEGRAPH_OAUTH_EMAIL_DOMAIN`. The chart generates the cookie secret that signs the sign-in, and gives each pod the same value. With `stategraph.oauth.existingSecret`, name its key in `stategraph.oauth.existingSecretKeys.cookieSecret`. See [Access control](/docs/admin/access-control).
 
 ## Health checks
 
@@ -173,107 +174,30 @@ At the first start, Stategraph loads the price book into the `cloud_pricing` dat
 
 Cost estimation connects with `PRICING_DB_*`, not `DB_*`. Its default host is `db`, the Docker Compose service name, so add `PRICING_DB_HOST` and `PRICING_DB_PASSWORD` for your database to the same `env` list. See [Enable cost estimation](/docs/admin/self-hosting/cost).
 
-## Enable Orchestration
+## Connect GitHub or GitLab
 
-Stategraph Orchestration is on as soon as `STATEGRAPH_FDW_PASSWORD` is set. Add the FDW role password and the GitHub App or GitLab credentials from Kubernetes secrets to the same `env` list. The webhook and runner URLs derive from `STATEGRAPH_UI_BASE`, and the callback URLs from `stategraph.ui.oauthRedirectBase`. For a GitHub App:
+Open **Get Started > Set up your first repository** in the console as the instance admin, and connect GitHub or GitLab. For GitHub, the console creates the GitHub App and stores it, with no change to the values. See [Connect GitHub or GitLab](/docs/admin/self-hosting/orchestration).
 
-```yaml
-# values.yaml
-env:
-  - name: GITHUB_APP_ID
-    valueFrom:
-      secretKeyRef:
-        name: stategraph-github-app
-        key: app-id
-  - name: GITHUB_APP_CLIENT_ID
-    valueFrom:
-      secretKeyRef:
-        name: stategraph-github-app
-        key: client-id
-  - name: GITHUB_APP_CLIENT_SECRET
-    valueFrom:
-      secretKeyRef:
-        name: stategraph-github-app
-        key: client-secret
-  - name: GITHUB_APP_PEM
-    valueFrom:
-      secretKeyRef:
-        name: stategraph-github-app
-        key: pem
-  - name: GITHUB_WEBHOOK_SECRET
-    valueFrom:
-      secretKeyRef:
-        name: stategraph-github-app
-        key: webhook-secret
-  - name: STATEGRAPH_FDW_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: stategraph-fdw
-        key: password
-```
-
-Create the secrets from the values of your GitHub App:
+To bring a GitHub App that you manage yourself, put its credentials in a secret:
 
 ```bash
-kubectl create secret generic stategraph-github-app -n stategraph \
-  --from-literal=app-id="$GITHUB_APP_ID" \
-  --from-literal=client-id="$GITHUB_APP_CLIENT_ID" \
-  --from-literal=client-secret="$GITHUB_APP_CLIENT_SECRET" \
-  --from-literal=pem="$GITHUB_APP_PEM" \
-  --from-literal=webhook-secret="$GITHUB_WEBHOOK_SECRET"
-
-kubectl create secret generic stategraph-fdw -n stategraph \
-  --from-literal=password='<fdw-password>'
-```
-
-To create the App from the console instead, leave out the five `GITHUB_*` entries and add `STATEGRAPH_FDW_PROVISIONER_PASSWORD` from a secret, as in the GitLab entries below. An instance admin then creates the App on the **Get Started** page, and Stategraph stores it in the Orchestration database. The `GITHUB_*` variables win over that App when set.
-
-For GitLab, replace the five `GITHUB_*` entries with the entries below. `STATEGRAPH_FDW_PROVISIONER_PASSWORD` lets the console connect a GitLab group. For self-managed GitLab, also add `GITLAB_API_BASE_URL` and `GITLAB_WEB_BASE_URL` with the root URL of the instance.
-
-```yaml
-# values.yaml, in the same env list
-  - name: GITLAB_APP_ID
-    valueFrom:
-      secretKeyRef:
-        name: stategraph-gitlab
-        key: app-id
-  - name: GITLAB_APP_SECRET
-    valueFrom:
-      secretKeyRef:
-        name: stategraph-gitlab
-        key: app-secret
-  - name: GITLAB_ACCESS_TOKEN
-    valueFrom:
-      secretKeyRef:
-        name: stategraph-gitlab
-        key: access-token
-  - name: STATEGRAPH_FDW_PROVISIONER_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: stategraph-fdw-provisioner
-        key: password
+kubectl create secret generic stategraph-github -n stategraph \
+  --from-literal=github-app-id="$GITHUB_APP_ID" \
+  --from-literal=github-app-client-id="$GITHUB_APP_CLIENT_ID" \
+  --from-literal=github-app-client-secret="$GITHUB_APP_CLIENT_SECRET" \
+  --from-literal=github-app-pem="$GITHUB_APP_PEM" \
+  --from-literal=github-webhook-secret="$GITHUB_WEBHOOK_SECRET"
 ```
 
 ```bash
-kubectl create secret generic stategraph-gitlab -n stategraph \
-  --from-literal=app-id="$GITLAB_APP_ID" \
-  --from-literal=app-secret="$GITLAB_APP_SECRET" \
-  --from-literal=access-token="$GITLAB_ACCESS_TOKEN"
-
-kubectl create secret generic stategraph-fdw-provisioner -n stategraph \
-  --from-literal=password='<provisioner-password>'
+helm upgrade stategraph stategraph/stategraph -n stategraph --reuse-values \
+  --set stategraph.orchestration.github.existingSecret=stategraph-github \
+  --set stategraph.orchestration.github.appUrl="$GITHUB_APP_URL"
 ```
 
-Orchestration also needs these on the same PostgreSQL server:
+Then set the webhook URL of the App to `https://stategraph.example.com/api/github/v1/events`.
 
-- The `terrateam` database.
-- The `stategraph_mql` role, with the FDW password.
-- For GitLab, the `stategraph_provisioner` role.
-- On managed PostgreSQL, superuser rights for `postgres_fdw`, through which the `stategraph` database reads `terrateam`.
-
-See [Enable Orchestration](/docs/admin/self-hosting/orchestration).
-
-After the rollout, with the `GITHUB_*` variables, set the webhook URL of your GitHub App to `https://stategraph.example.com/api/github/v1/events`, with the same secret. For GitLab, connect each group from the **Get Started** page of the console. The connect wizard shows the project webhook URL, `https://stategraph.example.com/api/v1/gitlab/events`, and the secret.
+For GitLab, the secret carries `gitlab-app-id`, `gitlab-app-secret`, and `gitlab-access-token`, and `stategraph.orchestration.gitlab.existingSecret` names it. For self-managed GitLab, also set `stategraph.orchestration.gitlab.apiBaseUrl` and `stategraph.orchestration.gitlab.webBaseUrl` to the root URL of the instance. Then connect each group from the **Get Started** page. The connect wizard shows the project webhook URL, `https://stategraph.example.com/api/v1/gitlab/events`, and the secret.
 
 ## Enable security scanning
 
@@ -283,10 +207,10 @@ Enterprise only. Add `STATEGRAPH_SECURITY` with the value `1` to the container `
 
 ```bash
 helm repo update
-helm upgrade stategraph stategraph/stategraph -n stategraph --reuse-values
+helm upgrade stategraph stategraph/stategraph -n stategraph --reset-then-reuse-values
 ```
 
-`--reuse-values` keeps the values of the install, the image included. Each chart version pins a server release; to run another one, set `stategraph.image.tag`. From chart 0.2.x, an Enterprise deployment adds `--set stategraph.edition=enterprise`. See [Upgrades](/docs/admin/operations/upgrades).
+`--reset-then-reuse-values` needs Helm 3.14 or later. It keeps the values that you set, and takes the defaults of the new chart. Each chart version pins a server release; to run another one, set `stategraph.image.tag`. From chart 0.2.x, an Enterprise deployment adds `--set stategraph.edition=enterprise`. Chart 0.4.0 turns on Orchestration: on an external PostgreSQL, check the [rights of the database user](#using-external-postgresql) first, or add `--set stategraph.orchestration.enabled=false`. With an earlier Helm, upgrade from 0.3.x with `--reuse-values --set stategraph.orchestration.enabled=true`. See [Upgrades](/docs/admin/operations/upgrades).
 
 ## Uninstalling
 
@@ -306,12 +230,11 @@ kubectl get events -n stategraph --sort-by='.lastTimestamp'
 A pod that never becomes ready is usually still migrating, or it failed at start and its log shows why:
 
 - A sign-in provider with a bad configuration.
-- `STATEGRAPH_ORCHESTRATION_ENABLED=true` without `STATEGRAPH_FDW_PASSWORD`.
 - No `GITHUB_WEBHOOK_SECRET`.
 - A `CONFIG : ERROR` line that names a missing GitLab variable.
 
 ## Next steps
 
-- [Import your Terraform state](/docs/get-started/quickstart/import-state)
-- [Enable Orchestration](/docs/admin/self-hosting/orchestration)
+- [Import your Terraform state](/docs/infrastructure-as-a-database/import-state)
+- [Connect GitHub or GitLab](/docs/admin/self-hosting/orchestration)
 - [Observability](/docs/admin/operations/observability)

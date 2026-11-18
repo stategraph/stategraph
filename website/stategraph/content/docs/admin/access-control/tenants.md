@@ -116,7 +116,7 @@ To turn this on in a self-hosted deployment:
 - Register `{STATEGRAPH_OAUTH_REDIRECT_BASE}/api/v1/vcs-installations/github/claim/callback` as a callback URL on the GitHub App.
 - Grant the GitHub App the organization **Members: read** permission.
 
-For the GitHub App setup, see [Enable orchestration](/docs/admin/self-hosting/orchestration).
+For the GitHub App setup, see [Connect GitHub](/docs/admin/self-hosting/orchestration#connect-github).
 
 ## Linking a GitLab installation
 
@@ -131,7 +131,7 @@ On **Settings > Integrations**, a tenant admin can also:
 - Rotate the access token, the webhook secret, or both (`PUT /api/v1/tenants/{tenant_id}/vcs-installations/gitlab/{group_id}`).
 - Unlink a GitHub or GitLab installation from the tenant (`DELETE /api/v1/tenants/{tenant_id}/vcs-installations/{provider}/{installation_core_id}`).
 
-In a self-hosted deployment, GitLab provisioning needs Orchestration turned on and `STATEGRAPH_FDW_PROVISIONER_PASSWORD` set. Without that password, the provisioning endpoint returns `503`. For the GitLab connection steps, see [Enable orchestration](/docs/admin/self-hosting/orchestration).
+In a self-hosted deployment, GitLab provisioning needs Orchestration on, with `STATEGRAPH_FDW_PROVISIONER_PASSWORD` set. Otherwise, the provisioning endpoint returns `503`. For the GitLab connection steps, see [Connect GitLab](/docs/admin/self-hosting/orchestration#connect-gitlab).
 
 ## Next steps
 

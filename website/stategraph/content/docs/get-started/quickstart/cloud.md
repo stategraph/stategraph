@@ -18,7 +18,7 @@ Go to [app.stategraph.cloud](https://app.stategraph.cloud), sign in, and name yo
 
 The Free plan includes every Orchestration feature. Plans differ by usage limits. See [Editions](/docs/get-started/editions).
 
-To import your Terraform state into Infrastructure as a Database, not connect GitHub or GitLab, see [Import your state](/docs/get-started/quickstart/import-state).
+To import your Terraform state into Infrastructure as a Database, not connect GitHub or GitLab, see [Import your state](/docs/infrastructure-as-a-database/import-state).
 
 ## Connect GitHub
 
@@ -242,5 +242,5 @@ Apply requirements gate the `stategraph apply` comment: approvals, no merge conf
 - [Configuration](/docs/orchestration/configuration): discovery, workflows, and guardrails.
 - [Pull request workflow](/docs/orchestration/workflows): every trigger and its effect.
 - [Cloud credentials](/docs/orchestration/security/cloud-credentials): OIDC and secrets for the runner.
-- [Import your state](/docs/get-started/quickstart/import-state): scoped plans and resource locks.
+- [Import your state](/docs/infrastructure-as-a-database/import-state): scoped plans and resource locks.
 - [Pull request commands](/docs/reference/orchestration/commands): all comment commands.

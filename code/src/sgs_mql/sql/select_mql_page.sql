@@ -256,8 +256,6 @@ transaction_logs as not materialized (
              )
            )
       then pg_temp.mask_tfvar_ephemeral_data(txl.data)
-      when txl.action = 'hcl_set' and txl.data -> 'data' -> 0 ->> 'type' = 'variable'
-      then pg_temp.mask_hcl_set_data(txl.data)
       else txl.data
     end as data,
     txl.id as id,
@@ -273,14 +271,10 @@ hcl as not materialized (
   select
     h.fq_address as fq_address,
     h.created_at as created_at,
-    -- SECURITY: the default of a variable declared [sensitive = true], except
-    -- in a tenant of [$unmasked_tenant_ids].
-    case
-      when h.data -> 0 ->> 'type' = 'variable'
-           and not (s.tenant_id = any($unmasked_tenant_ids::uuid[]))
-      then pg_temp.mask_hcl_variable_default(h.data)
-      else h.data
-    end as data,
+    -- SECURITY (mask policy): the configuration text is not a secret. A value
+    -- in stored HCL is a value the user reads in the code, so [hcl] serves it
+    -- as stored.
+    h.data as data,
     h.file_refs as file_refs,
     hh.expanded as hints,
     h.id as id,
@@ -353,14 +347,10 @@ tf_module_hcl as not materialized (
     tmh.version as version,
     tmh.id as id,
     tmh.fq_address as fq_address,
-    -- SECURITY: the default of a variable declared [sensitive = true], except
-    -- in a tenant of [$unmasked_tenant_ids].
-    case
-      when tmh.data -> 0 ->> 'type' = 'variable'
-           and not (s.tenant_id = any($unmasked_tenant_ids::uuid[]))
-      then pg_temp.mask_hcl_variable_default(tmh.data)
-      else tmh.data
-    end as data,
+    -- SECURITY (mask policy): the configuration text is not a secret. A value
+    -- in stored HCL is a value the user reads in the code, so [tf_module_hcl]
+    -- serves it as stored.
+    tmh.data as data,
     tmh.refs as refs,
     tmh.path_attrs as path_attrs,
     tmh.created_at as created_at,
@@ -520,12 +510,13 @@ tfvars as not materialized (
     tv.id as id,
     tv.var_address as var_address,
     tv.file as file,
-    -- SECURITY: the value of a variable declared [sensitive = true], except in a
-    -- tenant of [$unmasked_tenant_ids]. [hcl] is the scoped CTE above, whose
-    -- [data] keeps the [sensitive] attribute.
+    -- SECURITY: the value of a variable declared [sensitive = true]. A var file
+    -- can hold a value that never enters the repository -- a CI secret, a [--var]
+    -- on a command line, an encrypted var file -- so this arm masks every
+    -- tenant. [hcl] is the scoped CTE above, whose [data] keeps the [sensitive]
+    -- attribute, and the mask reads the declaration, not the default.
     case
-      when not (s.tenant_id = any($unmasked_tenant_ids::uuid[]))
-           and exists (
+      when exists (
         select 1
         from hcl as hv
         where hv.state_id = tv.state_id

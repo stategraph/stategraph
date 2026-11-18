@@ -121,7 +121,7 @@ After the import, manage these mappings with [`stategraph config files`](/docs/c
 
 ## Next Steps
 
-- [Import your Terraform state](/docs/get-started/quickstart/import-state): the guided quickstart.
+- [Import your Terraform state](/docs/infrastructure-as-a-database/import-state): the guided quickstart.
 - [Set up Infrastructure as a Database](/docs/infrastructure-as-a-database/setup): the full onboarding workflow.
 - [Terraform Commands](/docs/cli/tf): plan and apply after the import.
 - [States Commands](/docs/cli/states): inspect the imported state.

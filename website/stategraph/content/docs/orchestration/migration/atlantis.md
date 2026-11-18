@@ -45,7 +45,7 @@ As with `-p`, a tag in a comment selects only directories that the pull request 
 
 ## Before you begin
 
-- Connect the repository to Orchestration. See [Stategraph Cloud](/docs/get-started/quickstart/cloud) or [Self-hosted](/docs/get-started/quickstart/self-hosted).
+- Connect the repository to Orchestration. See [Stategraph Cloud](/docs/get-started/quickstart/cloud) or [Self-hosted](/docs/admin/self-hosting).
 - Install Python 3.8 or later and PyYAML.
 - Get the `repos.yaml` of your Atlantis server, and its server configuration file if it has one. The script converts the repository settings without them, but requirements, workflows, hooks, and policies often live there.
 
@@ -102,7 +102,7 @@ Exit status `0` means no manual steps, `2` means that the report lists manual st
 
 Your state stays in its backend, and the converted configuration runs Terraform on it as Atlantis did. To move each state into [Infrastructure as a Database](/docs/infrastructure-as-a-database) instead:
 
-1. Import the state of each directory and workspace with `stategraph import tf`, and commit the `stategraph.json` that it writes. See [Import your Terraform state](/docs/get-started/quickstart/import-state).
+1. Import the state of each directory and workspace with `stategraph import tf`, and commit the `stategraph.json` that it writes. See [Import your Terraform state](/docs/infrastructure-as-a-database/import-state).
 2. Set `engine: {name: stategraph}` in `.stategraph/config.yml`, and in each workflow that sets `engine`. `extra_args` of a `plan` step take the flags of `stategraph tf plan`, such as `--var-file`. Add the runner secrets. See [Use with Orchestration](/docs/infrastructure-as-a-database/orchestration).
 3. Remove the `backend` block from the configuration.
 

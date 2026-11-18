@@ -105,7 +105,12 @@ const FAILURE_LABELS: Partial<Record<RunFailure["reason"]["kind"], string>> = {
   tx_conflict: "Transaction conflict",
   tx_invalid_state: "Transaction was not in a state that allows this run",
   tf_binary_not_found: "terraform/tofu binary not found",
-  state_schema_behind: "State schema behind this server",
+  tx_schema_version_mismatch: "Schema version changed since the plan",
+  state_schema_placeholder_present: "State stores the sensitive-value placeholder",
+  state_schema_remote_module_missing: "State calls a remote module the server does not hold",
+  state_schema_upgrade_failed: "State schema upgrade failed",
+  state_schema_upgrade_rounds_exhausted: "State schema upgrade budget exhausted",
+  state_schema_upgrade_timeout: "State schema upgrade timed out",
 };
 
 /** A short human label for a failure, from its reason. */

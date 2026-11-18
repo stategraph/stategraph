@@ -9,7 +9,7 @@ Set up a coding agent so that it works on your infrastructure through Stategraph
 
 ## Before you begin
 
-- A Stategraph server with your state in it: [Stategraph Cloud](/docs/get-started/quickstart/cloud) or [self-hosted](/docs/get-started/quickstart/self-hosted). To load state, see [Import your state](/docs/get-started/quickstart/import-state).
+- A Stategraph server with your state in it: [Stategraph Cloud](/docs/get-started/quickstart/cloud) or [self-hosted](/docs/admin/self-hosting). To load state, see [Import your state](/docs/infrastructure-as-a-database/import-state).
 - A coding agent that can run shell commands, such as Claude Code, Codex, or Gemini CLI.
 
 ## 1. Install the CLI

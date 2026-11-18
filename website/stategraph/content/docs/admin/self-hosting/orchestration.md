@@ -1,59 +1,19 @@
 ---
-title: Enable Orchestration
-description: Set up Stategraph Orchestration on a self-hosted server with database passwords, your public URL, and a GitHub App or GitLab credentials.
+title: Connect GitHub or GitLab
+description: Connect a self-hosted Stategraph server to GitHub or GitLab, so that Stategraph Orchestration plans and applies from your pull requests.
 order: 6
 ---
 
 
-Stategraph Orchestration is on in the [Docker Compose](/docs/admin/self-hosting/docker-compose) setup. `STATEGRAPH_ORCHESTRATION_ENABLED=true` turns it on, `false` turns it off, and when the variable is unset, Orchestration is on exactly when `STATEGRAPH_FDW_PASSWORD` is set. To use it, give it two database passwords and your public URL, and connect a GitHub App or GitLab.
+Stategraph Orchestration is on in every self-hosted deployment. It plans and applies from your pull requests and merge requests, through a GitHub App or a GitLab connection. After you deploy Stategraph and create the first admin account, connect your provider from the **Get Started** page of the console.
 
-## Turn it on
+GitHub and GitLab call your server at its public URL, `STATEGRAPH_UI_BASE`, so they must reach that URL over HTTPS. The webhook, callback, and runner URLs derive from it.
 
-Add these variables to the container environment, and recreate the container:
+## Before you begin
 
-```bash
-STATEGRAPH_UI_BASE=https://stategraph.example.com
-STATEGRAPH_OAUTH_REDIRECT_BASE=https://stategraph.example.com
-STATEGRAPH_FDW_PASSWORD=<fdw-password>
-STATEGRAPH_FDW_PROVISIONER_PASSWORD=<provisioner-password>
-```
-
-| Variable | Notes |
-|----------|-------|
-| `STATEGRAPH_UI_BASE` | Your public URL. The webhook and runner URLs derive from it |
-| `STATEGRAPH_OAUTH_REDIRECT_BASE` | Your public URL. The callback URLs of the GitHub App are under it |
-| `STATEGRAPH_FDW_PASSWORD` | Password of the `stategraph_mql` database role. Setting it turns on Orchestration. See [Database](#database) |
-| `STATEGRAPH_FDW_PROVISIONER_PASSWORD` | Password of the `stategraph_provisioner` database role. The console creates the GitHub App and connects GitLab groups through it |
-
-`TERRAT_API_BASE` and `TERRAT_UI_BASE` default to `STATEGRAPH_UI_BASE` plus `/api`, and to `STATEGRAPH_UI_BASE`. Set them only when Orchestration has another public URL. `STATEGRAPH_ORCHESTRATION_ENABLED=false` turns Orchestration off with the passwords in place.
-
-Then connect your provider: [Connect GitHub](#connect-github) or [Connect GitLab](#connect-gitlab).
-
-The switch takes effect only with the default container command. Anonymous telemetry is on by default: `TERRAT_TELEMETRY_LEVEL=disabled` turns it off.
-
-## Database
-
-Orchestration stores its data in a second database, `terrateam`, on the same PostgreSQL server as `stategraph`. The console reads it through `postgres_fdw`, as the `stategraph_mql` role, and writes the GitHub App and the GitLab group connections as the `stategraph_provisioner` role. Stategraph creates the database and the roles, and keeps the grants of the roles current. You give the roles their passwords, one time.
-
-With the [Docker Compose](/docs/admin/self-hosting/docker-compose) setup, there is nothing to do: its `initdb/` scripts create the database and the roles at the first start of a new `db` volume, with the passwords that `orchestration.env` sets in `STATEGRAPH_FDW_PASSWORD` and `STATEGRAPH_FDW_PROVISIONER_PASSWORD`. For an existing volume, see [Connect GitHub or GitLab](/docs/admin/self-hosting/docker-compose#connect-github-or-gitlab).
-
-On any other PostgreSQL, create the roles before the first start with Orchestration on. If Stategraph already created them, use `ALTER ROLE` instead.
-
-```sql
-CREATE ROLE stategraph_mql LOGIN PASSWORD '<fdw-password>';
-CREATE ROLE stategraph_provisioner LOGIN PASSWORD '<provisioner-password>';
-```
-
-### Managed PostgreSQL
-
-On Amazon RDS, Cloud SQL, and other managed PostgreSQL, the role that Stategraph connects as is usually not a superuser. Then:
-
-- `postgres_fdw` needs superuser rights. On Amazon RDS, grant the role `rds_superuser`. Otherwise, create the foreign server and the user mapping in the `stategraph` database in advance. Without one of these, the Stategraph server does not start, and the error is in the server log.
-- When the role cannot create databases, create `terrateam` yourself, owned by that role. Stategraph logs the statement at each start. With `STATEGRAPH_ORCHESTRATION_ENABLED=true`, the start fails, and the server restarts a few seconds later. When only `STATEGRAPH_FDW_PASSWORD` turns on Orchestration, the server runs without Orchestration until its next start:
-
-```sql
-CREATE DATABASE terrateam OWNER stategraph;
-```
+- A public HTTPS URL in `STATEGRAPH_UI_BASE`, that GitHub or GitLab can reach. With Docker Compose and no public URL, use [Terratunnel](/docs/admin/self-hosting/docker-compose#5-set-the-public-url).
+- For GitHub, admin rights in the GitHub organization, to create and install a GitHub App.
+- For GitLab, gitlab.com or self-managed GitLab 18.1 or later (see [GitLab version](#gitlab-version)), a group (personal namespaces are not supported), and the rights to create an access token, add a project webhook, and change the project's CI/CD settings.
 
 ## Connect GitHub
 
@@ -61,7 +21,7 @@ Orchestration runs as a GitHub App that you own. An instance admin creates it fr
 
 ### From the console
 
-This path needs `STATEGRAPH_FDW_PROVISIONER_PASSWORD`. Sign in as an instance admin, and open **Get Started > Set up your first repository > Connect GitHub**. The first step is **Create**:
+Sign in as an instance admin, and open **Get Started > Set up your first repository > Connect GitHub**. The first step is **Create**:
 
 1. Keep the App name the console suggests, or type your own. GitHub requires a name no other App uses. To create the App under an organization, enter the organization name.
 2. Click **Create on GitHub**. GitHub opens with the App filled in: the webhook URL, the callback URLs, the setup URL, the permissions and events listed below, and OAuth on install.
@@ -126,7 +86,6 @@ Orchestration connects to GitLab as a bot user that you create, with an access t
 | `GITLAB_APP_SECRET` | Secret of the application. Required with `GITLAB_APP_ID` |
 | `GITLAB_ACCESS_TOKEN` | Access token of the bot user, with the `api` scope. Required with `GITLAB_APP_ID` |
 | `GITLAB_API_BASE_URL`, `GITLAB_WEB_BASE_URL` | Self-managed GitLab only: the root URL of the instance, for example `https://gitlab.example.com`. Both default to `https://gitlab.com` |
-| `STATEGRAPH_FDW_PROVISIONER_PASSWORD` | Password of the `stategraph_provisioner` database role. See [Database](#database). Without it, the console cannot connect a group |
 
 When `GITLAB_APP_ID` is set and `GITLAB_APP_SECRET` or `GITLAB_ACCESS_TOKEN` is missing, Orchestration does not start. The container log has a `CONFIG : ERROR` line that names the variable.
 
@@ -172,15 +131,96 @@ To replace a lost secret, rotate the credentials in **Settings > Integrations**.
 
 The instance must run GitLab 18.1 or later. Set `GITLAB_API_BASE_URL` and `GITLAB_WEB_BASE_URL` to its root URL, and enter the same URL in the connect wizard: Orchestration reads the variables, the console does not. Also mirror `gitlab.com/terrateam-io/terrateam-template` to `terrateam-io/terrateam-template` on the instance, because the `.gitlab-ci.yml` includes it from the instance that runs the pipeline. Without the mirror, pipeline creation fails.
 
-## Verify
+## Your first pull request
 
-After the container restarts with Orchestration on, search its log:
+Runs execute on your GitHub Actions or GitLab CI runners. The server only dispatches them.
 
-```bash
-docker compose logs server | grep -E 'terrat|GITHUB_APP|GitLab|CONFIG : ERROR|GITHUB_WEBHOOK_SECRET|CREATE DATABASE'
+### GitHub
+
+1. In the console, open **Get Started > Set up your first repository > Connect GitHub**. On the **Install** step, click **Install on GitHub**, and install the App on the organization that holds your repositories.
+2. Claim the installation:
+    - An instance admin sees every unclaimed installation.
+    - A tenant admin who is not an instance admin verifies with GitHub first, and sees only installations on organizations that they administer.
+3. Pick a repository that the App can access. To try Orchestration without cloud credentials, fork the [example repository](https://github.com/stategraph/kick-the-tires/fork), and enable workflows in the **Actions** tab of the fork.
+4. Add the [workflow file](#workflow-file) to the default branch.
+5. Open a pull request that changes a `.tf` file. Your GitHub App posts the plan comment.
+6. Comment `stategraph apply`, then merge.
+
+### GitLab
+
+1. [Connect the group](#connect-a-group), and push the `.gitlab-ci.yml` that the wizard shows to the default branch.
+2. Create a branch from the default branch, change a `.tf` file, and open a merge request. The owner of the group's access token posts the plan comment.
+3. Comment `stategraph apply`, then merge.
+
+### Workflow file
+
+Create `.github/workflows/stategraph.yml` on the default branch. Keep the file name and the action as shown:
+
+```yaml
+name: 'Stategraph'
+on:
+  workflow_dispatch:
+    inputs:
+      # The work-token and api-base-url are passed in by the backend
+      work-token:
+        description: 'Work Token'
+        required: true
+      api-base-url:
+        description: 'API Base URL'
+      environment:
+        description: 'Environment in which to run the action'
+        type: environment
+      runs_on:
+        description: 'runs-on configuration'
+        type: string
+        default: '"ubuntu-latest"'
+jobs:
+  stategraph:
+    permissions: # Required to pass credentials to the action
+      id-token: write
+      contents: read
+    runs-on: ${{ fromJSON(github.event.inputs.runs_on) }}
+    timeout-minutes: 1440
+    name: Stategraph
+    environment: '${{ github.event.inputs.environment }}'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Stategraph
+        id: stategraph
+        uses: terrateamio/action@v1
+        with:
+          work-token: '${{ github.event.inputs.work-token }}'
+          api-base-url: '${{ github.event.inputs.api-base-url }}'
+        env:
+          SECRETS_CONTEXT: ${{ toJson(secrets) }}
+          VARIABLES_CONTEXT: ${{ toJson(vars) }}
 ```
 
-A correct start logs that Orchestration starts and that the roles are reconciled, and with GitLab, `Starting GitLab Service`. With no GitHub App yet, it logs `GITHUB_APP : WAITING` until an instance admin creates one from the console, then `GITHUB_APP : LOADED` after the restart. A failed start logs the missing GitHub webhook secret, a `CONFIG : ERROR` line for a missing GitLab variable, or the `CREATE DATABASE` statement to run. Then open the console, and set up your first repository from the **Get Started** page. For anything else, see [Orchestration issues](/docs/reference/troubleshooting#orchestration-issues).
+The example repository already has this file.
+
+### If no plan starts
+
+- On GitHub, check that GitHub Actions is enabled and that the workflow file is on the default branch.
+- On GitHub, check the **Actions** tab for a run marked **Action required**. Select the run and select **Approve and run**.
+- On GitLab, check that the source branch contains `.gitlab-ci.yml` and that the minimum role to use pipeline variables is Developer.
+- Comment `stategraph repo-config` to see the configuration that Orchestration derived for the repository.
+- When a run fails, the pull request comment names the cause. Fix it and comment `stategraph plan`.
+
+## Verify
+
+After you connect a provider, search the container log:
+
+```bash
+docker compose logs server | grep -E 'terrat|GITHUB_APP|GitLab|CONFIG : ERROR|GITHUB_WEBHOOK_SECRET'
+```
+
+A correct start logs that Orchestration starts, and with GitLab, `Starting GitLab Service`. With no GitHub App yet, it logs `GITHUB_APP : WAITING` until an instance admin creates one from the console, then `GITHUB_APP : LOADED` after the restart. A failed start logs the missing GitHub webhook secret, or a `CONFIG : ERROR` line for a missing GitLab variable. Then open the console, and set up your first repository from the **Get Started** page. For anything else, see [Orchestration issues](/docs/reference/troubleshooting#orchestration-issues).
+
+## Turn Orchestration off
+
+Set `STATEGRAPH_ORCHESTRATION_ENABLED=false` in the container environment, and recreate the container. With the Helm chart, set `stategraph.orchestration.enabled=false`. With the Amazon ECS module, set `orchestration_enabled = false`.
+
+Orchestration sends anonymous telemetry by default. `TERRAT_TELEMETRY_LEVEL=disabled` turns it off.
 
 ## Next steps
 

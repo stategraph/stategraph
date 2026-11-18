@@ -64,11 +64,11 @@ The client ID or secret is wrong.
 
 **Symptoms**: Some logins fail at the OAuth callback with `403 Forbidden: Unable to find a valid CSRF token`, often after a restart or a scale-up.
 
-**Cause**: Without a shared secret, each replica signs the OAuth session and CSRF cookies with its own secret. When the login starts on one replica and the callback goes to another, that replica cannot validate the cookie.
+**Cause**: Without a shared secret, each replica signs the sign-in CSRF cookie with its own secret. When the login starts on one replica and the callback goes to another, that replica cannot validate the cookie.
 
 **Solutions**:
 
-- Set `STATEGRAPH_OAUTH_COOKIE_SECRET` to the same value, of 16, 24, or 32 characters, on each replica. Users then also stay logged in across restarts. The Helm chart and the ECS Terraform module create and share a stable value automatically.
+- Set `STATEGRAPH_OAUTH_COOKIE_SECRET` to the same value, of 16, 24, or 32 characters, on each replica. The Helm chart and the ECS Terraform module create and share a stable value automatically.
 - As a stopgap, turn on sticky sessions on the load balancer, so that one replica serves each login.
 
 ### "Access denied" after authentication
@@ -246,7 +246,7 @@ Error: the remote state address of data source data.terraform_remote_state.netwo
 
 ## Orchestration Issues
 
-For the flow of a run, see [Workflows](/docs/orchestration/workflows). For the self-hosted setup, see [Enable orchestration](/docs/admin/self-hosting/orchestration).
+For the flow of a run, see [Workflows](/docs/orchestration/workflows). For the self-hosted setup, see [Connect GitHub or GitLab](/docs/admin/self-hosting/orchestration).
 
 ### Orchestration does not start {#orchestration-engine-does-not-start}
 
@@ -259,7 +259,7 @@ For the flow of a run, see [Workflows](/docs/orchestration/workflows). For the s
 
 **Solution**:
 
-- Set the missing variable. `GITHUB_WEBHOOK_SECRET` is the webhook secret of your GitHub App. See [Enable orchestration](/docs/admin/self-hosting/orchestration) and [Connect GitLab](/docs/admin/self-hosting/orchestration#connect-gitlab).
+- Set the missing variable. `GITHUB_WEBHOOK_SECRET` is the webhook secret of your GitHub App. See [Connect GitHub](/docs/admin/self-hosting/orchestration#connect-github) and [Connect GitLab](/docs/admin/self-hosting/orchestration#connect-gitlab).
 
 ### Pull request comment gets an unknown-command reply
 
@@ -357,7 +357,7 @@ For the flow of a run, see [Workflows](/docs/orchestration/workflows). For the s
 
 - Set `GITHUB_APP_CLIENT_ID` and `GITHUB_APP_CLIENT_SECRET`.
 - Register `{STATEGRAPH_OAUTH_REDIRECT_BASE}/api/v1/vcs-installations/github/claim/callback` as a callback URL on the App.
-- Give the App the organization permission Members: read. See [Enable orchestration](/docs/admin/self-hosting/orchestration).
+- Give the App the organization permission Members: read. See [Connect GitHub](/docs/admin/self-hosting/orchestration#connect-github).
 
 ### Cannot connect a GitLab group from the console
 
@@ -377,7 +377,7 @@ Orchestration is not enabled on this server, so GitLab groups cannot be connecte
 
 **Solutions**:
 
-- [Turn on Orchestration](/docs/admin/self-hosting/orchestration#turn-it-on), set `STATEGRAPH_FDW_PROVISIONER_PASSWORD`, and give the `stategraph_provisioner` role that password. See [Database](/docs/admin/self-hosting/orchestration#database).
+- Check that Orchestration is on, and that `STATEGRAPH_FDW_PROVISIONER_PASSWORD` is set. The Docker Compose file, the Helm chart, and the Amazon ECS module set both. See [Turn Orchestration off](/docs/admin/self-hosting/orchestration#turn-orchestration-off).
 - For a connected group, continue its setup, or rotate its credentials in the wizard.
 - Ask a tenant admin to connect the group.
 

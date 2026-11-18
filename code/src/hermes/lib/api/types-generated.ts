@@ -359,6 +359,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description Mask policy: hcl, tf_module_hcl and the hcl_set log echo are served as stored; tfvars and state values stay masked. */
         get: operations["mql/get"];
         put?: never;
         post?: never;
@@ -3500,7 +3501,7 @@ export interface components {
         };
         /** @description One stored chunk of a transaction's apply output. */
         "tx-output-chunk": {
-            /** @description The base64 of one fragment of the payload's JSON text, cut between codepoints and outside escape sequences, so a chunk decodes on its own: a fragment of the apply's stdout string literal (the first chunk opens the quote, the last closes it) can be shown before the other chunks are fetched, and wrapped in quotes it parses as a JSON string. The whole payload is the concatenation of the decoded chunks in ascending idx, JSON-parsed. Served as stored, unmasked: tofu's own "(sensitive value)" redaction is all the redaction there is. */
+            /** @description The base64 of one fragment of the payload's JSON text, cut between codepoints and outside escape sequences, so a chunk decodes on its own: a fragment of the apply's stdout string literal (the first chunk opens the quote, the last closes it) can be shown before the other chunks are fetched, and wrapped in quotes it parses as a JSON string. The whole payload is the concatenation of the decoded chunks in ascending idx, JSON-parsed. Served as stored: tofu's own "(sensitive value)" redaction is all the redaction there is. */
             data: string;
             /** @description Zero-based chunk position within the output. */
             idx: number;
@@ -4165,20 +4166,6 @@ export interface components {
             /** @constant */
             kind: "tx_invalid_state";
         };
-        /** @description One state whose stored configuration is at an older Stategraph schema version than the server understands. Named well enough for an operator to find it: the id is unambiguous, the name and workspace are what they will recognise. */
-        "state-schema-behind-state": {
-            id: string;
-            name: string;
-            schema_version: number;
-            workspace: string;
-        };
-        /** @description One or more states pulled into the transaction's subgraph store their configuration in an older Stategraph representation than this server understands, so the run was refused before terraform ran. The client upgrades every state this reason names, from the configuration the state stored, and previews again in a fresh transaction, so the refusal is not terminal for the CLI. "states" names the offending states so the operator knows which; "server_schema_version" is what they must reach. */
-        "reason-state-schema-behind": {
-            /** @constant */
-            kind: "state_schema_behind";
-            server_schema_version: number;
-            states: components["schemas"]["state-schema-behind-state"][];
-        };
         /** @description A [terraform_remote_state] data source address names a variable or a local that does not resolve at plan time, so the run was refused before terraform ran. "block" is the address of the data source block; "variable" is the address that did not resolve; "detail" says why. */
         "reason-remote-state-address-unresolved": {
             block: string;
@@ -4187,8 +4174,54 @@ export interface components {
             kind: "remote_state_address_unresolved";
             variable: string;
         };
+        /** @description The transaction recorded a state schema version that differs from this server's, so the apply was refused before terraform ran. "planned_schema_version" is the version the transaction recorded when it was created; "server_schema_version" is this server's. Plan again in a new transaction. */
+        "reason-tx-schema-version-mismatch": {
+            /** @constant */
+            kind: "tx_schema_version_mismatch";
+            planned_schema_version: number;
+            server_schema_version: number;
+        };
+        /** @description One state whose in-process schema upgrade was refused. Named well enough for an operator to find it: the id is unambiguous, the name and workspace are what they will recognise, and "schema_version" is the version the state is stuck at. */
+        "state-schema-upgrade-state": {
+            id: string;
+            name: string;
+            schema_version: number;
+            workspace: string;
+        };
+        /** @description A state in the transaction's subgraph stores the sensitive-value placeholder in its HCL, so the upgrade refused the state instead of writing the placeholder back as the value. "state" names the state; the run was refused before terraform ran. */
+        "reason-state-schema-placeholder-present": {
+            /** @constant */
+            kind: "state_schema_placeholder_present";
+            state: components["schemas"]["state-schema-upgrade-state"];
+        };
+        /** @description A state in the transaction's subgraph calls a remote module whose body this server does not hold, so the upgrade refused the state instead of upgrading an incomplete configuration. "state" names the state; "source" names the module it calls and "version" is the version that call pins, absent when it pins none. */
+        "reason-state-schema-remote-module-missing": {
+            /** @constant */
+            kind: "state_schema_remote_module_missing";
+            source: string;
+            state: components["schemas"]["state-schema-upgrade-state"];
+            version?: string;
+        };
+        /** @description The state schema upgrade transaction this run waited on failed, so the run failed. "upgrade_tx_id" is that transaction. */
+        "reason-state-schema-upgrade-failed": {
+            /** @constant */
+            kind: "state_schema_upgrade_failed";
+            upgrade_tx_id: string;
+        };
+        /** @description The run re-ran the state schema upgrade protocol until its budget was spent and the states it serves were still behind, so it failed. "rounds" is how many upgrade rounds this run populated itself. */
+        "reason-state-schema-upgrade-rounds-exhausted": {
+            /** @constant */
+            kind: "state_schema_upgrade_rounds_exhausted";
+            rounds: number;
+        };
+        /** @description The run waited for a state schema upgrade longer than its bound, so it failed. "seconds" is the bound it waited. */
+        "reason-state-schema-upgrade-timeout": {
+            /** @constant */
+            kind: "state_schema_upgrade_timeout";
+            seconds: number;
+        };
         /** @description One cause of an actuator-run failure. The "kind" discriminates the shape; terraform-phase failures (init/plan/show_json/apply) carry the captured stdout and stderr. */
-        "run-failure-reason": components["schemas"]["reason-tf-binary-not-found"] | components["schemas"]["reason-hcl-parse"] | components["schemas"]["reason-write"] | components["schemas"]["reason-init"] | components["schemas"]["reason-plan"] | components["schemas"]["reason-show-json"] | components["schemas"]["reason-failed-apply"] | components["schemas"]["reason-read"] | components["schemas"]["reason-temp-dir"] | components["schemas"]["reason-preview-fetch"] | components["schemas"]["reason-preview-decode"] | components["schemas"]["reason-params-fetch"] | components["schemas"]["reason-bad-request"] | components["schemas"]["reason-unauthorized"] | components["schemas"]["reason-failed-transport-call"] | components["schemas"]["reason-client-create"] | components["schemas"]["reason-next-task-failed"] | components["schemas"]["reason-next-timeout"] | components["schemas"]["reason-results-task-failed"] | components["schemas"]["reason-capability-denied"] | components["schemas"]["reason-tx-conflict"] | components["schemas"]["reason-tx-invalid-state"] | components["schemas"]["reason-state-schema-behind"] | components["schemas"]["reason-remote-state-address-unresolved"];
+        "run-failure-reason": components["schemas"]["reason-tf-binary-not-found"] | components["schemas"]["reason-hcl-parse"] | components["schemas"]["reason-write"] | components["schemas"]["reason-init"] | components["schemas"]["reason-plan"] | components["schemas"]["reason-show-json"] | components["schemas"]["reason-failed-apply"] | components["schemas"]["reason-read"] | components["schemas"]["reason-temp-dir"] | components["schemas"]["reason-preview-fetch"] | components["schemas"]["reason-preview-decode"] | components["schemas"]["reason-params-fetch"] | components["schemas"]["reason-bad-request"] | components["schemas"]["reason-unauthorized"] | components["schemas"]["reason-failed-transport-call"] | components["schemas"]["reason-client-create"] | components["schemas"]["reason-next-task-failed"] | components["schemas"]["reason-next-timeout"] | components["schemas"]["reason-results-task-failed"] | components["schemas"]["reason-capability-denied"] | components["schemas"]["reason-tx-conflict"] | components["schemas"]["reason-tx-invalid-state"] | components["schemas"]["reason-remote-state-address-unresolved"] | components["schemas"]["reason-tx-schema-version-mismatch"] | components["schemas"]["reason-state-schema-placeholder-present"] | components["schemas"]["reason-state-schema-remote-module-missing"] | components["schemas"]["reason-state-schema-upgrade-failed"] | components["schemas"]["reason-state-schema-upgrade-rounds-exhausted"] | components["schemas"]["reason-state-schema-upgrade-timeout"];
         /** @description A set of strings, as rules read longest match first: "a.*" allows every string starting with "a.", "!a.b" refuses "a.b", and the more specific rule decides. Order does not matter. An empty list allows nothing. */
         scope: string[];
         /** @description The addresses reached in the states a rule names. */
@@ -5306,8 +5339,6 @@ export interface operations {
                 page?: string[];
                 tz?: string;
                 q: string;
-                /** @description Return the stored defaults of sensitive variables and the stored values of sensitive tfvars in the hcl, tf_module_hcl and tfvars tables, without masking, for the rows of each tenant that the preview capability of the session reaches. The rows of other tenants stay masked. Every other table stays masked. */
-                unmasked?: boolean;
             };
             header?: never;
             path?: never;
@@ -5336,15 +5367,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-            /** @description The session cannot preview in any tenant of the user, and the request asks for unmasked results. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["error-response"];
-                };
             };
             414: {
                 headers: {

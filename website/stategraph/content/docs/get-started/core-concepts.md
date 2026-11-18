@@ -98,7 +98,7 @@ In Infrastructure as a Database, a state is one Terraform state, the resources o
 
 ## Group
 
-A group connects a configuration directory to its states, one per workspace, such as `default`, `staging`, or `production`. The import writes the mapping to `stategraph.json` in that directory, so the CLI knows which state a directory drives. See [Import your Terraform state](/docs/get-started/quickstart/import-state). A group ID with a workspace selects one state. Each state also has its own state ID, which the API and the `--state` option of the CLI use.
+A group connects a configuration directory to its states, one per workspace, such as `default`, `staging`, or `production`. The import writes the mapping to `stategraph.json` in that directory, so the CLI knows which state a directory drives. See [Import your Terraform state](/docs/infrastructure-as-a-database/import-state). A group ID with a workspace selects one state. Each state also has its own state ID, which the API and the `--state` option of the CLI use.
 
 ## Resource and instance
 
