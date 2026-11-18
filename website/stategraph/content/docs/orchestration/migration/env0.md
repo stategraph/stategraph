@@ -33,7 +33,7 @@ Plans and applies move from env0 runners to your GitHub Actions or GitLab CI run
 
 ## Before you begin
 
-- Connect the repository to Orchestration. See [Stategraph Cloud](/docs/get-started/quickstart/cloud) or [Self-hosted](/docs/get-started/quickstart/self-hosted).
+- Connect the repository to Orchestration. See [Stategraph Cloud](/docs/get-started/quickstart/cloud) or [Self-hosted](/docs/admin/self-hosting).
 - Install Python 3.8 or later and PyYAML, and the [Stategraph CLI](/docs/cli).
 - Create an API key in env0 under **Organization settings → API keys**, of type **Admin**, not read-only. It reads the environments and the state, and `--state-via-task` runs a task.
 - For Infrastructure as a Database, export `STATEGRAPH_API_BASE`, `STATEGRAPH_API_KEY`, and `STATEGRAPH_TENANT_ID`. See [Use with Orchestration](/docs/infrastructure-as-a-database/orchestration).
@@ -152,7 +152,7 @@ stategraph states summary --state <state-id>
 
 6. Delete the state files.
 
-For the import on its own, see [Import your Terraform state](/docs/get-started/quickstart/import-state). For the engine and the runner secrets, see [Use with Orchestration](/docs/infrastructure-as-a-database/orchestration).
+For the import on its own, see [Import your Terraform state](/docs/infrastructure-as-a-database/import-state). For the engine and the runner secrets, see [Use with Orchestration](/docs/infrastructure-as-a-database/orchestration).
 
 ### Into a bucket backend
 

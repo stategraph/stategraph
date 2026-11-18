@@ -103,7 +103,7 @@ A query can have more than one join. Write the join type: `JOIN` alone, `LEFT OU
 | `files`, `tfvars` | Data files and variable definitions of a state, with ephemeral tfvar values masked |
 | `transaction_plan_operations`, `transaction_output_chunks` | Per-resource plan operations and apply output of transactions |
 | `transaction_subgraphs`, `revision_hashes`, `revision_tx_hashes` | Transaction and revision bookkeeping |
-| `github_pull_requests`, `gitlab_pull_requests`, `pull_request_stacks`, `plans`, `gates`, `gate_approvals`, `drift_schedules`, `github_work_manifests`, `gitlab_work_manifests`, `work_manifest_results`, `github_pull_request_latest_unlocks`, `gitlab_pull_request_latest_unlocks`, … | Orchestration data for GitHub and GitLab of your tenant: runs, pull requests, stacks, gates, and drift schedules. Present when [Orchestration is enabled](/docs/admin/self-hosting/orchestration) |
+| `github_pull_requests`, `gitlab_pull_requests`, `pull_request_stacks`, `plans`, `gates`, `gate_approvals`, `drift_schedules`, `github_work_manifests`, `gitlab_work_manifests`, `work_manifest_results`, `github_pull_request_latest_unlocks`, `gitlab_pull_request_latest_unlocks`, … | Orchestration data for GitHub and GitLab of your tenant: runs, pull requests, stacks, gates, and drift schedules. Present when [Orchestration is on](/docs/admin/self-hosting/orchestration) |
 
 For the full list of tables and columns, run `stategraph sql schema`, or see [Query](/docs/infrastructure-as-a-database/query/query).
 

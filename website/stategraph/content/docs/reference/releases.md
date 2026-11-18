@@ -66,7 +66,7 @@ All images are on GitHub Container Registry.
 
 ### Server
 
-Host Stategraph yourself with one of these images. Open Source needs no license key, and Enterprise needs one: see [Editions](/docs/get-started/editions). Orchestration is on in the [Docker Compose](/docs/admin/self-hosting/docker-compose) setup. For other deployments, see [Enable Orchestration](/docs/admin/self-hosting/orchestration).
+Host Stategraph yourself with one of these images. Open Source needs no license key, and Enterprise needs one: see [Editions](/docs/get-started/editions). Orchestration is on in every deployment: see [Self-hosting](/docs/admin/self-hosting).
 
 ```bash
 # Open Source

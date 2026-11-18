@@ -5,7 +5,7 @@ order: 2
 ---
 
 
-Set up Infrastructure as a Database for one Terraform or OpenTofu root module, from the API key to the first apply. For the fastest path from a state file to a first plan, see [Import your Terraform state](/docs/get-started/quickstart/import-state).
+Set up Infrastructure as a Database for one Terraform or OpenTofu root module, from the API key to the first apply. For the fastest path from a state file to a first plan, see [Import your Terraform state](/docs/infrastructure-as-a-database/import-state).
 
 ## Before you begin
 

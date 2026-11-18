@@ -1,11 +1,11 @@
 ---
 title: Amazon ECS
-description: Deploy Stategraph on Amazon ECS Fargate with the Terraform module, an Application Load Balancer, and RDS PostgreSQL.
+description: Deploy Stategraph Orchestration on Amazon ECS Fargate with the Terraform module, an Application Load Balancer, and RDS PostgreSQL.
 order: 4
 ---
 
 
-Deploy [Stategraph](/docs/admin/self-hosting) on Amazon ECS Fargate with the [Stategraph ECS Terraform module](https://github.com/stategraph/terraform-aws-stategraph-ecs).
+Deploy [Stategraph Orchestration](/docs/admin/self-hosting) on Amazon ECS Fargate with the [Stategraph ECS Terraform module](https://github.com/stategraph/terraform-aws-stategraph-ecs), then connect GitHub or GitLab.
 
 The module runs the Open Source image, `ghcr.io/stategraph/stategraph-server-oss`. For [Enterprise](/docs/get-started/editions), set `edition = "enterprise"`: the module then runs `ghcr.io/stategraph/stategraph-server`. Enterprise needs a license key, in `license_key` or entered on the setup screen. Replace `<module version>` with the latest tag of the [module](https://github.com/stategraph/terraform-aws-stategraph-ecs/tags).
 
@@ -118,6 +118,10 @@ terraform output -raw alb_zone_id
 
 After DNS propagates, open `https://stategraph.example.com` and create the first admin account on the setup screen. The module sets `STATEGRAPH_UI_BASE` to `https://<domain_name>`, so cookies have the `Secure` flag. Keep `domain_name` in step with the certificate and DNS record.
 
+### 6. Connect GitHub or GitLab
+
+Stategraph Orchestration is on. Open **Get Started > Set up your first repository** as the instance admin, and connect GitHub or GitLab. For GitHub, the console creates the GitHub App and stores it, with no change to the module. GitLab needs credentials from Secrets Manager first: see [GitLab and your own GitHub App](#gitlab-and-your-own-github-app).
+
 ## Configuration
 
 ### Required variables
@@ -144,6 +148,7 @@ After DNS propagates, open `https://stategraph.example.com` and create the first
 | `edition` | `oss` or `enterprise`: the server image | `oss` |
 | `stategraph_version` | Server release of the image | the release of the module version |
 | `stategraph_image` | Server image. Overrides `edition` and `stategraph_version` | `null` |
+| `orchestration_enabled` | Stategraph Orchestration | `true` |
 
 The module documentation lists every variable. Stategraph settings are [environment variables](/docs/admin/operations/environment-variables) on the server container in the task definition. Reference Secrets Manager secrets in the `secrets` list of the container definition, not in `environment`.
 
@@ -202,7 +207,7 @@ module "stategraph" {
 }
 ```
 
-The tasks need network access to the database server, and the `stategraph` database must exist before the first start.
+The tasks need network access to the database server, and the `stategraph` database must exist before the first start. For the rights of the database user, see [Databases](/docs/admin/self-hosting#databases).
 
 ## Authentication
 
@@ -226,7 +231,7 @@ module "stategraph" {
 
 In your provider, register the callback URL: `https://stategraph.example.com/oauth2/google/callback` for Google, `https://stategraph.example.com/oauth2/oidc/callback` for OIDC. Keep the client secret in an uncommitted `terraform.tfvars` file or a secrets manager.
 
-The module runs `ecs_desired_count` tasks. Set `STATEGRAPH_OAUTH_COOKIE_SECRET` in the server container environment to the same 16, 24, or 32 character value on each task. Otherwise each task signs cookies with its own random secret, and tasks do not share sessions. See [Access control](/docs/admin/access-control).
+The module generates `STATEGRAPH_OAUTH_COOKIE_SECRET` and gives each task the same value, so a sign-in can finish on any task. See [Access control](/docs/admin/access-control).
 
 ## Enable cost estimation
 
@@ -245,11 +250,21 @@ Enterprise only. Set `STATEGRAPH_COST_ENABLED=true` in the server container envi
 
 At the first start, Stategraph loads the price book into `cloud_pricing` in the background. Cost estimation connects with `PRICING_DB_*`, not `DB_*`, so point `PRICING_DB_HOST` and `PRICING_DB_PASSWORD` at the RDS instance. See [Enable cost estimation](/docs/admin/self-hosting/cost).
 
-## Enable Orchestration
+## GitLab and your own GitHub App
 
-Stategraph Orchestration is off by default. To turn it on, add `STATEGRAPH_ORCHESTRATION_ENABLED=true` and `STATEGRAPH_FDW_PASSWORD` to the server container environment, with the Orchestration public URLs. Keep the FDW password and each GitHub App or GitLab credential in Secrets Manager. For GitLab, these are `GITLAB_APP_ID`, `GITLAB_APP_SECRET`, `GITLAB_ACCESS_TOKEN`, and `STATEGRAPH_FDW_PROVISIONER_PASSWORD`.
+Pass the GitLab credentials, or the credentials of a GitHub App that you manage yourself, from Secrets Manager with `extra_secrets`. For GitLab, these are `GITLAB_APP_ID`, `GITLAB_APP_SECRET`, and `GITLAB_ACCESS_TOKEN`. See [Connect GitHub or GitLab](/docs/admin/self-hosting/orchestration) for how to create them.
 
-Orchestration needs a second database, `terrateam`, on the RDS instance. The `stategraph` database reads it through `postgres_fdw`, which on Amazon RDS needs the `rds_superuser` role for the database user. [Enable Orchestration](/docs/admin/self-hosting/orchestration) lists the variables and the database steps.
+```hcl
+module "stategraph" {
+  # ...
+
+  extra_secrets = [
+    { name = "GITLAB_APP_ID", value_from = "${aws_secretsmanager_secret.gitlab.arn}:app_id::" },
+    { name = "GITLAB_APP_SECRET", value_from = "${aws_secretsmanager_secret.gitlab.arn}:app_secret::" },
+    { name = "GITLAB_ACCESS_TOKEN", value_from = "${aws_secretsmanager_secret.gitlab.arn}:access_token::" },
+  ]
+}
+```
 
 To store a credential, for example the GitHub App private key:
 
@@ -268,7 +283,7 @@ aws ecs update-service \
   --force-new-deployment
 ```
 
-Then set the GitHub App webhook URL to `https://stategraph.example.com/api/github/v1/events`. For GitLab, connect each group from the **Get Started** page of the console. Its connect wizard shows the project webhook URL, `https://stategraph.example.com/api/v1/gitlab/events`, and the secret.
+For your own GitHub App, then set its webhook URL to `https://stategraph.example.com/api/github/v1/events`. For GitLab, connect each group from the **Get Started** page of the console. Its connect wizard shows the project webhook URL, `https://stategraph.example.com/api/v1/gitlab/events`, and the secret.
 
 ## Scaling
 
@@ -348,6 +363,6 @@ aws logs tail $(terraform output -raw cloudwatch_log_group_name) --follow
 
 ## Next steps
 
-- [Import your Terraform state](/docs/get-started/quickstart/import-state)
-- [Enable Orchestration](/docs/admin/self-hosting/orchestration)
+- [Import your Terraform state](/docs/infrastructure-as-a-database/import-state)
+- [Connect GitHub or GitLab](/docs/admin/self-hosting/orchestration)
 - [Gap analysis on AWS resources](/docs/infrastructure-as-a-database/query/gap-analysis)

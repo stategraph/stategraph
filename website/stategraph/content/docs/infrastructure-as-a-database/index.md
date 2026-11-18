@@ -57,7 +57,7 @@ stategraph tf mtx --tenant <tenant-id> --out plan.json ./networking ./compute ./
 ## Get started
 
 1. Get a server: [Stategraph Cloud](/docs/get-started/quickstart/cloud) or [host Stategraph yourself](/docs/admin/self-hosting).
-2. Import a state and run your first plan: see [Import your Terraform state](/docs/get-started/quickstart/import-state) for a short walkthrough, or [Setup](/docs/infrastructure-as-a-database/setup) for the full guide.
+2. Import a state and run your first plan: see [Import your Terraform state](/docs/infrastructure-as-a-database/import-state) for a short walkthrough, or [Setup](/docs/infrastructure-as-a-database/setup) for the full guide.
 
 ## In this section
 

@@ -10,7 +10,7 @@ Two `run` steps in an Atlantis custom workflow send plans and applies through th
 
 - The `stategraph` binary and OpenTofu on the Atlantis server's `PATH` before the first plan. Atlantis has no per-run install hook, so use a derived image of your Atlantis base image, or a custom image with both.
 - A Stategraph server that the Atlantis server can reach, with `STATEGRAPH_API_BASE`, `STATEGRAPH_API_KEY`, and `STATEGRAPH_TENANT_ID` in the Atlantis server's environment.
-- Your state imported once, with `stategraph.json` committed. See [Import your Terraform state](/docs/get-started/quickstart/import-state).
+- Your state imported once, with `stategraph.json` committed. See [Import your Terraform state](/docs/infrastructure-as-a-database/import-state).
 
 ## Define the workflow
 

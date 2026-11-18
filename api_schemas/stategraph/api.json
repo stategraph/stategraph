@@ -4720,7 +4720,7 @@
         "description": "One stored chunk of a transaction's apply output.",
         "properties": {
           "data": {
-            "description": "The base64 of one fragment of the payload's JSON text, cut between codepoints and outside escape sequences, so a chunk decodes on its own: a fragment of the apply's stdout string literal (the first chunk opens the quote, the last closes it) can be shown before the other chunks are fetched, and wrapped in quotes it parses as a JSON string. The whole payload is the concatenation of the decoded chunks in ascending idx, JSON-parsed. Served as stored, unmasked: tofu's own \"(sensitive value)\" redaction is all the redaction there is.",
+            "description": "The base64 of one fragment of the payload's JSON text, cut between codepoints and outside escape sequences, so a chunk decodes on its own: a fragment of the apply's stdout string literal (the first chunk opens the quote, the last closes it) can be shown before the other chunks are fetched, and wrapped in quotes it parses as a JSON string. The whole payload is the concatenation of the decoded chunks in ascending idx, JSON-parsed. Served as stored: tofu's own \"(sensitive value)\" redaction is all the redaction there is.",
             "type": "string"
           },
           "idx": {
@@ -7179,6 +7179,7 @@
     },
     "/api/v1/mql": {
       "get": {
+        "description": "Mask policy: hcl, tf_module_hcl and the hcl_set log echo are served as stored; tfvars and state values stay masked.",
         "operationId": "mql/get",
         "parameters": [
           {
@@ -7207,15 +7208,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "description": "Return the stored defaults of sensitive variables and the stored values of sensitive tfvars in the hcl, tf_module_hcl and tfvars tables, without masking, for the rows of each tenant that the preview capability of the session reaches. The rows of other tenants stay masked. Every other table stays masked.",
-            "in": "query",
-            "name": "unmasked",
-            "required": false,
-            "schema": {
-              "type": "boolean"
-            }
           }
         ],
         "responses": {
@@ -7238,16 +7230,6 @@
             }
           },
           "401": {},
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/error-response"
-                }
-              }
-            },
-            "description": "The session cannot preview in any tenant of the user, and the request asks for unmasked results."
-          },
           "414": {}
         }
       }

@@ -89,7 +89,7 @@ A missing or invalid sign-in variable stops the server at start, with the reason
 
 ## Orchestration
 
-[Enable Orchestration](/docs/admin/self-hosting/orchestration) explains the database, the roles, and the GitHub and GitLab setup.
+[Connect GitHub or GitLab](/docs/admin/self-hosting/orchestration) explains the GitHub and GitLab setup.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -196,5 +196,5 @@ If a configuration change has no effect, check the server metrics first: see [Ob
 ## Next steps
 
 - [Docker Compose](/docs/admin/self-hosting/docker-compose): the reference setup
-- [Enable Orchestration](/docs/admin/self-hosting/orchestration)
+- [Connect GitHub or GitLab](/docs/admin/self-hosting/orchestration)
 - [Upgrades](/docs/admin/operations/upgrades): variables whose behavior changed between releases

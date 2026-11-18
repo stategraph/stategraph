@@ -48,7 +48,7 @@ Stategraph runs a change to your cloud in one of two ways: Orchestration runs it
 
 ## Where each part runs
 
-- Stategraph runs on Stategraph Cloud, or on your own Docker Compose, Kubernetes, Amazon ECS, or Google Cloud Run deployment: see [Self-hosting](/docs/admin/self-hosting). It stores your states, transactions, users, and tenants, and serves the console and the API. The open-source edition runs Orchestration: see [Self-hosted](/docs/get-started/quickstart/self-hosted).
+- Stategraph runs on Stategraph Cloud, or on your own Docker Compose, Kubernetes, Amazon ECS, or Google Cloud Run deployment: see [Self-hosting](/docs/admin/self-hosting). It stores your states, transactions, users, and tenants, and serves the console and the API. The open-source edition runs Orchestration.
 - Plans and applies run on your GitHub Actions or GitLab CI runners. The `stategraph` CLI runs there or on your machine.
 - With Orchestration, you can query runs, pull requests, drift schedules, and more with SQL in your tenant.
 
@@ -57,6 +57,6 @@ Stategraph runs a change to your cloud in one of two ways: Orchestration runs it
 - [Core concepts](/docs/get-started/core-concepts): the vocabulary.
 - [Workflows](/docs/orchestration/workflows): pull request triggers.
 - [Self-hosting](/docs/admin/self-hosting): run Stategraph yourself.
-- [Enable Orchestration](/docs/admin/self-hosting/orchestration): GitHub App, GitLab, webhook secret, and databases.
+- [Connect GitHub or GitLab](/docs/admin/self-hosting/orchestration): the GitHub App, GitLab, and the webhook secret.
 - [Infrastructure as a Database](/docs/infrastructure-as-a-database): transactions, locking, and multi-state transactions.
 - [Use with Orchestration](/docs/infrastructure-as-a-database/orchestration): pull request runs with Infrastructure as a Database.

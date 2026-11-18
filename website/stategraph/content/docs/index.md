@@ -14,9 +14,9 @@ Stategraph is infrastructure as code with a database underneath, and works with 
     <h3>Stategraph Cloud</h3>
     <p>Sign up, connect GitHub or GitLab, and run your first plan and apply from a pull request.</p>
   </a>
-  <a href="/docs/get-started/quickstart" class="docs-product-card">
+  <a href="/docs/admin/self-hosting" class="docs-product-card">
     <h3>Self-hosted</h3>
-    <p>Run Open Source with Docker Compose, or the Enterprise build with a license key.</p>
+    <p>Run Orchestration on Docker Compose, Kubernetes, Amazon ECS, or Google Cloud Run, as Open Source or Enterprise.</p>
   </a>
 </div>
 
@@ -118,7 +118,7 @@ A Terraform state file is one JSON file per workspace, and each run locks all of
 Adopt Stategraph in two steps:
 
 1. Start with Orchestration and the tool that you use now: Terraform, OpenTofu, Terragrunt, Pulumi, or CDKTF. Your state stays where it is.
-2. Change to the [`stategraph` engine](/docs/infrastructure-as-a-database/orchestration), and [import your state](/docs/get-started/quickstart/import-state) into Infrastructure as a Database. You can export it back to a Terraform state file.
+2. Change to the [`stategraph` engine](/docs/infrastructure-as-a-database/orchestration), and [import your state](/docs/infrastructure-as-a-database/import-state) into Infrastructure as a Database. You can export it back to a Terraform state file.
 
 ## Browse the docs
 
@@ -146,7 +146,7 @@ Adopt Stategraph in two steps:
 <ul>
 <li><a href="/docs/infrastructure-as-a-database">Overview</a></li>
 <li><a href="/docs/infrastructure-as-a-database/setup">Setup</a></li>
-<li><a href="/docs/get-started/quickstart/import-state">Import your state</a></li>
+<li><a href="/docs/infrastructure-as-a-database/import-state">Import your state</a></li>
 <li><a href="/docs/infrastructure-as-a-database/orchestration">Use with Orchestration</a></li>
 </ul>
 </div>

@@ -311,28 +311,100 @@
       ],
       "type": "object"
     },
-    "reason-state-schema-behind": {
+    "reason-state-schema-placeholder-present": {
       "additionalProperties": false,
-      "description": "One or more states pulled into the transaction's subgraph store their configuration in an older Stategraph representation than this server understands, so the run was refused before terraform ran. The client upgrades every state this reason names, from the configuration the state stored, and previews again in a fresh transaction, so the refusal is not terminal for the CLI. \"states\" names the offending states so the operator knows which; \"server_schema_version\" is what they must reach.",
+      "description": "A state in the transaction's subgraph stores the sensitive-value placeholder in its HCL, so the upgrade refused the state instead of writing the placeholder back as the value. \"state\" names the state; the run was refused before terraform ran.",
       "properties": {
         "kind": {
-          "const": "state_schema_behind",
+          "const": "state_schema_placeholder_present",
           "type": "string"
         },
-        "server_schema_version": {
-          "type": "integer"
-        },
-        "states": {
-          "items": {
-            "$ref": "#/definitions/state-schema-behind-state"
-          },
-          "type": "array"
+        "state": {
+          "$ref": "#/definitions/state-schema-upgrade-state"
         }
       },
       "required": [
         "kind",
-        "states",
-        "server_schema_version"
+        "state"
+      ],
+      "type": "object"
+    },
+    "reason-state-schema-remote-module-missing": {
+      "additionalProperties": false,
+      "description": "A state in the transaction's subgraph calls a remote module whose body this server does not hold, so the upgrade refused the state instead of upgrading an incomplete configuration. \"state\" names the state; \"source\" names the module it calls and \"version\" is the version that call pins, absent when it pins none.",
+      "properties": {
+        "kind": {
+          "const": "state_schema_remote_module_missing",
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/state-schema-upgrade-state"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "state",
+        "source"
+      ],
+      "type": "object"
+    },
+    "reason-state-schema-upgrade-failed": {
+      "additionalProperties": false,
+      "description": "The state schema upgrade transaction this run waited on failed, so the run failed. \"upgrade_tx_id\" is that transaction.",
+      "properties": {
+        "kind": {
+          "const": "state_schema_upgrade_failed",
+          "type": "string"
+        },
+        "upgrade_tx_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "upgrade_tx_id"
+      ],
+      "type": "object"
+    },
+    "reason-state-schema-upgrade-rounds-exhausted": {
+      "additionalProperties": false,
+      "description": "The run re-ran the state schema upgrade protocol until its budget was spent and the states it serves were still behind, so it failed. \"rounds\" is how many upgrade rounds this run populated itself.",
+      "properties": {
+        "kind": {
+          "const": "state_schema_upgrade_rounds_exhausted",
+          "type": "string"
+        },
+        "rounds": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "rounds"
+      ],
+      "type": "object"
+    },
+    "reason-state-schema-upgrade-timeout": {
+      "additionalProperties": false,
+      "description": "The run waited for a state schema upgrade longer than its bound, so it failed. \"seconds\" is the bound it waited.",
+      "properties": {
+        "kind": {
+          "const": "state_schema_upgrade_timeout",
+          "type": "string"
+        },
+        "seconds": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "seconds"
       ],
       "type": "object"
     },
@@ -407,6 +479,28 @@
       "required": [
         "kind",
         "expected_state"
+      ],
+      "type": "object"
+    },
+    "reason-tx-schema-version-mismatch": {
+      "additionalProperties": false,
+      "description": "The transaction recorded a state schema version that differs from this server's, so the apply was refused before terraform ran. \"planned_schema_version\" is the version the transaction recorded when it was created; \"server_schema_version\" is this server's. Plan again in a new transaction.",
+      "properties": {
+        "kind": {
+          "const": "tx_schema_version_mismatch",
+          "type": "string"
+        },
+        "planned_schema_version": {
+          "type": "integer"
+        },
+        "server_schema_version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "planned_schema_version",
+        "server_schema_version"
       ],
       "type": "object"
     },
@@ -530,10 +624,25 @@
           "$ref": "#/definitions/reason-tx-invalid-state"
         },
         {
-          "$ref": "#/definitions/reason-state-schema-behind"
+          "$ref": "#/definitions/reason-remote-state-address-unresolved"
         },
         {
-          "$ref": "#/definitions/reason-remote-state-address-unresolved"
+          "$ref": "#/definitions/reason-tx-schema-version-mismatch"
+        },
+        {
+          "$ref": "#/definitions/reason-state-schema-placeholder-present"
+        },
+        {
+          "$ref": "#/definitions/reason-state-schema-remote-module-missing"
+        },
+        {
+          "$ref": "#/definitions/reason-state-schema-upgrade-failed"
+        },
+        {
+          "$ref": "#/definitions/reason-state-schema-upgrade-rounds-exhausted"
+        },
+        {
+          "$ref": "#/definitions/reason-state-schema-upgrade-timeout"
         }
       ]
     },
@@ -624,6 +733,31 @@
     "state-schema-behind-state": {
       "additionalProperties": false,
       "description": "One state whose stored configuration is at an older Stategraph schema version than the server understands. Named well enough for an operator to find it: the id is unambiguous, the name and workspace are what they will recognise.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "schema_version": {
+          "type": "integer"
+        },
+        "workspace": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "workspace",
+        "schema_version"
+      ],
+      "type": "object"
+    },
+    "state-schema-upgrade-state": {
+      "additionalProperties": false,
+      "description": "One state whose in-process schema upgrade was refused. Named well enough for an operator to find it: the id is unambiguous, the name and workspace are what they will recognise, and \"schema_version\" is the version the state is stuck at.",
       "properties": {
         "id": {
           "type": "string"

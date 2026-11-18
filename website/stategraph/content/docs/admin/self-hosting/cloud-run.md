@@ -1,11 +1,11 @@
 ---
 title: Google Cloud Run
-description: Deploy Stategraph on Google Cloud Run with Cloud SQL for PostgreSQL, the Cloud SQL Auth Proxy sidecar, and Secret Manager.
+description: Deploy Stategraph Orchestration on Google Cloud Run with Cloud SQL for PostgreSQL, the Cloud SQL Auth Proxy sidecar, and Secret Manager.
 order: 5
 ---
 
 
-Deploy [Stategraph](/docs/admin/self-hosting) as a fully managed Google Cloud Run service, with Cloud SQL for PostgreSQL through a Cloud SQL Auth Proxy sidecar, and Secret Manager for the database password.
+Deploy [Stategraph Orchestration](/docs/admin/self-hosting) as a fully managed Google Cloud Run service, with Cloud SQL for PostgreSQL through a Cloud SQL Auth Proxy sidecar, and Secret Manager for the database password.
 
 ## Before you begin
 
@@ -170,6 +170,21 @@ spec:
             # Set to the service URL after the first deploy (step 8).
             - name: STATEGRAPH_UI_BASE
               value: "https://REPLACE_WITH_SERVICE_URL"
+            # Stategraph Orchestration, with the same database user.
+            - name: STATEGRAPH_FDW_USER
+              value: "stategraph"
+            - name: STATEGRAPH_FDW_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: stategraph-db-pass
+                  key: "latest"
+            - name: STATEGRAPH_FDW_PROVISIONER_USER
+              value: "stategraph"
+            - name: STATEGRAPH_FDW_PROVISIONER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: stategraph-db-pass
+                  key: "latest"
           # Migrations run at boot; /health/ready returns 502 until they finish.
           startupProbe:
             httpGet:
@@ -262,6 +277,12 @@ curl -sS -H "Authorization: Bearer $TOKEN" \
 
 Open `$SERVICE_URL` and create the first admin account on the setup screen.
 
+### 11. Connect GitHub or GitLab
+
+Stategraph Orchestration is on, and creates its database at the first start. Open **Get Started > Set up your first repository** as the instance admin, and connect GitHub or GitLab. For GitHub, the console creates the GitHub App and stores it, with no change to the service. GitLab needs credentials in the service first: see [GitLab and your own GitHub App](#gitlab-and-your-own-github-app).
+
+GitHub and GitLab must reach the service URL, so this needs the unauthenticated access of step 9.
+
 ## Configuration
 
 The quick start sets the minimum on the `server` container:
@@ -298,13 +319,24 @@ Local email and password sign-in is on by default. For Google or OIDC, add the O
     secretKeyRef:
       name: stategraph-oauth-secret
       key: "latest"
+- name: STATEGRAPH_OAUTH_COOKIE_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: stategraph-oauth-cookie-secret
+      key: "latest"
 - name: STATEGRAPH_OAUTH_REDIRECT_BASE
   value: "https://stategraph.example.com"
 - name: STATEGRAPH_OAUTH_EMAIL_DOMAIN
   value: "example.com"
 ```
 
-In your provider, register `https://<your-domain>/oauth2/google/callback` or `/oauth2/oidc/callback`. Keep the client secret in Secret Manager, and grant the runtime service account `roles/secretmanager.secretAccessor` on it, as for the database password. See [Access control](/docs/admin/access-control).
+The service runs up to three instances, so give them one cookie secret of 32 characters. Otherwise a sign-in that starts on one instance fails on another:
+
+```bash
+openssl rand -hex 16 | tr -d '\n' | gcloud secrets create stategraph-oauth-cookie-secret --data-file=-
+```
+
+In your provider, register `https://<your-domain>/oauth2/google/callback` or `/oauth2/oidc/callback`. Keep the client secret in Secret Manager, and grant the runtime service account `roles/secretmanager.secretAccessor` on it and on the cookie secret, as for the database password. See [Access control](/docs/admin/access-control).
 
 ## Enable cost estimation
 
@@ -327,17 +359,9 @@ Enterprise only. Add `STATEGRAPH_COST_ENABLED=true` to the `server` container, a
 
 At the first start, Stategraph creates the `cloud_pricing` database, because the `gcloud` user has `cloudsqlsuperuser`, which includes `CREATEDB`. It then loads the price book in the background. The price book is in Cloud SQL, so it survives instance replacement. See [Enable cost estimation](/docs/admin/self-hosting/cost).
 
-## Enable Orchestration
+## GitLab and your own GitHub App
 
-Stategraph Orchestration is off by default. To turn it on, add `STATEGRAPH_ORCHESTRATION_ENABLED=true` to the `server` container. Also add the Orchestration public URLs, the FDW role password, and the GitHub App or GitLab credentials from Secret Manager. GitLab also needs `STATEGRAPH_FDW_PROVISIONER_PASSWORD`, so that the console can connect a GitLab group.
-
-Orchestration also needs the `terrateam` database on the same Cloud SQL instance:
-
-- The `gcloud` user has `CREATEDB`, so Orchestration creates it at the first start, owned by the role that it connects as.
-- The `stategraph` database reads it through `postgres_fdw`, which on managed PostgreSQL needs superuser rights, or a foreign server and user mapping that you create in advance.
-- `STATEGRAPH_FDW_HOST` is the address that the Cloud SQL instance uses to reach `terrateam`, not the sidecar address.
-
-[Enable Orchestration](/docs/admin/self-hosting/orchestration) lists the variables and the roles.
+Add the GitLab credentials, or the credentials of a GitHub App that you manage yourself, to the `server` container from Secret Manager, and redeploy. For GitLab, these are `GITLAB_APP_ID`, `GITLAB_APP_SECRET`, and `GITLAB_ACCESS_TOKEN`. For each secret, grant the runtime service account `roles/secretmanager.secretAccessor`, as in step 5. [Connect GitHub or GitLab](/docs/admin/self-hosting/orchestration) lists the variables and how to create them.
 
 ## Scaling
 
@@ -418,6 +442,6 @@ Invalid Tier (db-f1-micro) for (ENTERPRISE_PLUS) Edition
 
 ## Next steps
 
-- [Import your Terraform state](/docs/get-started/quickstart/import-state)
-- [Enable Orchestration](/docs/admin/self-hosting/orchestration)
+- [Import your Terraform state](/docs/infrastructure-as-a-database/import-state)
+- [Connect GitHub or GitLab](/docs/admin/self-hosting/orchestration)
 - [Gap analysis on GCP resources](/docs/infrastructure-as-a-database/query/gap-analysis)

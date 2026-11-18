@@ -36,13 +36,13 @@ At each start, Stategraph migrates its databases, then serves requests.
 - `/health/ready` answers `502` until Stategraph has migrated and serves, so a load balancer or readiness probe keeps traffic on the old containers. `/health/live` answers `200` as soon as Stategraph listens on port 8080. See [Health checks](/docs/admin/operations/health-checks).
 - A failed Orchestration migration stops the start when `STATEGRAPH_ORCHESTRATION_ENABLED=true`. When only `STATEGRAPH_FDW_PASSWORD` turns on Orchestration, Stategraph logs the error and serves without Orchestration until its next start.
 - A failed Stategraph server restarts every few seconds. In Docker Compose, the container waits for a healthy PostgreSQL through `depends_on`.
-- With Orchestration on, the `stategraph` migration also drops and rebuilds the `postgres_fdw` bridge to `terrateam` at each start. On managed PostgreSQL, this needs superuser rights: see [Enable Orchestration](/docs/admin/self-hosting/orchestration).
+- With Orchestration on, the `stategraph` migration also drops and rebuilds the `postgres_fdw` bridge to `terrateam` at each start. On managed PostgreSQL, this needs superuser rights: see [Databases](/docs/admin/self-hosting#databases).
 
 ## Rolling replacement
 
 At stop, Stategraph refuses new requests, finishes those in progress, then shuts down, within a 60 second grace period. Give the container that period: `stop_grace_period: 60s` in Compose, `stopTimeout` of 60 on ECS, or `terminationGracePeriodSeconds: 60` on the pod. Stopping it sooner cuts requests short.
 
-For zero downtime, run several replicas and let readiness control traffic. Set the same `STATEGRAPH_OAUTH_COOKIE_SECRET` on each, so that sessions survive.
+For zero downtime, run several replicas and let readiness control traffic. With Google or OIDC sign-in, give each the same `STATEGRAPH_OAUTH_COOKIE_SECRET`, so that a sign-in in progress can finish on any replica. The Helm chart and the ECS module do this.
 
 ## Behavior changes to check
 

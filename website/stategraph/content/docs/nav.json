@@ -39,20 +39,12 @@
           "title": "Quickstart",
           "items": [
             {
-              "page": "/docs/get-started/quickstart",
-              "label": "Choose a path"
-            },
-            {
               "page": "/docs/get-started/quickstart/cloud",
               "label": "Stategraph Cloud"
             },
             {
-              "page": "/docs/get-started/quickstart/self-hosted",
+              "href": "/docs/admin/self-hosting",
               "label": "Self-hosted"
-            },
-            {
-              "page": "/docs/get-started/quickstart/import-state",
-              "label": "Import your state"
             }
           ]
         }
@@ -411,6 +403,10 @@
               "label": "Setup"
             },
             {
+              "page": "/docs/infrastructure-as-a-database/import-state",
+              "label": "Import your state"
+            },
+            {
               "page": "/docs/infrastructure-as-a-database/orchestration",
               "label": "Use with Orchestration"
             }
@@ -661,7 +657,7 @@
             },
             {
               "page": "/docs/admin/self-hosting/orchestration",
-              "label": "Enable Orchestration"
+              "label": "Connect GitHub or GitLab"
             },
             {
               "page": "/docs/admin/self-hosting/cost",
