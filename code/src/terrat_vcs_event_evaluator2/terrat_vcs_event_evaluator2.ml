@@ -343,18 +343,40 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                        its hold of the work manifest row and its claim of the
                        job row both skip instead of wait, so no transaction
                        that waits for a work manifest row can close a cycle
-                       with it.  The read is lock-only: the candidate answer
-                       already carries everything it decides.  A work manifest
-                       with no node takes the fallback in dispatch_reserved,
-                       which makes one, and a node made here conflicts with no
-                       reader of another node. *)
+                       with it.  A work manifest with no node takes the
+                       fallback in dispatch_reserved, which makes one, and a
+                       node made here conflicts with no reader of another
+                       node.
+
+                       The select chose the candidate while its node was
+                       [queued], and the node can hold more than one work
+                       manifest.  A dispatcher that started a sibling of the
+                       candidate on the same node held this row until it
+                       committed, and the read under the hold returns the state
+                       it committed.  A node that is no longer [queued] has an
+                       action run that serves the candidate on its poll, so a
+                       second run must not start.  work_manifest_can_run asks
+                       about one work manifest and does not read the state of
+                       its node, thus the test is here. *)
                       (match compute_node_id with
-                      | Some compute_node_id ->
+                      | Some compute_node_id -> (
                           S.Job_context.Compute_node.query ~request_id ~compute_node_id db
-                          >>| fun _ -> ()
-                      | None -> Abbs_fc.return_ok ())
-                    >>= fun () ->
-                    (* Claim the row of the job of the candidate without
+                          >>| function
+                          | Some { Tjc.Compute_node.state = Tjc.Compute_node.State.Queued; _ }
+                          | None -> `Queued
+                          | Some _ -> `Started)
+                      | None -> Abbs_fc.return_ok `Queued)
+                    >>= function
+                    | `Started ->
+                        Logs.info (fun m ->
+                            m
+                              "%s : RUN_WORK_MANIFEST : id=%a : node_started"
+                              request_id
+                              Uuidm.pp
+                              wm.Wm.id);
+                        Abbs_fc.return_ok `Cont
+                    | `Queued -> (
+                        (* Claim the row of the job of the candidate without
                        waiting.  The claim is the mutex of the
                        concurrent_runs limit: two dispatchers that count the
                        running work manifests of one job at the same time can
@@ -365,20 +387,20 @@ module Make (S : Terrat_vcs_provider2.S) = struct
                        row, and a wait here would close that cycle (RFD
                        2903).  A work manifest with no job row takes no
                        claim. *)
-                    (match job_id with
-                      | Some job_id ->
-                          S.Db.claim_work_manifest_job ~request_id ~job_id db
-                          >>| fun claimed -> if claimed then None else Some job_id
-                      | None -> Abbs_fc.return_ok None)
-                    >>= function
-                    | Some job_id ->
-                        (* The job row is held by another transaction: a
+                          (match job_id with
+                          | Some job_id ->
+                              S.Db.claim_work_manifest_job ~request_id ~job_id db
+                              >>| fun claimed -> if claimed then None else Some job_id
+                          | None -> Abbs_fc.return_ok None)
+                        >>= function
+                        | Some job_id ->
+                            (* The job row is held by another transaction: a
                            sibling dispatch in flight, or a job going terminal.
                            End this transaction, which releases the
                            reservation of the candidate, and come back with
                            the job excluded from the drain. *)
-                        Abbs_fc.return_ok (`Skip_job job_id)
-                    | None -> dispatch_reserved ~db ~wm ~compute_node_id)
+                            Abbs_fc.return_ok (`Skip_job job_id)
+                        | None -> dispatch_reserved ~db ~wm ~compute_node_id))
                 | None -> Abbs_fc.return_ok `Done)))
     >>= function
     | `Cont -> run_next_pending_compute ~exclude_jobs ~request_id ~config ~storage ~exec ()

@@ -235,7 +235,7 @@ let csrf_test =
           ~pp:Oauth2_htp_csrf.pp_err
           (Oauth2_htp_csrf.set_cookie ~now ~secret:secret_32 ~secure:true csrf)
       in
-      Oth_abb.Assert.str_contains_all
+      Oth_abb.Assert.String.contains_all
         ~haystack:(Oauth2_htp_cookie.to_set_cookie_header cookie)
         ~needles:
           [
@@ -339,11 +339,11 @@ let oauth_start_test =
       (* An unsafe destination is replaced by the root, and an absolute one must be whitelisted. *)
       start t "//evil.test/x"
       >>= fun res ->
-      Oth_abb.Assert.str_contains ~haystack:(state_of res) ~needle:":/";
-      Oth_abb.Assert.str_doesnt_contain ~haystack:(state_of res) ~needle:"evil";
+      Oth_abb.Assert.String.contains ~haystack:(state_of res) ~needle:":/";
+      Oth_abb.Assert.String.doesnt_contain ~haystack:(state_of res) ~needle:"evil";
       start t "https://app.test/x"
       >>= fun res ->
-      Oth_abb.Assert.str_contains ~haystack:(state_of res) ~needle:":https://app.test/x";
+      Oth_abb.Assert.String.contains ~haystack:(state_of res) ~needle:":https://app.test/x";
       Abb.Future.return ())
 
 let screen_hint_test =

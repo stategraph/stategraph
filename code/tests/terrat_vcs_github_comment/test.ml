@@ -79,11 +79,11 @@ let test =
           (* The error is last, which is the whole point. *)
           let s = CCString.repeat "noise\n" 500 ^ "Error: 403 Forbidden: read-only dashboard\n" in
           let out = P.tail_of ~max_bytes:200 s in
-          Oth.Assert.str_contains ~haystack:out ~needle:"Error: 403 Forbidden";
+          Oth.Assert.String.contains ~haystack:out ~needle:"Error: 403 Forbidden";
           Oth.Assert.true_ (CCString.length out < 400));
       Oth.test ~name:"a trim is announced" (fun _ ->
           let s = CCString.repeat "x\n" 500 in
-          Oth.Assert.str_contains ~haystack:(P.tail_of ~max_bytes:50 s) ~needle:marker);
+          Oth.Assert.String.contains ~haystack:(P.tail_of ~max_bytes:50 s) ~needle:marker);
       Oth.test ~name:"kept text resumes at a line boundary" (fun _ ->
           let s = CCString.repeat "abcdefghij\n" 100 in
           let out = P.tail_of ~max_bytes:35 s in
@@ -99,7 +99,7 @@ let test =
       Oth.test ~name:"output with no newline at all still trims" (fun _ ->
           let s = CCString.repeat "z" 1000 in
           let out = P.tail_of ~max_bytes:100 s in
-          Oth.Assert.str_contains ~haystack:out ~needle:marker;
+          Oth.Assert.String.contains ~haystack:out ~needle:marker;
           Oth.Assert.true_ (CCString.length out < 300));
       (* A plan, apply or init step can now carry visible_on, so the payload has to win over the
          step's default. *)

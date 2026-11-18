@@ -75,29 +75,6 @@ module Assert = struct
 
   let false_ msg = raise (Assert_failure_msg msg)
 
-  let str_contains ~haystack ~needle =
-    if not (CCString.find ~sub:needle haystack >= 0) then
-      raise
-        (Assert_failure_msg
-           (Format.asprintf
-              "Expected HAYSTACK to contain NEEDLE, but it doesn't! See \
-               below.@.HAYSTACK:@.%s@.NEEDLE:@.%s"
-              haystack
-              needle))
-
-  let str_contains_all ~haystack ~needles =
-    CCList.iter (fun needle -> str_contains ~haystack ~needle) needles
-
-  let str_doesnt_contain ~haystack ~needle =
-    if CCString.find ~sub:needle haystack >= 0 then
-      raise
-        (Assert_failure_msg
-           (Format.asprintf
-              "Expected HAYSTACK to not contain NEEDLE, but it does! See \
-               below.@.HAYSTACK:@.%s@.NEEDLE:@.%s"
-              haystack
-              needle))
-
   module List = struct
     let length ~expected l =
       let actual = CCList.length l in
@@ -218,9 +195,31 @@ module Assert = struct
       if not (CCString.is_empty s) then
         false_ (Format.asprintf "Expected string to be empty, but got: %s" s)
 
-    (* TODO should move close to its friends as str_doesnt_contain_any (or the others should move here..) *)
+    let contains ~haystack ~needle =
+      if not (CCString.find ~sub:needle haystack >= 0) then
+        raise
+          (Assert_failure_msg
+             (Format.asprintf
+                "Expected HAYSTACK to contain NEEDLE, but it doesn't! See \
+                 below.@.HAYSTACK:@.%s@.NEEDLE:@.%s"
+                haystack
+                needle))
+
+    let contains_all ~haystack ~needles =
+      CCList.iter (fun needle -> contains ~haystack ~needle) needles
+
+    let doesnt_contain ~haystack ~needle =
+      if CCString.find ~sub:needle haystack >= 0 then
+        raise
+          (Assert_failure_msg
+             (Format.asprintf
+                "Expected HAYSTACK to not contain NEEDLE, but it does! See \
+                 below.@.HAYSTACK:@.%s@.NEEDLE:@.%s"
+                haystack
+                needle))
+
     let doesnt_contain_any ~haystack ~needles =
-      CCList.iter (fun needle -> str_doesnt_contain ~haystack ~needle) needles
+      CCList.iter (fun needle -> doesnt_contain ~haystack ~needle) needles
   end
 end
 

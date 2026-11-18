@@ -224,7 +224,7 @@ let no_stranger_io_after_close =
         (match st with
         | `Det res -> Result.is_error res
         | `Undet | `Aborted | `Exn _ -> false);
-      Oth.Assert.str_doesnt_contain ~haystack:(Bytes.to_string buf) ~needle:"STRANGER";
+      Oth.Assert.String.doesnt_contain ~haystack:(Bytes.to_string buf) ~needle:"STRANGER";
       close_both c d >>= fun () -> close_both a b >>= fun () -> Abb.Future.return ())
 
 (* The shape abb_tls uses: wait for readiness, retry, repeat.  The loop has to
