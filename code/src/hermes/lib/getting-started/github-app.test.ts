@@ -67,6 +67,23 @@ const tests: Array<{ name: string; run: () => void }> = [
     },
   },
   {
+    name: "an install that did not finish starts over like no result",
+    run: () => {
+      assert.equal(
+        githubConnectStep({ claimResult: "returned", creatable: true, ready: true }),
+        "install",
+      );
+      assert.equal(
+        githubConnectStep({ claimResult: "returned", creatable: true, ready: false }),
+        "create",
+      );
+      assert.equal(
+        githubConnectStep({ claimResult: "returned", creatable: false, ready: false }),
+        "install",
+      );
+    },
+  },
+  {
     name: "only the callback's results are results",
     run: () => {
       assert.equal(githubAppResult("created"), "created");

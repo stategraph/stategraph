@@ -15,6 +15,7 @@ export interface SetupFacts {
 }
 
 export const ORCHESTRATION_SETUP_HREF = "/getting-started?path=orchestrate";
+export const FIRST_RUN_SETUP_HREF = "/getting-started?path=orchestrate&step=repo";
 export const STATE_SETUP_HREF = "/migrate-stategraph";
 export const ENGINE_SETUP_HREF = "/migrate-stategraph?step=orchestration";
 export const STATE_DOCS_HREF = "https://stategraph.com/docs/infrastructure-as-a-database";
@@ -36,14 +37,19 @@ export function engineStatus(facts: Pick<SetupFacts, "engineRun">): SetupStatus 
 }
 
 /** What an empty orchestration screen shows: `connect` replaces the screen's copy with the way into
- *  setup, `ask-admin` follows it with who connects a provider, `plain` is the screen's copy alone.
+ *  setup, `first-run` replaces it with the way to a first run once a provider is linked, `ask-admin`
+ *  follows it with who connects a provider, `plain` is the screen's copy alone.
  *  A member cannot read the installation list, so a member is only told when the tenant has no run. */
-export type OrchestrationEmptyKind = "connect" | "ask-admin" | "plain";
+export type OrchestrationEmptyKind = "connect" | "first-run" | "ask-admin" | "plain";
 
 export function orchestrationEmptyKind(
   facts: Pick<SetupFacts, "hasWorkManifest" | "linkedInstallation"> & { tenantAdmin: boolean },
 ): OrchestrationEmptyKind {
-  if (facts.tenantAdmin) return facts.linkedInstallation === false ? "connect" : "plain";
+  if (facts.tenantAdmin) {
+    if (facts.linkedInstallation === false) return "connect";
+    if (facts.linkedInstallation === true && facts.hasWorkManifest === false) return "first-run";
+    return "plain";
+  }
   return facts.hasWorkManifest === false ? "ask-admin" : "plain";
 }
 
@@ -196,6 +202,9 @@ export const SETUP_COPY = {
     connectBody: "Connect a GitHub organization or GitLab group to run plans from pull requests.",
     connectAction: "Get started",
     askAdmin: "A tenant admin connects GitHub or GitLab from Get Started.",
+    firstRunTitle: "No runs yet",
+    firstRunBody: "A run starts when a pull request changes a Terraform file in a connected repository.",
+    firstRunAction: "Create your first run",
   },
   featureNav: {
     firstRunHint: "After your first run",

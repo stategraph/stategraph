@@ -287,6 +287,7 @@ export const ORCHESTRATION_COPY = {
     referenceAction: "Open config reference",
   },
   handoff: "Continue to repository",
+  firstRun: "Create your first run",
 } as const;
 
 /** Source: docs/src/content/docs/quickstart/cloud/first-plan-apply.mdx, docs/src/content/docs/overview/how-it-works.mdx. Legacy demo contract: code/src/iris/src/lib/GettingStarted.svelte */

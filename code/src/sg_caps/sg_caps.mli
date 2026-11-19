@@ -5,6 +5,15 @@
     {!union} and {!inter} are exact -- they allow exactly what their operands allow between them, or
     in common.
 
+    Capabilities authorize changing and administering, not reading. What a session reads of a
+    tenant's infrastructure -- its states, its transactions and their results, and what MQL answers
+    over them -- is decided by its user's membership of that tenant, whatever capabilities the
+    session holds. A tenant scope therefore limits what its grant may change or administer there; it
+    does not confine the session to those tenants: an access token whose every grant names tenant A
+    still reads every tenant its user is a member of. The administrative records of a tenant -- its
+    members, invitations, group rules, billing sources and VCS installations -- are the exception:
+    they are read under the [admin] or [users-manage] grant that changes them.
+
     A capability that reaches nothing is a capability that is not there: there is no option around a
     scope, and {!empty} allows nothing at all.
 

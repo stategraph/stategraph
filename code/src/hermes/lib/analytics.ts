@@ -78,6 +78,9 @@ export async function startAnalytics(mode: string | undefined): Promise<void> {
       capture_pageview: "history_change",
       capture_pageleave: true,
       disable_session_recording: true,
+      // Replays carry no text: page text names organizations, repositories
+      // and tenants.
+      session_recording: { maskAllInputs: true, maskTextSelector: "*" },
       disable_surveys: true,
       before_send: scrubUrls,
     });
@@ -95,6 +98,29 @@ export async function startAnalytics(mode: string | undefined): Promise<void> {
 /** Capture a product event in PostHog. */
 export function track(event: string, props?: Record<string, unknown>) {
   withPostHog((posthog) => posthog.capture(event, props));
+}
+
+/**
+ * Record this browser's session from here on, with all text masked. Overrides
+ * the init setting that leaves recording off; the PostHog project must still
+ * allow recordings.
+ */
+export function startSessionRecording() {
+  withPostHog((posthog) => posthog.startSessionRecording());
+}
+
+/**
+ * The console landed from a GitHub callback. PostHog only: the installation id
+ * must not reach the tag manager's data layer.
+ */
+export function trackGithubOauthCallback(props: {
+  /** The github_claim value: "installed" from the install callback, "ready" from the claim. */
+  result: string;
+  success: boolean;
+  error_reason?: string;
+  installation_id?: number;
+}) {
+  track("github_oauth_callback_received", props);
 }
 
 /** Tie this browser to the signed-in user. */

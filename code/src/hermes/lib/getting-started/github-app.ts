@@ -80,7 +80,8 @@ export function postGithubAppManifest(form: { action_url: string; manifest: stri
 
 /**
  * Which step the wizard shows, given what the server reports. A return from
- * the claim handshake lands on the link step. Otherwise: a server that cannot
+ * the claim handshake lands on the link step. A `returned` landing, where the
+ * install did not finish, starts over like no result. Otherwise: a server that cannot
  * create an App, or one whose engine already holds an App, starts at install;
  * an App that is stored but not yet loaded keeps the create step, which says
  * the engine is starting.
@@ -90,7 +91,7 @@ export function githubConnectStep(args: {
   creatable: boolean;
   ready: boolean;
 }): GithubConnectStep {
-  if (args.claimResult !== null) return "link";
+  if (args.claimResult !== null && args.claimResult !== "returned") return "link";
   if (!args.creatable || args.ready) return "install";
   return "create";
 }
