@@ -95,25 +95,25 @@ let test =
               Unix.putenv "STATEGRAPH_OAUTH_GITHUB_ORG" orgs;
               match Sgs_config.create () with
               | Error (`Key_error key) ->
-                  Oth.Assert.str_contains ~haystack:key ~needle:"STATEGRAPH_OAUTH_GITHUB_ORG"
+                  Oth.Assert.String.contains ~haystack:key ~needle:"STATEGRAPH_OAUTH_GITHUB_ORG"
               | Ok _ -> Oth.Assert.false_ (Printf.sprintf "config loaded with orgs %S" orgs))
             [ ""; " , " ]);
       Oth.test ~name:"startup config print masks the Google service account key" (fun _ ->
           set_env ();
           let config = Oth.Assert.ok_pp ~pp:Sgs_config.pp_err (Sgs_config.create ()) in
           let shown = Sgs_config.show config in
-          Oth.Assert.str_doesnt_contain ~haystack:shown ~needle:private_key;
-          Oth.Assert.str_doesnt_contain ~haystack:shown ~needle:"client_email";
+          Oth.Assert.String.doesnt_contain ~haystack:shown ~needle:private_key;
+          Oth.Assert.String.doesnt_contain ~haystack:shown ~needle:"client_email";
           (* Still shows whether one is configured, just not its contents. *)
-          Oth.Assert.str_contains
+          Oth.Assert.String.contains
             ~haystack:shown
             ~needle:"google_service_account_json = (Some <opaque>)");
       Oth.test ~name:"startup config print masks the other secrets too" (fun _ ->
           set_env ();
           let config = Oth.Assert.ok_pp ~pp:Sgs_config.pp_err (Sgs_config.create ()) in
           let shown = Sgs_config.show config in
-          Oth.Assert.str_doesnt_contain ~haystack:shown ~needle:"hunter2-should-not-print";
-          Oth.Assert.str_doesnt_contain ~haystack:shown ~needle:"client-secret-should-not-print");
+          Oth.Assert.String.doesnt_contain ~haystack:shown ~needle:"hunter2-should-not-print";
+          Oth.Assert.String.doesnt_contain ~haystack:shown ~needle:"client-secret-should-not-print");
     ]
 
 let () = Oth.run ~file:__FILE__ ~setup:(fun () -> Ok ()) ~teardown:(fun _ -> ()) (fun _ -> test)

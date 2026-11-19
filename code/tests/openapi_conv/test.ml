@@ -26,7 +26,7 @@ let test_integer_query_enums =
       with_output_dir (fun dir ->
           convert ~input_file:"integer_enum.json" ~output_name:"enum_api" ~output_dir:dir;
           let generated = read_file (Filename.concat dir "enum_api_enum.ml") CCIO.read_all in
-          Oth.Assert.str_contains_all
+          Oth.Assert.String.contains_all
             ~haystack:generated
             ~needles:
               [
@@ -38,7 +38,7 @@ let test_integer_query_enums =
                 "Some 20000000000L";
                 "let open Brtl_rtng.Route.Query in";
               ];
-          Oth.Assert.str_doesnt_contain ~haystack:generated ~needle:"Brtl_rtng.Route.Query."))
+          Oth.Assert.String.doesnt_contain ~haystack:generated ~needle:"Brtl_rtng.Route.Query."))
 
 let test_unsupported_default_fails_generation =
   Oth.test ~name:"Unsupported query defaults fail generation" (fun _ ->
@@ -52,7 +52,7 @@ let test_unsupported_default_fails_generation =
               None
             with Failure message -> Some message
           in
-          Oth.Assert.str_contains
+          Oth.Assert.String.contains
             ~haystack:(Oth.Assert.some failure)
             ~needle:"Unsupported query parameter default for \"codes\""))
 
@@ -61,7 +61,7 @@ let test_required_param_default_is_not_generated =
       with_output_dir (fun dir ->
           convert ~input_file:"required_array_default.json" ~output_name:"enum_api" ~output_dir:dir;
           let generated = read_file (Filename.concat dir "enum_api_array.ml") CCIO.read_all in
-          Oth.Assert.str_contains
+          Oth.Assert.String.contains
             ~haystack:generated
             ~needle:"(rel / \"array\") /? (array (int \"codes\"))"))
 
@@ -75,7 +75,7 @@ let generation_failure input_file =
 
 let test_undeclared_template_param_fails_generation =
   Oth.test ~name:"A path template parameter that is not declared fails generation" (fun _ ->
-      Oth.Assert.str_contains
+      Oth.Assert.String.contains
         ~haystack:(generation_failure "undeclared_template_param.json")
         ~needle:"Path template /things/{id} of things/get: {id} is not a declared path parameter")
 
@@ -83,7 +83,7 @@ let test_path_param_not_in_template_fails_generation =
   Oth.test
     ~name:"A declared path parameter that is not in the path template fails generation"
     (fun _ ->
-      Oth.Assert.str_contains
+      Oth.Assert.String.contains
         ~haystack:(generation_failure "path_param_not_in_template.json")
         ~needle:"Path parameter \"thing_id\" of things/get is not in its path template /things/{id}")
 

@@ -60,16 +60,6 @@ module type ASSERT = sig
   (** Fails the test, displaying [msg] *)
   val false_ : string -> 'a
 
-  (** Asserts that [haystack] contains the substring [needle], otherwise fails the test. *)
-  val str_contains : haystack:string -> needle:string -> unit
-
-  (** Asserts that [haystack] contains every substring in [needles], otherwise fails the test on the
-      first one that is missing. *)
-  val str_contains_all : haystack:string -> needles:string list -> unit
-
-  (** Asserts that [haystack] does not contain the substring [needle], otherwise fails the test. *)
-  val str_doesnt_contain : haystack:string -> needle:string -> unit
-
   module List : sig
     (** Asserts that the list has the [expected] length, otherwise fails the test. *)
     val length : expected:int -> 'a list -> unit
@@ -149,6 +139,17 @@ module type ASSERT = sig
   module String : sig
     (** Asserts that the string is empty, otherwise fails the test. *)
     val empty : string -> unit
+
+    (** Asserts that [haystack] contains the substring [needle], otherwise fails the test. *)
+    val contains : haystack:string -> needle:string -> unit
+
+    (** Asserts that [haystack] contains every substring in [needles], otherwise fails the test on
+        the first one that is missing. *)
+    val contains_all : haystack:string -> needles:string list -> unit
+
+    (** Asserts that [haystack] does not contain the substring [needle], otherwise fails the test.
+    *)
+    val doesnt_contain : haystack:string -> needle:string -> unit
 
     (** Asserts that [haystack] does not contain any member of [needles], otherwise fails the test.
     *)

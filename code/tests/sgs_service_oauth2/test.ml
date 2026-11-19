@@ -53,7 +53,7 @@ let start_request path =
              (Uri.of_string path))))
 
 let assert_invalid_config ~needle = function
-  | `Det (Error (`Invalid_config msg)) -> Oth.Assert.str_contains ~haystack:msg ~needle
+  | `Det (Error (`Invalid_config msg)) -> Oth.Assert.String.contains ~haystack:msg ~needle
   | `Det (Ok _) -> Oth.Assert.false_ "the configuration was accepted"
   | `Det (Error err) -> Oth.Assert.false_ (Sgs_service_oauth2.Provider.show_create_err err)
   | `Aborted -> Oth.Assert.false_ "scheduler aborted"
@@ -61,7 +61,8 @@ let assert_invalid_config ~needle = function
 
 (* The configuration was accepted and the service account key was read and checked. *)
 let assert_admin_checked = function
-  | `Det (Error (`Provider_err msg)) -> Oth.Assert.str_contains ~haystack:msg ~needle:"private_key"
+  | `Det (Error (`Provider_err msg)) ->
+      Oth.Assert.String.contains ~haystack:msg ~needle:"private_key"
   | `Det (Ok _) -> Oth.Assert.false_ "a service account without a private key was accepted"
   | `Det (Error err) -> Oth.Assert.false_ (Sgs_service_oauth2.Provider.show_create_err err)
   | `Aborted -> Oth.Assert.false_ "scheduler aborted"
@@ -113,7 +114,8 @@ let test =
       Oth.test ~name:"a missing service account key file fails the create" (fun _ ->
           let path = "/nonexistent/sa.json" in
           match with_oauth2 (group_env path) (fun _ -> Abb.Future.return ()) with
-          | `Det (Error (`Invalid_config msg)) -> Oth.Assert.str_contains ~haystack:msg ~needle:path
+          | `Det (Error (`Invalid_config msg)) ->
+              Oth.Assert.String.contains ~haystack:msg ~needle:path
           | `Det (Ok ()) -> Oth.Assert.false_ "a missing key file was accepted"
           | `Det (Error err) -> Oth.Assert.false_ (Sgs_service_oauth2.Provider.show_create_err err)
           | `Aborted -> Oth.Assert.false_ "scheduler aborted"

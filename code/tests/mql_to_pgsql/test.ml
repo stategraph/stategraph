@@ -2171,9 +2171,9 @@ left join dep_hotspot on true|};
             Oth.Assert.ok_pp ~pp:Mql.Ast.pp_err @@ Mql.Ast.to_string @@ Mql_to_pgsql.query query
           in
           (* The payload is a bound value, so it must NOT appear in the SQL... *)
-          Oth.Assert.str_doesnt_contain ~haystack:sql ~needle:evil;
+          Oth.Assert.String.doesnt_contain ~haystack:sql ~needle:evil;
           (* ...it appears as a parameter reference instead... *)
-          Oth.Assert.str_contains ~haystack:sql ~needle:"$texts";
+          Oth.Assert.String.contains ~haystack:sql ~needle:"$texts";
           (* ...and the value itself is in the texts vector, to be bound. *)
           Oth.Assert.true_
             ~fail_msg:"cursor value must be bound in the texts vector"

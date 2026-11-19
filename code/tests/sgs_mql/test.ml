@@ -493,11 +493,11 @@ let test =
          [terrateam_admin] can only leak if a CTE or the assembled query names
          it -- assert it appears nowhere in either. *)
       Oth.test ~name:"MQL surface never references the terrateam_admin schema" (fun _ ->
-          Oth.Assert.str_doesnt_contain ~haystack:terrateam_ctes_sql ~needle:"terrateam_admin";
-          Oth.Assert.str_doesnt_contain
+          Oth.Assert.String.doesnt_contain ~haystack:terrateam_ctes_sql ~needle:"terrateam_admin";
+          Oth.Assert.String.doesnt_contain
             ~haystack:(Sgs_mql_paged.Tests.select_page_sql ~orchestration:true)
             ~needle:"terrateam_admin";
-          Oth.Assert.str_doesnt_contain
+          Oth.Assert.String.doesnt_contain
             ~haystack:(Sgs_mql_paged.Tests.select_page_sql ~orchestration:false)
             ~needle:"terrateam_admin");
     ]

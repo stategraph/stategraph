@@ -1053,7 +1053,7 @@ let assert_bad_glob ~expected_glob ~expected_pattern = function
   | `Bad_glob_err { V1.Bad_glob.location; pattern; glob; err } ->
       Oth.Assert.eq ~eq:CCString.equal ~pp:CCString.pp expected_glob glob;
       Oth.Assert.eq ~eq:CCString.equal ~pp:CCString.pp expected_pattern pattern;
-      Oth.Assert.str_contains ~haystack:location ~needle:expected_glob;
+      Oth.Assert.String.contains ~haystack:location ~needle:expected_glob;
       Oth.Assert.not_true ~fail_msg:"the parser message is empty" (CCString.is_empty err)
   | err ->
       Oth.Assert.false_
@@ -1127,7 +1127,7 @@ let test_bad_glob_shows_everything_needed_to_diagnose =
     ~name:"derive: the reported error names the glob, the location and the cause"
     (fun _ ->
       let shown = V1.show_derive_err (Oth.Assert.error (derive_dirs_key "team:*")) in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:shown
         ~needles:[ "team:*"; "dirs."; "Unexpected character" ];
       ())
@@ -1281,7 +1281,7 @@ let test_batch_runs_max_work_manifests_per_node_above_maximum =
       let json = `Assoc [ ("batch_runs", `Assoc [ ("max_work_manifests_per_node", `Int 10) ]) ] in
       match Oth.Assert.error (V1.of_version_1_json json) with
       | `Repo_config_schema_err _ as err ->
-          Oth.Assert.str_contains
+          Oth.Assert.String.contains
             ~haystack:(V1.show_of_version_1_json_err err)
             ~needle:"batch_runs.max_work_manifests_per_node"
       | err ->
@@ -1305,8 +1305,10 @@ let test_batch_runs_and_concurrent_runs_both_out_of_range =
       match Oth.Assert.error (V1.of_version_1_json json) with
       | `Repo_config_schema_err _ as err ->
           let shown = V1.show_of_version_1_json_err err in
-          Oth.Assert.str_contains ~haystack:shown ~needle:"work_manifests.concurrent_runs";
-          Oth.Assert.str_contains ~haystack:shown ~needle:"batch_runs.max_work_manifests_per_node"
+          Oth.Assert.String.contains ~haystack:shown ~needle:"work_manifests.concurrent_runs";
+          Oth.Assert.String.contains
+            ~haystack:shown
+            ~needle:"batch_runs.max_work_manifests_per_node"
       | err ->
           Oth.Assert.false_
             (Printf.sprintf
@@ -1982,8 +1984,8 @@ let test_parameters_schema_decoder_agree =
       match Oth.Assert.error (V1.of_version_1_json json) with
       | `Repo_config_schema_err errs ->
           let shown = V1.show_of_version_1_json_err (`Repo_config_schema_err errs) in
-          Oth.Assert.str_contains ~haystack:shown ~needle:"parallel_runs";
-          Oth.Assert.str_doesnt_contain ~haystack:shown ~needle:"parameters"
+          Oth.Assert.String.contains ~haystack:shown ~needle:"parallel_runs";
+          Oth.Assert.String.doesnt_contain ~haystack:shown ~needle:"parameters"
       | err -> failwith ("Expected Repo_config_schema_err, got " ^ V1.show_of_version_1_json_err err))
 
 let test_parameters_alias_params_are_read =

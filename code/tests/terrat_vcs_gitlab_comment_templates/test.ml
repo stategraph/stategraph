@@ -105,7 +105,7 @@ let test_operation_failed_internal_err =
           Tmpl.operation_failed_internal_err
           (`Assoc [ ("request_id", `String "req-123"); ("tag", `String "EXPECTED_REPO_TREE") ])
       in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:
           [
@@ -113,7 +113,7 @@ let test_operation_failed_internal_err =
           ];
       (* Every tag this template renders names a database or in-process state failure, not a forge
          call, so the comment must not claim a retry happened. *)
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"tried this call again")
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"tried this call again")
 
 (* A call the VCS never answered is a separate comment from a call that failed,
    so that the reader is told GitLab is unresponsive rather than that Stategraph
@@ -127,10 +127,10 @@ let test_operation_failed_vcs_api_rate_limit_err =
           Tmpl.operation_failed_vcs_api_rate_limit_err
           (`Assoc [ ("request_id", `String "req-123"); ("operation", `String "FETCH_PULL_REQUEST") ])
       in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:[ "req-123"; "FETCH_PULL_REQUEST"; "GitLab"; "rate limit" ];
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"UNKNOWN")
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"UNKNOWN")
 
 let test_operation_failed_vcs_api_timeout_err =
   Oth.test ~name:"Operation failed vcs api timeout err" (fun _ ->
@@ -139,10 +139,10 @@ let test_operation_failed_vcs_api_timeout_err =
           Tmpl.operation_failed_vcs_api_timeout_err
           (`Assoc [ ("request_id", `String "req-123"); ("operation", `String "FETCH_PULL_REQUEST") ])
       in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:[ "req-123"; "FETCH_PULL_REQUEST"; "GitLab"; "timed out" ];
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"UNKNOWN")
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"UNKNOWN")
 
 (* #2038: a plan whose dirspaces all came back with no changes must not tell the
    reader to apply, and a layered run must say the next layer follows on its
@@ -240,8 +240,8 @@ let test_plan_complete2_no_changes_more_layers =
           Tmpl.plan_complete2
           (plan_complete2_kv ~changes:[ false ] ~is_layered_run:true ~num_more_layers:3 ())
       in
-      Oth.Assert.str_contains_all ~haystack:body ~needles:[ no_changes_layer; next_layer ];
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:apply_footer)
+      Oth.Assert.String.contains_all ~haystack:body ~needles:[ no_changes_layer; next_layer ];
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:apply_footer)
 
 (* [num_more_layers] counts the layer just planned, so one remaining layer means
    this is the last one. *)
@@ -252,10 +252,10 @@ let test_plan_complete2_no_changes_last_layer =
           Tmpl.plan_complete2
           (plan_complete2_kv ~changes:[ false ] ~is_layered_run:true ~num_more_layers:1 ())
       in
-      Oth.Assert.str_contains ~haystack:body ~needle:no_changes_layer;
-      Oth.Assert.str_contains ~haystack:body ~needle:"with 1 layer remaining to apply";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:next_layer;
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:apply_footer)
+      Oth.Assert.String.contains ~haystack:body ~needle:no_changes_layer;
+      Oth.Assert.String.contains ~haystack:body ~needle:"with 1 layer remaining to apply";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:next_layer;
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:apply_footer)
 
 let test_plan_complete2_upgrade_link =
   Oth.test ~tags:[ "plan_complete" ] ~name:"Plan complete: upgrade link" (fun _ ->
@@ -270,7 +270,7 @@ let test_plan_complete2_upgrade_link =
              ])
       in
       let body = render_brand Terrat_brand.Terrateam Tmpl.plan_complete2 kv in
-      Oth.Assert.str_contains
+      Oth.Assert.String.contains
         ~haystack:body
         ~needle:"[upgrade your plan](https://app.stategraph.com/settings/)")
 
@@ -281,9 +281,9 @@ let test_plan_complete2_no_changes_not_layered =
           Tmpl.plan_complete2
           (plan_complete2_kv ~changes:[ false ] ~is_layered_run:false ~num_more_layers:0 ())
       in
-      Oth.Assert.str_contains ~haystack:body ~needle:"There are no changes.";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"in this layer";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:apply_footer)
+      Oth.Assert.String.contains ~haystack:body ~needle:"There are no changes.";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"in this layer";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:apply_footer)
 
 (* The summary header carries the per-dirspace resource counts from the plan step's
    [resource_summary] payload, plus a totals row (#1929). *)
@@ -299,7 +299,7 @@ let test_plan_complete2_resource_summary =
              ~num_more_layers:0
              ())
       in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:
           [
@@ -319,7 +319,7 @@ let test_plan_complete2_resource_summary_missing =
           Tmpl.plan_complete2
           (plan_complete2_kv ~changes:[ true ] ~is_layered_run:false ~num_more_layers:0 ())
       in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:[ "| - | - | - | - | - |"; "| **-** | **-** | **-** | **-** | **-** |" ])
 
@@ -330,8 +330,8 @@ let test_plan_complete2_changes_keep_apply =
           Tmpl.plan_complete2
           (plan_complete2_kv ~changes:[ true ] ~is_layered_run:true ~num_more_layers:3 ())
       in
-      Oth.Assert.str_contains ~haystack:body ~needle:apply_footer;
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"There are no changes")
+      Oth.Assert.String.contains ~haystack:body ~needle:apply_footer;
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"There are no changes")
 
 (* One dirspace with changes is enough to make the apply instruction correct. *)
 let test_plan_complete2_mixed_keeps_apply =
@@ -344,8 +344,8 @@ let test_plan_complete2_mixed_keeps_apply =
           Tmpl.plan_complete2
           (plan_complete2_kv ~changes:[ true; false ] ~is_layered_run:true ~num_more_layers:3 ())
       in
-      Oth.Assert.str_contains ~haystack:body ~needle:apply_footer;
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:no_changes_layer)
+      Oth.Assert.String.contains ~haystack:body ~needle:apply_footer;
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:no_changes_layer)
 
 (* The payload [Terrat_vcs_service_gitlab_provider] builds for a [depends_on] that
    reaches out of its stack.  The message is only useful if it names both
@@ -367,7 +367,7 @@ let test_depends_on_crosses_stack =
                ("depends_on_stack", `String "prod");
              ])
       in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:
           [
@@ -406,7 +406,7 @@ let test_cycle_names_the_rule =
                    ] );
              ])
       in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:
           [
@@ -421,11 +421,11 @@ let test_plan_complete2_brand =
   Oth.test ~tags:[ "brand" ] ~name:"Plan complete: the heading follows the brand" (fun _ ->
       let kv = plan_complete2_kv ~changes:[ true ] ~is_layered_run:false ~num_more_layers:0 () in
       let stategraph = render_brand Terrat_brand.Stategraph Tmpl.plan_complete2 kv in
-      Oth.Assert.str_contains ~haystack:stategraph ~needle:"## Stategraph Plan Output";
-      Oth.Assert.str_doesnt_contain ~haystack:stategraph ~needle:"Terrateam";
+      Oth.Assert.String.contains ~haystack:stategraph ~needle:"## Stategraph Plan Output";
+      Oth.Assert.String.doesnt_contain ~haystack:stategraph ~needle:"Terrateam";
       let terrateam = render_brand Terrat_brand.Terrateam Tmpl.plan_complete2 kv in
-      Oth.Assert.str_contains ~haystack:terrateam ~needle:"## Terrateam Plan Output";
-      Oth.Assert.str_doesnt_contain ~haystack:terrateam ~needle:"Stategraph")
+      Oth.Assert.String.contains ~haystack:terrateam ~needle:"## Terrateam Plan Output";
+      Oth.Assert.String.doesnt_contain ~haystack:terrateam ~needle:"Stategraph")
 
 (* The unknown-command reply is the one place a reader learns the trigger word, so it is stored in
    the shipped Stategraph wording and reaches the Terrateam brand through the same rewrite as every
@@ -434,15 +434,15 @@ let test_plan_complete2_brand =
 let test_unknown_action_brand =
   Oth.test ~tags:[ "brand" ] ~name:"Unknown action lists Stategraph commands" (fun _ ->
       let body = Tmpl.terrateam_comment_unknown_action Terrat_brand.Stategraph in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:[ "List of Stategraph commands:"; "`stategraph plan`"; "`stategraph apply`" ];
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"terrateam";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"terrateam";
       let body = Tmpl.terrateam_comment_unknown_action Terrat_brand.Terrateam in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:[ "List of Terrateam commands:"; "`terrateam plan`"; "`terrateam apply`" ];
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"stategraph")
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"stategraph")
 
 (* The data of the stale message, rendered through the JSON the provider sends to the template, so
    the template and the record cannot disagree about a name.  See RFD 2356. *)
@@ -472,7 +472,7 @@ let stale_kv
 let test_work_manifest_stale_plan =
   Oth.test ~name:"Stale plan names the changed dirspaces and asks for a new plan" (fun _ ->
       let body = render Tmpl.work_manifest_stale (stale_kv ~is_plan:true [ ("tf", "default") ]) in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:
           [
@@ -483,7 +483,7 @@ let test_work_manifest_stale_plan =
             "This plan is stale.";
             "stategraph plan";
           ];
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"The apply is complete";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"The apply is complete";
       ())
 
 (* A stale apply applied its commit and not the head: the message says so and asks for a new plan
@@ -491,7 +491,7 @@ let test_work_manifest_stale_plan =
 let test_work_manifest_stale_apply =
   Oth.test ~name:"Stale apply does not apply the head and asks for a new plan" (fun _ ->
       let body = render Tmpl.work_manifest_stale (stale_kv [ ("tf", "default") ]) in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:
           [
@@ -502,17 +502,17 @@ let test_work_manifest_stale_apply =
             "Plan and apply these directories again.";
             "stategraph plan";
           ];
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"The apply is complete";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"You can continue";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"This plan is stale.";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"plan dir:";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"The apply is complete";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"You can continue";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"This plan is stale.";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"plan dir:";
       ())
 
 (* An apply whose files cannot be compared does not apply the head either. *)
 let test_work_manifest_stale_apply_files_unknown =
   Oth.test ~name:"Stale apply with unknown files does not apply the head" (fun _ ->
       let body = render Tmpl.work_manifest_stale (stale_kv ~files_unknown:true []) in
-      Oth.Assert.str_contains
+      Oth.Assert.String.contains
         ~haystack:body
         ~needle:"The files of the directories of this apply can be different at the head";
       ())
@@ -529,12 +529,12 @@ let test_work_manifest_stale_dest_branch_move =
              ~dest_branch_move:("cccc333", "dddd444")
              [ ("tf", "default") ])
       in
-      Oth.Assert.str_contains
+      Oth.Assert.String.contains
         ~haystack:body
         ~needle:
           "The destination branch was at commit `cccc333` when the run started.  Its head is now \
            `dddd444`.";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"The branch was at commit";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"The branch was at commit";
       ())
 
 (* A tree that is not stored means nothing was compared, which the message must say instead of
@@ -542,8 +542,8 @@ let test_work_manifest_stale_dest_branch_move =
 let test_work_manifest_stale_files_unknown =
   Oth.test ~name:"Stale message when the files cannot be compared" (fun _ ->
       let body = render Tmpl.work_manifest_stale (stale_kv ~files_unknown:true []) in
-      Oth.Assert.str_contains ~haystack:body ~needle:"cannot compare the files";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"| Directory | Workspace |";
+      Oth.Assert.String.contains ~haystack:body ~needle:"cannot compare the files";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"| Directory | Workspace |";
       ())
 
 (* A stale layer tells the user how to go back to it: one plan command per directory. *)
@@ -557,7 +557,7 @@ let test_work_manifest_stale_layer =
              ~replan_dirs:[ "network"; "dns" ]
              [ ("network", "default") ])
       in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:
           [
@@ -565,7 +565,7 @@ let test_work_manifest_stale_layer =
             "stategraph plan dir:network";
             "stategraph plan dir:dns";
           ];
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"The next layers run";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"The next layers run";
       ())
 
 (* The trigger word is in the template, so the brand rewrite reaches it. *)
@@ -577,7 +577,7 @@ let test_work_manifest_stale_brand =
           Tmpl.work_manifest_stale
           (stale_kv ~is_plan:true [ ("tf", "default") ])
       in
-      Oth.Assert.str_contains ~haystack:body ~needle:"terrateam plan";
+      Oth.Assert.String.contains ~haystack:body ~needle:"terrateam plan";
       ())
 
 (* The publisher adds the stale report to the data of the output comment as the key [stale]. *)
@@ -605,8 +605,10 @@ let assert_warning ~needles body =
   let lines = warning_lines body in
   Oth.Assert.not_true (CCList.is_empty lines);
   Oth.Assert.true_ (CCList.for_all (CCString.prefix ~pre:">") lines);
-  Oth.Assert.str_contains_all ~haystack:(CCString.concat "\n" lines) ~needles;
-  Oth.Assert.str_contains ~haystack:body ~needle:(stale_docs_link Terrat_brand.Stategraph ^ "\n\n")
+  Oth.Assert.String.contains_all ~haystack:(CCString.concat "\n" lines) ~needles;
+  Oth.Assert.String.contains
+    ~haystack:body
+    ~needle:(stale_docs_link Terrat_brand.Stategraph ^ "\n\n")
 
 (* A stale apply shows the warning directly under the heading of the apply comment. *)
 let test_apply_complete2_stale =
@@ -618,7 +620,7 @@ let test_apply_complete2_stale =
              (stale_kv [ ("tf", "default") ])
              (apply_complete2_kv ~compact_view:false ~num_dirspaces:1))
       in
-      Oth.Assert.str_contains
+      Oth.Assert.String.contains
         ~haystack:body
         ~needle:
           "## Applies :white_check_mark:\n\n> [!WARNING]\n> **Commits moved during this apply.**";
@@ -662,7 +664,7 @@ let test_plan_complete2_stale_failed =
       let body =
         render Tmpl.plan_complete2 (with_stale (stale_kv ~is_plan:true ~files_unknown:true []) kv)
       in
-      Oth.Assert.str_contains
+      Oth.Assert.String.contains
         ~haystack:body
         ~needle:
           "## Plans :heavy_multiplication_x:\n\n> [!WARNING]\n> **Commits moved during this plan.**";
@@ -682,10 +684,10 @@ let test_stale_docs_link =
       let stale_msg_kv = stale_kv [ ("tf", "default") ] in
       CCList.iter
         (fun brand ->
-          Oth.Assert.str_contains
+          Oth.Assert.String.contains
             ~haystack:(render_brand brand Tmpl.apply_complete2 apply_kv)
             ~needle:(link brand);
-          Oth.Assert.str_contains
+          Oth.Assert.String.contains
             ~haystack:(render_brand brand Tmpl.work_manifest_stale stale_msg_kv)
             ~needle:(link brand))
         Terrat_brand.all;
@@ -704,8 +706,8 @@ let test_plan_complete2_not_stale =
              `Null
              (plan_complete2_kv ~changes:[ true ] ~is_layered_run:false ~num_more_layers:0 ()))
       in
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"Commits moved";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"[!WARNING]";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"Commits moved";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"[!WARNING]";
       ())
 
 (* The GitLab work-manifest templates are Snabela templates; the helpers above render the Jinja
@@ -733,7 +735,7 @@ let test_parameter_err_undeclared =
   Oth.test ~name:"Parameter err undeclared" (fun _ ->
       let kv = `Assoc [ ("name", `String "nope") ] in
       let body = render Tmpl.parameter_err_undeclared kv in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:
           [
@@ -743,16 +745,16 @@ let test_parameter_err_undeclared =
             "The command starts no run";
             "https://stategraph.com/docs/reference/orchestration/configuration/parameters";
           ];
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"{{";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"{{";
       let terrateam = render_brand Terrat_brand.Terrateam Tmpl.parameter_err_undeclared kv in
-      Oth.Assert.str_contains ~haystack:terrateam ~needle:"terrateam.io";
-      Oth.Assert.str_doesnt_contain ~haystack:terrateam ~needle:"stategraph")
+      Oth.Assert.String.contains ~haystack:terrateam ~needle:"terrateam.io";
+      Oth.Assert.String.doesnt_contain ~haystack:terrateam ~needle:"stategraph")
 
 let test_parameter_err_value_not_allowed =
   Oth.test ~name:"Parameter err value not allowed" (fun _ ->
       let kv = parameter_err_value_not_allowed_kv ~allowed:[ "DEBUG"; "RELEASE" ] in
       let body = render Tmpl.parameter_err_value_not_allowed kv in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:
           [
@@ -763,48 +765,48 @@ let test_parameter_err_value_not_allowed =
             "- `RELEASE`";
             "The command starts no run";
           ];
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"{{";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"{{";
       let terrateam = render_brand Terrat_brand.Terrateam Tmpl.parameter_err_value_not_allowed kv in
-      Oth.Assert.str_contains ~haystack:terrateam ~needle:"terrateam.io";
-      Oth.Assert.str_doesnt_contain ~haystack:terrateam ~needle:"stategraph")
+      Oth.Assert.String.contains ~haystack:terrateam ~needle:"terrateam.io";
+      Oth.Assert.String.doesnt_contain ~haystack:terrateam ~needle:"stategraph")
 
 let test_parameter_err_value_not_allowed_no_values =
   Oth.test ~name:"Parameter err value not allowed with no allowed values" (fun _ ->
       let kv = parameter_err_value_not_allowed_kv ~allowed:[] in
       let body = render Tmpl.parameter_err_value_not_allowed kv in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:[ "`mode`"; "`NOPE`"; "accepts no value at all" ];
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"- `DEBUG`";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"{{";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"- `DEBUG`";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"{{";
       let terrateam = render_brand Terrat_brand.Terrateam Tmpl.parameter_err_value_not_allowed kv in
-      Oth.Assert.str_contains ~haystack:terrateam ~needle:"terrateam.io";
-      Oth.Assert.str_doesnt_contain ~haystack:terrateam ~needle:"stategraph")
+      Oth.Assert.String.contains ~haystack:terrateam ~needle:"terrateam.io";
+      Oth.Assert.String.doesnt_contain ~haystack:terrateam ~needle:"stategraph")
 
 let test_parameter_err_duplicate =
   Oth.test ~name:"Parameter err duplicate" (fun _ ->
       let kv = `Assoc [ ("name", `String "mode") ] in
       let body = render Tmpl.parameter_err_duplicate kv in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:[ "Parameter Set Twice"; "`mode`"; "more than once"; "The command starts no run" ];
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"{{";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"{{";
       let terrateam = render_brand Terrat_brand.Terrateam Tmpl.parameter_err_duplicate kv in
-      Oth.Assert.str_contains ~haystack:terrateam ~needle:"terrateam.io";
-      Oth.Assert.str_doesnt_contain ~haystack:terrateam ~needle:"stategraph")
+      Oth.Assert.String.contains ~haystack:terrateam ~needle:"terrateam.io";
+      Oth.Assert.String.doesnt_contain ~haystack:terrateam ~needle:"stategraph")
 
 (* A workflow that never started stops any layered run it belonged to: the body names the later
    layers and the command that plans them. *)
 let test_failed_to_start_workflow =
   Oth.test ~name:"Failed to start workflow" (fun _ ->
       let body = render_snabela Tmpl.failed_to_start_workflow Snabela.Kv.Map.empty in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:
           [ "Unable to start workflow."; "the later layers were not planned"; "stategraph plan" ];
       (* A workflow start can fail without a retry, for example a first-attempt rate limit, so the
          comment must not claim one happened. *)
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"tried this call again")
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"tried this call again")
 
 (* The [work_manifests] table rows both providers build for every message that lists work
    manifests, see [work_manifests_kv] in the service providers. *)
@@ -842,8 +844,8 @@ let test_apply_queued_behind_pull_request =
              ~unlock_ids:[ "42" ]
              [ ("42", true, "Plan", "Running", "2026-8-21 9:14") ])
       in
-      Oth.Assert.str_contains ~haystack:body ~needle:"Apply queued";
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains ~haystack:body ~needle:"Apply queued";
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:[ "#42"; "Plan"; "Running"; "stategraph unlock 42" ])
 
@@ -856,8 +858,8 @@ let test_apply_queued_behind_drift =
              ~unlock_ids:[ "drift" ]
              [ ("drift", false, "Plan", "Running", "2026-8-21 0:02") ])
       in
-      Oth.Assert.str_contains ~haystack:body ~needle:"stategraph unlock drift";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"#drift")
+      Oth.Assert.String.contains ~haystack:body ~needle:"stategraph unlock drift";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"#drift")
 
 (* One command unlocks both kinds of blocker at the same time. *)
 let test_apply_queued_behind_both_kinds =
@@ -872,7 +874,7 @@ let test_apply_queued_behind_both_kinds =
                ("drift", false, "Plan", "Running", "2026-8-21 0:02");
              ])
       in
-      Oth.Assert.str_contains ~haystack:body ~needle:"stategraph unlock 42 drift")
+      Oth.Assert.String.contains ~haystack:body ~needle:"stategraph unlock 42 drift")
 
 (* The conflict message covers a queued apply as well as a running one, so it must not claim the
    apply is in progress.  The system tests match on this title. *)
@@ -885,8 +887,8 @@ let test_conflicting_work_manifests_title =
              ~unlock_ids:[ "42" ]
              [ ("42", true, "Apply", "Queued", "2026-8-21 9:25") ])
       in
-      Oth.Assert.str_contains ~haystack:body ~needle:"Apply already queued or running";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"Apply already in progress")
+      Oth.Assert.String.contains ~haystack:body ~needle:"Apply already queued or running";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"Apply already in progress")
 
 (* The ids arrive pre-deduped from the publisher, so these tests cannot see a publisher that
    fails to dedupe.  What they pin is that the template iterates [unlock_ids], not
@@ -907,12 +909,14 @@ let test_maybe_stale_work_manifests_unlock_key =
                ("123", true, "Plan", "Queued", "2026-8-21 9:44");
              ])
       in
-      Oth.Assert.str_contains ~haystack:body ~needle:"stategraph unlock 123 drift";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"unlock 123 123";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"drift drift";
+      Oth.Assert.String.contains ~haystack:body ~needle:"stategraph unlock 123 drift";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"unlock 123 123";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"drift drift";
       (* The table keeps one row per stuck run even though the command dedupes. *)
-      Oth.Assert.str_contains ~haystack:body ~needle:"| #123 | Plan | Queued | 2026-8-21 9:44 UTC |";
-      Oth.Assert.str_contains
+      Oth.Assert.String.contains
+        ~haystack:body
+        ~needle:"| #123 | Plan | Queued | 2026-8-21 9:44 UTC |";
+      Oth.Assert.String.contains
         ~haystack:body
         ~needle:"| drift | Plan | Queued | 2026-8-21 0:40 UTC |";
       ())
@@ -930,9 +934,9 @@ let test_conflicting_work_manifests_unlock_key =
                ("45", true, "Plan", "Queued", "2026-8-21 8:50");
              ])
       in
-      Oth.Assert.str_contains ~haystack:body ~needle:"stategraph unlock 123 45";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"unlock 123 123";
-      Oth.Assert.str_contains
+      Oth.Assert.String.contains ~haystack:body ~needle:"stategraph unlock 123 45";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"unlock 123 123";
+      Oth.Assert.String.contains
         ~haystack:body
         ~needle:"| #123 | Apply | Queued | 2026-8-21 9:12 UTC |";
       ())
@@ -975,36 +979,36 @@ let render_missing_plans rows = render Tmpl.missing_plans (missing_plans_kv rows
 let test_missing_plans_never_planned =
   Oth.test ~name:"Missing plans: never planned" (fun _ ->
       let body = render_missing_plans [ ("foo", "default", "never_planned", None) ] in
-      Oth.Assert.str_contains ~haystack:body ~needle:"Never planned on this ref";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"superseded")
+      Oth.Assert.String.contains ~haystack:body ~needle:"Never planned on this ref";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"superseded")
 
 let test_missing_plans_invalidated =
   Oth.test ~name:"Missing plans: invalidated names the merge request" (fun _ ->
       let body = render_missing_plans [ ("foo", "default", "invalidated", Some 849) ] in
-      Oth.Assert.str_contains ~haystack:body ~needle:"Plan superseded by #849";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"Never planned")
+      Oth.Assert.String.contains ~haystack:body ~needle:"Plan superseded by #849";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"Never planned")
 
 let test_missing_plans_last_run_failed =
   Oth.test ~name:"Missing plans: last run failed" (fun _ ->
       let body = render_missing_plans [ ("foo", "default", "last_run_failed", None) ] in
-      Oth.Assert.str_contains ~haystack:body ~needle:"The last run for this directory failed";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"superseded")
+      Oth.Assert.String.contains ~haystack:body ~needle:"The last run for this directory failed";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"superseded")
 
 let test_missing_plans_stale =
   Oth.test ~name:"Missing plans: a stale plan" (fun _ ->
       let body = render_missing_plans [ ("foo", "default", "stale", None) ] in
-      Oth.Assert.str_contains
+      Oth.Assert.String.contains
         ~haystack:body
         ~needle:"The commits moved while this directory was planned, plan it again";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"Never planned")
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"Never planned")
 
 let test_missing_plans_out_of_order =
   Oth.test ~name:"Missing plans: a plan older than a run of its dependency" (fun _ ->
       let body = render_missing_plans [ ("foo", "default", "out_of_order", None) ] in
-      Oth.Assert.str_contains
+      Oth.Assert.String.contains
         ~haystack:body
         ~needle:"A directory this one depends on ran after this plan, plan it again";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"The commits moved")
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"The commits moved")
 
 let test_missing_plans_mixed_reasons =
   Oth.test ~name:"Missing plans: every reason renders in one table" (fun _ ->
@@ -1016,16 +1020,16 @@ let test_missing_plans_mixed_reasons =
             ("c", "default", "last_run_failed", None);
           ]
       in
-      Oth.Assert.str_contains ~haystack:body ~needle:"Never planned on this ref";
-      Oth.Assert.str_contains ~haystack:body ~needle:"Plan superseded by #12";
-      Oth.Assert.str_contains ~haystack:body ~needle:"The last run for this directory failed")
+      Oth.Assert.String.contains ~haystack:body ~needle:"Never planned on this ref";
+      Oth.Assert.String.contains ~haystack:body ~needle:"Plan superseded by #12";
+      Oth.Assert.String.contains ~haystack:body ~needle:"The last run for this directory failed")
 
 let test_missing_plans_plan_in_progress =
   Oth.test ~name:"Missing plans: a plan in progress tells the user to wait" (fun _ ->
       let body = render_missing_plans [ ("foo", "default", "plan_in_progress", None) ] in
-      Oth.Assert.str_contains ~haystack:body ~needle:"queued or running";
-      Oth.Assert.str_contains ~haystack:body ~needle:"stategraph apply";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"stategraph plan")
+      Oth.Assert.String.contains ~haystack:body ~needle:"queued or running";
+      Oth.Assert.String.contains ~haystack:body ~needle:"stategraph apply";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"stategraph plan")
 
 let test_missing_plans_plan_in_progress_mixed =
   Oth.test
@@ -1035,9 +1039,9 @@ let test_missing_plans_plan_in_progress_mixed =
         render_missing_plans
           [ ("a", "default", "plan_in_progress", None); ("b", "default", "never_planned", None) ]
       in
-      Oth.Assert.str_contains ~haystack:body ~needle:"Never planned on this ref";
-      Oth.Assert.str_contains ~haystack:body ~needle:"stategraph plan";
-      Oth.Assert.str_contains ~haystack:body ~needle:"stategraph apply")
+      Oth.Assert.String.contains ~haystack:body ~needle:"Never planned on this ref";
+      Oth.Assert.String.contains ~haystack:body ~needle:"stategraph plan";
+      Oth.Assert.String.contains ~haystack:body ~needle:"stategraph apply")
 
 (* The payload the providers build for [Msg.Plan_already_planned]: one reason
    string per row.  The two reasons are not the same answer, so each one has to
@@ -1064,22 +1068,22 @@ let render_plan_already_planned rows =
 let test_plan_already_planned_standing =
   Oth.test ~name:"Plan already planned: a standing plan says so" (fun _ ->
       let body = render_plan_already_planned [ ("foo", "default", "already_planned") ] in
-      Oth.Assert.str_contains
+      Oth.Assert.String.contains
         ~haystack:body
         ~needle:"Already has a plan for the files as they are now";
-      Oth.Assert.str_contains ~haystack:body ~needle:"stategraph plan dir:<path>";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"queued or running")
+      Oth.Assert.String.contains ~haystack:body ~needle:"stategraph plan dir:<path>";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"queued or running")
 
 let test_plan_already_planned_in_progress =
   Oth.test ~name:"Plan already planned: a plan in flight tells the user to wait" (fun _ ->
       let body = render_plan_already_planned [ ("foo", "default", "plan_in_progress") ] in
-      Oth.Assert.str_contains
+      Oth.Assert.String.contains
         ~haystack:body
         ~needle:"A plan for this directory is queued or running";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"Already has a plan";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"Already has a plan";
       (* Nothing is waiting on a file change, so the force-a-plan hint would answer a question
          the user did not ask. *)
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"stategraph plan dir:<path>")
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"stategraph plan dir:<path>")
 
 let test_plan_already_planned_mixed =
   Oth.test ~name:"Plan already planned: both reasons render in one table" (fun _ ->
@@ -1087,13 +1091,13 @@ let test_plan_already_planned_mixed =
         render_plan_already_planned
           [ ("a", "default", "already_planned"); ("b", "default", "plan_in_progress") ]
       in
-      Oth.Assert.str_contains
+      Oth.Assert.String.contains
         ~haystack:body
         ~needle:"Already has a plan for the files as they are now";
-      Oth.Assert.str_contains
+      Oth.Assert.String.contains
         ~haystack:body
         ~needle:"A plan for this directory is queued or running";
-      Oth.Assert.str_contains ~haystack:body ~needle:"stategraph plan dir:<path>")
+      Oth.Assert.String.contains ~haystack:body ~needle:"stategraph plan dir:<path>")
 
 (* The three parameters configuration-error comments.  They are Jinja templates, rendered
    through [apply_template_and_publish_jinja], so the kv is the JSON the provider builds for
@@ -1107,7 +1111,7 @@ let test_parameters_alias_shadows_verb_err =
       let body =
         render Tmpl.repo_config_err_parameters_alias_shadows_verb_err (parameters_alias_kv "plan")
       in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:
           [
@@ -1115,7 +1119,7 @@ let test_parameters_alias_shadows_verb_err =
             "`parameters.aliases`";
             "## What to do?";
           ];
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"{{";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"{{";
       (* The Terrateam render carries the Terrateam docs host, not the Stategraph one. *)
       let terrateam =
         render_brand
@@ -1123,8 +1127,8 @@ let test_parameters_alias_shadows_verb_err =
           Tmpl.repo_config_err_parameters_alias_shadows_verb_err
           (parameters_alias_kv "plan")
       in
-      Oth.Assert.str_contains ~haystack:terrateam ~needle:"terrateam.io";
-      Oth.Assert.str_doesnt_contain ~haystack:terrateam ~needle:"stategraph")
+      Oth.Assert.String.contains ~haystack:terrateam ~needle:"terrateam.io";
+      Oth.Assert.String.doesnt_contain ~haystack:terrateam ~needle:"stategraph")
 
 let test_parameters_alias_unknown_parameter_err =
   Oth.test ~name:"Repo config err: parameters alias sets an undeclared parameter" (fun _ ->
@@ -1133,7 +1137,7 @@ let test_parameters_alias_unknown_parameter_err =
           Tmpl.repo_config_err_parameters_alias_unknown_parameter_err
           (parameters_alias_kv "debug" ~name:"mode")
       in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:
           [
@@ -1141,15 +1145,15 @@ let test_parameters_alias_unknown_parameter_err =
             "which the `parameters.names` section does not declare";
             "## What to do?";
           ];
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"{{";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"{{";
       let terrateam =
         render_brand
           Terrat_brand.Terrateam
           Tmpl.repo_config_err_parameters_alias_unknown_parameter_err
           (parameters_alias_kv "debug" ~name:"mode")
       in
-      Oth.Assert.str_contains ~haystack:terrateam ~needle:"terrateam.io";
-      Oth.Assert.str_doesnt_contain ~haystack:terrateam ~needle:"stategraph")
+      Oth.Assert.String.contains ~haystack:terrateam ~needle:"terrateam.io";
+      Oth.Assert.String.doesnt_contain ~haystack:terrateam ~needle:"stategraph")
 
 let test_parameters_alias_value_not_allowed_err =
   Oth.test ~name:"Repo config err: parameters alias sets a value the parameter refuses" (fun _ ->
@@ -1158,7 +1162,7 @@ let test_parameters_alias_value_not_allowed_err =
           Tmpl.repo_config_err_parameters_alias_value_not_allowed_err
           (parameters_alias_kv "debug" ~name:"mode" ~value:"NOPE")
       in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:
           [
@@ -1166,15 +1170,15 @@ let test_parameters_alias_value_not_allowed_err =
             "`values` key of the parameter `mode`";
             "## What to do?";
           ];
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"{{";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"{{";
       let terrateam =
         render_brand
           Terrat_brand.Terrateam
           Tmpl.repo_config_err_parameters_alias_value_not_allowed_err
           (parameters_alias_kv "debug" ~name:"mode" ~value:"NOPE")
       in
-      Oth.Assert.str_contains ~haystack:terrateam ~needle:"terrateam.io";
-      Oth.Assert.str_doesnt_contain ~haystack:terrateam ~needle:"stategraph")
+      Oth.Assert.String.contains ~haystack:terrateam ~needle:"terrateam.io";
+      Oth.Assert.String.doesnt_contain ~haystack:terrateam ~needle:"stategraph")
 
 (* The publisher always adds the keys [parameters] and [fail_if_set] to the data of the run
    output: the parameters of the run as name/value pairs, and the names the configuration
@@ -1205,8 +1209,8 @@ let test_run_parameters_line =
           (plan_complete2_kv ~changes:[ true ] ~is_layered_run:false ~num_more_layers:0 ())
       in
       let body = render Tmpl.plan_complete2 kv in
-      Oth.Assert.str_contains ~haystack:body ~needle:"**Parameters**: `mode=DEBUG`";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"[!WARNING]";
+      Oth.Assert.String.contains ~haystack:body ~needle:"**Parameters**: `mode=DEBUG`";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"[!WARNING]";
       let kv =
         with_parameters
           [ ("mode", "DEBUG") ]
@@ -1214,8 +1218,8 @@ let test_run_parameters_line =
           (apply_complete2_kv ~compact_view:false ~num_dirspaces:1)
       in
       let body = render Tmpl.apply_complete2 kv in
-      Oth.Assert.str_contains ~haystack:body ~needle:"**Parameters**: `mode=DEBUG`";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"[!WARNING]";
+      Oth.Assert.String.contains ~haystack:body ~needle:"**Parameters**: `mode=DEBUG`";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"[!WARNING]";
       ())
 
 (* A parameter the configuration declares [fail_if_set] renders the admonition that the run
@@ -1232,7 +1236,7 @@ let test_run_parameters_fail_if_set_admonition =
           (plan_complete2_kv ~changes:[ true ] ~is_layered_run:false ~num_more_layers:0 ())
       in
       let body = render Tmpl.plan_complete2 kv in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:
           [
@@ -1248,7 +1252,7 @@ let test_run_parameters_fail_if_set_admonition =
           (apply_complete2_kv ~compact_view:false ~num_dirspaces:1)
       in
       let body = render Tmpl.apply_complete2 kv in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:
           [
@@ -1290,7 +1294,7 @@ let test_run_parameters_fail_if_set_failure_heading =
              (plan_complete2_kv ~changes:[ true ] ~is_layered_run:false ~num_more_layers:0 ()))
       in
       let body = render Tmpl.plan_complete2 kv in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:
           [
@@ -1307,7 +1311,7 @@ let test_run_parameters_fail_if_set_failure_heading =
              (apply_complete2_kv ~compact_view:false ~num_dirspaces:1))
       in
       let body = render Tmpl.apply_complete2 kv in
-      Oth.Assert.str_contains_all
+      Oth.Assert.String.contains_all
         ~haystack:body
         ~needles:
           [
@@ -1329,13 +1333,13 @@ let test_run_parameters_absent =
           Tmpl.plan_complete2
           (plan_complete2_kv ~changes:[ true ] ~is_layered_run:false ~num_more_layers:0 ())
       in
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"**Parameters**";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"so this run counts as failed";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"**Parameters**";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"so this run counts as failed";
       let body =
         render Tmpl.apply_complete2 (apply_complete2_kv ~compact_view:false ~num_dirspaces:1)
       in
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"**Parameters**";
-      Oth.Assert.str_doesnt_contain ~haystack:body ~needle:"so this run counts as failed";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"**Parameters**";
+      Oth.Assert.String.doesnt_contain ~haystack:body ~needle:"so this run counts as failed";
       ())
 
 (* Several parameters render in one line, in the order the run set them. *)
@@ -1350,7 +1354,7 @@ let test_run_parameters_order =
           []
           (plan_complete2_kv ~changes:[ true ] ~is_layered_run:false ~num_more_layers:0 ())
       in
-      Oth.Assert.str_contains
+      Oth.Assert.String.contains
         ~haystack:(render Tmpl.plan_complete2 kv)
         ~needle:"**Parameters**: `mode=DEBUG`, `region=us-east-1`";
       let kv =
@@ -1359,7 +1363,7 @@ let test_run_parameters_order =
           []
           (apply_complete2_kv ~compact_view:false ~num_dirspaces:1)
       in
-      Oth.Assert.str_contains
+      Oth.Assert.String.contains
         ~haystack:(render Tmpl.apply_complete2 kv)
         ~needle:"**Parameters**: `mode=DEBUG`, `region=us-east-1`";
       ())
@@ -1384,8 +1388,8 @@ let test_run_parameters_failed_run =
         |> set_failed
       in
       let body = render Tmpl.plan_complete2 kv in
-      Oth.Assert.str_contains ~haystack:body ~needle:"**Parameters**: `mode=DEBUG`";
-      Oth.Assert.str_contains ~haystack:body ~needle:"so this run counts as failed";
+      Oth.Assert.String.contains ~haystack:body ~needle:"**Parameters**: `mode=DEBUG`";
+      Oth.Assert.String.contains ~haystack:body ~needle:"so this run counts as failed";
       let kv =
         with_parameters
           [ ("mode", "DEBUG") ]
@@ -1394,8 +1398,8 @@ let test_run_parameters_failed_run =
         |> set_failed
       in
       let body = render Tmpl.apply_complete2 kv in
-      Oth.Assert.str_contains ~haystack:body ~needle:"**Parameters**: `mode=DEBUG`";
-      Oth.Assert.str_contains ~haystack:body ~needle:"so this run counts as failed";
+      Oth.Assert.String.contains ~haystack:body ~needle:"**Parameters**: `mode=DEBUG`";
+      Oth.Assert.String.contains ~haystack:body ~needle:"so this run counts as failed";
       ())
 
 (* The macro names no brand, so the parameters block reads the same under both brands. *)
@@ -1421,8 +1425,8 @@ let test_run_parameters_brand =
         (CCString.equal
            (CCList.hd stategraph)
            (CCList.hd (block (render_brand Terrat_brand.Terrateam Tmpl.plan_complete2 kv))));
-      Oth.Assert.str_doesnt_contain ~haystack:(CCList.hd stategraph) ~needle:"terrateam";
-      Oth.Assert.str_doesnt_contain ~haystack:(CCList.hd stategraph) ~needle:"stategraph";
+      Oth.Assert.String.doesnt_contain ~haystack:(CCList.hd stategraph) ~needle:"terrateam";
+      Oth.Assert.String.doesnt_contain ~haystack:(CCList.hd stategraph) ~needle:"stategraph";
       ())
 
 let test =
