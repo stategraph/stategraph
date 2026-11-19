@@ -50,7 +50,7 @@
 # makes its HTTP calls through libcurl (code/src/abb_curl), so libcurl and the
 # curl CLI are built here too.
 # ---------------------------------------------------------------------------
-FROM cgr.dev/chainguard/wolfi-base:latest@sha256:d69a74aa929a006d05880a9287fbbf89aa278d55d7239955331f239122824ba6 AS openssl-fips
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:8509ee4351a2e501b7f98201f2e2642396e82020c61a589cacdcfe74b9de46c1 AS openssl-fips
 
 ARG OPENSSL_FIPS_PROVIDER_VERSION=3.1.2
 ARG OPENSSL_VERSION=3.6.4
@@ -242,7 +242,7 @@ RUN set -eux; \
 # ---------------------------------------------------------------------------
 # opam switch and the OCaml, Rust and Node dependencies of the terrat build.
 # ---------------------------------------------------------------------------
-FROM cgr.dev/chainguard/wolfi-base:latest@sha256:d69a74aa929a006d05880a9287fbbf89aa278d55d7239955331f239122824ba6 AS build-base
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:8509ee4351a2e501b7f98201f2e2642396e82020c61a589cacdcfe74b9de46c1 AS build-base
 
 ENV SSL_PREFIX=/usr/local/ssl
 
@@ -333,7 +333,7 @@ RUN eval $(opam env) && cd mono/code && \
 # stage keeps the distro OpenSSL. Its output is static files and carries no
 # cryptography into the image.
 # ---------------------------------------------------------------------------
-FROM cgr.dev/chainguard/wolfi-base:latest@sha256:d69a74aa929a006d05880a9287fbbf89aa278d55d7239955331f239122824ba6 AS iris-build
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:8509ee4351a2e501b7f98201f2e2642396e82020c61a589cacdcfe74b9de46c1 AS iris-build
 
 RUN apk add --no-cache \
     bash \
@@ -374,7 +374,7 @@ RUN eval $(opam env) && \
 # ---------------------------------------------------------------------------
 # Runtime.
 # ---------------------------------------------------------------------------
-FROM cgr.dev/chainguard/wolfi-base:latest@sha256:d69a74aa929a006d05880a9287fbbf89aa278d55d7239955331f239122824ba6 AS terrat-fips-base
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:8509ee4351a2e501b7f98201f2e2642396e82020c61a589cacdcfe74b9de46c1 AS terrat-fips-base
 
 ENV SSL_PREFIX=/usr/local/ssl
 ENV TERRAT_BRAND=terrateam

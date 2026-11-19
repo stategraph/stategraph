@@ -38,6 +38,11 @@ import {
   stashStartIntent,
 } from '@/lib/getting-started/start-intent';
 import { hasSeenFirstRun, markFirstRunSeen } from '@/lib/getting-started/first-run';
+import {
+  clearGithubInstallPending,
+  githubInstallReturnHref,
+  readGithubInstallPending,
+} from '@/lib/getting-started/github-install-return';
 import { StateFilter } from '@/components/filters';
 import {
   ControlPlaneStatus,
@@ -65,6 +70,17 @@ function HomePageContent() {
   const layout = homeLayout(firstRunSetup, progress.shape);
   const stateSections = layout.stateSections;
 
+  // GitHub's install callback signs the user in and lands here when the install
+  // link's state did not survive the trip. That return resumes the GitHub wizard.
+  const [installReturnHref] = useState(() =>
+    githubInstallReturnHref({ search: searchParams, pending: readGithubInstallPending() }),
+  );
+  useEffect(() => {
+    if (!installReturnHref || authLoading || !isAuthenticated) return;
+    clearGithubInstallPending();
+    router.replace(installReturnHref);
+  }, [installReturnHref, authLoading, isAuthenticated, router]);
+
   // The website's Start buttons name the product on the landing URL. Keep it
   // for the redirect below, which happens after the facts load.
   const startIntent = searchParams.get(START_INTENT_PARAM);
@@ -91,9 +107,14 @@ function HomePageContent() {
   // Bumped by the Refresh button to force a reload without changing selection.
   const [reloadKey, setReloadKey] = useState(0);
 
+  // Arriving from an accepted invitation, the joined tenant decides, however
+  // many other tenants the user has and whatever this browser saw before.
+  const fromInvite = searchParams.get('from') === 'invite';
+
   // Preserve the existing first-run guards. Only an authenticated user on a
-  // server with first-run setup, with one tenant and a fully loaded empty state
-  // list, needs the orchestration-aware routing decision below.
+  // server with first-run setup, with one tenant (or the tenant an invitation
+  // just joined) and a fully loaded empty state list, needs the
+  // orchestration-aware routing decision below.
   const shouldResolveHomeOnboarding =
     isAuthenticated &&
     !!currentTenant &&
@@ -101,10 +122,12 @@ function HomePageContent() {
     !statesLoading &&
     states.length === 0 &&
     firstRunSetup !== false &&
-    tenants.length <= 1;
+    (tenants.length <= 1 || fromInvite);
 
   let homeOnboardingDestination: HostedHomeDestination | "checking" = "home";
-  if (shouldResolveHomeOnboarding) {
+  if (installReturnHref) {
+    homeOnboardingDestination = "checking";
+  } else if (shouldResolveHomeOnboarding) {
     if (progress.isLoading || firstRunSetup === null) {
       homeOnboardingDestination = "checking";
     } else {
@@ -119,7 +142,11 @@ function HomePageContent() {
       });
       // Setup is entered by itself once per tenant and browser. After that Home
       // is Home, with the welcome panel, and leaving the wizard sticks.
-      if (homeOnboardingDestination === "setup" && hasSeenFirstRun(currentTenant.id)) {
+      if (
+        homeOnboardingDestination === "setup" &&
+        !fromInvite &&
+        hasSeenFirstRun(currentTenant.id)
+      ) {
         homeOnboardingDestination = "home";
       }
     }

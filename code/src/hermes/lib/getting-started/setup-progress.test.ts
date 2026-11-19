@@ -64,11 +64,20 @@ test("an admin with no linked installation is sent to connect one, whatever the 
   }
 });
 
-test("an admin with a linked or unknown installation keeps the screen's copy", () => {
+test("an admin with a linked installation and no run is sent to a first run", () => {
   assert.equal(
     orchestrationEmptyKind({ tenantAdmin: true, linkedInstallation: true, hasWorkManifest: false }),
-    "plain",
+    "first-run",
   );
+  for (const hasWorkManifest of [true, null]) {
+    assert.equal(
+      orchestrationEmptyKind({ tenantAdmin: true, linkedInstallation: true, hasWorkManifest }),
+      "plain",
+    );
+  }
+});
+
+test("an admin with an unknown installation keeps the screen's copy", () => {
   assert.equal(
     orchestrationEmptyKind({ tenantAdmin: true, linkedInstallation: null, hasWorkManifest: false }),
     "plain",

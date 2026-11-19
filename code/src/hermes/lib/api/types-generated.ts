@@ -4243,7 +4243,7 @@ export interface components {
             modified: components["schemas"]["reach"];
             "pulled-in": components["schemas"]["reach"];
         };
-        /** @description What a user or a token is allowed to do. [admin] and [users-manage] scope over tenants, [sudo] over user names. Every field is present: a capability that reaches nothing is written as a scope that allows nothing, not as an absent key. */
+        /** @description What a user or a token is allowed to do. [admin] and [users-manage] scope over tenants, [sudo] over user names. Every field is present: a capability that reaches nothing is written as a scope that allows nothing, not as an absent key. Capabilities authorize changing and administering, not reading: the states, transactions and MQL answers of a tenant are readable by any session of its members, whatever its capabilities. A tenant scope therefore limits what its grant may change or administer there, and does not confine a token to those tenants. The administrative records of a tenant (members, invitations, group rules, billing sources, VCS installations) are read under the [admin] or [users-manage] grant that changes them. */
         "definitions-capabilities": {
             "access-token-create": boolean;
             "access-token-refresh": boolean;

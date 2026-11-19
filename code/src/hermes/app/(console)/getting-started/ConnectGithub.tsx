@@ -41,7 +41,7 @@ import { useAuth } from "@/components/auth";
 import { useCapabilities } from "@/hooks";
 import { isInstanceAdmin, isTenantAdmin } from "@/lib/api/capabilities";
 import { OrchestrationUnavailable } from "@/components/orchestration";
-import { pushGettingStartedEvent } from "@/lib/analytics";
+import { pushGettingStartedEvent, trackGithubOauthCallback } from "@/lib/analytics";
 import type { VcsProvider } from "@/lib/vcs/links";
 import {
   ORCHESTRATION_COPY,
@@ -54,6 +54,11 @@ import {
   githubSelfServeErrorMessage,
   githubSelfServeRefusal,
 } from "./githubConnectErrors";
+import {
+  clearGithubInstallPending,
+  markGithubInstallPending,
+  parseInstallationId,
+} from "@/lib/getting-started/github-install-return";
 
 // The create step polls the server this often while the engine restarts with
 // the new App.
@@ -81,6 +86,8 @@ const CLAIM_RESULT_MESSAGE: Record<string, string> = {
     "Orchestration or the GitHub app's OAuth client is not configured on this server, so it cannot verify your access.",
   not_member:
     "You are not a member of this tenant, so you cannot link an installation to it. Ask one of its admins to add you.",
+  returned:
+    "The install did not finish on GitHub. Installing the app on an organization needs an owner of that organization. If you are not one, GitHub asks an owner to approve it. If the app is already installed, continue to Link.",
 };
 
 /** A listed installation plus the cursor of the page it arrived on, so a claim can
@@ -114,6 +121,23 @@ export function ConnectGithub({ onBack, onRepositories, onConnected }: ConnectGi
 
   const claimResult = searchParams.get("github_claim");
   const proven = claimResult === "ready";
+  const callbackInstallationId = parseInstallationId(searchParams.get("installation_id"));
+
+  // One event per landing from a GitHub callback, whatever it reported.
+  const reportedCallback = useRef<string | null>(null);
+  useEffect(() => {
+    if (claimResult === null || reportedCallback.current === claimResult) return;
+    reportedCallback.current = claimResult;
+    const success = claimResult === "installed" || claimResult === "ready";
+    trackGithubOauthCallback({
+      result: claimResult,
+      success,
+      ...(success ? {} : { error_reason: claimResult }),
+      ...(callbackInstallationId === null
+        ? {}
+        : { installation_id: Number(callbackInstallationId) }),
+    });
+  }, [claimResult, callbackInstallationId]);
 
   // Null until the user moves the wizard by hand; until then the server's own
   // report decides, so there is one rule rather than a state to keep in step
@@ -309,6 +333,7 @@ export function ConnectGithub({ onBack, onRepositories, onConnected }: ConnectGi
         await linkVcsInstallation(currentTenant.id, "github", inst.installation_core_id);
       }
       setClaimedLogin(inst.login);
+      clearGithubInstallPending();
       refreshSetupProgress();
       // The event name is the whole funnel signal; the installation's GitHub id
       // is an identifier and must not reach the tag manager's data layer.
@@ -495,6 +520,11 @@ export function ConnectGithub({ onBack, onRepositories, onConnected }: ConnectGi
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {claimResult === "returned" ? (
+              <div className="rounded-md border border-[var(--sg-warning)]/30 bg-[var(--sg-warning)]/10 px-3 py-2 text-sm text-[var(--sg-warning)]">
+                {CLAIM_RESULT_MESSAGE.returned}
+              </div>
+            ) : null}
             {!instanceAdmin && !tenantAdmin ? (
               // Installing the app is real work on someone else's GitHub
               // organization. Say up front that the claim needs a grant this
@@ -506,7 +536,12 @@ export function ConnectGithub({ onBack, onRepositories, onConnected }: ConnectGi
             ) : null}
             {appUrl ? (
               <Button asChild>
-                <a href={githubInstallUrl(appUrl)}>
+                <a
+                  href={githubInstallUrl(appUrl)}
+                  onClick={() => {
+                    if (currentTenant) markGithubInstallPending(currentTenant.id);
+                  }}
+                >
                   Install on GitHub <ArrowRight className="h-4 w-4 ml-1" />
                 </a>
               </Button>
@@ -536,7 +571,7 @@ export function ConnectGithub({ onBack, onRepositories, onConnected }: ConnectGi
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {claimResult !== null && claimResult !== "ready" ? (
+            {claimResult !== null && claimResult !== "ready" && claimResult !== "returned" ? (
               <div
                 className={
                   // "installed" and "requested" are where GitHub drops the user
@@ -634,7 +669,7 @@ export function ConnectGithub({ onBack, onRepositories, onConnected }: ConnectGi
       {step === "done" ? (
         <Card>
           <CardHeader>
-            <CardTitle>Connected</CardTitle>
+            <CardTitle>GitHub App installed</CardTitle>
             <CardDescription>
               {githubConnectedDescription(claimedLogin)}
             </CardDescription>
@@ -643,12 +678,12 @@ export function ConnectGithub({ onBack, onRepositories, onConnected }: ConnectGi
             <div className="p-3 rounded-lg bg-[var(--sg-success)]/10 border border-[var(--sg-success)]/30">
               <div className="text-sm text-[var(--sg-success)] flex items-center gap-2">
                 <Check className="h-4 w-4" />
-                {claimedLogin} is connected.
+                GitHub App installed on {claimedLogin}
               </div>
             </div>
             {onConnected ? (
               <Button onClick={() => onConnected("github")}>
-                {ORCHESTRATION_COPY.handoff}
+                {ORCHESTRATION_COPY.firstRun} <ArrowRight className="h-4 w-4 ml-1" />
               </Button>
             ) : (
               <Button variant="outline" onClick={onRepositories}>

@@ -179,7 +179,7 @@ let perform_auth request_id config storage code =
 
 (* The Stategraph console's install link carries this state. Its users sign in
    on that console, so the install returns there and creates no session here. *)
-let stategraph_install_return config setup_action ctx =
+let stategraph_install_return config installation_id_opt setup_action ctx =
   let result =
     match setup_action with
     | Some "request" -> "requested"
@@ -192,6 +192,10 @@ let stategraph_install_return config setup_action ctx =
          Terrat_brand.Stategraph)
     ^ "/getting-started/?path=github&github_claim="
     ^ result
+    ^ CCOption.map_or
+        ~default:""
+        (fun installation_id -> "&installation_id=" ^ Int64.to_string installation_id)
+        installation_id_opt
   in
   Logs.info (fun m ->
       m "%s : CALLBACK : STATEGRAPH_INSTALL : result=%s" (Brtl_ctx.token ctx) result);
@@ -240,7 +244,8 @@ let login config storage code installation_id_opt ctx =
 let get config storage code installation_id_opt state setup_action =
   Brtl_ep.run ~content_type:"text/plain" ~f:(fun ctx ->
       match (state, code) with
-      | Some "stategraph", _ -> stategraph_install_return config setup_action ctx
+      | Some "stategraph", _ ->
+          stategraph_install_return config installation_id_opt setup_action ctx
       | _, Some code -> login config storage code installation_id_opt ctx
       | _, None ->
           Abb.Future.return (Brtl_ctx.set_response (Brtl_rspnc.create ~status:`Not_found "") ctx))

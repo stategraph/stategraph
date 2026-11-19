@@ -134,7 +134,14 @@ function InviteContent() {
                   join succeeded; the mismatch was recorded.
                 </p>
               )}
-              <Button className="mt-6" onClick={() => router.push('/')}>
+              <Button
+                className="mt-6"
+                onClick={() =>
+                  router.push(
+                    `/?${new URLSearchParams({ tenant: accepted.tenant_id, from: 'invite' }).toString()}`
+                  )
+                }
+              >
                 Open the console
               </Button>
             </>

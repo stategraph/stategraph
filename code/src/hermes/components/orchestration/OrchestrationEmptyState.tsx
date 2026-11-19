@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Plug } from "lucide-react";
+import { Play, Plug } from "lucide-react";
 
 import { useAuth } from "@/components/auth";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { useSetupProgress, useTenant } from "@/contexts";
 import { useDeepLinkRouter } from "@/hooks";
 import { isTenantAdmin } from "@/lib/api/capabilities";
 import {
+  FIRST_RUN_SETUP_HREF,
   ORCHESTRATION_SETUP_HREF,
   SETUP_COPY,
   orchestrationEmptyKind,
@@ -50,6 +51,19 @@ export function OrchestrationEmptyState({
         <div className="mt-1 max-w-md text-xs text-[var(--sg-text-muted)]">{COPY.connectBody}</div>
         <Button size="sm" className="mt-4" {...router.nav(ORCHESTRATION_SETUP_HREF)}>
           {COPY.connectAction}
+        </Button>
+      </div>
+    );
+  }
+
+  if (kind === "first-run") {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <Play className="h-8 w-8 mb-3 text-[var(--sg-text-muted)]" />
+        <div className="text-sm font-medium text-[var(--sg-text)]">{COPY.firstRunTitle}</div>
+        <div className="mt-1 max-w-md text-xs text-[var(--sg-text-muted)]">{COPY.firstRunBody}</div>
+        <Button size="sm" className="mt-4" {...router.nav(FIRST_RUN_SETUP_HREF)}>
+          {COPY.firstRunAction}
         </Button>
       </div>
     );
