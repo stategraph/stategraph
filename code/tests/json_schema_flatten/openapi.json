@@ -1,0 +1,19 @@
+{
+  "openapi": "3.0.3",
+  "components": {
+    "schemas": {
+      "tx-detail": {
+        "type": "object",
+        "properties": {
+          "tx": { "$ref": "#/components/schemas/tx" }
+        }
+      },
+      "tx": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" }
+        }
+      }
+    }
+  }
+}

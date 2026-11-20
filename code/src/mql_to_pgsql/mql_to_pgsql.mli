@@ -214,6 +214,9 @@ val default_cast_allow_list : string list
     [code/src/sgs_mql/sql/select_mql_page.sql]); a name that escaped the schema would resolve to the
     real, unscoped table.
 
+    A function or cast name is compared with the lists as PostgreSQL resolves it: an unquoted name
+    in lower case, a quoted name as written. Thus each list holds lower-case names.
+
     The guarantee is enforced twice — by the rewrite itself, and by an independent audit of the
     result, which is what {!audit_err} reports. *)
 val of_mql :

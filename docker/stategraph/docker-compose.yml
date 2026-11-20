@@ -65,6 +65,14 @@ services:
       # STATEGRAPH_SECURITY=true in your .env.
       STATEGRAPH_SECURITY: "${STATEGRAPH_SECURITY:-}"
 
+      # MCP server for AI agents at /api/v1/mcp.  The Enterprise image
+      # serves it, on by default; STATEGRAPH_MCP_ENABLED=false in your .env
+      # turns it off.  The OSS image ignores these variables.
+      # The docs tools read the docs bundled in the image;
+      # STATEGRAPH_MCP_DOCS_URL in your .env names another llms-full.txt, and
+      # empty turns them off.
+      STATEGRAPH_MCP_ENABLED: "${STATEGRAPH_MCP_ENABLED:-}"
+
       # Orchestration (terrat's services) is ON: orchestration.env (env_file
       # above) sets STATEGRAPH_ORCHESTRATION_ENABLED=true, so a failure to
       # start it stops the server, and carries the FDW role passwords that

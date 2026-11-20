@@ -38,6 +38,10 @@ val expr_to_json : Hcl_parser_value.Expr.t -> Yojson.Safe.t
 (** Convert JSON back to a single HCL expression. *)
 val json_to_expr : Yojson.Safe.t -> (Hcl_parser_value.Expr.t, [> err ]) result
 
+(** Convert a computed value, such as a state attribute or a data source result, to a literal
+    expression. Each JSON string is the string itself: [${] and [%{] in it are text. *)
+val literal_to_expr : Yojson.Safe.t -> (Hcl_parser_value.Expr.t, [> err ]) result
+
 (** Convert JSON back to an HCL AST.
     @param schema Block schema for disambiguation. Defaults to {!Schema.tf}. *)
 val to_ast : ?schema:Schema.t -> Yojson.Safe.t -> (Hcl_ast.t, [> err ]) result

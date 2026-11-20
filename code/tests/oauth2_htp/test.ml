@@ -204,6 +204,26 @@ let json_test =
       Oth_abb.Assert.none (Json.list obj);
       Abb.Future.return ())
 
+(* {2 GitHub groups} *)
+
+let github_groups_test =
+  Oth_abb.test ~name:"github_groups" (fun () ->
+      let module Groups = Oauth2_htp_github.Groups in
+      let module Tests = Oauth2_htp_github.Tests in
+      (* The prefix on each, the organizations first, and the logins as GitHub spells them. *)
+      Oth_abb.Assert.Eq.string_list
+        ~expected:[ "github:Acme"; "github:Other"; "github:Acme/platform"; "github:Acme/k8s" ]
+        ~actual:
+          (Groups.to_github_prefixed_list
+             {
+               Groups.organizations = [ "Acme"; "Other" ];
+               teams =
+                 [ Tests.team ~org:"Acme" ~slug:"platform"; Tests.team ~org:"Acme" ~slug:"k8s" ];
+             });
+      Oth_abb.Assert.List.empty
+        (Groups.to_github_prefixed_list { Groups.organizations = []; teams = [] });
+      Abb.Future.return ())
+
 (* {2 Email domains} *)
 
 let validator_test =
@@ -449,6 +469,7 @@ let () =
           nonce_test;
           jwk_test;
           json_test;
+          github_groups_test;
           validator_test;
           csrf_test;
           oauth_start_test;

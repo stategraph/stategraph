@@ -60,7 +60,7 @@ http {
     # skips an add_header whose value is empty, so everything else is untouched.
     map $sent_http_content_type $terrat_document_cache_control {
         default    "";
-        ~*^text/html "no-store";
+        ~*^text/html "no-store, no-cache, must-revalidate";
     }
 
     # Public facing portion of the app
@@ -136,7 +136,7 @@ http {
 
             # API responses carry organisation-scoped data and must not be
             # stored by browsers or intermediary caches.
-            add_header Cache-Control "no-store" always;
+            add_header Cache-Control "no-store, no-cache, must-revalidate" always;
             add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
             add_header X-Frame-Options "DENY" always;
             add_header X-Content-Type-Options "nosniff" always;

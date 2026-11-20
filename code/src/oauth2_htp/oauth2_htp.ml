@@ -23,7 +23,7 @@ module Config = struct
   type provider =
     | Google of { group : Oauth2_htp_google.Group.t option }
     | Github of {
-        orgs : string Sln_list.Non_empty.t;
+        authorized_orgs : string Sln_list.Non_empty.t;
         endpoints : Oauth2_htp_github.Endpoints.t;
       }
     | Oidc of { issuer_url : string }
@@ -108,9 +108,10 @@ let create config =
         >>= fun now ->
         let open Abbs_fc.Infix_result_monad in
         Oauth2_htp_google.check_admin ~now provider >>| fun () -> Google provider
-    | Config.Github { orgs; endpoints } ->
+    | Config.Github { authorized_orgs; endpoints } ->
         Abb.Future.return
-          (Ok (Github (Oauth2_htp_github.make ~client_id ~client_secret ~endpoints ~orgs)))
+          (Ok
+             (Github (Oauth2_htp_github.make ~client_id ~client_secret ~endpoints ~authorized_orgs)))
     | Config.Oidc { issuer_url } ->
         Oauth2_htp_oidc.discover ~issuer_url ~client_id ~client_secret
         >>| fun provider -> Oidc provider)
@@ -183,20 +184,26 @@ let oauth_start ~now t req =
           ~secure:t.config.Config.cookie_secure
           csrf))
 
+(* The session of the sign-in, and whether it is authorized: the email domain first, then what the
+   provider checks, which it may only do on what its own [redeem] answers. *)
 let redeem ~now ~code t =
+  let open Abbs_fc.Infix_result_monad in
   let redirect_uri = t.config.Config.redirect_url in
+  let authorized session provider_authorizes =
+    (session, t.email_validator session.Oauth2_htp_session.email && provider_authorizes ())
+  in
   match t.provider with
-  | Google provider -> Oauth2_htp_google.redeem ~now ~redirect_uri ~code provider
-  | Github provider -> Oauth2_htp_github.redeem ~redirect_uri ~code provider
-  | Oidc provider -> Oauth2_htp_oidc.redeem ~now ~redirect_uri ~code provider
-
-let authorize t session =
-  t.email_validator session.Oauth2_htp_session.email
-  &&
-  match t.provider with
-  | Google provider -> Oauth2_htp_google.authorize provider session
-  | Github provider -> Oauth2_htp_github.authorize provider session
-  | Oidc _ -> true
+  | Google provider ->
+      Oauth2_htp_google.redeem ~now ~redirect_uri ~code provider
+      >>| fun session -> authorized session (fun () -> Oauth2_htp_google.authorize provider session)
+  | Github provider ->
+      Oauth2_htp_github.redeem ~redirect_uri ~code provider
+      >>| fun redeemed ->
+      authorized (Oauth2_htp_github.session redeemed) (fun () ->
+          Oauth2_htp_github.authorize provider redeemed)
+  | Oidc provider ->
+      Oauth2_htp_oidc.redeem ~now ~redirect_uri ~code provider
+      >>| fun session -> authorized session (fun () -> true)
 
 let clear_cookies t = [ Csrf.clear ~secure:t.config.Config.cookie_secure ]
 
@@ -230,8 +237,8 @@ let oauth_callback ~now t req =
       (match Request.form_value "code" req with
         | "" -> Abb.Future.return (Error `Missing_code)
         | code -> redeem ~now ~code t)
-      >>= fun session ->
-      match authorize t session with
+      >>= fun (session, authorized) ->
+      match authorized with
       | true ->
           Logs.info (fun m ->
               m

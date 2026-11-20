@@ -71,8 +71,19 @@ A sign-in asks for the scopes `read:user`, `user:email`, and `read:org`. With th
 - The avatar of the account, which the console shows for the user.
 - The primary email of the account, which must be verified.
 - The logins of the organizations the user is an active member of. A pending invitation is not a membership.
+- The teams the user is a member of.
 
-Stategraph compares the organization logins with `STATEGRAPH_OAUTH_GITHUB_ORG` without case. The logins are also the user's groups for [group rules](/docs/admin/access-control/group-rules), as GitHub spells them, for example `Acme`.
+Stategraph compares the organization logins with `STATEGRAPH_OAUTH_GITHUB_ORG` without case. Write the logins there without a prefix.
+
+The organizations and teams are the user's groups for [group rules](/docs/admin/access-control/group-rules). Each GitHub group starts with `github:`, which tells it apart from the groups of other providers in a rule:
+
+- Each organization is the group `github:<organization>`, spelled as GitHub spells it, for example `github:Acme`.
+- Each team of an organization in `STATEGRAPH_OAUTH_GITHUB_ORG` is the group `github:<organization>/<team slug>`, for example `github:Acme/platform`. The teams of other organizations are not groups.
+- A member of a child team is also in the groups of its parent teams, as GitHub counts them as members of the parent. For example, a member of `platform-infra`, a child team of `platform` in `Acme`, has the groups `github:Acme`, `github:Acme/platform-infra`, and `github:Acme/platform`.
+
+A rule must name the group with its prefix: `{"group": "github:Acme/platform"}` matches the members of the team, while `{"group": "Acme/platform"}` matches no GitHub user. `{"group": "github:*"}` matches every user who signs in with GitHub.
+
+A change of teams takes effect at the user's next sign-in. If Stategraph cannot read the teams at a sign-in, it logs an error and the user's groups are their organizations only, until the next sign-in.
 
 ### GitHub Enterprise Server
 
@@ -171,6 +182,6 @@ The server log shows `GitHub refused the code`, for example with `incorrect_clie
 
 ## Next steps
 
-- [Group Rules](/docs/admin/access-control/group-rules) to grant capabilities from GitHub organizations
+- [Group Rules](/docs/admin/access-control/group-rules) to grant capabilities from GitHub organizations and teams
 - [OIDC Configuration](/docs/admin/access-control/oidc) for other providers
 - [Environment Variables](/docs/admin/operations/environment-variables)

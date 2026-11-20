@@ -109,7 +109,7 @@ let make_config ~group ~email_domains ~callback_url config oauth2_config =
     | Sgs_config.Github { github_orgs } ->
         ( Oauth2_htp.Config.Github
             {
-              orgs = github_orgs;
+              authorized_orgs = github_orgs;
               endpoints =
                 {
                   Oauth2_htp_github.Endpoints.web_base = Sgs_config.github_web_base config;

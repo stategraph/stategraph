@@ -1,0 +1,1257 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "blast-radius-arguments": {
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "description": "The address of the instance, e.g. aws_vpc.main or module.net.aws_subnet.a[0].",
+          "type": "string"
+        },
+        "limit": {
+          "description": "The maximum number of nodes.",
+          "maximum": 1000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_depth": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "state_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "state_id",
+        "address"
+      ],
+      "type": "object"
+    },
+    "blast-radius-output": {
+      "$ref": "api.json#/components/schemas/instance-blast-radius"
+    },
+    "empty-object": {
+      "additionalProperties": false,
+      "description": "An object with no properties: the arguments of a tool that takes none, and the result of ping.",
+      "properties": {},
+      "type": "object"
+    },
+    "error": {
+      "additionalProperties": false,
+      "description": "A JSON-RPC error.",
+      "properties": {
+        "code": {
+          "description": "The JSON-RPC error code: -32700 parse error, -32600 invalid request, -32601 method not found, -32602 invalid params, -32603 internal error.",
+          "type": "integer"
+        },
+        "message": {
+          "description": "A human-readable message.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "type": "object"
+    },
+    "get-doc-arguments": {
+      "additionalProperties": false,
+      "properties": {
+        "offset": {
+          "description": "The byte offset to read from. Use next_offset of the previous result.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "url": {
+          "description": "The URL or the path of the page, e.g. https://stategraph.com/docs/orchestration or /docs/orchestration.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    },
+    "get-doc-output": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "description": "The Markdown of the page from offset, at most 32 KB.",
+          "type": "string"
+        },
+        "docs_version": {
+          "description": "The version of the Stategraph server whose image holds these docs. Absent when the docs come from another URL, such as stategraph.com, which has the docs of the latest release.",
+          "type": "string"
+        },
+        "next_offset": {
+          "description": "The offset of the next part. Absent when content holds the end of the page.",
+          "type": "integer"
+        },
+        "offset": {
+          "description": "The byte offset that this part starts at.",
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        },
+        "total_bytes": {
+          "description": "The size of the whole text, in bytes.",
+          "type": "integer"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "url",
+        "content",
+        "offset",
+        "total_bytes"
+      ],
+      "type": "object"
+    },
+    "get-run-arguments": {
+      "additionalProperties": false,
+      "properties": {
+        "failed_only": {
+          "description": "Return only the dirspaces and steps that failed.",
+          "type": "boolean"
+        },
+        "provider": {
+          "description": "The VCS provider. The default is github.",
+          "enum": [
+            "github",
+            "gitlab"
+          ],
+          "type": "string"
+        },
+        "run_id": {
+          "description": "The id of the run (work manifest), from list_pull_request_runs.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "type": "object"
+    },
+    "get-run-output": {
+      "additionalProperties": false,
+      "properties": {
+        "dirspaces": {
+          "description": "The result of each dirspace, failures first.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "success": {
+                "type": "boolean"
+              },
+              "workspace": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path",
+              "workspace"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "run": {
+          "additionalProperties": false,
+          "description": "The run. Absent when it does not exist or is not in a tenant of the user.",
+          "properties": {
+            "base_sha": {
+              "type": "string"
+            },
+            "branch": {
+              "type": "string"
+            },
+            "completed_at": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "environment": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "pull_number": {
+              "type": "integer"
+            },
+            "repo_name": {
+              "type": "string"
+            },
+            "repo_owner": {
+              "type": "string"
+            },
+            "run_kind": {
+              "type": "string"
+            },
+            "run_type": {
+              "type": "string"
+            },
+            "sha": {
+              "type": "string"
+            },
+            "state": {
+              "$ref": "../terrat/api.json#/components/schemas/work-manifest-state"
+            },
+            "tag_query": {
+              "type": "string"
+            },
+            "username": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        },
+        "steps": {
+          "description": "The workflow steps without their output. Read an output with get_step_output.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "type": "string"
+              },
+              "idx": {
+                "type": "integer"
+              },
+              "ignore_errors": {
+                "type": "boolean"
+              },
+              "scope": {
+                "$ref": "../terrat/api.json#/components/schemas/workflow-step-output-scope"
+              },
+              "step": {
+                "type": "string"
+              },
+              "success": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "idx",
+              "step"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "truncated": {
+          "description": "True when a list holds only its first rows: 50 runs, or 500 rows for any other list.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "dirspaces",
+        "steps",
+        "truncated"
+      ],
+      "type": "object"
+    },
+    "get-step-output-arguments": {
+      "additionalProperties": false,
+      "properties": {
+        "idx": {
+          "description": "The idx of the step, from get_run.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "offset": {
+          "description": "The byte offset to read from. Use next_offset of the previous result.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "run_id": {
+          "description": "The id of the run (work manifest).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "idx"
+      ],
+      "type": "object"
+    },
+    "get-step-output-output": {
+      "additionalProperties": false,
+      "properties": {
+        "fields": {
+          "additionalProperties": {},
+          "description": "The scalar fields of the step payload, e.g. has_changes.",
+          "type": "object"
+        },
+        "next_offset": {
+          "description": "The offset of the next part. Absent when text holds the end.",
+          "type": "integer"
+        },
+        "offset": {
+          "description": "The byte offset that this part starts at.",
+          "type": "integer"
+        },
+        "step": {
+          "additionalProperties": false,
+          "description": "The step: idx, step, scope, success. Absent when the step does not exist.",
+          "properties": {
+            "idx": {
+              "type": "integer"
+            },
+            "ignore_errors": {
+              "type": "boolean"
+            },
+            "scope": {
+              "$ref": "../terrat/api.json#/components/schemas/workflow-step-output-scope"
+            },
+            "step": {
+              "type": "string"
+            },
+            "success": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "idx",
+            "step"
+          ],
+          "type": "object"
+        },
+        "text": {
+          "description": "The output of the step from offset, at most 32 KB. Values that the tool marked sensitive are masked as it printed them.",
+          "type": "string"
+        },
+        "text_field": {
+          "description": "The payload field that text is read from: plan, text, or the first other text field.",
+          "type": "string"
+        },
+        "total_bytes": {
+          "description": "The size of the whole text, in bytes.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "fields",
+        "offset",
+        "total_bytes"
+      ],
+      "type": "object"
+    },
+    "get-transaction-arguments": {
+      "additionalProperties": false,
+      "properties": {
+        "page": {
+          "description": "The next_page value of a previous result, for more plan operations.",
+          "type": "string"
+        },
+        "tx_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tx_id"
+      ],
+      "type": "object"
+    },
+    "get-transaction-output": {
+      "additionalProperties": false,
+      "properties": {
+        "next_page": {
+          "type": "string"
+        },
+        "plan_operations": {
+          "$ref": "api.json#/components/schemas/plan-operations"
+        },
+        "transaction": {
+          "$ref": "api.json#/components/schemas/tx-detail"
+        }
+      },
+      "required": [
+        "transaction",
+        "plan_operations"
+      ],
+      "type": "object"
+    },
+    "initialize-params": {
+      "additionalProperties": {},
+      "description": "The parameters of initialize.",
+      "properties": {
+        "protocolVersion": {
+          "description": "The MCP version that the client asks for.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "initialize-result": {
+      "additionalProperties": false,
+      "description": "The result of initialize and server/discover.",
+      "properties": {
+        "capabilities": {
+          "$ref": "#/definitions/server-capabilities"
+        },
+        "instructions": {
+          "description": "Guidance for the model on how to use the server.",
+          "type": "string"
+        },
+        "protocolVersion": {
+          "description": "The MCP version that the server uses for this client.",
+          "type": "string"
+        },
+        "serverInfo": {
+          "$ref": "#/definitions/server-info"
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "capabilities",
+        "serverInfo"
+      ],
+      "type": "object"
+    },
+    "list-changed-capability": {
+      "additionalProperties": false,
+      "description": "A server capability. listChanged is true when the server sends notifications when the list changes.",
+      "properties": {
+        "listChanged": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "listChanged"
+      ],
+      "type": "object"
+    },
+    "list-states-arguments": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "page": {
+          "description": "The next_page value of a previous result.",
+          "type": "string"
+        },
+        "q": {
+          "description": "A filter on the state name.",
+          "type": "string"
+        },
+        "tenant_id": {
+          "description": "The tenant. Required when the user is in more than one tenant.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "list-states-output": {
+      "additionalProperties": false,
+      "properties": {
+        "next_page": {
+          "type": "string"
+        },
+        "states": {
+          "$ref": "api.json#/components/schemas/tenant-states"
+        },
+        "tenant_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "states"
+      ],
+      "type": "object"
+    },
+    "pull-request-arguments": {
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "description": "The VCS provider. The default is github.",
+          "enum": [
+            "github",
+            "gitlab"
+          ],
+          "type": "string"
+        },
+        "pull_number": {
+          "description": "The number of the pull request or merge request.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "repo": {
+          "description": "The repository as owner/name. For GitLab, owner is the group path.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repo",
+        "pull_number"
+      ],
+      "type": "object"
+    },
+    "pull-request-gates-output": {
+      "additionalProperties": false,
+      "properties": {
+        "approvals": {
+          "description": "The gate approvals of the pull request.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "approver": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "sha": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "gates": {
+          "description": "The gates of the pull request, for each commit and dirspace.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "type": "string"
+              },
+              "dir": {
+                "type": "string"
+              },
+              "gate": {},
+              "name": {
+                "type": "string"
+              },
+              "sha": {
+                "type": "string"
+              },
+              "workspace": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "truncated": {
+          "description": "True when a list holds only its first rows: 50 runs, or 500 rows for any other list.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "approvals",
+        "gates",
+        "truncated"
+      ],
+      "type": "object"
+    },
+    "pull-request-locks-output": {
+      "additionalProperties": false,
+      "properties": {
+        "locks": {
+          "description": "The dirspace locks in the repository. held_by_this_pull_request tells which pull request holds each lock. A lock held by another pull request on a dirspace that this pull request changes blocks its apply.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "branch_target": {
+                "type": "string"
+              },
+              "held_by_this_pull_request": {
+                "type": "boolean"
+              },
+              "holder_pull_number": {
+                "type": "integer"
+              },
+              "path": {
+                "type": "string"
+              },
+              "workspace": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path",
+              "workspace"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "truncated": {
+          "description": "True when a list holds only its first rows: 50 runs, or 500 rows for any other list.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "locks",
+        "truncated"
+      ],
+      "type": "object"
+    },
+    "pull-request-runs-output": {
+      "additionalProperties": false,
+      "properties": {
+        "dirspace_results": {
+          "description": "For each run, the number of dirspaces that succeeded and failed.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "dirspaces": {
+                "type": "integer"
+              },
+              "success": {
+                "type": "boolean"
+              },
+              "work_manifest": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "work_manifest"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "pull_request": {
+          "additionalProperties": false,
+          "description": "The pull request: state, head sha, base sha, branches, title, author. Absent when Orchestration has no record of it. A run whose sha is not the head sha ran on an older commit.",
+          "properties": {
+            "base_branch": {
+              "type": "string"
+            },
+            "base_sha": {
+              "type": "string"
+            },
+            "branch": {
+              "type": "string"
+            },
+            "merged_at": {
+              "type": "string"
+            },
+            "merged_sha": {
+              "type": "string"
+            },
+            "pull_number": {
+              "type": "integer"
+            },
+            "sha": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "username": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "runs": {
+          "description": "The 50 most recent runs (work manifests) of the pull request, newest first.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "base_sha": {
+                "type": "string"
+              },
+              "branch": {
+                "type": "string"
+              },
+              "completed_at": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "environment": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "run_kind": {
+                "type": "string"
+              },
+              "run_type": {
+                "type": "string"
+              },
+              "sha": {
+                "type": "string"
+              },
+              "state": {
+                "$ref": "../terrat/api.json#/components/schemas/work-manifest-state"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "truncated": {
+          "description": "True when a list holds only its first rows: 50 runs, or 500 rows for any other list.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "dirspace_results",
+        "runs",
+        "truncated"
+      ],
+      "type": "object"
+    },
+    "query-arguments": {
+      "additionalProperties": false,
+      "properties": {
+        "page": {
+          "description": "The next_page value of a previous result of the same statement.",
+          "type": "string"
+        },
+        "sql": {
+          "description": "One read-only SELECT statement. Add ORDER BY to get next_page cursors. Without LIMIT the server returns 20 rows; the maximum is 1000.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sql"
+      ],
+      "type": "object"
+    },
+    "query-output": {
+      "additionalProperties": false,
+      "properties": {
+        "next_page": {
+          "description": "Pass this as page to read the next rows. Absent when there are no more rows or the statement has no ORDER BY.",
+          "type": "string"
+        },
+        "note": {
+          "description": "Why the result is incomplete and what to change.",
+          "type": "string"
+        },
+        "row_count": {
+          "description": "The number of rows in rows.",
+          "type": "integer"
+        },
+        "rows": {
+          "items": {},
+          "type": "array"
+        },
+        "truncated": {
+          "description": "True when more rows match than rows holds.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "rows",
+        "row_count",
+        "truncated"
+      ],
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "description": "A JSON-RPC 2.0 request or notification of the Model Context Protocol. A request without an id is a notification and gets no response.",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/request-id"
+        },
+        "jsonrpc": {
+          "description": "The JSON-RPC version.",
+          "enum": [
+            "2.0"
+          ],
+          "type": "string"
+        },
+        "method": {
+          "description": "The MCP method, e.g. tools/call.",
+          "type": "string"
+        },
+        "params": {
+          "description": "The parameters of the method. Their shape depends on the method."
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "method"
+      ],
+      "type": "object"
+    },
+    "request-id": {
+      "description": "The id of a JSON-RPC request, echoed in its response.",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        }
+      ]
+    },
+    "resource": {
+      "additionalProperties": false,
+      "description": "A resource that the client can read.",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "mimeType": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "uri",
+        "name",
+        "mimeType"
+      ],
+      "type": "object"
+    },
+    "resource-contents": {
+      "additionalProperties": false,
+      "description": "The text of a resource.",
+      "properties": {
+        "mimeType": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "uri",
+        "mimeType",
+        "text"
+      ],
+      "type": "object"
+    },
+    "resource-read-params": {
+      "additionalProperties": {},
+      "description": "The parameters of resources/read.",
+      "properties": {
+        "uri": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "uri"
+      ],
+      "type": "object"
+    },
+    "resource-read-result": {
+      "additionalProperties": false,
+      "description": "The result of resources/read.",
+      "properties": {
+        "contents": {
+          "items": {
+            "$ref": "#/definitions/resource-contents"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "contents"
+      ],
+      "type": "object"
+    },
+    "resource-templates-list-result": {
+      "additionalProperties": false,
+      "description": "The result of resources/templates/list.",
+      "properties": {
+        "resourceTemplates": {
+          "items": {
+            "$ref": "#/definitions/resource"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "resourceTemplates"
+      ],
+      "type": "object"
+    },
+    "resources-list-result": {
+      "additionalProperties": false,
+      "description": "The result of resources/list.",
+      "properties": {
+        "resources": {
+          "items": {
+            "$ref": "#/definitions/resource"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "resources"
+      ],
+      "type": "object"
+    },
+    "response": {
+      "additionalProperties": false,
+      "description": "A JSON-RPC 2.0 response. It has a result or an error, not both.",
+      "properties": {
+        "error": {
+          "$ref": "#/definitions/error"
+        },
+        "id": {
+          "description": "The id of the request. Null when the request could not be parsed.",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/request-id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "jsonrpc": {
+          "description": "The JSON-RPC version.",
+          "enum": [
+            "2.0"
+          ],
+          "type": "string"
+        },
+        "result": {
+          "description": "The result of the method."
+        }
+      },
+      "required": [
+        "jsonrpc"
+      ],
+      "type": "object"
+    },
+    "schema-document": {
+      "additionalProperties": {},
+      "description": "This document, read to take the input and output schemas of the tools from it.",
+      "properties": {
+        "definitions": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "required": [
+        "definitions"
+      ],
+      "type": "object"
+    },
+    "search-docs-arguments": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "description": "The maximum number of pages to return. The default is 5.",
+          "maximum": 20,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "description": "The question or the words to search for, e.g. \"apply requirements\".",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    },
+    "search-docs-output": {
+      "additionalProperties": false,
+      "properties": {
+        "docs_version": {
+          "description": "The version of the Stategraph server whose image holds these docs. Absent when the docs come from another URL, such as stategraph.com, which has the docs of the latest release.",
+          "type": "string"
+        },
+        "results": {
+          "items": {
+            "additionalProperties": false,
+            "description": "A page that matches the search. Cite url.",
+            "properties": {
+              "excerpt": {
+                "description": "Text from the part of the page that matches best.",
+                "type": "string"
+              },
+              "score": {
+                "description": "The BM25 score. Higher is a better match.",
+                "type": "number"
+              },
+              "section": {
+                "description": "The heading of the part of the page that matches best.",
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "url": {
+                "description": "The stategraph.com URL of the page.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "title",
+              "url",
+              "excerpt",
+              "score"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "source": {
+          "description": "The URL that the docs were read from.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "results",
+        "source"
+      ],
+      "type": "object"
+    },
+    "server-capabilities": {
+      "additionalProperties": false,
+      "description": "The MCP features that the server has.",
+      "properties": {
+        "resources": {
+          "$ref": "#/definitions/list-changed-capability"
+        },
+        "tools": {
+          "$ref": "#/definitions/list-changed-capability"
+        }
+      },
+      "required": [
+        "tools",
+        "resources"
+      ],
+      "type": "object"
+    },
+    "server-info": {
+      "additionalProperties": false,
+      "description": "The name and version of the server.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "type": "object"
+    },
+    "sql-schema-arguments": {
+      "additionalProperties": false,
+      "properties": {
+        "table": {
+          "description": "Return only this table. Omit to return all tables.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "sql-schema-output": {
+      "$ref": "api.json#/components/schemas/mql-schema-response"
+    },
+    "text-content": {
+      "additionalProperties": false,
+      "description": "A block of text.",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "text"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "text"
+      ],
+      "type": "object"
+    },
+    "tool": {
+      "additionalProperties": false,
+      "description": "A tool that the client can call.",
+      "properties": {
+        "annotations": {
+          "$ref": "#/definitions/tool-annotations"
+        },
+        "description": {
+          "type": "string"
+        },
+        "inputSchema": {
+          "description": "The JSON schema of the arguments."
+        },
+        "name": {
+          "type": "string"
+        },
+        "outputSchema": {
+          "description": "The JSON schema of structuredContent in the result."
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "inputSchema",
+        "annotations"
+      ],
+      "type": "object"
+    },
+    "tool-annotations": {
+      "additionalProperties": false,
+      "description": "Hints about the behavior of a tool.",
+      "properties": {
+        "destructiveHint": {
+          "description": "True when the tool can delete or overwrite data.",
+          "type": "boolean"
+        },
+        "idempotentHint": {
+          "description": "True when a second identical call has no further effect.",
+          "type": "boolean"
+        },
+        "openWorldHint": {
+          "description": "True when the tool reads or changes systems outside the Stategraph instance.",
+          "type": "boolean"
+        },
+        "readOnlyHint": {
+          "description": "True when the tool does not change anything.",
+          "type": "boolean"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "readOnlyHint",
+        "destructiveHint",
+        "idempotentHint",
+        "openWorldHint"
+      ],
+      "type": "object"
+    },
+    "tool-call-params": {
+      "additionalProperties": {},
+      "description": "The parameters of tools/call.",
+      "properties": {
+        "arguments": {
+          "description": "The arguments of the tool, as an object."
+        },
+        "name": {
+          "description": "The name of the tool.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "tool-call-result": {
+      "additionalProperties": false,
+      "description": "The result of tools/call. isError is true when the tool failed; content then holds the reason.",
+      "properties": {
+        "content": {
+          "items": {
+            "$ref": "#/definitions/text-content"
+          },
+          "type": "array"
+        },
+        "isError": {
+          "type": "boolean"
+        },
+        "structuredContent": {
+          "description": "The result as a JSON object that matches the outputSchema of the tool."
+        }
+      },
+      "required": [
+        "content",
+        "isError"
+      ],
+      "type": "object"
+    },
+    "tools-list-result": {
+      "additionalProperties": false,
+      "description": "The result of tools/list.",
+      "properties": {
+        "tools": {
+          "items": {
+            "$ref": "#/definitions/tool"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "tools"
+      ],
+      "type": "object"
+    },
+    "whoami-output": {
+      "additionalProperties": false,
+      "properties": {
+        "tenants": {
+          "$ref": "api.json#/components/schemas/user-tenants"
+        },
+        "user": {
+          "$ref": "api.json#/components/schemas/user"
+        }
+      },
+      "required": [
+        "user",
+        "tenants"
+      ],
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/definitions/request"
+    }
+  ]
+}

@@ -1,27 +1,33 @@
 (* All the state accumulated while flattening, threaded immutably through the recursion (no mutable
-   structures).  [visited] is a [file -> name -> canonical name] nesting, since [Sln_map] is
+   structures).  [visited] is a [file -> fragment -> canonical name] nesting, since [Sln_map] is
    string-keyed. *)
 type state = {
   defs : Yojson.Safe.t Sln_map.String.t;
       (* newly-inlined foreign definitions, keyed by canonical name *)
   visited : string Sln_map.String.t Sln_map.String.t;
-      (* (file, name) -> canonical name, for dedup and cycle breaking *)
+      (* (file, fragment) -> canonical name, for dedup and cycle breaking *)
   used_canon : Sln_set.String.t; (* canonical names already in use, to avoid collisions *)
   file_cache : Yojson.Safe.t Sln_map.String.t; (* parsed foreign files, keyed by resolved path *)
 }
 
-(* [visited] lookup/insert for a [(file, name)] pair over the nested map. *)
-let visited_get ~file ~name visited =
-  CCOption.flat_map (Sln_map.String.get name) (Sln_map.String.get file visited)
+(* [visited] lookup/insert for a [(file, fragment)] pair over the nested map. *)
+let visited_get ~file ~frag visited =
+  CCOption.flat_map (Sln_map.String.get frag) (Sln_map.String.get file visited)
 
-let visited_add ~file ~name canon visited =
+let visited_add ~file ~frag canon visited =
   let inner = CCOption.get_or ~default:Sln_map.String.empty (Sln_map.String.get file visited) in
-  Sln_map.String.add file (Sln_map.String.add name canon inner) visited
+  Sln_map.String.add file (Sln_map.String.add frag canon inner) visited
 
 let flatten_document ~search_path ~file_link ~root_file json =
   let file_link_by_base =
     CCList.map (fun (file, module_base) -> (Filename.basename file, module_base)) file_link
   in
+  let file_link_of path =
+    match Sln_list.String.assoc_opt path file_link with
+    | Some _ as module_base -> module_base
+    | None -> Sln_list.String.assoc_opt (Filename.basename path) file_link_by_base
+  in
+  let root_dir = Filename.dirname root_file in
   let load_json state file =
     match Sln_map.String.get file state.file_cache with
     | Some j -> (j, state)
@@ -67,53 +73,68 @@ let flatten_document ~search_path ~file_link ~root_file json =
     | Some (path, frag) -> (path, "#" ^ frag)
     | None -> (ref_, "")
   in
-  let name_of_fragment frag ref_ =
+  (* The keys from the root of a document to a definition, for the pointers that refs may use. *)
+  let keys_of_fragment frag ref_ =
     match CCString.split_on_char '/' frag with
-    | [ "#"; "definitions"; n ] -> n
+    | [ "#"; "definitions"; n ] -> ([ "definitions"; n ], n)
+    | [ "#"; "components"; "schemas"; n ] -> ([ "components"; "schemas"; n ], n)
     | _ ->
         failwith
-          (Printf.sprintf "Unsupported foreign ref %S: only #/definitions/<Name> is supported" ref_)
+          (Printf.sprintf
+             "Unsupported foreign ref %S: only #/definitions/<Name> and \
+              #/components/schemas/<Name> are supported"
+             ref_)
   in
-  let rec rewrite_ref_string state ~base_dir ref_ =
+  let rec lookup json = function
+    | [] -> Some json
+    | k :: ks -> (
+        match json with
+        | `Assoc kvs -> CCOption.flat_map (fun j -> lookup j ks) (Sln_list.String.assoc_opt k kvs)
+        | _ -> None)
+  in
+  (* [current_file] is the foreign file that holds the ref, or [None] in the root document. *)
+  let rec rewrite_ref_string state ~current_file ref_ =
     let path, frag = split_ref ref_ in
-    if CCString.equal path "" then (ref_, state) (* internal ref, unchanged *)
-    else
-      let name = name_of_fragment frag ref_ in
-      match Sln_list.String.assoc_opt (Filename.basename path) file_link_by_base with
-      | Some module_base -> (Printf.sprintf "#/file-link/%s/%s" module_base name, state)
+    match (path, current_file) with
+    | "", None -> (ref_, state) (* internal ref of the root document, unchanged *)
+    | "", Some file -> inline_ref state ~file ~frag ref_
+    | path, _ -> (
+        match file_link_of path with
+        | Some module_base ->
+            let _, name = keys_of_fragment frag ref_ in
+            (Printf.sprintf "#/file-link/%s/%s" module_base name, state)
+        | None ->
+            let base_dir = CCOption.map_or ~default:root_dir Filename.dirname current_file in
+            inline_ref state ~file:(resolve_file ~base_dir path) ~frag ref_)
+  and inline_ref state ~file ~frag ref_ =
+    let keys, name = keys_of_fragment frag ref_ in
+    let canon, state =
+      match visited_get ~file ~frag state.visited with
+      | Some c -> (c, state)
       | None ->
-          let file = resolve_file ~base_dir path in
-          let canon, state =
-            match visited_get ~file ~name state.visited with
-            | Some c -> (c, state)
-            | None ->
-                let c, state = fresh_canonical state file name in
-                (* Reserve before recursing so cyclic refs terminate. *)
-                let state = { state with visited = visited_add ~file ~name c state.visited } in
-                let json, state = load_json state file in
-                let def_json =
-                  match Yojson.Safe.Util.member "definitions" json with
-                  | `Assoc kvs -> (
-                      match Sln_list.String.assoc_opt name kvs with
-                      | Some d -> d
-                      | None -> failwith (Printf.sprintf "Definition %S not found in %s" name file))
-                  | _ -> failwith (Printf.sprintf "No definitions object in %s" file)
-                in
-                (* Recurse so transitive foreign refs are flattened relative to this file's dir. *)
-                let def_json, state = rewrite state ~base_dir:(Filename.dirname file) def_json in
-                (c, { state with defs = Sln_map.String.add c def_json state.defs })
+          let c, state = fresh_canonical state file name in
+          (* Reserve before recursing so cyclic refs terminate. *)
+          let state = { state with visited = visited_add ~file ~frag c state.visited } in
+          let json, state = load_json state file in
+          let def_json =
+            match lookup json keys with
+            | Some d -> d
+            | None -> failwith (Printf.sprintf "Definition %s not found in %s" frag file)
           in
-          ("#/definitions/" ^ canon, state)
-  and rewrite state ~base_dir json =
+          let def_json, state = rewrite state ~current_file:(Some file) def_json in
+          (c, { state with defs = Sln_map.String.add c def_json state.defs })
+    in
+    ("#/definitions/" ^ canon, state)
+  and rewrite state ~current_file json =
     match json with
     | `Assoc [ ("$ref", `String ref_) ] ->
-        let ref_, state = rewrite_ref_string state ~base_dir ref_ in
+        let ref_, state = rewrite_ref_string state ~current_file ref_ in
         (`Assoc [ ("$ref", `String ref_) ], state)
     | `Assoc kvs ->
         let state, kvs =
           CCList.fold_map
             (fun state (k, v) ->
-              let v, state = rewrite state ~base_dir v in
+              let v, state = rewrite state ~current_file v in
               (state, (k, v)))
             state
             kvs
@@ -123,7 +144,7 @@ let flatten_document ~search_path ~file_link ~root_file json =
         let state, xs =
           CCList.fold_map
             (fun state x ->
-              let x, state = rewrite state ~base_dir x in
+              let x, state = rewrite state ~current_file x in
               (state, x))
             state
             xs
@@ -146,8 +167,7 @@ let flatten_document ~search_path ~file_link ~root_file json =
       file_cache = Sln_map.String.empty;
     }
   in
-  let root_dir = Filename.dirname root_file in
-  let rewritten, state = rewrite state ~base_dir:root_dir json in
+  let rewritten, state = rewrite state ~current_file:None json in
   (* Handle a document-level "$ref" entrypoint (a sibling of "definitions"), which is a plain string
      field rather than a sole-key {"$ref": ...} object. *)
   let rewritten, state =
@@ -158,7 +178,7 @@ let flatten_document ~search_path ~file_link ~root_file json =
             (fun state (k, v) ->
               match (k, v) with
               | "$ref", `String ref_ ->
-                  let ref_, state = rewrite_ref_string state ~base_dir:root_dir ref_ in
+                  let ref_, state = rewrite_ref_string state ~current_file:None ref_ in
                   (state, (k, `String ref_))
               | _ -> (state, (k, v)))
             state

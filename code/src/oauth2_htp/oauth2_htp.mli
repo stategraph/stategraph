@@ -27,7 +27,7 @@ module Config : sig
   type provider =
     | Google of { group : Oauth2_htp_google.Group.t option }
     | Github of {
-        orgs : string Sln_list.Non_empty.t;
+        authorized_orgs : string Sln_list.Non_empty.t;
             (** A user may sign in when they are an active member of at least one of these orgs:
                 [[ "acme"; "acme-labs" ]] admits a member of [acme], of [acme-labs], or of both. *)
         endpoints : Oauth2_htp_github.Endpoints.t;

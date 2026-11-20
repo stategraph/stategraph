@@ -9747,9 +9747,7 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["error-response"];
-                };
+                content?: never;
             };
             403: {
                 headers: {
@@ -9803,9 +9801,7 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["error-response"];
-                };
+                content?: never;
             };
             403: {
                 headers: {
@@ -9862,9 +9858,7 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["error-response"];
-                };
+                content?: never;
             };
             403: {
                 headers: {
@@ -9925,9 +9919,7 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["error-response"];
-                };
+                content?: never;
             };
             403: {
                 headers: {
@@ -9988,9 +9980,7 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["error-response"];
-                };
+                content?: never;
             };
             403: {
                 headers: {
@@ -10055,9 +10045,7 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["error-response"];
-                };
+                content?: never;
             };
             403: {
                 headers: {
@@ -10122,9 +10110,7 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["error-response"];
-                };
+                content?: never;
             };
             403: {
                 headers: {

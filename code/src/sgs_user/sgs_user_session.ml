@@ -605,6 +605,10 @@ let credential_predates_caps_change ctx =
     | `Assoc _ | `Bool _ | `Float _ | `Int _ | `Intlit _ | `Null | `String _ -> true)
 
 let unauthorized ctx =
+  (* TODO: The CREDENTIAL_EXPIRED branch below breaks the idiom that a 401 has no body: no
+     operation in api_schemas/stategraph/api.json declares a 401 body, so the generated clients
+     ignore this JSON and none of them shows its advice.  Either send a body on every 401 and
+     declare it in the schema, or drop this one. *)
   if credential_predates_caps_change ctx then (
     Logs.info (fun m -> m "%s : CREDENTIAL_PREDATES_CAPS_CHANGE" (Brtl_ctx.token ctx));
     let body =

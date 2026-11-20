@@ -8,7 +8,9 @@ type oauth2_provider =
   | Github of {
       github_orgs : string Sln_list.Non_empty.t;
           (** STATEGRAPH_OAUTH_GITHUB_ORG, required: the organizations whose members can sign in,
-              comma-separated. The GitHub hosts are {!github_web_base} and {!github_api_base}. *)
+              comma-separated. Only the teams of these organizations, with their parent teams, are
+              groups that capability group rules can match. The GitHub hosts are {!github_web_base}
+              and {!github_api_base}. *)
     }
   | Oidc of {
       oidc_issuer_url : string;
@@ -131,6 +133,15 @@ val terrat_api_base : t -> string
 (** STATEGRAPH_PRICING_SERVICE_URL: endpoint of the pricing service, used when cost estimation is
     enabled. Defaults to the in-image service. *)
 val pricing_service_url : t -> string
+
+(** STATEGRAPH_MCP_DOCS_URL: the [llms-full.txt] that the MCP docs tools search, from a [file],
+    [http] or [https] URL. Unset or empty turns the docs tools off. The server image sets it to the
+    docs of its own commit. *)
+val mcp_docs_url : t -> string option
+
+(** STATEGRAPH_MCP_ENABLED: whether the server answers the MCP endpoint [/api/v1/mcp]. On when unset
+    or empty. Otherwise on iff it is [true] or [1]. *)
+val mcp_enabled : t -> bool
 
 (** STATEGRAPH_PRICING_DEFAULT_REGION: region passed to the pricing service for resources whose
     [region] attribute is not set. Defaults to "us-east-1". *)

@@ -33,6 +33,7 @@ A group matches by exact name, or by a prefix glob that ends in `*`:
 - `{"group": "platform-eng"}` matches one group.
 - `{"group": "eng-*"}` matches `eng-web`, `eng-db`, and so on.
 - `{"any": [{"group": "developers"}, {"group": "devops"}]}` matches either of two groups.
+- `{"group": "github:Acme/platform"}` matches the members of the team `platform` of the GitHub organization `Acme`, and `{"group": "github:Acme"}` the members of the organization, with [GitHub sign-in](/docs/admin/access-control/github#what-stategraph-reads-from-github).
 
 ## stategraph capabilities group create
 
@@ -126,4 +127,4 @@ All three need admin of the tenant (`403` otherwise). Create returns `400` when 
 
 - [Access Tokens and Capabilities](/docs/admin/access-control/access-tokens): the capability model and new-user defaults
 - [Tenants and Administration](/docs/admin/access-control/tenants): instance admin versus tenant admin
-- [OIDC Setup](/docs/admin/access-control/oidc) and [Google OAuth Setup](/docs/admin/access-control/google-oauth): the providers that report groups
+- [OIDC Setup](/docs/admin/access-control/oidc), [Google OAuth Setup](/docs/admin/access-control/google-oauth), and [GitHub OAuth Setup](/docs/admin/access-control/github): the providers that report groups

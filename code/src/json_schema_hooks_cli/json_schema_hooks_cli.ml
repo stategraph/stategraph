@@ -56,6 +56,10 @@ module Cmdline = struct
         $ search_path
         $ file_link)
 
+  let flatten_cmd f =
+    let doc = "Print the input document with its foreign refs inlined" in
+    C.Cmd.v (C.Cmd.info "flatten" ~doc) C.Term.(const f $ input_file $ search_path)
+
   let default_cmd = C.Term.(ret (const (`Help (`Pager, None))))
 end
 
@@ -227,16 +231,24 @@ let convert_document strict_records output_dir output_name { Document.definition
   in
   Sln_map.String.iter
     (fun name def ->
-      match def with
-      | Json_schema_conv.Value.Ref _ -> ()
-      | Json_schema_conv.Value.V def ->
-          let module_name =
-            module_base ^ "_" ^ CCString.lowercase_ascii (module_name_of_string name)
-          in
-          let structure = convert_def strict_records definitions module_base def in
-          CCIO.with_out
-            (Filename.concat output_dir (CCString.lowercase_ascii module_name ^ ".ml"))
-            (fun oc -> CCIO.write_line oc (Pprintast.string_of_structure structure)))
+      let module_name = module_base ^ "_" ^ CCString.lowercase_ascii (module_name_of_string name) in
+      let structure =
+        match def with
+        | Json_schema_conv.Value.Ref ref_ ->
+            (* A definition that is only a ref is an alias of the module of its target. *)
+            Ast_helper.
+              [
+                Str.include_
+                  (Incl.mk
+                     (Mod.ident
+                        (Location.mknoloc
+                           (Json_schema_conv.Gen.ident (module_name_of_ref module_base ref_)))));
+              ]
+        | Json_schema_conv.Value.V def -> convert_def strict_records definitions module_base def
+      in
+      CCIO.with_out
+        (Filename.concat output_dir (CCString.lowercase_ascii module_name ^ ".ml"))
+        (fun oc -> CCIO.write_line oc (Pprintast.string_of_structure structure)))
     definitions;
   let structure =
     Ast_helper.(
@@ -274,7 +286,16 @@ let convert non_strict_records input_file output_name output_dir search_path fil
   | Ok document -> convert_document strict_records output_dir output_name document
   | Error err -> print_endline err
 
-let cmds = Cmdline.[ convert_cmd convert ]
+let flatten input_file search_path =
+  Json_schema_flatten.flatten_document
+    ~search_path
+    ~file_link:[]
+    ~root_file:input_file
+    (Yojson.Safe.from_file input_file)
+  |> Yojson.Safe.pretty_to_string
+  |> print_endline
+
+let cmds = Cmdline.[ convert_cmd convert; flatten_cmd flatten ]
 
 let () =
   let info = Cmdliner.Cmd.info "json_schema_hooks_cli" in

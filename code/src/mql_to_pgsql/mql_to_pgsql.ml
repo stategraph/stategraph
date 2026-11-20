@@ -349,6 +349,10 @@ let valid_identifier s =
 let check_identifier { Mql_ast.name; quoted = _ } =
   if not (valid_identifier name) then raise (Rw_exn (`Invalid_identifier_err name))
 
+(* The name that PostgreSQL resolves.  PostgreSQL folds an unquoted name to lower case, so
+   [COUNT] calls [count] and [::UUID] casts to [uuid]. *)
+let folded_name { Mql_ast.name; quoted } = if quoted then name else CCString.lowercase_ascii name
+
 (* A call to [count] over a star, with no decoration. This is the form of the page count of
    a read query, and the only form that the pagination code can give a value
    to.  A call with a decoration is a different value. *)
@@ -362,7 +366,7 @@ let is_plain_count_star = function
         agg_order_by = None;
         filter = None;
         over = None;
-      } -> CCString.equal name.Mql_ast.name "count"
+      } -> CCString.equal (folded_name name) "count"
   | _ -> false
 
 (* The decorations of a call, for the error and for the refusal. *)
@@ -736,7 +740,7 @@ let rw_lit_text ~rw =
    thus such a target is refused. *)
 let cast_type_name { Mql_ast.type_ident; type_extra; args; array_dims } =
   match (type_ident.Mql_ast.qualifier, type_extra, args) with
-  | None, Mql_ast.No_extra, [] when array_dims = 0 -> Some type_ident.Mql_ast.base.Mql_ast.name
+  | None, Mql_ast.No_extra, [] when array_dims = 0 -> Some type_ident.Mql_ast.base
   | _ -> None
 
 (* The name of a target that the allow-list cannot hold.  The error message
@@ -753,7 +757,7 @@ let rec output_name =
   let open Mql_ast in
   function
   | Identifier id | Field_select (_, id) -> id.name
-  | Func { name; _ } -> name.name
+  | Func { name; _ } -> folded_name name
   | Cast (e, _) -> output_name e
   | _ -> "?column?"
 
@@ -813,9 +817,9 @@ let rec rw_expr ~rw =
   | And (e1, e2) -> rw_bin_op ~rw ~c:(fun e1 e2 -> And (e1, e2)) e1 e2
   | Cast (e1, type_) -> (
       match cast_type_name type_ with
-      | Some name when CCList.mem ~eq:CCString.equal name rw.Rw.cast_allow_list ->
+      | Some name when Sln_list.String.mem (folded_name name) rw.Rw.cast_allow_list ->
           Cast (rw_expr ~rw e1, type_)
-      | Some name -> raise (Rw_exn (`Cast_err name))
+      | Some name -> raise (Rw_exn (`Cast_err name.name))
       | None -> raise (Rw_exn (`Cast_err (cast_type_show type_))))
   | Concat (e1, e2) -> Concat (rw_expr ~rw e1, rw_expr ~rw e2)
   | Div (e1, e2) -> rw_bin_op ~rw ~c:(fun e1 e2 -> Div (e1, e2)) e1 e2
@@ -837,7 +841,8 @@ let rec rw_expr ~rw =
      read: the allow list holds names without a schema. *)
   | Func { qualifier = Some q; _ } ->
       raise (Rw_exn (`Construct_not_allowed_err ("schema-qualified call " ^ q.name)))
-  | Func { name; _ } when not @@ CCList.mem ~eq:CCString.equal name.name rw.Rw.func_allow_list ->
+  | Func { qualifier = None; name; distinct = _; args = _; agg_order_by = _; filter = _; over = _ }
+    when not @@ Sln_list.String.mem (folded_name name) rw.Rw.func_allow_list ->
       raise (Rw_exn (`Func_access_err name.name))
   (* The rewriter refuses a decoration.  The audit refuses it a second time.  A
      window makes the cost of a query difficult to calculate.  A sort order or
@@ -1627,7 +1632,7 @@ and audit_expr ~env ~ctes =
       (match qualifier with
       | Some q -> raise (Audit_exn (`Audit_construct_err ("schema-qualified call " ^ q.name)))
       | None -> ());
-      if not (CCList.mem ~eq:CCString.equal name.name env.func_allow_list) then
+      if not (Sln_list.String.mem (folded_name name) env.func_allow_list) then
         raise (Audit_exn (`Audit_func_err name.name));
       (* A decoration of a call: a window, a sort order or a filter. *)
       if f.distinct then raise (Audit_exn (`Audit_construct_err "distinct"));
@@ -1653,7 +1658,7 @@ and audit_expr ~env ~ctes =
           array_dims = 0;
         } ) ->
       audit_expr ~env ~ctes e;
-      if not (CCList.mem ~eq:CCString.equal base.name env.cast_allow_list) then
+      if not (Sln_list.String.mem (folded_name base) env.cast_allow_list) then
         raise (Audit_exn (`Audit_cast_err base.name))
   | Cast (_, _) -> raise (Audit_exn (`Audit_construct_err "a cast target that is not a plain name"))
   | Variable v -> raise (Audit_exn (`Audit_variable_err v))

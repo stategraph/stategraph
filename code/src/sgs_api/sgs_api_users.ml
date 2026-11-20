@@ -24,10 +24,7 @@ module Update = struct
       [@@deriving yojson { strict = false; meta = false }, show, eq]
     end
 
-    module Unauthorized = struct
-      type t = Sgs_api_components.Error_response.t
-      [@@deriving yojson { strict = false; meta = false }, show, eq]
-    end
+    module Unauthorized = struct end
 
     module Forbidden = struct
       type t = Sgs_capability_denied_response.t
@@ -47,7 +44,7 @@ module Update = struct
     type t =
       [ `OK of OK.t
       | `Bad_request of Bad_request.t
-      | `Unauthorized of Unauthorized.t
+      | `Unauthorized
       | `Forbidden of Forbidden.t
       | `Not_found of Not_found.t
       | `Internal_server_error of Internal_server_error.t
@@ -58,7 +55,7 @@ module Update = struct
       [
         ("200", Openapi.of_json_body (fun v -> `OK v) OK.of_yojson);
         ("400", Openapi.of_json_body (fun v -> `Bad_request v) Bad_request.of_yojson);
-        ("401", Openapi.of_json_body (fun v -> `Unauthorized v) Unauthorized.of_yojson);
+        ("401", fun _ -> Ok `Unauthorized);
         ("403", Openapi.of_json_body (fun v -> `Forbidden v) Forbidden.of_yojson);
         ("404", Openapi.of_json_body (fun v -> `Not_found v) Not_found.of_yojson);
         ( "500",
@@ -110,10 +107,7 @@ module Set_instance_admin = struct
       [@@deriving yojson { strict = false; meta = false }, show, eq]
     end
 
-    module Unauthorized = struct
-      type t = Sgs_api_components.Error_response.t
-      [@@deriving yojson { strict = false; meta = false }, show, eq]
-    end
+    module Unauthorized = struct end
 
     module Forbidden = struct
       type t = Sgs_capability_denied_response.t
@@ -133,7 +127,7 @@ module Set_instance_admin = struct
     type t =
       [ `OK of OK.t
       | `Bad_request of Bad_request.t
-      | `Unauthorized of Unauthorized.t
+      | `Unauthorized
       | `Forbidden of Forbidden.t
       | `Not_found of Not_found.t
       | `Internal_server_error of Internal_server_error.t
@@ -144,7 +138,7 @@ module Set_instance_admin = struct
       [
         ("200", Openapi.of_json_body (fun v -> `OK v) OK.of_yojson);
         ("400", Openapi.of_json_body (fun v -> `Bad_request v) Bad_request.of_yojson);
-        ("401", Openapi.of_json_body (fun v -> `Unauthorized v) Unauthorized.of_yojson);
+        ("401", fun _ -> Ok `Unauthorized);
         ("403", Openapi.of_json_body (fun v -> `Forbidden v) Forbidden.of_yojson);
         ("404", Openapi.of_json_body (fun v -> `Not_found v) Not_found.of_yojson);
         ( "500",
@@ -191,10 +185,7 @@ module Detail = struct
       [@@deriving yojson { strict = false; meta = false }, show, eq]
     end
 
-    module Unauthorized = struct
-      type t = Sgs_api_components.Error_response.t
-      [@@deriving yojson { strict = false; meta = false }, show, eq]
-    end
+    module Unauthorized = struct end
 
     module Forbidden = struct
       type t = Sgs_capability_denied_response.t
@@ -214,7 +205,7 @@ module Detail = struct
     type t =
       [ `OK of OK.t
       | `Bad_request of Bad_request.t
-      | `Unauthorized of Unauthorized.t
+      | `Unauthorized
       | `Forbidden of Forbidden.t
       | `Not_found of Not_found.t
       | `Internal_server_error of Internal_server_error.t
@@ -225,7 +216,7 @@ module Detail = struct
       [
         ("200", Openapi.of_json_body (fun v -> `OK v) OK.of_yojson);
         ("400", Openapi.of_json_body (fun v -> `Bad_request v) Bad_request.of_yojson);
-        ("401", Openapi.of_json_body (fun v -> `Unauthorized v) Unauthorized.of_yojson);
+        ("401", fun _ -> Ok `Unauthorized);
         ("403", Openapi.of_json_body (fun v -> `Forbidden v) Forbidden.of_yojson);
         ("404", Openapi.of_json_body (fun v -> `Not_found v) Not_found.of_yojson);
         ( "500",
@@ -270,10 +261,7 @@ module Delete = struct
       [@@deriving yojson { strict = false; meta = false }, show, eq]
     end
 
-    module Unauthorized = struct
-      type t = Sgs_api_components.Error_response.t
-      [@@deriving yojson { strict = false; meta = false }, show, eq]
-    end
+    module Unauthorized = struct end
 
     module Forbidden = struct
       type t = Sgs_capability_denied_response.t
@@ -293,7 +281,7 @@ module Delete = struct
     type t =
       [ `OK of OK.t
       | `Bad_request of Bad_request.t
-      | `Unauthorized of Unauthorized.t
+      | `Unauthorized
       | `Forbidden of Forbidden.t
       | `Not_found of Not_found.t
       | `Internal_server_error of Internal_server_error.t
@@ -304,7 +292,7 @@ module Delete = struct
       [
         ("200", Openapi.of_json_body (fun v -> `OK v) OK.of_yojson);
         ("400", Openapi.of_json_body (fun v -> `Bad_request v) Bad_request.of_yojson);
-        ("401", Openapi.of_json_body (fun v -> `Unauthorized v) Unauthorized.of_yojson);
+        ("401", fun _ -> Ok `Unauthorized);
         ("403", Openapi.of_json_body (fun v -> `Forbidden v) Forbidden.of_yojson);
         ("404", Openapi.of_json_body (fun v -> `Not_found v) Not_found.of_yojson);
         ( "500",
@@ -354,10 +342,7 @@ module Change_password = struct
       [@@deriving yojson { strict = false; meta = false }, show, eq]
     end
 
-    module Unauthorized = struct
-      type t = Sgs_api_components.Error_response.t
-      [@@deriving yojson { strict = false; meta = false }, show, eq]
-    end
+    module Unauthorized = struct end
 
     module Forbidden = struct
       type t = Sgs_capability_denied_response.t
@@ -377,7 +362,7 @@ module Change_password = struct
     type t =
       [ `OK of OK.t
       | `Bad_request of Bad_request.t
-      | `Unauthorized of Unauthorized.t
+      | `Unauthorized
       | `Forbidden of Forbidden.t
       | `Not_found of Not_found.t
       | `Internal_server_error of Internal_server_error.t
@@ -388,7 +373,7 @@ module Change_password = struct
       [
         ("200", Openapi.of_json_body (fun v -> `OK v) OK.of_yojson);
         ("400", Openapi.of_json_body (fun v -> `Bad_request v) Bad_request.of_yojson);
-        ("401", Openapi.of_json_body (fun v -> `Unauthorized v) Unauthorized.of_yojson);
+        ("401", fun _ -> Ok `Unauthorized);
         ("403", Openapi.of_json_body (fun v -> `Forbidden v) Forbidden.of_yojson);
         ("404", Openapi.of_json_body (fun v -> `Not_found v) Not_found.of_yojson);
         ( "500",
@@ -437,10 +422,7 @@ module Create = struct
       [@@deriving yojson { strict = false; meta = false }, show, eq]
     end
 
-    module Unauthorized = struct
-      type t = Sgs_api_components.Error_response.t
-      [@@deriving yojson { strict = false; meta = false }, show, eq]
-    end
+    module Unauthorized = struct end
 
     module Forbidden = struct
       type t = Sgs_capability_denied_response.t
@@ -455,7 +437,7 @@ module Create = struct
     type t =
       [ `Created of Created.t
       | `Bad_request of Bad_request.t
-      | `Unauthorized of Unauthorized.t
+      | `Unauthorized
       | `Forbidden of Forbidden.t
       | `Internal_server_error of Internal_server_error.t
       ]
@@ -465,7 +447,7 @@ module Create = struct
       [
         ("201", Openapi.of_json_body (fun v -> `Created v) Created.of_yojson);
         ("400", Openapi.of_json_body (fun v -> `Bad_request v) Bad_request.of_yojson);
-        ("401", Openapi.of_json_body (fun v -> `Unauthorized v) Unauthorized.of_yojson);
+        ("401", fun _ -> Ok `Unauthorized);
         ("403", Openapi.of_json_body (fun v -> `Forbidden v) Forbidden.of_yojson);
         ( "500",
           Openapi.of_json_body (fun v -> `Internal_server_error v) Internal_server_error.of_yojson
@@ -516,10 +498,7 @@ module List = struct
       [@@deriving yojson { strict = false; meta = false }, show, eq]
     end
 
-    module Unauthorized = struct
-      type t = Sgs_api_components.Error_response.t
-      [@@deriving yojson { strict = false; meta = false }, show, eq]
-    end
+    module Unauthorized = struct end
 
     module Forbidden = struct
       type t = Sgs_capability_denied_response.t
@@ -533,7 +512,7 @@ module List = struct
 
     type t =
       [ `OK of OK.t
-      | `Unauthorized of Unauthorized.t
+      | `Unauthorized
       | `Forbidden of Forbidden.t
       | `Internal_server_error of Internal_server_error.t
       ]
@@ -542,7 +521,7 @@ module List = struct
     let t =
       [
         ("200", Openapi.of_json_body (fun v -> `OK v) OK.of_yojson);
-        ("401", Openapi.of_json_body (fun v -> `Unauthorized v) Unauthorized.of_yojson);
+        ("401", fun _ -> Ok `Unauthorized);
         ("403", Openapi.of_json_body (fun v -> `Forbidden v) Forbidden.of_yojson);
         ( "500",
           Openapi.of_json_body (fun v -> `Internal_server_error v) Internal_server_error.of_yojson

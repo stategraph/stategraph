@@ -238,6 +238,22 @@ let rec json_to_expr (json : Yojson.Safe.t) =
       convert_pairs [] pairs
   | `Intlit s -> Error (`Invalid_expr_type_err ("intlit: " ^ s))
 
+let rec literal_to_expr (json : Yojson.Safe.t) =
+  let open CCResult.Infix in
+  match json with
+  | `String s -> Ok (Expr.String s)
+  | `Int i -> Ok (Expr.Int i)
+  | `Float f -> Ok (Expr.Float f)
+  | `Bool b -> Ok (Expr.Bool b)
+  | `Null -> Ok Expr.Null
+  | `List elements -> CCResult.map_l literal_to_expr elements >|= fun exprs -> Expr.Tuple exprs
+  | `Assoc pairs ->
+      CCResult.map_l
+        (fun (key, value) -> literal_to_expr value >|= fun expr -> (Obj_key.Bare key, expr))
+        pairs
+      >|= fun fields -> Expr.Object fields
+  | `Intlit s -> Error (`Invalid_expr_type_err ("intlit: " ^ s))
+
 (* Convert a block body (list of AST values) to JSON *)
 let rec body_to_json body =
   let fields =

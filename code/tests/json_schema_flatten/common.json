@@ -4,8 +4,10 @@
       "type": "object",
       "properties": {
         "street": { "type": "string" },
+        "city": { "$ref": "#/definitions/City" },
         "zip": { "$ref": "deep.json#/definitions/Zip" }
       }
-    }
+    },
+    "City": { "type": "string" }
   }
 }
