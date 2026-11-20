@@ -88,6 +88,8 @@ type t = {
   terrat_api_base : string;
   pricing_service_url : string;
   pricing_default_region : string;
+  mcp_docs_url : string option;
+  mcp_enabled : bool;
   cost_schedule_hours : int;
   cost_event_debounce_hours : int;
   cost_pricing_call_timeout_seconds : int;
@@ -149,12 +151,19 @@ let comma_separated value =
       | v -> Some v)
     (CCString.split_on_char ',' value)
 
-(* A STATEGRAPH boolean env var is on iff it is exactly "true" or "1"; unset,
-   empty, or any other value is off. *)
+(* A STATEGRAPH boolean env var is on iff it is exactly "true" or "1"; any
+   other value is off. Unset or empty is off, or [default] for
+   [env_bool_default]. *)
 let env_bool key =
   match Sys.getenv_opt key with
   | Some ("true" | "1") -> true
   | _ -> false
+
+let env_bool_default ~default key =
+  match Sys.getenv_opt key with
+  | None | Some "" -> default
+  | Some ("true" | "1") -> true
+  | Some _ -> false
 
 (* Compute a hash of the OAuth2 config for invalidation *)
 let compute_oauth2_config_hash ~provider_type ~client_id ~email_domain ~provider_specific =
@@ -412,6 +421,12 @@ let create ?(github_app_managed = false) () =
   let pricing_default_region =
     env_str_default "STATEGRAPH_PRICING_DEFAULT_REGION" ~default:"us-east-1"
   in
+  let mcp_enabled = env_bool_default ~default:true "STATEGRAPH_MCP_ENABLED" in
+  let mcp_docs_url =
+    match Sys.getenv_opt "STATEGRAPH_MCP_DOCS_URL" with
+    | None | Some "" -> None
+    | some -> some
+  in
   let cost_schedule_hours = env_int_default "STATEGRAPH_COST_SCHEDULE_HOURS" 24 in
   let cost_event_debounce_hours = env_int_default "STATEGRAPH_COST_EVENT_DEBOUNCE_HOURS" 6 in
   let cost_pricing_call_timeout_seconds =
@@ -489,6 +504,8 @@ let create ?(github_app_managed = false) () =
       terrat_api_base;
       pricing_service_url;
       pricing_default_region;
+      mcp_docs_url;
+      mcp_enabled;
       cost_schedule_hours;
       cost_event_debounce_hours;
       cost_pricing_call_timeout_seconds;
@@ -545,6 +562,8 @@ let fdw_provisioner_password t = t.fdw_provisioner_password
 let github_app_url t = t.github_app_url
 let terrat_api_base t = t.terrat_api_base
 let pricing_service_url t = t.pricing_service_url
+let mcp_docs_url t = t.mcp_docs_url
+let mcp_enabled t = t.mcp_enabled
 let pricing_default_region t = t.pricing_default_region
 let cost_schedule_hours t = t.cost_schedule_hours
 let cost_event_debounce_hours t = t.cost_event_debounce_hours

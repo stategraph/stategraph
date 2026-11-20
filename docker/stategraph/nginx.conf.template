@@ -47,14 +47,16 @@ http {
 
     limit_conn_zone $server_name zone=stategraph_app:10m;
 
-    # The console document is the shell of a signed-in app and must not be stored; the assets
-    # `location /` serves beside it -- public/fonts, public/logos, the favicons -- must be. Only
+    # The console document and the route payloads it fetches (the Next.js __next.*.txt files,
+    # served as text/plain) are the shell of a signed-in app and must not be stored; the assets
+    # `location /` serves beside them -- public/fonts, public/logos, the favicons -- must be. Only
     # the bundles under /_next/static carry a content hash, so the split is made on content type
     # rather than on path. nginx skips an add_header whose value is empty, so everything else is
     # untouched. Mirrors docker/terrat/nginx.conf.template.
     map $sent_http_content_type $stategraph_document_cache_control {
-        default      "";
-        ~*^text/html "no-store";
+        default       "";
+        ~*^text/html  "no-store, no-cache, must-revalidate";
+        ~*^text/plain "no-store, no-cache, must-revalidate";
     }
     limit_req_zone $binary_remote_addr zone=client_limit:10m rate=1000r/s;
 
@@ -149,17 +151,17 @@ http {
             # favicons this same location serves.
             add_header Cache-Control $stategraph_document_cache_control always;
 
-            # Report-only for now. The built UI carries four inline scripts -- our theme
-            # flash-guard and boot watchdog, and two Next.js Flight payloads -- and Next puts no
-            # nonce on the latter, so an enforcing policy needs either a nonce injected into the
-            # markup or a hermes change. script-src therefore does NOT list 'unsafe-inline':
-            # report-only enforces nothing, so leaving it out is what makes those four scripts show up as
-            # violations instead of being silently allowed. There is no report-uri yet, so the
-            # violations are read from the browser devtools console during manual QA; adding a
-            # reporting endpoint is the next step before enforcing. Note browsers ignore
-            # upgrade-insecure-requests in a report-only policy; it is carried here so the
-            # string is the one that will later be enforced. See #2162.
-            add_header Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self' https://www.googletagmanager.com https://eu-assets.i.posthog.com https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://eu.i.posthog.com https://eu-assets.i.posthog.com; frame-src https://www.googletagmanager.com https://js.stripe.com; object-src 'none'; base-uri 'self'; form-action 'self' ${STATEGRAPH_GITHUB_WEB_BASE}; frame-ancestors 'none'; manifest-src 'self'; upgrade-insecure-requests;" always;
+            # Every bare <script> in the built UI is first-party inline code -- the theme
+            # flash-guard, the boot watchdog and the Next.js Flight payloads -- so each one gets
+            # this response's nonce, and script-src allows no other inline script. External
+            # scripts are written <script src=...> and do not match. The document is no-store,
+            # so a nonce is never served twice. sub_filter does not rescan its own output, so
+            # the GTM snippet of STATEGRAPH_GTM_SUB_FILTER carries the nonce itself.
+            set $cspNonce $request_id;
+            sub_filter_once off;
+            sub_filter '<script>' '<script nonce="$cspNonce">';
+
+            add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'nonce-$cspNonce' https://www.googletagmanager.com https://eu-assets.i.posthog.com https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.github.com https://*.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://www.google.com https://*.doubleclick.net https://px.ads.linkedin.com https://eu.i.posthog.com https://eu-assets.i.posthog.com; worker-src 'self' blob:; frame-src https://www.googletagmanager.com https://js.stripe.com; object-src 'none'; base-uri 'self'; form-action 'self' ${STATEGRAPH_GITHUB_WEB_BASE}; frame-ancestors 'none'; manifest-src 'self'; upgrade-insecure-requests;" always;
             add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
             add_header X-Frame-Options "DENY" always;
             add_header X-Content-Type-Options "nosniff" always;
@@ -185,7 +187,7 @@ http {
 
             # API responses carry tenant-scoped data and must not be stored by
             # browsers or intermediary caches.
-            add_header Cache-Control "no-store" always;
+            add_header Cache-Control "no-store, no-cache, must-revalidate" always;
             add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
             add_header X-Frame-Options "DENY" always;
             add_header X-Content-Type-Options "nosniff" always;
@@ -205,7 +207,7 @@ http {
             proxy_buffering off;
 
             # Authentication redirects carry session state; never store them.
-            add_header Cache-Control "no-store" always;
+            add_header Cache-Control "no-store, no-cache, must-revalidate" always;
             add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
             add_header X-Frame-Options "DENY" always;
             add_header X-Content-Type-Options "nosniff" always;

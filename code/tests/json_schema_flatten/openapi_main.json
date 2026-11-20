@@ -1,0 +1,10 @@
+{
+  "definitions": {
+    "Output": {
+      "type": "object",
+      "properties": {
+        "transaction": { "$ref": "openapi.json#/components/schemas/tx-detail" }
+      }
+    }
+  }
+}

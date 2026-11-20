@@ -116,6 +116,19 @@ RUN mkdir -p "$DUCKDB_EXTENSION_DIR" && \
 # Sgs_focus_sync worker.
 COPY --chown=${USERNAME}:${USERNAME} --chmod=755 code/src/focus_etl/load-focus-billing /usr/local/bin/load-focus-billing
 
+# llms-full.txt of the docs in this commit, for the MCP docs tools of the server
+# (STATEGRAPH_MCP_DOCS_URL). Only the docs sources and their builder are in the
+# build context.
+FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS stategraph-docs
+RUN apk add --no-cache python3 py3-markdown py3-pygments
+WORKDIR /tmp/docs
+COPY website/stategraph/builder builder
+COPY website/stategraph/content/docs content/docs
+COPY website/stategraph/tools/llms_full.py tools/llms_full.py
+COPY code/src/sg_version/data/version.txt version.txt
+RUN python3 tools/llms_full.py llms-full.txt "$(cat version.txt)" && \
+    python3 -c "import re,sys; t=open('llms-full.txt').read(); n=len(re.findall(r'^---\n\n# .+\n\nSource: https://stategraph.com/docs', t, re.M)); sys.exit(0 if n >= 100 else 'llms-full.txt has %d page headers' % n)"
+
 FROM base-tenv-tofu AS base
 
 RUN apk add --no-cache \
@@ -691,6 +704,8 @@ COPY --from=stategraph-dev --chown=${USERNAME}:${USERNAME} /tmp/mono/code/src/sg
 # Pricing service for cost estimation. Opt-in via STATEGRAPH_PRICING_SERVICE_URL.
 COPY --from=stategraph-dev --chown=${USERNAME}:${USERNAME} --chmod=755 /tmp/mono/_build/default/code/src/pricing_service/pricing-service /usr/local/bin/pricing-service
 COPY --chown=${USERNAME}:${USERNAME} --chmod=755 code/src/pricing_service/load-pricing-data /usr/local/bin/load-pricing-data
+COPY --from=stategraph-docs --chown=${USERNAME}:${USERNAME} /tmp/docs/llms-full.txt /usr/local/share/stategraph/docs/llms-full.txt
+ENV STATEGRAPH_MCP_DOCS_URL=file:///usr/local/share/stategraph/docs/llms-full.txt
 USER ${USERNAME}
 
 # The image every workflow, compose file and deployment names: the enterprise

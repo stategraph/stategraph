@@ -1,0 +1,11 @@
+{
+  "definitions": {
+    "Root": {
+      "type": "object",
+      "properties": {
+        "a": { "$ref": "common.json#/definitions/Address" },
+        "b": { "$ref": "sub/common.json#/definitions/Address" }
+      }
+    }
+  }
+}

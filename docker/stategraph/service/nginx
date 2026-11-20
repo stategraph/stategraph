@@ -32,11 +32,13 @@ fi
 # (the hosted multi-tenant substrate); self-hosted deployments get nothing.
 # The head snippet uses only single quotes (wrapped in double quotes) and the
 # noscript only double quotes (wrapped in single quotes) so neither needs
-# escaping in the nginx config. sub_filter_once keeps a single injection.
+# escaping in the nginx config. The head snippet carries the CSP nonce of the
+# console location (docker/stategraph/nginx.conf.template) and hands it to the
+# tags GTM inserts. That location sets sub_filter_once off; the built UI has one
+# <head> and one </body>.
 if [ "$STATEGRAPH_MODE" = "COMMUNISM" ]; then
-    export STATEGRAPH_GTM_SUB_FILTER="sub_filter '<head>' \"<head><!-- Google Tag Manager --><script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-ND4RB8T8');</script><!-- End Google Tag Manager -->\";
-            sub_filter '</body>' '<!-- Google Tag Manager (noscript) --><noscript><iframe src=\"https://www.googletagmanager.com/ns.html?id=GTM-ND4RB8T8\" height=\"0\" width=\"0\" style=\"display:none;visibility:hidden\"></iframe></noscript><!-- End Google Tag Manager (noscript) --></body>';
-            sub_filter_once on;"
+    export STATEGRAPH_GTM_SUB_FILTER="sub_filter '<head>' \"<head><!-- Google Tag Manager --><script nonce='\$cspNonce'>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;var n=d.querySelector('[nonce]');n&&j.setAttribute('nonce',n.nonce||n.getAttribute('nonce'));f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-ND4RB8T8');</script><!-- End Google Tag Manager -->\";
+            sub_filter '</body>' '<!-- Google Tag Manager (noscript) --><noscript><iframe src=\"https://www.googletagmanager.com/ns.html?id=GTM-ND4RB8T8\" height=\"0\" width=\"0\" style=\"display:none;visibility:hidden\"></iframe></noscript><!-- End Google Tag Manager (noscript) --></body>';"
 else
     export STATEGRAPH_GTM_SUB_FILTER=""
 fi
@@ -84,7 +86,7 @@ terrat_location() {
 
             proxy_read_timeout 120;
 
-            add_header Cache-Control "no-store" always;
+            add_header Cache-Control "no-store, no-cache, must-revalidate" always;
 
             # Marks the responses of these locations, which only terrat's
             # routes reach. Asserted by e2e_tests_orchestration.
@@ -245,7 +247,7 @@ case "$STATEGRAPH_ORCHESTRATION_ON" in
 
             proxy_read_timeout 120;
 
-            add_header Cache-Control "no-store" always;
+            add_header Cache-Control "no-store, no-cache, must-revalidate" always;
 
             # Marks the responses of this host's API, which serves terrat's
             # routes, the same marker as the console host's terrat locations.

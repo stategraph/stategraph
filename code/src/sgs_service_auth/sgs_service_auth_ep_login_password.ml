@@ -92,6 +92,10 @@ let run config storage =
                   in
                   Abb.Future.return (Brtl_ctx.set_response (Brtl_rspnc.create ~status:`OK body) ctx)
               | Ok None ->
+                  (* TODO: This INVALID_CREDENTIALS 401 breaks the idiom that a 401 has no body:
+                     no operation in api_schemas/stategraph/api.json declares a 401 body, so no
+                     client shows this message.  Either send a body on every 401 and declare it in
+                     the schema, or drop this one. *)
                   (* Generic error message to prevent user enumeration *)
                   let error_response =
                     {

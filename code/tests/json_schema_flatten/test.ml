@@ -68,6 +68,69 @@ let test_cycle =
         ~actual:(ref_of (prop "a" (def "b_b" flat)));
       Oth.Assert.true_ (present (def "a_a" flat)))
 
+(* An internal ref inside an inlined foreign definition points into its own file: the target is
+   inlined too and the ref rewritten to it. *)
+let test_foreign_internal_ref =
+  Oth.test ~name:"Internal ref of a foreign definition" (fun _ ->
+      let flat = flatten ~search_path:[] ~file_link:[] ~root_file:"main.json" (load "main.json") in
+      Oth.Assert.Eq.string
+        ~expected:"#/definitions/common_city"
+        ~actual:(ref_of (prop "city" (def "common_address" flat)));
+      Oth.Assert.true_ (present (def "common_city" flat));
+      ())
+
+(* A ref into the components of an OpenAPI document is inlined like a ref into [definitions], with
+   the internal refs of the component. *)
+let test_components_inline =
+  Oth.test ~name:"Inline OpenAPI component ref" (fun _ ->
+      let flat =
+        flatten
+          ~search_path:[]
+          ~file_link:[]
+          ~root_file:"openapi_main.json"
+          (load "openapi_main.json")
+      in
+      Oth.Assert.Eq.string
+        ~expected:"#/definitions/openapi_tx_detail"
+        ~actual:(ref_of (prop "transaction" (def "Output" flat)));
+      Oth.Assert.Eq.string
+        ~expected:"#/definitions/openapi_tx"
+        ~actual:(ref_of (prop "tx" (def "openapi_tx_detail" flat)));
+      Oth.Assert.true_ (present (def "openapi_tx" flat));
+      ())
+
+(* A ref into the components of a file-linked OpenAPI document points at the existing module. *)
+let test_components_file_link =
+  Oth.test ~name:"File-link OpenAPI component ref" (fun _ ->
+      let flat =
+        flatten
+          ~search_path:[]
+          ~file_link:[ ("openapi.json", "Api") ]
+          ~root_file:"openapi_main.json"
+          (load "openapi_main.json")
+      in
+      Oth.Assert.Eq.string
+        ~expected:"#/file-link/Api/tx-detail"
+        ~actual:(ref_of (prop "transaction" (def "Output" flat)));
+      Oth.Assert.not_true (present (def "openapi_tx_detail" flat));
+      ())
+
+(* A file-link whose path equals the ref's path wins over one that matches only its basename. *)
+let test_file_link_same_basename =
+  Oth.test ~name:"File-link of two files with the same basename" (fun _ ->
+      let flat =
+        flatten
+          ~search_path:[]
+          ~file_link:[ ("common.json", "Common"); ("sub/common.json", "Sub_common") ]
+          ~root_file:"same_basename.json"
+          (load "same_basename.json")
+      in
+      let root = def "Root" flat in
+      Oth.Assert.Eq.string ~expected:"#/file-link/Common/Address" ~actual:(ref_of (prop "a" root));
+      Oth.Assert.Eq.string
+        ~expected:"#/file-link/Sub_common/Address"
+        ~actual:(ref_of (prop "b" root)))
+
 (* An unresolvable foreign file is a hard error. *)
 let test_missing_file =
   Oth.test ~name:"Missing foreign file raises" (fun _ ->
@@ -80,7 +143,18 @@ let test_missing_file =
       Oth.Assert.true_ raised)
 
 let test =
-  Oth.parallel [ test_inline; test_file_link; test_search_path; test_cycle; test_missing_file ]
+  Oth.parallel
+    [
+      test_inline;
+      test_file_link;
+      test_search_path;
+      test_cycle;
+      test_foreign_internal_ref;
+      test_components_inline;
+      test_components_file_link;
+      test_file_link_same_basename;
+      test_missing_file;
+    ]
 
 let () =
   Random.self_init ();

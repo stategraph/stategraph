@@ -1051,9 +1051,51 @@ let test_1032_repeated_blocks_body_array =
           (count_resource_blocks
              {|{"resource": {"null_resource": {"a": [{"foo": "x"}, {"foo": "y"}]}}}|}))
 
+(* A computed value keeps [${...}] and [%{...}] as text: printed, it escapes them, and the printed
+   attribute parses back to the same string. *)
+let test_literal_to_expr_template_text =
+  Oth.test ~name:"literal_to_expr_template_text" (fun _ ->
+      let text = "\"Resource\": \"arn:aws:iam::${account_id}:role/build\" %{ if x }y%{ endif }" in
+      let expr =
+        Oth.Assert.ok_pp
+          ~pp:Hcl_parser_value_json.pp_err
+          (Hcl_parser_value_json.literal_to_expr (`Assoc [ ("template", `String text) ]))
+      in
+      Oth.Assert.eq
+        ~eq:Hcl_parser_value.Expr.equal
+        ~pp:Hcl_parser_value.Expr.pp
+        (Hcl_parser_value.Expr.Object
+           [ (Hcl_parser_value.Obj_key.Bare "template", Hcl_parser_value.Expr.String text) ])
+        expr;
+      let printed = Hcl_ast.To_string.ast [ Hcl_parser_value.Attribute ("v", expr) ] in
+      Oth.Assert.Eq.bool ~expected:true ~actual:(CCString.mem ~sub:"$${account_id}" printed);
+      Oth.Assert.Eq.bool ~expected:true ~actual:(CCString.mem ~sub:"%%{ if x }" printed);
+      let reparsed = Oth.Assert.ok_pp ~pp:Hcl_ast.pp_err (Hcl_ast.of_string printed) in
+      Oth.Assert.eq
+        ~eq:(CCOption.equal Hcl_parser_value.Expr.equal)
+        ~pp:(CCOption.pp Hcl_parser_value.Expr.pp)
+        (Some expr)
+        (Hcl_ast.find_attr "v" reparsed))
+
+let test_literal_to_expr_scalars =
+  Oth.test ~name:"literal_to_expr_scalars" (fun _ ->
+      let expr =
+        Oth.Assert.ok_pp
+          ~pp:Hcl_parser_value_json.pp_err
+          (Hcl_parser_value_json.literal_to_expr
+             (`List [ `Int 1; `Float 1.5; `Bool true; `Null; `String "${ var.x }" ]))
+      in
+      Oth.Assert.eq
+        ~eq:Hcl_parser_value.Expr.equal
+        ~pp:Hcl_parser_value.Expr.pp
+        Hcl_parser_value.Expr.(Tuple [ Int 1; Float 1.5; Bool true; Null; String "${ var.x }" ])
+        expr)
+
 let test =
   Oth.parallel
     [
+      test_literal_to_expr_template_text;
+      test_literal_to_expr_scalars;
       test_1032_repeated_blocks_multi_name;
       test_1032_repeated_blocks_body_array;
       test_simple_attribute;

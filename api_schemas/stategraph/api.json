@@ -12165,15 +12165,7 @@
               }
             }
           },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/error-response"
-                }
-              }
-            }
-          },
+          "401": {},
           "403": {
             "content": {
               "application/json": {
@@ -12225,15 +12217,7 @@
               }
             }
           },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/error-response"
-                }
-              }
-            }
-          },
+          "401": {},
           "403": {
             "content": {
               "application/json": {
@@ -12292,15 +12276,7 @@
               }
             }
           },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/error-response"
-                }
-              }
-            }
-          },
+          "401": {},
           "403": {
             "content": {
               "application/json": {
@@ -12359,15 +12335,7 @@
               }
             }
           },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/error-response"
-                }
-              }
-            }
-          },
+          "401": {},
           "403": {
             "content": {
               "application/json": {
@@ -12426,15 +12394,7 @@
               }
             }
           },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/error-response"
-                }
-              }
-            }
-          },
+          "401": {},
           "403": {
             "content": {
               "application/json": {
@@ -12502,15 +12462,7 @@
               }
             }
           },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/error-response"
-                }
-              }
-            }
-          },
+          "401": {},
           "403": {
             "content": {
               "application/json": {
@@ -12578,15 +12530,7 @@
               }
             }
           },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/error-response"
-                }
-              }
-            }
-          },
+          "401": {},
           "403": {
             "content": {
               "application/json": {

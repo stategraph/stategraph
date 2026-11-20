@@ -8,6 +8,10 @@ _opam/
 code/src/hermes/node_modules/
 code/src/hermes/.next/
 website/
+# The docs that the server bundles for its MCP docs tools (see the stategraph-docs stage).
+!website/stategraph/builder/
+!website/stategraph/content/docs/
+!website/stategraph/tools/llms_full.py
 CODEOWNERS
 CONTRIBUTING.md
 docker/stategraph/.env

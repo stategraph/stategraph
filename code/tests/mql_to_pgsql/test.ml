@@ -561,6 +561,17 @@ select json_build_object('modules', num_modules.num_modules) from num_modules|};
             (Error (`Func_access_err "foobar"))
             (of_mql ~schema @@ Oth.Assert.ok_pp ~pp:Mql.Ast.pp_err @@ Mql.Ast.of_string query);
           ());
+      Oth.test ~name:"Func names in any case" (fun _ ->
+          assert_cases
+            ~expected:accepted
+            [
+              ("upper case", "select COUNT(*) from test");
+              ("mixed case", "select Count(*) from test");
+              ("order by", "select id, COUNT(*) from test group by id order by COUNT(*)");
+              ("function with arguments", "select COALESCE(id, id) from test");
+              ("output column of a CTE", "with c as (select COUNT(*) from test) select count from c");
+            ];
+          ());
       Oth.test ~name:"Cast err 1" (fun _ ->
           let query = build_str [ "select 'foo'::regclass from test" ] in
           Oth.Assert.eq
@@ -2764,6 +2775,7 @@ let allow_list_tests =
               ("upper case", "select PG_READ_FILE('x') from test");
               ("mixed case", "select Pg_Read_File('x') from test");
               ("quoted identifier", {|select "pg_read_file"('x') from test|});
+              ("quoted upper case", {|select "COUNT"(*) from test|});
             ];
           ());
       Oth.test ~name:"Allow list: a schema-qualified function" (fun _ ->
@@ -2781,6 +2793,19 @@ let allow_list_tests =
               ("the :: form", "select 'test'::regclass from test");
               ("the CAST form", "select cast('test' as regclass) from test");
             ];
+          ());
+      Oth.test ~name:"Allow list: a cast in any case" (fun _ ->
+          assert_cases
+            ~expected:accepted
+            [
+              ("upper case", "select '1'::INTEGER from test");
+              ("mixed case", "select cast(id as Text) from test");
+            ];
+          ());
+      Oth.test ~name:"Allow list: a quoted cast target in upper case" (fun _ ->
+          assert_cases
+            ~expected:(of_mql_err (`Cast_err "INTEGER"))
+            [ ("quoted upper case", {|select '1'::"INTEGER" from test|}) ];
           ());
       Oth.test ~name:"Allow list: a cast target that is not a plain name" (fun _ ->
           assert_cases
