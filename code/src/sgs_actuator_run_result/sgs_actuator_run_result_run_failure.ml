@@ -10,8 +10,13 @@ module Kind = struct
   [@@deriving yojson { strict = false; meta = true }, show, eq]
 end
 
+module Stategraph_import_id_dropped = struct
+  type t = string list [@@deriving yojson { strict = false; meta = true }, show, eq]
+end
+
 type t = {
   kind : Kind.t;
   reason : Sgs_actuator_run_result_run_failure_reason.t;
+  stategraph_import_id_dropped : Stategraph_import_id_dropped.t option; [@default None]
 }
 [@@deriving yojson { strict = false; meta = true }, make, show, eq]

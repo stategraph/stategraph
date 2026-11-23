@@ -24,6 +24,7 @@
   terrat_repo_tree_retention
   terrat_session
   terrat_sql_of_tag_query
+  terrat_user
   terrat_vcs_api_gitlab
   terrat_vcs_event_evaluator2
   terrat_vcs_gitlab_comment

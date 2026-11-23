@@ -88,16 +88,13 @@ module Make (P : Terrat_vcs_provider2_github.S) = struct
     let post _config storage work_manifest_id plan =
       Brtl_ep.run_result_json ~f:(fun ctx ->
           let open Abbs_fc.Infix_result_monad in
-          (* TODO: Uncomment once all runs are on new work manifest access tokens *)
-          (* Terrat_session.with_session ctx *)
-          (* >>= fun user -> *)
-          (* enforce_work_manifest_access *)
-          (*   (Terrat_user.access_token_id user) *)
-          (*   work_manifest_id *)
-          (*   storage *)
-          (*   ctx *)
-          (* >>= fun () -> *)
-          enforce_work_manifest_access (Some work_manifest_id) work_manifest_id storage ctx
+          Terrat_session.with_session ctx
+          >>= fun user ->
+          enforce_work_manifest_access
+            (Terrat_user.access_token_id user)
+            work_manifest_id
+            storage
+            ctx
           >>= fun () ->
           let open Abb.Future.Infix_monad in
           let request_id = Brtl_ctx.token ctx in
@@ -122,16 +119,13 @@ module Make (P : Terrat_vcs_provider2_github.S) = struct
     let get _config storage work_manifest_id dir workspace =
       Brtl_ep.run_result_json ~f:(fun ctx ->
           let open Abbs_fc.Infix_result_monad in
-          (* TODO: Uncomment once all runs are on new work manifest access tokens *)
-          (* Terrat_session.with_session ctx *)
-          (* >>= fun user -> *)
-          (* enforce_work_manifest_access *)
-          (*   (Terrat_user.access_token_id user) *)
-          (*   work_manifest_id *)
-          (*   storage *)
-          (*   ctx *)
-          (* >>= fun () -> *)
-          enforce_work_manifest_access (Some work_manifest_id) work_manifest_id storage ctx
+          Terrat_session.with_session ctx
+          >>= fun user ->
+          enforce_work_manifest_access
+            (Terrat_user.access_token_id user)
+            work_manifest_id
+            storage
+            ctx
           >>= fun () ->
           let open Abb.Future.Infix_monad in
           let request_id = Brtl_ctx.token ctx in
@@ -157,15 +151,14 @@ module Make (P : Terrat_vcs_provider2_github.S) = struct
     let put config storage exec work_manifest_id result =
       Brtl_ep.run_result_json ~f:(fun ctx ->
           let open Abbs_fc.Infix_result_monad in
-          (* TODO: Uncomment once all runs are on new work manifest access tokens *)
-          (* Terrat_session.with_session ctx *)
-          (* >>= fun user -> *)
-          (* enforce_work_manifest_access *)
-          (*   (Terrat_user.access_token_id user) *)
-          (*   work_manifest_id *)
-          (*   storage *)
-          (*   ctx *)
-          (* >>= fun () -> *)
+          Terrat_session.with_session ctx
+          >>= fun user ->
+          enforce_work_manifest_access
+            (Terrat_user.access_token_id user)
+            work_manifest_id
+            storage
+            ctx
+          >>= fun () ->
           let request_id = Brtl_ctx.token ctx in
           Logs.info (fun m ->
               m
@@ -173,8 +166,6 @@ module Make (P : Terrat_vcs_provider2_github.S) = struct
                 request_id
                 Uuidm.pp
                 work_manifest_id);
-          enforce_work_manifest_access (Some work_manifest_id) work_manifest_id storage ctx
-          >>= fun () ->
           let open Abb.Future.Infix_monad in
           Evaluator2.work_manifest_result
             ~request_id
@@ -327,16 +318,13 @@ module Make (P : Terrat_vcs_provider2_github.S) = struct
     let get _config storage work_manifest_id =
       Brtl_ep.run_result_json ~f:(fun ctx ->
           let open Abbs_fc.Infix_result_monad in
-          (* TODO: Uncomment once all runs are on new work manifest access tokens *)
-          (* Terrat_session.with_session ctx *)
-          (* >>= fun user -> *)
-          (* enforce_work_manifest_access *)
-          (*   (Terrat_user.access_token_id user) *)
-          (*   work_manifest_id *)
-          (*   storage *)
-          (*   ctx *)
-          (* >>= fun () -> *)
-          enforce_work_manifest_access (Some work_manifest_id) work_manifest_id storage ctx
+          Terrat_session.with_session ctx
+          >>= fun user ->
+          enforce_work_manifest_access
+            (Terrat_user.access_token_id user)
+            work_manifest_id
+            storage
+            ctx
           >>= fun () ->
           let open Abb.Future.Infix_monad in
           Pgsql_pool.with_conn storage ~f:(fun db ->

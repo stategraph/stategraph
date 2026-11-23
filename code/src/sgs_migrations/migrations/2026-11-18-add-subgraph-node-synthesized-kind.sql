@@ -1,0 +1,27 @@
+-- Carry the SYNTHESIZED KIND of a cache node on its row.
+--
+-- Sgs_reifier.Subgraph_page.materialize_root_scaffolding mints one node id per
+-- scaffolding family, "synthesized.<kind>.<state prefix>", in [state_item].  The
+-- read of the lifted [import] [id] chains selected its rows by matching that text:
+-- [item->>'node_id' like 'synthesized.import_id.%'].  RFD 1008, RFD 2172 and
+-- RFD 2716 forbid SQL to parse an identifier, and the [_] in that pattern is a
+-- one-character wildcard, so the match set was wider than the comment claimed.
+--
+-- The kind is now a column and the read compares it by equality.  The state prefix
+-- the read selects on needs no second column: [state_hash_id] already carries it
+-- (2026-07-29-add-subgraph-node-state-hash-id.sql).
+--
+-- [insert_reifier_root_scaffolding.sql] is the one writer.  It labels every row it
+-- writes -- [root], [state_placeholder], [import_foreach], [import_id] -- from the
+-- item's [synthesized_kind], the same way it writes [state_hash_id].  Every other
+-- cache writer leaves the column NULL, and the one reader compares by equality, so
+-- a NULL matches nothing.
+--
+-- Rolling deploy: a transaction an older binary staged carries no
+-- [synthesized_kind], so this read answers no mapping for it and the demangle
+-- leaves the md5 name of that state's synthesized output in place.  That is the
+-- text such a transaction shows today, and the derivation that would remove it is
+-- the identifier parse this migration forbids.
+--
+-- Nullable so the migration is additive: no table rewrite, no backfill.
+ALTER TABLE transaction_subgraph_nodes ADD COLUMN synthesized_kind text;

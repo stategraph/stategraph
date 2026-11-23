@@ -1,3 +1,5 @@
+let is_non_empty l = not (CCList.is_empty l)
+
 module String = struct
   let mem = CCList.mem ~eq:CCString.equal
   let sort = CCList.sort CCString.compare

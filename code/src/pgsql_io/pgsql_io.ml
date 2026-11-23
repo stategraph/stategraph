@@ -523,6 +523,14 @@ type err =
   ]
 [@@deriving show]
 
+(* Declared apart from [err] because it carries one: a savepoint statement failing with a
+   [savepoint_err] would make [err] recursive. *)
+type savepoint_err =
+  [ `Savepoint_not_in_tx
+  | `Savepoint_stmt_err of err
+  ]
+[@@deriving show]
+
 let binary_of_numeric z =
   let module Bv = Pgsql_codec.Binary_value.Encode in
   if Z.equal z Z.zero then (
@@ -1909,6 +1917,121 @@ let tx t ~f =
    channel names are interpolated as a quoted identifier: wrap in double quotes
    and double any embedded double quote. *)
 let quote_ident ident = "\"" ^ CCString.concat "\"\"" (CCString.split_on_char '"' ident) ^ "\""
+
+(* [ROLLBACK TO SAVEPOINT] is the only savepoint statement PostgreSQL accepts in an aborted
+   transaction, and it restores the transaction. [25P02] is the SQLSTATE for "current transaction is
+   aborted"; [handle_err_frame] has no arm for it, so it arrives as the catch-all [`Pgsql_err]
+   ([pgsql_io.ml:393]). *)
+let is_aborted_tx_err = function
+  | `Pgsql_err { code; _ } -> CCString.equal code "25P02"
+  | _ -> false
+
+(* [tag] is the statement's verb -- [SAVEPOINT], [RELEASE] or [ROLLBACK TO] -- and the name is an
+   identifier, not a bind parameter, so it is quoted the same way [quote_ident] quotes a LISTEN
+   channel. *)
+let savepoint_stmt tag name = Printf.sprintf "%s %s" tag (quote_ident name)
+
+(* Move the transaction back to [name]: [ROLLBACK TO] discards the work done since it and leaves the
+   savepoint itself in place, which is the difference from [tx_rollback] that matters here -- the
+   enclosing transaction stays usable, so a caller can still write the outcome of the failed body. *)
+let savepoint_rollback t name =
+  let open Abbs_fc.Infix_result_monad in
+  (* [tx_rollback] clears the cache for the same reason, and doing it here costs one re-Parse on the
+     failure path: a statement first parsed since the savepoint may no longer exist on the server. *)
+  stmt_cache_clear t;
+  Io.send_frame t Pgsql_codec.Frame.Frontend.(Query { query = savepoint_stmt "ROLLBACK TO" name })
+  >>= fun () ->
+  add_expected_frames
+    t
+    Pgsql_codec.Frame.Backend.
+      [ equal (CommandComplete { tag = "ROLLBACK" }); equal (ReadyForQuery { status = 'T' }) ];
+  Io.consume_matching ~skip_leading_unmatched:true t (consume_expected_frames t) >>| fun _ -> ()
+
+(* Keep the work done since [name] and drop the savepoint. *)
+let savepoint_release t name =
+  let open Abbs_fc.Infix_result_monad in
+  Io.send_frame t Pgsql_codec.Frame.Frontend.(Query { query = savepoint_stmt "RELEASE" name })
+  >>= fun () ->
+  add_expected_frames
+    t
+    Pgsql_codec.Frame.Backend.
+      [ equal (CommandComplete { tag = "RELEASE" }); equal (ReadyForQuery { status = 'T' }) ];
+  Io.consume_matching t (consume_expected_frames t) >>| fun _ -> ()
+
+(* Open [name]. Its [CommandComplete] tag is [SAVEPOINT], and the transaction is still open
+   afterwards, so the ready status is [T]. *)
+let savepoint_open t name =
+  let open Abbs_fc.Infix_result_monad in
+  Io.send_frame t Pgsql_codec.Frame.Frontend.(Query { query = savepoint_stmt "SAVEPOINT" name })
+  >>= fun () ->
+  add_expected_frames
+    t
+    Pgsql_codec.Frame.Backend.
+      [ equal (CommandComplete { tag = "SAVEPOINT" }); equal (ReadyForQuery { status = 'T' }) ];
+  Io.consume_matching t (consume_expected_frames t) >>| fun _ -> ()
+
+(* Run [f] inside a savepoint named [name], which must already be inside a transaction.
+
+   On [Ok] the savepoint is released and the work done since it is kept. On [Error] it is rolled
+   back -- discarding the work done since it -- and the error is given back; the enclosing
+   transaction is still usable, which is the reason a caller that must record the outcome of a
+   failed body asks for one. An exception or an abort in [f] is a failure too, so it rolls back as
+   well before it propagates. An [Ok] whose body left the transaction aborted -- it swallowed a
+   statement error -- is downgraded to a rollback, and [Ok] is still returned.
+
+   [name] is the caller's to scope: PostgreSQL keeps only the most recent savepoint of a given name,
+   so a name shared with an enclosing savepoint makes the release or the rollback address the inner
+   one.
+
+   Each savepoint statement maps through [stmt_err], so a failure of the machinery is told apart
+   from a failure of the body. That failure wins over the body's own error: the body's error is a
+   value the caller can act on, and the transaction it would act in is gone. *)
+let savepoint t ~name ~f =
+  let open Abb.Future.Infix_monad in
+  let stmt_err err = Abbs_fc.return_err (`Savepoint_stmt_err err) in
+  let keep ok =
+    (* A body that swallowed a statement error leaves the transaction aborted, and [RELEASE] then
+       fails with 25P02. That is not worth failing a caller that has already answered [Ok], so
+       downgrade to a rollback: it is accepted in an aborted transaction, it restores usability,
+       and it discards what the body wrote since the savepoint. *)
+    savepoint_release t name
+    >>= fun released ->
+    match released with
+    | Ok () -> Abb.Future.return ok
+    | Error err when is_aborted_tx_err err -> (
+        savepoint_rollback t name
+        >>= fun rolled ->
+        match rolled with
+        | Ok () -> Abb.Future.return ok
+        | Error err -> stmt_err err)
+    | Error err -> stmt_err err
+  in
+  let discard body_err =
+    savepoint_rollback t name
+    >>= fun rolled ->
+    match rolled with
+    | Ok () -> Abb.Future.return body_err
+    | Error err -> stmt_err err
+  in
+  if not t.in_tx then Abbs_fc.return_err `Savepoint_not_in_tx
+  else
+    savepoint_open t name
+    >>= fun opened ->
+    match opened with
+    | Error err -> stmt_err err
+    | Ok () ->
+        (* [on_failure] covers the body only. [savepoint_open] is outside it, and [bind] drops the
+           continuation of an aborted future, so an abort during the open issues no [ROLLBACK TO].
+           [Abbs_fc.protect_finally] would guard that open, but it cannot replace [on_failure]: its
+           [finally] receives the setup value and no outcome, so it cannot tell [Ok] from [Error],
+           and it needs a flag to avoid a second rollback. *)
+        Abbs_fc.on_failure
+          (fun () ->
+            f ()
+            >>= function
+            | Ok _ as ok -> keep ok
+            | Error _ as body_err -> discard body_err)
+          ~failure:(fun () -> Abbs_fc.ignore (savepoint_rollback t name))
 
 (* Run [f] while holding the connection's single-op guard, releasing it on
    success, failure, or abort.  [with_finally] registers the release as the

@@ -105,6 +105,32 @@
       ],
       "type": "object"
     },
+    "reason-import-id-unresolved": {
+      "additionalProperties": false,
+      "description": "The id of an import block keeps a module reference that the bundle root cannot resolve, so the run was refused before terraform ran. \"block\" is the to expression text of the import block; \"reference\" is the surviving module reference; \"detail\" says why.",
+      "properties": {
+        "block": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "import_id_unresolved",
+          "type": "string"
+        },
+        "reference": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "block",
+        "reference",
+        "detail"
+      ],
+      "type": "object"
+    },
     "reason-init": {
       "additionalProperties": false,
       "description": "[terraform init] failed.",
@@ -546,6 +572,13 @@
         },
         "reason": {
           "$ref": "#/definitions/run-failure-reason"
+        },
+        "stategraph_import_id_dropped": {
+          "description": "The states whose import id expression could not be restored, one entry per undecodable row. Present only when the mapping was incomplete, in which case an internal name stands in its place in the captured output.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "required": [
@@ -643,6 +676,9 @@
         },
         {
           "$ref": "#/definitions/reason-state-schema-upgrade-timeout"
+        },
+        {
+          "$ref": "#/definitions/reason-import-id-unresolved"
         }
       ]
     },

@@ -1,3 +1,6 @@
+(** [not (CCList.is_empty l)]: [is_non_empty [ "a" ] = true] and [is_non_empty [] = false]. *)
+val is_non_empty : 'a list -> bool
+
 module String : sig
   (** [CCList.mem ~eq:CCString.equal] *)
   val mem : string -> string list -> bool

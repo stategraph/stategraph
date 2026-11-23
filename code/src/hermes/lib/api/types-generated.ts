@@ -2834,6 +2834,8 @@ export interface components {
             /** @constant */
             kind: "failure";
             reason: components["schemas"]["run-failure-reason"];
+            /** @description The states whose import id expression could not be restored, one entry per undecodable row. Present only when the mapping was incomplete, in which case an internal name stands in its place in the captured output. The reserved entry "*" says the mapping itself could not be read, so no per-row information exists. */
+            stategraph_import_id_dropped?: string[];
         };
         /** @description Whether the server runs security scans: STATEGRAPH_SECURITY is "true" or "1". Modelled as an object so security-related metadata can be added later without breaking the capabilities contract. */
         "security-availability": {
@@ -4220,8 +4222,16 @@ export interface components {
             kind: "state_schema_upgrade_timeout";
             seconds: number;
         };
+        /** @description The id of an import block keeps a module reference that the bundle root cannot resolve, so the run was refused before terraform ran. "block" is the to expression text of the import block; "reference" is the surviving module reference; "detail" says why. */
+        "reason-import-id-unresolved": {
+            block: string;
+            detail: string;
+            /** @constant */
+            kind: "import_id_unresolved";
+            reference: string;
+        };
         /** @description One cause of an actuator-run failure. The "kind" discriminates the shape; terraform-phase failures (init/plan/show_json/apply) carry the captured stdout and stderr. */
-        "run-failure-reason": components["schemas"]["reason-tf-binary-not-found"] | components["schemas"]["reason-hcl-parse"] | components["schemas"]["reason-write"] | components["schemas"]["reason-init"] | components["schemas"]["reason-plan"] | components["schemas"]["reason-show-json"] | components["schemas"]["reason-failed-apply"] | components["schemas"]["reason-read"] | components["schemas"]["reason-temp-dir"] | components["schemas"]["reason-preview-fetch"] | components["schemas"]["reason-preview-decode"] | components["schemas"]["reason-params-fetch"] | components["schemas"]["reason-bad-request"] | components["schemas"]["reason-unauthorized"] | components["schemas"]["reason-failed-transport-call"] | components["schemas"]["reason-client-create"] | components["schemas"]["reason-next-task-failed"] | components["schemas"]["reason-next-timeout"] | components["schemas"]["reason-results-task-failed"] | components["schemas"]["reason-capability-denied"] | components["schemas"]["reason-tx-conflict"] | components["schemas"]["reason-tx-invalid-state"] | components["schemas"]["reason-remote-state-address-unresolved"] | components["schemas"]["reason-tx-schema-version-mismatch"] | components["schemas"]["reason-state-schema-placeholder-present"] | components["schemas"]["reason-state-schema-remote-module-missing"] | components["schemas"]["reason-state-schema-upgrade-failed"] | components["schemas"]["reason-state-schema-upgrade-rounds-exhausted"] | components["schemas"]["reason-state-schema-upgrade-timeout"];
+        "run-failure-reason": components["schemas"]["reason-tf-binary-not-found"] | components["schemas"]["reason-hcl-parse"] | components["schemas"]["reason-write"] | components["schemas"]["reason-init"] | components["schemas"]["reason-plan"] | components["schemas"]["reason-show-json"] | components["schemas"]["reason-failed-apply"] | components["schemas"]["reason-read"] | components["schemas"]["reason-temp-dir"] | components["schemas"]["reason-preview-fetch"] | components["schemas"]["reason-preview-decode"] | components["schemas"]["reason-params-fetch"] | components["schemas"]["reason-bad-request"] | components["schemas"]["reason-unauthorized"] | components["schemas"]["reason-failed-transport-call"] | components["schemas"]["reason-client-create"] | components["schemas"]["reason-next-task-failed"] | components["schemas"]["reason-next-timeout"] | components["schemas"]["reason-results-task-failed"] | components["schemas"]["reason-capability-denied"] | components["schemas"]["reason-tx-conflict"] | components["schemas"]["reason-tx-invalid-state"] | components["schemas"]["reason-remote-state-address-unresolved"] | components["schemas"]["reason-tx-schema-version-mismatch"] | components["schemas"]["reason-state-schema-placeholder-present"] | components["schemas"]["reason-state-schema-remote-module-missing"] | components["schemas"]["reason-state-schema-upgrade-failed"] | components["schemas"]["reason-state-schema-upgrade-rounds-exhausted"] | components["schemas"]["reason-state-schema-upgrade-timeout"] | components["schemas"]["reason-import-id-unresolved"];
         /** @description A set of strings, as rules read longest match first: "a.*" allows every string starting with "a.", "!a.b" refuses "a.b", and the more specific rule decides. Order does not matter. An empty list allows nothing. */
         scope: string[];
         /** @description The addresses reached in the states a rule names. */

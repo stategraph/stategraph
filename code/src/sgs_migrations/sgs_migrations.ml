@@ -582,6 +582,11 @@ let migrations =
        its commit while that pull request is open; see the comment in the file. *)
     ("add-tx-metadata", run_sql [%blob "./migrations/2026-11-06-add-tx-metadata.sql"]);
     ("restore-masked-sensitive-values", restore_masked_sensitive_values);
+    (* The kind of a synthesized scaffolding node, as a column: the read of the
+       lifted [import] [id] chains matched the node id as text, which RFD 1008
+       forbids SQL to do.  See the migration for the one writer and the NULL rule. *)
+    ( "add-subgraph-node-synthesized-kind",
+      run_sql [%blob "./migrations/2026-11-18-add-subgraph-node-synthesized-kind.sql"] );
   ]
 
 (* Each value that [restore-masked-sensitive-values] cannot restore: its state and its address. *)

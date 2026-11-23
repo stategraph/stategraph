@@ -3,6 +3,7 @@ module Keys = struct
 end
 
 type t = {
+  ds : string option; [@default None]
   fq_address : string;
   keys : Keys.t option; [@default None]
 }

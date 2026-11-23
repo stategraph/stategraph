@@ -255,6 +255,10 @@
       "additionalProperties": false,
       "description": "One for_each'd block this node reads, as stored: the block and the keys demanded of it, merged across every read of it in the node.",
       "properties": {
+        "ds": {
+          "description": "For a CROSS-STATE entry, the data source the demand went through, as its own fq_address: data.terraform_remote_state.<name>. Absent on a same-state entry, where fq_address already identifies the block inside the consuming row's own state. It is present on a cross-state one because fq_address does NOT: two producers both exporting [foo] give two entries that are otherwise identical, and entries are selected by the origin's fq_address, so without this both are consulted on either edge. Written at ingest from Sg_tf_eval_obj_ref_canon.collect_remote_reads, in the coordinates of the row's own body; Sgs_reifier_subgraph2_hints.instantiate_naming roots it at the call path. This entry carries no ref_state_id: the instance-demand walk does not yet scope a demand by state.",
+          "type": "string"
+        },
         "fq_address": {
           "description": "The for_each'd block, keyed to match _sg_realized_for_each.fq_address (its state_id comes from the consuming row). There is no state id, for the reason stored_object_attr_ref has none: the demand is resolved against the consuming row's own state, and a cross-state edge has already been pinned by hcl_refs.ref_state_id where the demand is raised.",
           "type": "string"
