@@ -1087,7 +1087,8 @@ CREATE TABLE public.transaction_subgraph_nodes (
     resource_hcl jsonb NOT NULL,
     hints jsonb,
     state_hash_id text,
-    file_targets jsonb
+    file_targets jsonb,
+    synthesized_kind text
 )
 WITH (autovacuum_vacuum_scale_factor='0.0', autovacuum_vacuum_threshold='20000', autovacuum_vacuum_insert_scale_factor='0.0', autovacuum_vacuum_insert_threshold='20000', autovacuum_analyze_scale_factor='0.0', autovacuum_analyze_threshold='20000');
 

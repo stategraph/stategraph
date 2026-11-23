@@ -34,6 +34,7 @@ type t =
       Sgs_actuator_run_result_reason_state_schema_upgrade_rounds_exhausted.t
   | Reason_state_schema_upgrade_timeout of
       Sgs_actuator_run_result_reason_state_schema_upgrade_timeout.t
+  | Reason_import_id_unresolved of Sgs_actuator_run_result_reason_import_id_unresolved.t
 [@@deriving show, eq]
 
 let of_yojson =
@@ -138,6 +139,10 @@ let of_yojson =
          map
            (fun v -> Reason_state_schema_upgrade_timeout v)
            (Sgs_actuator_run_result_reason_state_schema_upgrade_timeout.of_yojson v));
+       (fun v ->
+         map
+           (fun v -> Reason_import_id_unresolved v)
+           (Sgs_actuator_run_result_reason_import_id_unresolved.of_yojson v));
      ])
 
 let to_yojson = function
@@ -178,3 +183,4 @@ let to_yojson = function
       Sgs_actuator_run_result_reason_state_schema_upgrade_rounds_exhausted.to_yojson v
   | Reason_state_schema_upgrade_timeout v ->
       Sgs_actuator_run_result_reason_state_schema_upgrade_timeout.to_yojson v
+  | Reason_import_id_unresolved v -> Sgs_actuator_run_result_reason_import_id_unresolved.to_yojson v

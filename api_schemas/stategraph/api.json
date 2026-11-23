@@ -2664,6 +2664,13 @@
           },
           "reason": {
             "$ref": "actuator-run-result.json#/definitions/run-failure-reason"
+          },
+          "stategraph_import_id_dropped": {
+            "description": "The states whose import id expression could not be restored, one entry per undecodable row. Present only when the mapping was incomplete, in which case an internal name stands in its place in the captured output. The reserved entry \"*\" says the mapping itself could not be read, so no per-row information exists.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           }
         },
         "required": [

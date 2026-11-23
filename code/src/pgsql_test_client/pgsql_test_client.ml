@@ -39,9 +39,11 @@ let with_conn :
 
 let pp_pgsql_err fmt err = Format.pp_print_string fmt (Pgsql_io.show_err err)
 let pp_pgsql_create_err fmt err = Format.pp_print_string fmt (Pgsql_io.show_create_err err)
+let pp_pgsql_savepoint_err fmt err = Format.pp_print_string fmt (Pgsql_io.show_savepoint_err err)
 
 let pp_pgsql_combined_err fmt = function
   | #Pgsql_io.create_err as err -> pp_pgsql_create_err fmt err
+  | #Pgsql_io.savepoint_err as err -> pp_pgsql_savepoint_err fmt err
   | #Pgsql_io.err as err -> pp_pgsql_err fmt err
 
 let pp_unit fmt () = Format.pp_print_string fmt "()"
@@ -569,6 +571,69 @@ let test_rollback =
       with_conn f
       >>= fun r ->
       ignore (Oth.Assert.ok_pp ~pp:pp_pgsql_combined_err r);
+      Abb.Future.return ())
+
+(* [test_rollback] pins that a failed body discards its work by ending the transaction. The
+   savepoint exists so that it does NOT end the transaction, so the assertion is two-part: inside the
+   same [Pgsql_io.tx], a write after the savepoint answered [Error] succeeds, and a later transaction
+   sees only that later write. *)
+let test_savepoint_rollback =
+  Oth_abb.test ~desc:"Savepoint rollback" ~name:"savepoint_rollback" (fun () ->
+      let open Abb.Future.Infix_monad in
+      let f conn =
+        let create_sql =
+          Pgsql_io.Typed_sql.(
+            sql /^ "CREATE TABLE IF NOT EXISTS foo (name TEXT PRIMARY KEY, age INTEGER)")
+        in
+        let insert_sql =
+          Pgsql_io.Typed_sql.(
+            sql /^ "INSERT INTO foo VALUES($name, $age)" /% Var.text "name" /% Var.integer "age")
+        in
+        let select_sql =
+          Pgsql_io.Typed_sql.(
+            sql
+            //
+            (* name *)
+            Ret.varchar
+            //
+            (* age *)
+            Ret.integer
+            /^ "SELECT * FROM foo")
+        in
+        let open Abbs_fc.Infix_result_monad in
+        Pgsql_io.Prepared_stmt.execute conn create_sql
+        >>= fun () ->
+        let open Abb.Future.Infix_monad in
+        Pgsql_io.tx conn ~f:(fun () ->
+            let open Abb.Future.Infix_monad in
+            (* The second insert repeats the primary key, so it fails with a unique violation and
+               aborts the transaction -- exactly the case the savepoint is for. *)
+            Pgsql_io.savepoint conn ~name:"test_savepoint_rollback" ~f:(fun () ->
+                let open Abbs_fc.Infix_result_monad in
+                Pgsql_io.Prepared_stmt.execute conn insert_sql "Discarded" (Int32.of_int 36)
+                >>= fun () ->
+                Pgsql_io.Prepared_stmt.execute conn insert_sql "Discarded" (Int32.of_int 37))
+            >>= fun rolled_back ->
+            (match rolled_back with
+            | Error (`Unique_violation_err _) -> ()
+            | Ok () -> Oth_abb.Assert.false_ "the duplicate insert did not fail"
+            | Error err ->
+                Oth_abb.Assert.false_
+                  (Format.asprintf "expected a unique violation, got %a" pp_pgsql_combined_err err));
+            (* The enclosing transaction is usable again, so this write is kept by the commit. *)
+            Pgsql_io.Prepared_stmt.execute conn insert_sql "Kept" (Int32.of_int 36))
+        >>= fun committed ->
+        ignore (Oth_abb.Assert.ok_pp ~pp:pp_pgsql_combined_err committed);
+        let open Abbs_fc.Infix_result_monad in
+        Pgsql_io.tx conn ~f:(fun () ->
+            Pgsql_io.Prepared_stmt.fetch conn select_sql ~f:(fun name age -> (name, age)))
+        >>| fun r ->
+        Oth_abb.Assert.eq ~eq:( = ) ~pp:(pp_list (pp_pair pp_string pp_int32)) [ ("Kept", 36l) ] r;
+        ()
+      in
+      with_conn f
+      >>= fun r ->
+      ignore (Oth_abb.Assert.ok_pp ~pp:pp_pgsql_combined_err r);
       Abb.Future.return ())
 
 let test_bad_state =
@@ -2459,6 +2524,7 @@ let test =
         test_integrity_fail;
         test_integrity_recover;
         test_rollback;
+        test_savepoint_rollback;
         test_bad_state;
         test_copy_to;
         test_copy_to_conflict;

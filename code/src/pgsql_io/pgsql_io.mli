@@ -56,6 +56,20 @@ type err =
   ]
 [@@deriving show]
 
+(** Why {!savepoint} failed. Each of these leaves the enclosing transaction absent or unusable, so
+    the caller can only fail that transaction.
+
+    - [`Savepoint_not_in_tx]: there was no transaction to mark. A savepoint marks a point inside an
+      already-open transaction, so there is nothing for it to mark otherwise.
+    - [`Savepoint_stmt_err]: one of the savepoint's own statements failed. The error of that
+      statement is the payload. The savepoint no longer marks a point of the transaction, thus the
+      work of the body cannot be released or discarded on its own. *)
+type savepoint_err =
+  [ `Savepoint_not_in_tx
+  | `Savepoint_stmt_err of err
+  ]
+[@@deriving show]
+
 module Typed_sql : sig
   module Var : sig
     type 'a t
@@ -307,6 +321,32 @@ val ping : t -> bool Abb.Future.t
 
     Nested transactions are not supported. *)
 val tx : t -> f:(unit -> ('a, ([> err ] as 'e)) result Abb.Future.t) -> ('a, 'e) result Abb.Future.t
+
+(** Run [f] inside a savepoint named [name], which must already be inside a transaction. The
+    savepoint sets a mark in the transaction, so the work of [f] can be discarded on its own while
+    the enclosing transaction stays usable.
+
+    On [Ok] the savepoint is released and the work done since it is kept. On [Error] it is rolled
+    back -- discarding the work done since it -- and the error is returned.
+
+    An [Ok] whose body left the transaction aborted -- it swallowed a statement error -- is
+    downgraded to a rollback, and [Ok] is still returned. The work done since [name] is discarded in
+    that case too, so [f] must not rely on it surviving.
+
+    An exception or an abort in [f] rolls the savepoint back before it propagates.
+
+    The savepoint's own failures come back as {!savepoint_err} values, in the same error channel as
+    the errors of [f]. The caller thus handles them in the error path of the future, and no call
+    raises for a savepoint.
+
+    [name] is the caller's to scope. PostgreSQL keeps only the most recent savepoint of a given
+    name, so a name shared with an enclosing savepoint makes the release or the rollback address the
+    inner one; prefix it with the caller's own module name. *)
+val savepoint :
+  t ->
+  name:string ->
+  f:(unit -> ('a, ([> savepoint_err ] as 'e)) result Abb.Future.t) ->
+  ('a, 'e) result Abb.Future.t
 
 (** {1 Asynchronous notifications (LISTEN / NOTIFY)}
 

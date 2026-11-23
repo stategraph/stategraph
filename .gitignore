@@ -51,12 +51,12 @@ code/src/iris/src/lib/api-types-generated.ts
 .claude/scheduled_tasks.lock
 
 # Demo Terraform artifacts
-./stategraph/demo/**/.terraform/
-./stategraph/demo/**/.terraform.lock.hcl
-./stategraph/demo/**/terraform.tfstate
-./stategraph/demo/**/terraform.tfstate.backup
-./stategraph/demo/**/*.zip
-./stategraph/demo/.env
+/stategraph/demo/**/.terraform/
+/stategraph/demo/**/.terraform.lock.hcl
+/stategraph/demo/**/terraform.tfstate
+/stategraph/demo/**/terraform.tfstate.backup
+/stategraph/demo/**/*.zip
+/stategraph/demo/.env
 
 # Tap files from tests
 *.tap

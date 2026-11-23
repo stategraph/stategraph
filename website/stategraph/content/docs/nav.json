@@ -577,6 +577,10 @@
             {
               "page": "/docs/ai/skills",
               "label": "Skills"
+            },
+            {
+              "page": "/docs/ai/mcp",
+              "label": "Connect over MCP"
             }
           ]
         },
