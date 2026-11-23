@@ -86,6 +86,34 @@ module Gc : sig
   type t = { dynamic_gc : dynamic_gc option } [@@deriving show]
 end
 
+(** The deletion of the data of uninstalled installations.
+
+    TERRAT_INSTALLATION_RETENTION (default [off]): [off] runs no task, [schedule] puts each
+    uninstalled installation on the deletion schedule and deletes nothing, [delete] also deletes the
+    installations whose deletion is due. TERRAT_INSTALLATION_RETENTION_DAYS (default 30, at least 1)
+    is the days an installation is kept after its uninstall.
+    TERRAT_INSTALLATION_RETENTION_NOTICE_DAYS (default 7, at least 0) is the days an installation is
+    on the schedule before its deletion. *)
+module Installation_retention : sig
+  type mode =
+    | Off
+    | Schedule
+    | Delete
+  [@@deriving show]
+
+  type t = {
+    mode : mode;
+    days : int;
+    notice_days : int;
+  }
+  [@@deriving show]
+
+  val default : t
+  val mode : t -> mode
+  val days : t -> int
+  val notice_days : t -> int
+end
+
 val admin_token : t -> string option
 val api_base : t -> string
 val create : unit -> (t, [> err ]) result
@@ -110,6 +138,10 @@ val github_of_stored :
 (** [with_github t github] is [t] with [github] as its GitHub App. *)
 val with_github : t -> Github.t -> t
 
+(** [with_installation_retention t retention] is [t] with [retention] as its installation retention.
+*)
+val with_installation_retention : t -> Installation_retention.t -> t
+
 (** Build a configuration from explicit values, with no read of the environment. A test uses it to
     get a configuration that differs from the process environment, for example a test that runs
     several databases at the same time and must not change the environment that the others read. An
@@ -132,6 +164,7 @@ val make :
   ?github:Github.t ->
   ?gitlab:Gitlab.t ->
   ?infracost:Infracost.t ->
+  ?installation_retention:Installation_retention.t ->
   ?nginx_status_uri:Uri.t ->
   port:int ->
   python_exec:string ->
@@ -160,6 +193,7 @@ val gc : t -> Gc.t
 val github : t -> Github.t option
 val gitlab : t -> Gitlab.t option
 val infracost : t -> Infracost.t option
+val installation_retention : t -> Installation_retention.t
 val nginx_status_uri : t -> Uri.t option
 val port : t -> int
 val python_exec : t -> string

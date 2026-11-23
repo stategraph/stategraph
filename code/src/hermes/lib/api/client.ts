@@ -1851,6 +1851,35 @@ export async function renameTenant(tenantId: string, data: TenantUpdateRequest):
   });
 }
 
+export type ClosedTenant = components["schemas"]["closed-tenant"];
+export type UserClosedTenantsResponse = components["schemas"]["user-closed-tenants"];
+
+/**
+ * POST /api/v1/tenants/{tenant_id}/close — close the tenant. From then on it refuses every request
+ * but its reopen, and its data is deleted after the retention days. Stategraph Cloud only.
+ */
+export async function closeTenant(tenantId: string): Promise<void> {
+  // Explicit empty body: without a Content-Length the backend waits for one when reached
+  // directly.
+  await fetchAPI<void>(`/api/v1/tenants/${encodeURIComponent(tenantId)}/close`, {
+    method: "POST",
+    body: "",
+  });
+}
+
+/** POST /api/v1/tenants/{tenant_id}/reopen — reopen a closed tenant. Stategraph Cloud only. */
+export async function reopenTenant(tenantId: string): Promise<void> {
+  await fetchAPI<void>(`/api/v1/tenants/${encodeURIComponent(tenantId)}/reopen`, {
+    method: "POST",
+    body: "",
+  });
+}
+
+/** GET /api/v1/user/closed-tenants — the closed tenants of the user. Stategraph Cloud only. */
+export async function listClosedTenants(): Promise<UserClosedTenantsResponse> {
+  return fetchAPI<UserClosedTenantsResponse>("/api/v1/user/closed-tenants");
+}
+
 /** GET /api/v1/tenants/{tenant_id}/invitations */
 export async function listTenantInvitations(
   tenantId: string,

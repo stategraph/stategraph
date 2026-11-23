@@ -1,0 +1,18 @@
+(library
+ (name terrat_installation_retention)
+ (wrapped false)
+ (libraries
+  abb
+  abbs
+  containers
+  logs
+  mql_sql
+  pgsql_io
+  pgsql_pool
+  terrat_config
+  terrat_storage
+  yojson)
+ (preprocessor_deps
+  (glob_files sql/*.sql))
+ (preprocess
+  (pps ppx_blob)))

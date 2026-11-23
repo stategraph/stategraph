@@ -1,11 +1,11 @@
 ---
 title: User Commands
-description: Use the stategraph user commands to see who you are, list your tenants, and create, list, and delete your Stategraph access tokens.
+description: Use the stategraph user commands to see who you are, list your tenants, manage your access tokens, list users, and set installation admins.
 order: 1
 ---
 
 
-The `stategraph user` commands show who you are and which tenants you belong to, and create, list, and delete your access tokens.
+The `stategraph user` commands show who you are and which tenants you belong to, and create, list, and delete your access tokens. For an installation admin, they also list the installation's users and grant or revoke installation admin.
 
 ## Commands
 
@@ -16,6 +16,8 @@ The `stategraph user` commands show who you are and which tenants you belong to,
 | `stategraph user access-tokens create` | Create a capability-scoped access token |
 | `stategraph user access-tokens list` | List your access tokens |
 | `stategraph user access-tokens delete` | Delete (revoke) an access token |
+| `stategraph user list` | List the installation's users, with their IDs and admin rights |
+| `stategraph user set-instance-admin` | Grant or revoke installation admin |
 
 ## stategraph user whoami
 
@@ -159,6 +161,75 @@ The default table shows `id`, `name`, `created_at`, `expiration`, `owner_name`, 
 stategraph user access-tokens delete --token-id f02791c8-aa63-4cdf-acae-a7c968d8a831
 ```
 
+## stategraph user list
+
+Lists the users of the whole installation, with their IDs and admin rights. It requires installation admin, or the users-manage capability without a tenant restriction. A tenant admin cannot list users. See [Tenants](/docs/admin/access-control/tenants) for installation and tenant admins.
+
+```bash
+stategraph user list [--search <text>] [--type user|api|system]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--search <text>` | Case-insensitive substring match against a user's name or email. |
+| `--type <type>` | Only users of this type: `user`, `api`, or `system`. |
+
+The command reads every page of results, so the output holds every matching user. When no user matches, the table prints nothing and the JSON is `[]`.
+
+### Example
+
+```bash
+stategraph user list --search jane
+```
+
+The default output is a table:
+
+```text
+id                                    name      email             type  is_instance_admin  is_tenant_admin
+------------------------------------  --------  ----------------  ----  -----------------  ---------------
+550e8400-e29b-41d4-a716-446655440000  Jane Doe  jane@example.com  user  false              false
+```
+
+For scripts, use `--format json`. It prints an array of users:
+
+```json
+[
+  {
+    "admin_rights": { "is_instance_admin": false, "is_tenant_admin": false },
+    "auth_origin": "local",
+    "created_at": "2026-01-15T10:30:00Z",
+    "email": "jane@example.com",
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "name": "Jane Doe",
+    "type": "user"
+  }
+]
+```
+
+## stategraph user set-instance-admin
+
+Grants a user the installation-wide admin capability, or removes it with `--revoke`. It requires installation admin. Get the user ID from `stategraph user list`.
+
+```bash
+stategraph user set-instance-admin [--revoke] <user-id>
+```
+
+The grant is set, not toggled, so repeating a call changes nothing. `--revoke` removes only the installation-wide grant: an admin grant scoped to named tenants is kept. You cannot remove your own grant (`CANNOT_ACT_ON_SELF`), nor the grant of the last installation admin (`CANNOT_REMOVE_LAST_ADMIN`).
+
+When the grant changes, the user's browser sessions end and the user must sign in again. Access tokens the user already holds keep the capabilities they were created with, so `--revoke` does not remove admin from them. To finish a demotion, list the user's tokens with `stategraph user access-tokens list` and delete each one with `stategraph user access-tokens delete --token-id`.
+
+### Example
+
+```bash
+stategraph user set-instance-admin 550e8400-e29b-41d4-a716-446655440000
+```
+
+The default output is an `id | is_instance_admin` table. With `--format json`:
+
+```json
+{ "id": "550e8400-e29b-41d4-a716-446655440000", "is_instance_admin": true }
+```
+
 ## Scripting Examples
 
 ### Get tenant ID by name
@@ -166,6 +237,14 @@ stategraph user access-tokens delete --token-id f02791c8-aa63-4cdf-acae-a7c968d8
 ```bash
 TENANT_ID=$(stategraph user tenants list --format simple | grep "production" | awk '{print $1}')
 echo "Production tenant: $TENANT_ID"
+```
+
+### Promote a user by email
+
+```bash
+USER_ID=$(stategraph user list --search jane@example.com --format json \
+  | jq -r '.[] | select(.email == "jane@example.com") | .id')
+stategraph user set-instance-admin "$USER_ID"
 ```
 
 ### Verify authentication in CI
@@ -188,7 +267,7 @@ stategraph user tenants list --format simple | while read id name; do
 done
 ```
 
-## Next Steps
+## Next steps
 
 - [States](/docs/cli/states): manage Terraform states
 - [Access control](/docs/admin/access-control): sign-in methods and access tokens

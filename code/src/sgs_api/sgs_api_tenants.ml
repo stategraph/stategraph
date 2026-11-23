@@ -139,6 +139,176 @@ module Link_vcs_installation = struct
       `Put
 end
 
+module Uninstall_gitlab_installation = struct
+  module Parameters = struct
+    type t = {
+      group_id : int;
+      tenant_id : string;
+    }
+    [@@deriving make, show, eq]
+  end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v1"
+    / "tenants"
+    /% Path.uuid
+    / "vcs-installations"
+    / "gitlab"
+    /% Path.int
+    / "uninstall"
+
+  module Responses = struct
+    module OK = struct
+      type t = Sgs_api_components.Gitlab_installation_state.t
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
+    module Bad_request = struct
+      type t = Sgs_api_components.Error_response.t
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
+    module Unauthorized = struct end
+
+    module Forbidden = struct
+      type t = Sgs_capability_denied_response.t
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
+    module Not_found = struct end
+    module Internal_server_error = struct end
+
+    module Service_unavailable = struct
+      type t = Sgs_api_components.Error_response.t
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
+    type t =
+      [ `OK of OK.t
+      | `Bad_request of Bad_request.t
+      | `Unauthorized
+      | `Forbidden of Forbidden.t
+      | `Not_found
+      | `Internal_server_error
+      | `Service_unavailable of Service_unavailable.t
+      ]
+    [@@deriving show, eq]
+
+    let t =
+      [
+        ("200", Openapi.of_json_body (fun v -> `OK v) OK.of_yojson);
+        ("400", Openapi.of_json_body (fun v -> `Bad_request v) Bad_request.of_yojson);
+        ("401", fun _ -> Ok `Unauthorized);
+        ("403", Openapi.of_json_body (fun v -> `Forbidden v) Forbidden.of_yojson);
+        ("404", fun _ -> Ok `Not_found);
+        ("500", fun _ -> Ok `Internal_server_error);
+        ("503", Openapi.of_json_body (fun v -> `Service_unavailable v) Service_unavailable.of_yojson);
+      ]
+  end
+
+  let url = "/api/v1/tenants/{tenant_id}/vcs-installations/gitlab/{group_id}/uninstall"
+
+  let make params =
+    Openapi.Request.make
+      ~headers:[]
+      ~url_params:
+        (let open Openapi.Request.Var in
+         let open Parameters in
+         [ ("tenant_id", Var (params.tenant_id, String)); ("group_id", Var (params.group_id, Int)) ])
+      ~query_params:[]
+      ~url
+      ~responses:Responses.t
+      `Post
+end
+
+module Restore_gitlab_installation = struct
+  module Parameters = struct
+    type t = {
+      group_id : int;
+      tenant_id : string;
+    }
+    [@@deriving make, show, eq]
+  end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel
+    / "api"
+    / "v1"
+    / "tenants"
+    /% Path.uuid
+    / "vcs-installations"
+    / "gitlab"
+    /% Path.int
+    / "restore"
+
+  module Responses = struct
+    module OK = struct
+      type t = Sgs_api_components.Gitlab_installation_state.t
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
+    module Bad_request = struct
+      type t = Sgs_api_components.Error_response.t
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
+    module Unauthorized = struct end
+
+    module Forbidden = struct
+      type t = Sgs_capability_denied_response.t
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
+    module Not_found = struct end
+    module Internal_server_error = struct end
+
+    module Service_unavailable = struct
+      type t = Sgs_api_components.Error_response.t
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
+    type t =
+      [ `OK of OK.t
+      | `Bad_request of Bad_request.t
+      | `Unauthorized
+      | `Forbidden of Forbidden.t
+      | `Not_found
+      | `Internal_server_error
+      | `Service_unavailable of Service_unavailable.t
+      ]
+    [@@deriving show, eq]
+
+    let t =
+      [
+        ("200", Openapi.of_json_body (fun v -> `OK v) OK.of_yojson);
+        ("400", Openapi.of_json_body (fun v -> `Bad_request v) Bad_request.of_yojson);
+        ("401", fun _ -> Ok `Unauthorized);
+        ("403", Openapi.of_json_body (fun v -> `Forbidden v) Forbidden.of_yojson);
+        ("404", fun _ -> Ok `Not_found);
+        ("500", fun _ -> Ok `Internal_server_error);
+        ("503", Openapi.of_json_body (fun v -> `Service_unavailable v) Service_unavailable.of_yojson);
+      ]
+  end
+
+  let url = "/api/v1/tenants/{tenant_id}/vcs-installations/gitlab/{group_id}/restore"
+
+  let make params =
+    Openapi.Request.make
+      ~headers:[]
+      ~url_params:
+        (let open Openapi.Request.Var in
+         let open Parameters in
+         [ ("tenant_id", Var (params.tenant_id, String)); ("group_id", Var (params.group_id, Int)) ])
+      ~query_params:[]
+      ~url
+      ~responses:Responses.t
+      `Post
+end
+
 module Rotate_gitlab_installation = struct
   module Parameters = struct
     type t = {
@@ -1121,6 +1291,68 @@ module Resource_types = struct
       ~url
       ~responses:Responses.t
       `Get
+end
+
+module Reopen = struct
+  module Parameters = struct
+    type t = { tenant_id : string } [@@deriving make, show, eq]
+  end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "reopen"
+
+  module Responses = struct
+    module No_content = struct end
+    module Unauthorized = struct end
+
+    module Forbidden = struct
+      type t = Sgs_capability_denied_response.t
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
+    module Not_found = struct
+      type t = Sgs_api_components.Error_response.t
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
+    module Conflict = struct
+      type t = Sgs_api_components.Error_response.t
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
+    type t =
+      [ `No_content
+      | `Unauthorized
+      | `Forbidden of Forbidden.t
+      | `Not_found of Not_found.t
+      | `Conflict of Conflict.t
+      ]
+    [@@deriving show, eq]
+
+    let t =
+      [
+        ("204", fun _ -> Ok `No_content);
+        ("401", fun _ -> Ok `Unauthorized);
+        ("403", Openapi.of_json_body (fun v -> `Forbidden v) Forbidden.of_yojson);
+        ("404", Openapi.of_json_body (fun v -> `Not_found v) Not_found.of_yojson);
+        ("409", Openapi.of_json_body (fun v -> `Conflict v) Conflict.of_yojson);
+      ]
+  end
+
+  let url = "/api/v1/tenants/{tenant_id}/reopen"
+
+  let make params =
+    Openapi.Request.make
+      ~headers:[]
+      ~url_params:
+        (let open Openapi.Request.Var in
+         let open Parameters in
+         [ ("tenant_id", Var (params.tenant_id, String)) ])
+      ~query_params:[]
+      ~url
+      ~responses:Responses.t
+      `Post
 end
 
 module Set_member_role = struct
@@ -2254,6 +2486,68 @@ module Costs = struct
       ~url
       ~responses:Responses.t
       `Get
+end
+
+module Close = struct
+  module Parameters = struct
+    type t = { tenant_id : string } [@@deriving make, show, eq]
+  end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "tenants" /% Path.uuid / "close"
+
+  module Responses = struct
+    module No_content = struct end
+    module Unauthorized = struct end
+
+    module Forbidden = struct
+      type t = Sgs_capability_denied_response.t
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
+    module Not_found = struct
+      type t = Sgs_api_components.Error_response.t
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
+    module Conflict = struct
+      type t = Sgs_api_components.Error_response.t
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
+    type t =
+      [ `No_content
+      | `Unauthorized
+      | `Forbidden of Forbidden.t
+      | `Not_found of Not_found.t
+      | `Conflict of Conflict.t
+      ]
+    [@@deriving show, eq]
+
+    let t =
+      [
+        ("204", fun _ -> Ok `No_content);
+        ("401", fun _ -> Ok `Unauthorized);
+        ("403", Openapi.of_json_body (fun v -> `Forbidden v) Forbidden.of_yojson);
+        ("404", Openapi.of_json_body (fun v -> `Not_found v) Not_found.of_yojson);
+        ("409", Openapi.of_json_body (fun v -> `Conflict v) Conflict.of_yojson);
+      ]
+  end
+
+  let url = "/api/v1/tenants/{tenant_id}/close"
+
+  let make params =
+    Openapi.Request.make
+      ~headers:[]
+      ~url_params:
+        (let open Openapi.Request.Var in
+         let open Parameters in
+         [ ("tenant_id", Var (params.tenant_id, String)) ])
+      ~query_params:[]
+      ~url
+      ~responses:Responses.t
+      `Post
 end
 
 module Sync_billing_source = struct

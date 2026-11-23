@@ -209,6 +209,8 @@ let tables =
             make ~name:"state" ~type_:Type_.Text ();
             make ~name:"tier" ~type_:Type_.Text ();
             make ~name:"trial_ends_at" ~type_:Type_.Timestamptz ();
+            make ~name:"uninstalled_by" ~type_:Type_.Text ();
+            make ~name:"uninstalled_at" ~type_:Type_.Timestamptz ();
           ];
       Table.make
         ~name:"gitlab_installations_map"

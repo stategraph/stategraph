@@ -24,6 +24,12 @@ module Rt = struct
       /% Path.int
       /* Body.decode ~json:Sgs_api_tenants.Rotate_gitlab_installation.Request_body.of_yojson ())
 
+  let tenant_gitlab_uninstall () =
+    Brtl_rtng.Route.(tenant () / "vcs-installations" / "gitlab" /% Path.int / "uninstall")
+
+  let tenant_gitlab_restore () =
+    Brtl_rtng.Route.(tenant () / "vcs-installations" / "gitlab" /% Path.int / "restore")
+
   (* GitHub identity claim (#1795): start the handshake, take GitHub's answer,
      list what was proven, spend the proof. The callback is not tenant-scoped
      because GitHub redirects to a fixed URL; the tenant rides in the signed
@@ -117,6 +123,12 @@ let routes { config; storage } =
       ( `PUT,
         Rt.tenant_gitlab_rotate () --> Sgs_service_orchestration_ep_gitlab_rotate.run config storage
       );
+      ( `POST,
+        Rt.tenant_gitlab_uninstall ()
+        --> Sgs_service_orchestration_ep_gitlab_installation_state.uninstall config storage );
+      ( `POST,
+        Rt.tenant_gitlab_restore ()
+        --> Sgs_service_orchestration_ep_gitlab_installation_state.restore config storage );
       ( `PUT,
         Rt.tenant_vcs_installation ()
         --> Sgs_service_orchestration_ep_vcs_installation_put.run config storage );

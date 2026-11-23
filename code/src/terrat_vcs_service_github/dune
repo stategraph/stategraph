@@ -26,6 +26,7 @@
   terrat_metrics
   terrat_output_baseline
   terrat_plan_diff
+  terrat_installation_retention
   terrat_repo_tree_retention
   terrat_scope
   terrat_session

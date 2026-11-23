@@ -1051,6 +1051,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenants/{tenant_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close a tenant
+         * @description Closes the tenant. A closed tenant refuses every request except its reopen, and its data is deleted 30 days after it was closed. Requires tenant administrator and membership. Only in Stategraph Cloud: elsewhere the route answers 404. Returns 204 on success; 409 when the tenant is closed already.
+         */
+        post: operations["tenants/close"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenants/{tenant_id}/costs": {
         parameters: {
             query?: never;
@@ -1296,6 +1316,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenants/{tenant_id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reopen a tenant
+         * @description Reopens a closed tenant and cancels the deletion of its data. Requires tenant administrator and membership. Only in Stategraph Cloud: elsewhere the route answers 404. Returns 204 on success; 404 when the tenant does not exist; 409 when the tenant is not closed.
+         */
+        post: operations["tenants/reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenants/{tenant_id}/resource-types": {
         parameters: {
             query?: never;
@@ -1506,6 +1546,38 @@ export interface paths {
         get?: never;
         put: operations["tenants/rotate-gitlab-installation"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant_id}/vcs-installations/gitlab/{group_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["tenants/restore-gitlab-installation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant_id}/vcs-installations/gitlab/{group_id}/uninstall": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["tenants/uninstall-gitlab-installation"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1816,6 +1888,26 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["user/access-tokens-revoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/closed-tenants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List closed tenants
+         * @description The closed tenants the user is a member of, with the time each was closed. Only in Stategraph Cloud: elsewhere the route answers 404.
+         */
+        get: operations["user/closed-tenants"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2249,6 +2341,15 @@ export interface components {
         "caps-group-rule-list-response": {
             rules: components["schemas"]["caps-group-rule"][];
         };
+        /** @description A tenant that its administrator closed. */
+        "closed-tenant": {
+            /** @description When the tenant was closed, as an RFC 3339 timestamp. */
+            ended_at: string;
+            /** @description The id of the tenant. */
+            id: string;
+            /** @description The name of the tenant. */
+            name: string;
+        };
         "commit-response": {
             task: components["schemas"]["task"];
             token: string;
@@ -2531,6 +2632,15 @@ export interface components {
             next_cursor?: string;
             /** @description The unclaimed installations in this page, newest first. */
             results: components["schemas"]["github-unclaimed-installation"][];
+        };
+        /** @description A GitLab group installation after an uninstall or a restore. An uninstalled installation ignores its webhooks. A restored installation is "pending" until its next webhook arrives. */
+        "gitlab-installation-state": {
+            /** @description GitLab group id (the installation id). */
+            group_id: number;
+            /** @description Display name of the GitLab group, as stored. */
+            name: string;
+            /** @description Installation state on the orchestration side: "uninstalled" after an uninstall, "pending" after a restore until a webhook arrives, "installed" after it. */
+            state: string;
         };
         /** @description What it takes to provision a GitLab group as an orchestration installation: the group's id, its display name and a group access token. */
         "gitlab-provision-request": {
@@ -3890,6 +4000,11 @@ export interface components {
         "user-change-password-response": {
             id: string;
             password_changed: boolean;
+        };
+        /** @description The closed tenants of the user. */
+        "user-closed-tenants": {
+            /** @description The closed tenants, the most recently closed first. */
+            results: components["schemas"]["closed-tenant"][];
         };
         "user-create-request": {
             email?: string;
@@ -7441,6 +7556,56 @@ export interface operations {
             };
         };
     };
+    "tenants/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The tenant to close or reopen. */
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["response"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["error-response"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["error-response"];
+                };
+            };
+        };
+    };
     "tenants/costs": {
         parameters: {
             query?: {
@@ -8196,6 +8361,56 @@ export interface operations {
             };
         };
     };
+    "tenants/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The tenant to close or reopen. */
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["response"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["error-response"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["error-response"];
+                };
+            };
+        };
+    };
     "tenants/resource-types": {
         parameters: {
             query?: {
@@ -8833,6 +9048,134 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["error-response"];
+                };
+            };
+        };
+    };
+    "tenants/restore-gitlab-installation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+                group_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["gitlab-installation-state"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["error-response"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["response"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["error-response"];
+                };
+            };
+        };
+    };
+    "tenants/uninstall-gitlab-installation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+                group_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["gitlab-installation-state"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["error-response"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["response"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -9689,6 +10032,37 @@ export interface operations {
                 content?: never;
             };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "user/closed-tenants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["user-closed-tenants"];
+                };
+            };
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

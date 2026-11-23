@@ -587,6 +587,7 @@ let migrations =
        forbids SQL to do.  See the migration for the one writer and the NULL rule. *)
     ( "add-subgraph-node-synthesized-kind",
       run_sql [%blob "./migrations/2026-11-18-add-subgraph-node-synthesized-kind.sql"] );
+    ("add-tenant-retention", run_sql [%blob "./migrations/2026-11-19-add-tenant-retention.sql"]);
   ]
 
 (* Each value that [restore-masked-sensitive-values] cannot restore: its state and its address. *)

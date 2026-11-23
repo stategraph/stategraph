@@ -209,6 +209,79 @@ let test_retention_days_not_an_integer =
       Unix.putenv "TERRAT_REPO_TREE_RETENTION_DAYS" "abc";
       assert_retention_key_error ())
 
+(* Each case sets every variable it reads, because [config] reads the process environment and the
+   earlier cases leave theirs set. *)
+let installation_retention ~mode ~days ~notice_days =
+  Unix.putenv "TERRAT_REPO_TREE_RETENTION_DAYS" unset;
+  Unix.putenv "TERRAT_INSTALLATION_RETENTION" mode;
+  Unix.putenv "TERRAT_INSTALLATION_RETENTION_DAYS" days;
+  Unix.putenv "TERRAT_INSTALLATION_RETENTION_NOTICE_DAYS" notice_days;
+  Terrat_config.create ()
+
+let assert_installation_retention_key_error ~expected r =
+  match r with
+  | Error (`Key_error msg) -> Oth.Assert.Eq.string ~expected ~actual:msg
+  | Ok _ -> Oth.Assert.false_ "an invalid installation retention was accepted"
+  | Error err -> Oth.Assert.false_ (Terrat_config.show_err err)
+
+let test_installation_retention_default =
+  Oth.test
+    ~tags:[ "retention" ]
+    ~name:"an unset TERRAT_INSTALLATION_RETENTION is off, with 30 days and 7 notice days"
+    (fun _ ->
+      let module R = Terrat_config.Installation_retention in
+      let config =
+        Oth.Assert.ok_show
+          ~show:Terrat_config.show_err
+          (installation_retention ~mode:unset ~days:unset ~notice_days:unset)
+      in
+      let retention = Terrat_config.installation_retention config in
+      Oth.Assert.true_
+        ~fail_msg:"mode is not off"
+        (match R.mode retention with
+        | R.Off -> true
+        | R.Schedule | R.Delete -> false);
+      Oth.Assert.Eq.int ~expected:30 ~actual:(R.days retention);
+      Oth.Assert.Eq.int ~expected:7 ~actual:(R.notice_days retention))
+
+let test_installation_retention_delete =
+  Oth.test
+    ~tags:[ "retention" ]
+    ~name:"TERRAT_INSTALLATION_RETENTION=delete passes its days through"
+    (fun _ ->
+      let module R = Terrat_config.Installation_retention in
+      let config =
+        Oth.Assert.ok_show
+          ~show:Terrat_config.show_err
+          (installation_retention ~mode:"delete" ~days:"45" ~notice_days:"0")
+      in
+      let retention = Terrat_config.installation_retention config in
+      Oth.Assert.true_
+        ~fail_msg:"mode is not delete"
+        (match R.mode retention with
+        | R.Delete -> true
+        | R.Off | R.Schedule -> false);
+      Oth.Assert.Eq.int ~expected:45 ~actual:(R.days retention);
+      Oth.Assert.Eq.int ~expected:0 ~actual:(R.notice_days retention))
+
+let test_installation_retention_bad_mode =
+  Oth.test
+    ~tags:[ "retention" ]
+    ~name:"an unknown TERRAT_INSTALLATION_RETENTION is a config error"
+    (fun _ ->
+      assert_installation_retention_key_error
+        ~expected:"TERRAT_INSTALLATION_RETENTION: must be off, schedule or delete"
+        (installation_retention ~mode:"purge" ~days:unset ~notice_days:unset))
+
+let test_installation_retention_zero_days =
+  Oth.test
+    ~tags:[ "retention" ]
+    ~name:"a TERRAT_INSTALLATION_RETENTION_DAYS of 0 is a config error"
+    (fun _ ->
+      assert_installation_retention_key_error
+        ~expected:"TERRAT_INSTALLATION_RETENTION_DAYS: must be an integer of at least 1"
+        (installation_retention ~mode:"schedule" ~days:"0" ~notice_days:unset))
+
 let test_with_github =
   Oth.test ~tags:[ "github_app" ] ~name:"with_github puts the stored App in the config" (fun _ ->
       let config =
@@ -240,6 +313,10 @@ let test =
       test_retention_days_zero;
       test_retention_days_negative;
       test_retention_days_not_an_integer;
+      test_installation_retention_default;
+      test_installation_retention_delete;
+      test_installation_retention_bad_mode;
+      test_installation_retention_zero_days;
     ]
 
 let () =

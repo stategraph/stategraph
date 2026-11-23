@@ -22,7 +22,9 @@ create foreign table terrateam_admin.gitlab_installations (
   id bigint,
   name text,
   state text,
-  webhook_secret text
+  webhook_secret text,
+  uninstalled_by text,
+  uninstalled_at timestamp with time zone
 ) server terrateam_admin_fdw options (schema_name 'public', table_name 'gitlab_installations');
 drop foreign table if exists terrateam_admin.gitlab_installations_map;
 create foreign table terrateam_admin.gitlab_installations_map (

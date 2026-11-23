@@ -78,6 +78,49 @@ module Tenants = struct
       `Get
 end
 
+module Closed_tenants = struct
+  module Parameters = struct end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "user" / "closed-tenants"
+
+  module Responses = struct
+    module OK = struct
+      type t = Sgs_api_components.User_closed_tenants.t
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
+    module Unauthorized = struct end
+    module Not_found = struct end
+
+    type t =
+      [ `OK of OK.t
+      | `Unauthorized
+      | `Not_found
+      ]
+    [@@deriving show, eq]
+
+    let t =
+      [
+        ("200", Openapi.of_json_body (fun v -> `OK v) OK.of_yojson);
+        ("401", fun _ -> Ok `Unauthorized);
+        ("404", fun _ -> Ok `Not_found);
+      ]
+  end
+
+  let url = "/api/v1/user/closed-tenants"
+
+  let make () =
+    Openapi.Request.make
+      ~headers:[]
+      ~url_params:[]
+      ~query_params:[]
+      ~url
+      ~responses:Responses.t
+      `Get
+end
+
 module Access_tokens_revoke = struct
   module Parameters = struct
     type t = { token_id : string } [@@deriving make, show, eq]

@@ -250,6 +250,50 @@ module Sql = struct
       /^ select_tenant_member_sql
       /% Var.uuid "tenant_id"
       /% Var.uuid "user_id")
+
+  let close_tenant_sql = Mql_sql.read [%blob "./sql/close_tenant.sql"]
+
+  let close_tenant () =
+    Pgsql_io.Typed_sql.(sql // Ret.uuid /^ close_tenant_sql /% Var.uuid "tenant_id")
+
+  let reopen_tenant_sql = Mql_sql.read [%blob "./sql/reopen_tenant.sql"]
+
+  let reopen_tenant () =
+    Pgsql_io.Typed_sql.(sql // Ret.uuid /^ reopen_tenant_sql /% Var.uuid "tenant_id")
+
+  let delete_tenant_deletion_schedule_sql =
+    Mql_sql.read [%blob "./sql/delete_tenant_deletion_schedule.sql"]
+
+  let delete_tenant_deletion_schedule () =
+    Pgsql_io.Typed_sql.(sql /^ delete_tenant_deletion_schedule_sql /% Var.uuid "tenant_id")
+
+  let select_member_of_any_tenant_sql = Mql_sql.read [%blob "./sql/select_member_of_any_tenant.sql"]
+
+  let select_member_of_any_tenant () =
+    Pgsql_io.Typed_sql.(
+      sql
+      // Ret.uuid
+      /^ select_member_of_any_tenant_sql
+      /% Var.uuid "user_id"
+      /% Var.uuid "tenant_id")
+
+  let select_closed_by_user_id_sql =
+    Mql_sql.read [%blob "./sql/select_closed_tenants_by_user_id.sql"]
+
+  let select_closed_by_user_id () =
+    Pgsql_io.Typed_sql.(
+      sql
+      //
+      (* id *)
+      Ret.uuid
+      //
+      (* name *)
+      Ret.text
+      //
+      (* ended_at *)
+      Ret.text
+      /^ select_closed_by_user_id_sql
+      /% Var.uuid "user_id")
 end
 
 let make ~id () = { id; v = () }
@@ -307,6 +351,41 @@ let enforce_user user tenant db =
   >>? function
   | [] -> Error (`User_not_in_tenant_err (id tenant, Sgs_user.id user))
   | _ :: _ -> Ok ()
+
+let enforce_member user tenant db =
+  let open Abbs_fc.Infix_result_monad in
+  Pgsql_io.Prepared_stmt.fetch
+    db
+    (Sql.select_member_of_any_tenant ())
+    ~f:CCFun.id
+    (Sgs_user.id user)
+    (id tenant)
+  >>? function
+  | [] -> Error (`User_not_in_tenant_err (id tenant, Sgs_user.id user))
+  | _ :: _ -> Ok ()
+
+let close tenant db =
+  let open Abbs_fc.Infix_result_monad in
+  Pgsql_io.Prepared_stmt.fetch db (Sql.close_tenant ()) ~f:CCFun.id (id tenant)
+  >>| function
+  | [] -> `Already_closed
+  | _ :: _ -> `Closed
+
+let reopen tenant db =
+  let open Abbs_fc.Infix_result_monad in
+  Pgsql_io.Prepared_stmt.fetch db (Sql.reopen_tenant ()) ~f:CCFun.id (id tenant)
+  >>= function
+  | [] -> Abbs_fc.return_ok `Not_closed
+  | _ :: _ ->
+      Pgsql_io.Prepared_stmt.execute db (Sql.delete_tenant_deletion_schedule ()) (id tenant)
+      >>| fun () -> `Reopened
+
+let list_closed_by_user user db =
+  Pgsql_io.Prepared_stmt.fetch
+    db
+    (Sql.select_closed_by_user_id ())
+    ~f:(fun id name ended_at -> (id, name, ended_at))
+    (Sgs_user.id user)
 
 let add_user_idempotent t user db =
   Pgsql_io.Prepared_stmt.execute db (Sql.add_user_idempotent ()) t.id (Sgs_user.id user)

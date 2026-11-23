@@ -17,6 +17,10 @@ module Rt = struct
     Brtl_rtng.Route.(
       tenant () /* Body.decode ~json:Sgs_api_components_tenant_update_request.of_yojson ())
 
+  let tenant_close () = Brtl_rtng.Route.(tenant () / "close")
+  let tenant_reopen () = Brtl_rtng.Route.(tenant () / "reopen")
+  let user_closed_tenants () = Brtl_rtng.Route.(api_v1 () / "user" / "closed-tenants")
+
   let tenant_members () =
     Brtl_rtng.Route.(
       tenant ()
@@ -101,40 +105,58 @@ module Make (Cloud : Sgs_cloud.S) = struct
       (Sgs_svc_mngr.load ~name:Sgs_service_storage.name Sgs_service_storage.Ty mgr)
     >>| fun (config, storage) -> { config; storage }
 
+  (* Closing a tenant exists only where each user gets a tenant of their own: elsewhere the routes
+     are absent, so they answer 404. *)
+  let retention_routes config storage =
+    match Cloud.new_user_tenant () with
+    | `Personal_tenant ->
+        Brtl_rtng.Route.
+          [
+            (`POST, Rt.tenant_close () --> Sgs_service_tenants_ep_close.run config storage);
+            (`POST, Rt.tenant_reopen () --> Sgs_service_tenants_ep_reopen.run config storage);
+            ( `GET,
+              Rt.user_closed_tenants () --> Sgs_service_tenants_ep_closed_tenants.run config storage
+            );
+          ]
+    | `Default_tenant -> []
+
   let routes { config; storage } =
-    Brtl_rtng.Route.
-      [
-        ( `GET,
-          Sgs_api_user.Tenants.route () --> Sgs_service_tenants_ep_user_tenants.run config storage
-        );
-        (* Members before the bare tenant route: /members and /members/set-role are more specific
+    retention_routes config storage
+    @ Brtl_rtng.Route.
+        [
+          ( `GET,
+            Sgs_api_user.Tenants.route () --> Sgs_service_tenants_ep_user_tenants.run config storage
+          );
+          (* Members before the bare tenant route: /members and /members/set-role are more specific
          than the tenant path they hang off, and the router matches in order. *)
-        (`POST, Rt.tenants_create () --> Sgs_service_tenants_ep_create.run config storage);
-        (`GET, Rt.tenant_members () --> Sgs_service_tenants_ep_members_list.run config storage);
-        (`POST, Rt.tenant_members_add () --> Sgs_service_tenants_ep_members_add.run config storage);
-        ( `POST,
-          Rt.tenant_members_set_role ()
-          --> Sgs_service_tenants_ep_members_set_role.run config storage );
-        ( `DELETE,
-          Rt.tenant_members_remove () --> Sgs_service_tenants_ep_members_remove.run config storage
-        );
-        (`PUT, Rt.tenant_update () --> Sgs_service_tenants_ep_update.run config storage);
-        (* Invitations.  The two-segment routes come before the one-segment /invitations pair. *)
-        (`POST, Rt.tenant_invitation_reissue () --> Ep_invitation_reissue.run config storage);
-        ( `POST,
-          Rt.tenant_invitation_revoke ()
-          --> Sgs_service_tenants_ep_invitation_revoke.run config storage );
-        ( `GET,
-          Rt.tenant_invitations () --> Sgs_service_tenants_ep_invitation_list.run config storage );
-        (`POST, Rt.tenant_invitation_create () --> Ep_invitation_create.run config storage);
-        (* Unauthenticated: the invitation token is the credential, so this sits outside the tenant
+          (`POST, Rt.tenants_create () --> Sgs_service_tenants_ep_create.run config storage);
+          (`GET, Rt.tenant_members () --> Sgs_service_tenants_ep_members_list.run config storage);
+          (`POST, Rt.tenant_members_add () --> Sgs_service_tenants_ep_members_add.run config storage);
+          ( `POST,
+            Rt.tenant_members_set_role ()
+            --> Sgs_service_tenants_ep_members_set_role.run config storage );
+          ( `DELETE,
+            Rt.tenant_members_remove () --> Sgs_service_tenants_ep_members_remove.run config storage
+          );
+          (`PUT, Rt.tenant_update () --> Sgs_service_tenants_ep_update.run config storage);
+          (* Invitations.  The two-segment routes come before the one-segment /invitations pair. *)
+          (`POST, Rt.tenant_invitation_reissue () --> Ep_invitation_reissue.run config storage);
+          ( `POST,
+            Rt.tenant_invitation_revoke ()
+            --> Sgs_service_tenants_ep_invitation_revoke.run config storage );
+          ( `GET,
+            Rt.tenant_invitations () --> Sgs_service_tenants_ep_invitation_list.run config storage
+          );
+          (`POST, Rt.tenant_invitation_create () --> Ep_invitation_create.run config storage);
+          (* Unauthenticated: the invitation token is the credential, so this sits outside the tenant
            path. *)
-        ( `GET,
-          Sgs_api_invitations.Preview.route ()
-          --> Sgs_service_tenants_ep_invitation_preview.run config storage );
-        ( `POST,
-          Rt.invitation_accept () --> Sgs_service_tenants_ep_invitation_accept.run config storage );
-      ]
+          ( `GET,
+            Sgs_api_invitations.Preview.route ()
+            --> Sgs_service_tenants_ep_invitation_preview.run config storage );
+          ( `POST,
+            Rt.invitation_accept () --> Sgs_service_tenants_ep_invitation_accept.run config storage
+          );
+        ]
 
   let wrap _ = CCFun.id
   let stop _ = Abb.Future.return ()

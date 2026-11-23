@@ -39,7 +39,13 @@ module Sql = struct
     Mql_sql.read [%blob "sql/update_installation_to_installed.sql"]
 
   let update_installation_to_installed () =
-    Pgsql_io.Typed_sql.(sql /^ update_installation_to_installed_sql /% Var.bigint "installation_id")
+    Pgsql_io.Typed_sql.(
+      sql
+      //
+      (* id *)
+      Ret.bigint
+      /^ update_installation_to_installed_sql
+      /% Var.bigint "installation_id")
 
   let insert_installation_repository_sql =
     Mql_sql.read [%blob "sql/insert_installation_repository.sql"]
@@ -276,20 +282,38 @@ module Make (P : Terrat_vcs_provider2_gitlab.S) = struct
           webhook_secret)
     >>= function
     | [] -> Abbs_fc.return_err `Installation_not_found
-    | (installation_id, "pending") :: _ ->
+    | (installation_id, "pending") :: _ -> (
         Logs.info (fun m ->
             m "%s : EVENT : PING : installation_id=%Ld" (Brtl_ctx.token ctx) installation_id);
         Pgsql_pool.with_conn storage ~f:(fun db ->
-            Pgsql_io.Prepared_stmt.execute
+            Pgsql_io.Prepared_stmt.fetch
               db
               (Sql.update_installation_to_installed ())
+              ~f:CCFun.id
               installation_id)
-        >>= fun () ->
-        Abb.Future.return @@ decode ctx
-        >>= fun event ->
-        (* We insert the repository here so that during onboarding we can verify
-           to the user that the webhook was successfully received *)
-        upsert_installation_repo config storage installation_id event
+        >>= function
+        | [] ->
+            (* The installation left [pending] after it was read: it is uninstalled, or another
+               delivery verified it. *)
+            Logs.info (fun m ->
+                m
+                  "%s : EVENT : IGNORED : NOT_PENDING : installation_id=%Ld"
+                  (Brtl_ctx.token ctx)
+                  installation_id);
+            Abbs_fc.return_ok ()
+        | _ :: _ ->
+            Abb.Future.return @@ decode ctx
+            >>= fun event ->
+            (* We insert the repository here so that during onboarding we can verify
+               to the user that the webhook was successfully received *)
+            upsert_installation_repo config storage installation_id event)
+    | (installation_id, "uninstalled") :: _ ->
+        Logs.info (fun m ->
+            m
+              "%s : EVENT : IGNORED : UNINSTALLED : installation_id=%Ld"
+              (Brtl_ctx.token ctx)
+              installation_id);
+        Abbs_fc.return_ok ()
     | (installation_id, _) :: _ ->
         Abb.Future.return @@ decode ctx
         >>= fun event ->

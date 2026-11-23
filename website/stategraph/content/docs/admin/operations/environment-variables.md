@@ -21,6 +21,9 @@ Leave optional variables unset, not empty: several Orchestration variables treat
 | `STATEGRAPH_LICENSE_KEY` | unset | License key of the Enterprise build. You can also enter it on the setup screen, or later under **Settings > License**. Needed to complete the first-time setup. Afterwards, the server checks it at each start and exits with `LICENSE_REQUIRED` when neither this variable nor an entered key is valid |
 | `STATEGRAPH_DEFAULT_TENANT_NAME` | `Default` | Tenant that new users join at sign-in. With an empty string, new users have no tenant until someone adds them to one |
 | `STATEGRAPH_INVITATION_TTL_HOURS` | `168` | Tenant invitation link validity, in hours (7 days) |
+| `STATEGRAPH_TENANT_RETENTION` | `off` | Deletion of the data of closed tenants by a daily task, in Stategraph Cloud. `off` runs no task. `schedule` records when the data of each closed tenant is due for deletion and deletes nothing. `delete` also deletes the data of each tenant whose deletion is due and has no hold. Another value stops the server at start |
+| `STATEGRAPH_TENANT_RETENTION_DAYS` | `30` | Days the data of a closed tenant is kept |
+| `STATEGRAPH_TENANT_RETENTION_NOTICE_DAYS` | `7` | Days a deletion is recorded before it is due, at the least |
 | `STATEGRAPH_AEGIS_API_BASE` / `STATEGRAPH_AEGIS_SERVICE_TOKEN` | unset | Aegis control plane, used only for invitation emails. Both unset: invitations are links only |
 | `STATEGRAPH_ENABLE_CORS` | `false` | Send CORS headers. Development only, with the console on another origin |
 | `STATEGRAPH_CORS_DEFAULT_ORIGIN` | `http://localhost:3000` | Origin that CORS allows |
@@ -108,6 +111,9 @@ A missing or invalid sign-in variable stops the server at start, with the reason
 | `TERRAT_EVENT_EVALUATOR_SLOTS` | `20` | Concurrent event evaluations |
 | `TERRAT_STATEMENT_TIMEOUT` | `5s` | Statement timeout for the Orchestration database |
 | `TERRAT_REPO_TREE_RETENTION_DAYS` | `7` | Days of repo-tree history the daily retention task keeps: at least N days, up to N+1 day bounds, because the partitions are whole days. It must be an integer of at least 1: another value stops Orchestration at start |
+| `TERRAT_INSTALLATION_RETENTION` | `off` | Deletion of the data of uninstalled GitHub and GitLab installations by a daily task. `off` runs no task. `schedule` records when the data of each uninstalled installation is due for deletion and deletes nothing. `delete` also deletes the data of each installation whose deletion is due and has no hold. Another value stops Orchestration at start |
+| `TERRAT_INSTALLATION_RETENTION_DAYS` | `30` | Days the data of an installation is kept after its uninstall. It must be an integer of at least 1: another value stops Orchestration at start |
+| `TERRAT_INSTALLATION_RETENTION_NOTICE_DAYS` | `7` | Days a deletion is recorded before it is due, at the least. It must be an integer of at least 0: another value stops Orchestration at start |
 | `GITHUB_WORKFLOW_PATH_OVERRIDE` | unset | Path of the GitHub Actions workflow file that Orchestration dispatches, in place of the default |
 | `TERRATUNNEL_API_ENDPOINT` | unset | Development only: `TERRAT_API_BASE` comes from a tunnel |
 | `INFRACOST_PRICING_API_ENDPOINT` / `SELF_HOSTED_INFRACOST_API_KEY` | empty | Infracost pricing API endpoint and key, for cost estimation in pull requests. See [Cost estimation in pull requests](/docs/orchestration/external-tools/infracost) |

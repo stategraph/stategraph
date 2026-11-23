@@ -212,6 +212,18 @@ val magic_link_secret : t -> string option
     main mitigation for an invitation sent to the wrong address. *)
 val invitation_ttl_hours : t -> int
 
+(** STATEGRAPH_TENANT_RETENTION (default [off]): [off] runs no tenant retention task, [schedule]
+    puts each closed tenant on the deletion schedule and deletes nothing, [delete] also deletes the
+    tenants whose deletion is due. Another value is a config error. *)
+val tenant_retention_mode : t -> [ `Off | `Schedule | `Delete ]
+
+(** STATEGRAPH_TENANT_RETENTION_DAYS (default 30, at least 1): the days a closed tenant is kept. *)
+val tenant_retention_days : t -> int
+
+(** STATEGRAPH_TENANT_RETENTION_NOTICE_DAYS (default 7, at least 0): the days a deletion is on the
+    schedule before it is due, at the least. *)
+val tenant_retention_notice_days : t -> int
+
 (** The orchestration GitHub App's OAuth client, used to establish which GitHub user is driving an
     installation claim (#1795). The App's private key is deliberately not here: this client can
     identify a user, never act as the App. *)

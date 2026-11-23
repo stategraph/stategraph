@@ -378,6 +378,7 @@ struct
       repo_config_cleanup : unit Abb.Future.t;
       stale_work_manifest_cleanup : unit Abb.Future.t;
       repo_tree_retention : unit Abb.Future.t;
+      installation_retention : unit Abb.Future.t;
       exec : Terrat_vcs_event_evaluator2.Exec.t;
     }
 
@@ -423,6 +424,14 @@ struct
       Abbs_fc.ignore (Terrat_repo_tree_retention.run config storage)
       >>= fun () -> Abb.Sys.sleep one_day >>= fun () -> repo_tree_retention config storage
 
+    (* The deletion of the data of uninstalled installations: one run at start, then one per day.
+       The mode of [Terrat_config.installation_retention] decides whether a run does anything. *)
+    let rec installation_retention config storage =
+      let open Abb.Future.Infix_monad in
+      Abbs_fc.ignore
+        (Terrat_installation_retention.run Terrat_installation_retention.Github config storage)
+      >>= fun () -> Abb.Sys.sleep one_day >>= fun () -> installation_retention config storage
+
     let name _ = "github"
 
     let start config vcs_config storage exec =
@@ -440,13 +449,15 @@ struct
              repo_config_cleanup
              stale_work_manifest_cleanup
              repo_tree_retention
+             installation_retention
            ->
           ( drift,
             flow_state_cleanup,
             plan_cleanup,
             repo_config_cleanup,
             stale_work_manifest_cleanup,
-            repo_tree_retention ))
+            repo_tree_retention,
+            installation_retention ))
         <$> Abb.Future.fork
               (Terrat_vcs_service.start_loop "drift" (fun () -> drift config storage exec))
         <*> Abb.Future.fork
@@ -462,13 +473,17 @@ struct
                    stale_work_manifest_cleanup config storage exec))
         <*> Abb.Future.fork
               (Terrat_vcs_service.start_loop "repo_tree_retention" (fun () ->
-                   repo_tree_retention terrat_config storage)))
+                   repo_tree_retention terrat_config storage))
+        <*> Abb.Future.fork
+              (Terrat_vcs_service.start_loop "installation_retention" (fun () ->
+                   installation_retention terrat_config storage)))
       >>= fun ( drift,
                 flow_state_cleanup,
                 plan_cleanup,
                 repo_config_cleanup,
                 stale_work_manifest_cleanup,
-                repo_tree_retention )
+                repo_tree_retention,
+                installation_retention )
             ->
       Abbs_fc.return_ok
         {
@@ -480,6 +495,7 @@ struct
           repo_config_cleanup;
           stale_work_manifest_cleanup;
           repo_tree_retention;
+          installation_retention;
           exec;
         }
 
@@ -494,7 +510,9 @@ struct
       Abb.Future.abort t.repo_config_cleanup
       >>= fun () ->
       Abb.Future.abort t.stale_work_manifest_cleanup
-      >>= fun () -> Abb.Future.abort t.repo_tree_retention >>= fun () -> Abb.Future.return ()
+      >>= fun () ->
+      Abb.Future.abort t.repo_tree_retention
+      >>= fun () -> Abb.Future.abort t.installation_retention >>= fun () -> Abb.Future.return ()
 
     let routes t = Routes.routes t.config t.storage t.exec
 

@@ -13,6 +13,8 @@ type t
 type provision_err =
   [ Pgsql_io.err
   | `Already_provisioned_err  (** the group id already has an installation *)
+  | `Uninstalled_err
+    (** the group's installation is uninstalled and linked to this tenant: restore brings it back *)
   | `Tenant_not_found_err  (** the tenant vanished between the capability check and the link *)
   | `Provisioned_row_missing_err
     (** the read-back after the insert returned no row, so the remote side is not the schema this

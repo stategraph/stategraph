@@ -79,4 +79,21 @@ module Make (_ : S with type Account_id.t = int) : sig
       Terrat_api_components_gitlab_access_token.t ->
       Brtl_rtng.Handler.t
   end
+
+  (** Uninstall and restore a GitLab installation. Only a user with at least the Maintainer access
+      level (40) in the group changes its state. An uninstalled installation ignores its webhooks;
+      restore takes it back to [pending], and its next webhook verifies it again. *)
+  module Installation_state : sig
+    val uninstall :
+      Terrat_vcs_service_gitlab_provider.Api.Config.t ->
+      Terrat_storage.t ->
+      int ->
+      Brtl_rtng.Handler.t
+
+    val restore :
+      Terrat_vcs_service_gitlab_provider.Api.Config.t ->
+      Terrat_storage.t ->
+      int ->
+      Brtl_rtng.Handler.t
+  end
 end

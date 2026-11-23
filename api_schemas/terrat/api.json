@@ -215,6 +215,24 @@
         ],
         "type": "object"
       },
+      "gitlab-installation-state": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "The GitLab group id.",
+            "type": "string"
+          },
+          "state": {
+            "description": "The installation state: \"pending\" until a webhook arrives, \"installed\" after it, or \"uninstalled\".",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "state"
+        ],
+        "type": "object"
+      },
       "gitlab-user": {
         "additionalProperties": false,
         "properties": {
@@ -3898,6 +3916,78 @@
             }
           },
           "403": {
+            "content": {}
+          }
+        }
+      }
+    },
+    "/api/v1/gitlab/installations/{installation_id}/restore": {
+      "post": {
+        "description": "Restore an uninstalled GitLab installation. Only a user with at least the Maintainer access level in the group may do it. The installation goes back to pending, and its next webhook verifies it again. An installation in any other state is unchanged.",
+        "operationId": "gitlab-installations/restore",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installation_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/gitlab-installation-state"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {}
+          },
+          "404": {
+            "content": {}
+          },
+          "500": {
+            "content": {}
+          }
+        }
+      }
+    },
+    "/api/v1/gitlab/installations/{installation_id}/uninstall": {
+      "post": {
+        "description": "Mark the GitLab installation uninstalled. Only a user with at least the Maintainer access level in the group may do it. An uninstalled installation ignores its webhooks. An installation that is already uninstalled keeps the time of its uninstall.",
+        "operationId": "gitlab-installations/uninstall",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installation_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/gitlab-installation-state"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {}
+          },
+          "404": {
+            "content": {}
+          },
+          "500": {
             "content": {}
           }
         }

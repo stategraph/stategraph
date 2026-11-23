@@ -110,7 +110,9 @@ gitlab_installations as not materialized (
     gi.name as name,
     gi.state as state,
     gi.tier as tier,
-    gi.trial_ends_at as trial_ends_at
+    gi.trial_ends_at as trial_ends_at,
+    gi.uninstalled_by as uninstalled_by,
+    gi.uninstalled_at as uninstalled_at
   from terrateam.gitlab_installations as gi
   where gi.id = any(array(select installation_id from gitlab_installation_ids))
 ),
