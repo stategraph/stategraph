@@ -240,6 +240,84 @@ RUN set -eux; \
     rm -f /tmp/providers.txt
 
 # ---------------------------------------------------------------------------
+# nginx.
+#
+# Wolfi's current nginx links OpenSSL 4, which has no FIPS build here. This
+# nginx serves plain HTTP on 8080 behind the platform's TLS, so it is built
+# without the SSL modules and links no OpenSSL. Its paths are the ones the
+# runtime stage and docker/terrat/service/nginx expect.
+# ---------------------------------------------------------------------------
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:be019c1c74fe69204a42c4e10bc4d886a49bf5403ffa74374ef7baa408fc9a26 AS nginx-build
+
+ARG NGINX_VERSION=1.30.7
+ARG NGINX_SHA256=2565b5c837050e958f70fb0f73c48e2bca4542ad349fd356f46fb0c72610bc6e
+ARG NGINX_PGP_FINGERPRINT=0xD6786CE303D9A9022998DC6CC8464D549AF75C0A
+ARG PGP_KEYSERVER=keyserver.ubuntu.com
+
+# gnutar: the busybox tar of the base exits 1, with no message, on the nginx
+# tarball in the CI builder.
+RUN apk add --no-cache \
+    build-base \
+    ca-certificates \
+    curl \
+    gnupg \
+    gnupg-dirmngr \
+    gnutar \
+    gpg \
+    gpg-agent \
+    pcre2-dev \
+    zlib-dev
+
+WORKDIR /usr/src
+
+RUN set -eux; \
+    curl -fsSLO "https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz"; \
+    curl -fsSLO "https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz.asc"; \
+    echo "${NGINX_SHA256}  nginx-${NGINX_VERSION}.tar.gz" | sha256sum -c -; \
+    GNUPGHOME="$(mktemp -d)"; export GNUPGHOME; \
+    gpg --batch --keyserver "${PGP_KEYSERVER}" --recv-keys "${NGINX_PGP_FINGERPRINT}"; \
+    gpg --batch --verify "nginx-${NGINX_VERSION}.tar.gz.asc" "nginx-${NGINX_VERSION}.tar.gz"; \
+    gpgconf --kill all || :; \
+    rm -rf "${GNUPGHOME}"; \
+    tar -xzf "nginx-${NGINX_VERSION}.tar.gz"
+
+# docker/terrat/nginx.conf.template needs the realip, sub and stub_status
+# modules on top of the default set.
+RUN set -eux; \
+    cd "nginx-${NGINX_VERSION}"; \
+    ./configure --prefix=/var/lib/nginx \
+                --sbin-path=/usr/bin/nginx \
+                --conf-path=/etc/nginx/nginx.conf \
+                --pid-path=/run/nginx.pid \
+                --lock-path=/run/nginx.lock \
+                --error-log-path=/var/log/nginx/error.log \
+                --http-log-path=/var/log/nginx/access.log \
+                --http-client-body-temp-path=/var/lib/nginx/tmp/client_body \
+                --http-proxy-temp-path=/var/lib/nginx/tmp/proxy \
+                --http-fastcgi-temp-path=/var/lib/nginx/tmp/fastcgi \
+                --http-uwsgi-temp-path=/var/lib/nginx/tmp/uwsgi \
+                --http-scgi-temp-path=/var/lib/nginx/tmp/scgi \
+                --with-http_realip_module \
+                --with-http_sub_module \
+                --with-http_stub_status_module; \
+    make -j"$(nproc)"; \
+    make install DESTDIR=/opt/nginx
+
+RUN set -eux; \
+    /opt/nginx/usr/bin/nginx -V 2>&1 | tee /tmp/nginx-version.txt; \
+    grep -q "nginx/${NGINX_VERSION}" /tmp/nginx-version.txt; \
+    if grep -q 'OpenSSL' /tmp/nginx-version.txt; then \
+        echo "nginx is built with OpenSSL" >&2; exit 1; \
+    fi; \
+    if readelf -d /opt/nginx/usr/bin/nginx | grep -qE 'lib(crypto|ssl)\.so'; then \
+        echo "nginx links OpenSSL" >&2; exit 1; \
+    fi; \
+    rm -f /tmp/nginx-version.txt; \
+    for f in mime.types fastcgi_params fastcgi.conf scgi_params uwsgi_params; do \
+        test -f "/opt/nginx/etc/nginx/${f}"; \
+    done
+
+# ---------------------------------------------------------------------------
 # opam switch and the OCaml, Rust and Node dependencies of the terrat build.
 # ---------------------------------------------------------------------------
 FROM cgr.dev/chainguard/wolfi-base:latest@sha256:be019c1c74fe69204a42c4e10bc4d886a49bf5403ffa74374ef7baa408fc9a26 AS build-base
@@ -315,7 +393,7 @@ COPY vendor /tmp/mono/vendor
 COPY code/opam.pins code/transitive.pins /tmp/mono/code/
 # [[[cog emit("opam-switch") ]]]
 RUN eval $(opam env) && \
-    opam switch create -y 5.5.1 && \
+    opam switch create -y 5.5.2 && \
     eval $(opam env) && \
     opam repository add opam-acsl mono/opam && \
     opam pin add -n ISO8601 mono/vendor/ISO8601 --no-depexts && \
@@ -379,6 +457,13 @@ FROM cgr.dev/chainguard/wolfi-base:latest@sha256:be019c1c74fe69204a42c4e10bc4d88
 ENV SSL_PREFIX=/usr/local/ssl
 ENV TERRAT_BRAND=terrateam
 
+# A builder with a persistent layer cache reuses this layer for as long as
+# nothing above it changes, so a release can ship packages that are weeks old.
+# OS_REFRESH is a cache key and nothing else: the release workflow sets it to
+# the build date, which re-runs this upgrade whenever the date moves.
+ARG OS_REFRESH
+RUN apk upgrade --no-cache
+
 RUN apk add --no-cache \
     bash \
     ca-certificates \
@@ -387,10 +472,13 @@ RUN apk add --no-cache \
     jq \
     libffi \
     libnghttp2-14 \
-    nginx-stable \
+    libpcre2-8-0 \
     runit \
     sudo \
     zlib
+
+COPY --from=nginx-build /opt/nginx/usr/bin/nginx /usr/bin/nginx
+COPY --from=nginx-build /opt/nginx/etc/nginx/ /etc/nginx/
 
 COPY --from=openssl-fips ${SSL_PREFIX}/ ${SSL_PREFIX}/
 RUN set -eux; \
@@ -413,9 +501,8 @@ RUN chmod 755 /usr/local/bin/install-ca-cert && \
     chown root:root /usr/local/bin/install-ca-cert
 RUN echo 'terrat ALL=(root) NOPASSWD: /usr/local/bin/install-ca-cert' > /etc/sudoers.d/terrat && \
     chmod 440 /etc/sudoers.d/terrat
-# nginx on Wolfi keeps its prefix at /var/lib/nginx and its pid at
-# /run/nginx.pid, and it creates the temp directories itself only when the
-# parent is writable.
+# nginx keeps its prefix at /var/lib/nginx and its pid at /run/nginx.pid, and
+# it creates the temp directories itself only when the parent is writable.
 RUN mkdir -p /var/lib/nginx/tmp /var/log/nginx /run && \
     chown -R terrat:terrat /etc/service /usr/local/share/terrat /etc/nginx /var/lib/nginx /var/log/nginx /run
 COPY --chmod=755 docker/terrat/fips/service-terrat /etc/service/terrat/run
@@ -457,6 +544,20 @@ RUN set -eux; \
     rm -f /tmp/openssl4.txt
 
 USER terrat
+
+# The template, rendered as docker/terrat/service/nginx renders it, passes
+# nginx -t, so the build fails on a directive this nginx is built without.
+RUN set -eux; \
+    vars="$(sed -n "s/^envsubst '\([^']*\)'.*/\1/p" /etc/service/nginx/run)"; \
+    test -n "${vars}"; \
+    NGINX_WORKER_SHUTDOWN_TIMEOUT=35 \
+    IPV6_LISTEN='listen [::]:8080;' \
+    TERRAT_ACCESS_LOG=off \
+    TERRATEAM_CLIENT_MAX_BODY_SIZE=100m \
+        envsubst "${vars}" < /etc/nginx/nginx.conf.template > /etc/nginx/nginx-test.conf; \
+    nginx -t -c /etc/nginx/nginx-test.conf; \
+    rm -rf /etc/nginx/nginx-test.conf /tmp/terrat-assets
+
 EXPOSE 8080
 CMD ["/usr/local/bin/runit-init"]
 

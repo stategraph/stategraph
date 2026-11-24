@@ -23,12 +23,6 @@ type t = {
 }
 [@@deriving show]
 
-let owner_type_of_string = function
-  | "api" -> `Api
-  | "system" -> `System
-  | "user" -> `User
-  | s -> failwith ("Unknown owner_type: " ^ s)
-
 module Sql = struct
   let insert_access_token_sql = Mql_sql.read [%blob "./sql/insert_access_token.sql"]
 
@@ -100,7 +94,7 @@ module Sql = struct
       Ret.text
       //
       (* owner_type *)
-      Ret.text
+      Ret.(u text Sgs_user.Type_.of_string)
       /^ select_access_tokens_by_user_sql
       /% Var.uuid "user_id")
 
@@ -141,7 +135,7 @@ module Sql = struct
       Ret.text
       //
       (* owner_type *)
-      Ret.text
+      Ret.(u text Sgs_user.Type_.of_string)
       /^ select_access_tokens_all_sql)
 
   let delete_access_token_admin_sql = Mql_sql.read [%blob "./sql/delete_access_token_admin.sql"]
@@ -217,7 +211,7 @@ let list_by_user user db =
         expiration;
         owner_id = Uuidm.to_string owner_id;
         owner_name;
-        owner_type = owner_type_of_string owner_type;
+        owner_type = Sgs_user.Type_.to_api owner_type;
       })
     (Sgs_user.id user)
 
@@ -245,7 +239,7 @@ let list_all db =
         expiration;
         owner_id = Uuidm.to_string owner_id;
         owner_name;
-        owner_type = owner_type_of_string owner_type;
+        owner_type = Sgs_user.Type_.to_api owner_type;
       })
 
 let delete_any ~token_id db =

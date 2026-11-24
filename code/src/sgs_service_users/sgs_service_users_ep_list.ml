@@ -23,7 +23,7 @@ module Sql = struct
       Ret.(option text)
       //
       (* type *)
-      Ret.text
+      Ret.(u text Sgs_user.Type_.of_string)
       //
       (* avatar_url *)
       Ret.(option text)
@@ -40,7 +40,7 @@ module Sql = struct
       (* total_count *)
       Ret.bigint
       /^ select_users_list_sql
-      /% Var.(option (text "type"))
+      /% Var.(option (ud (text "type") Sgs_user.Type_.to_string))
       /% Var.(option (text "search"))
       /% Var.(option (timestamptz "cursor"))
       /% Var.(option (uuid "cursor_id"))
@@ -48,6 +48,7 @@ module Sql = struct
 end
 
 let run _config storage type_ search cursor limit =
+  let type_ = CCOption.map Sgs_user.Type_.of_api type_ in
   Sgs_user_session.with_user ~caps:Sgs_user_session.Caps.users_manage_instance ~f:(fun _user ->
       Brtl_ep.run_json ~f:(fun ctx ->
           let open Abb.Future.Infix_monad in
@@ -101,7 +102,7 @@ let run _config storage type_ search cursor limit =
                       Sgs_api_components_users_list_response.Users.Items.id = Uuidm.to_string id;
                       name;
                       email;
-                      type_;
+                      type_ = Sgs_user.Type_.to_api type_;
                       avatar_url;
                       auth_origin;
                       admin_rights = Common.admin_rights capabilities;

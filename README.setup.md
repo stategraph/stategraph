@@ -8,7 +8,7 @@ them on every pull request.
 Create a local opam switch from the repository's root:
 
 ```shell
-opam switch create -y 5.5.1 --no-depexts
+opam switch create -y 5.5.2 --no-depexts
 eval $(opam env)
 ```
 

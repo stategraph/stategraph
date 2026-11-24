@@ -13,15 +13,17 @@ FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec4
 # constant to abandon a corrupted cache.
 ARG DUNE_CACHE_ID=dune-cache-3
 
-# The minirootfs lags its own package branch, so upgrade what it pre-installed.
-RUN apk upgrade --no-cache
-
 ARG UID
 ARG GID
 ARG USERNAME
 
+# The minirootfs lags its own package branch, so upgrade what it pre-installed.
+# Every `apk add` in this file shares its RUN with an `apk upgrade`. A cached
+# layer keeps the packages of an older index, and an add against a newer index
+# fails when a package split moves files out of a package that layer installed.
 # Packages needed for installing tenv, tofu (bash, ca-certificates, curl), DuckDB (libstdc++), and checkov (python)
-RUN apk add --no-cache \
+RUN apk upgrade --no-cache && \
+    apk add --no-cache \
     bash \
     ca-certificates \
     curl \
@@ -49,7 +51,7 @@ RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') && \
     rm -f "${APK_FILE}" "tenv_${TENV_VERSION}_checksums.txt"
 
 # This version number is also used in .github/workflows/test-macos.yml. Update both simultaneously.
-ENV TOFU_VERSION=1.11.14
+ENV TOFU_VERSION=1.13.9
 # Run tenv as the user so it installs with the correct permissions. The user
 # owns TENV_ROOT so the install can write there.
 RUN mkdir -p ${TENV_ROOT} && chown ${USERNAME}:${USERNAME} ${TENV_ROOT}
@@ -120,7 +122,7 @@ COPY --chown=${USERNAME}:${USERNAME} --chmod=755 code/src/focus_etl/load-focus-b
 # (STATEGRAPH_MCP_DOCS_URL). Only the docs sources and their builder are in the
 # build context.
 FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS stategraph-docs
-RUN apk add --no-cache python3 py3-markdown py3-pygments
+RUN apk upgrade --no-cache && apk add --no-cache python3 py3-markdown py3-pygments
 WORKDIR /tmp/docs
 COPY website/stategraph/builder builder
 COPY website/stategraph/content/docs content/docs
@@ -131,7 +133,8 @@ RUN python3 tools/llms_full.py llms-full.txt "$(cat version.txt)" && \
 
 FROM base-tenv-tofu AS base
 
-RUN apk add --no-cache \
+RUN apk upgrade --no-cache && \
+    apk add --no-cache \
     bash \
     brotli-static \
     bsd-compat-headers \
@@ -189,7 +192,8 @@ RUN apk add --no-cache \
 FROM base AS base-development
 
 ARG USERNAME
-RUN apk add --no-cache \
+RUN apk upgrade --no-cache && \
+    apk add --no-cache \
     age \
     fd \
     github-cli \
@@ -241,7 +245,7 @@ COPY --chown=${USERNAME}:${USERNAME} ./vendor/ISO8601 mono/vendor/ISO8601
 
 # region:opam-switch
 RUN eval $(opam env) && \
-    opam switch create -y 5.5.1 && \
+    opam switch create -y 5.5.2 && \
     eval $(opam env) && \
     opam repository add opam-acsl mono/opam && \
     opam pin add -n ISO8601 mono/vendor/ISO8601 --no-depexts && \
@@ -521,7 +525,8 @@ COPY --from=focus-etl --chown=${USERNAME}:${USERNAME} /usr/local/bin/load-focus-
 # `sv restart`, takes effect without rebuilding the image. No pricing-service runit service:
 # docker-compose-dev.yml runs its own container.
 USER root
-RUN apk add --no-cache \
+RUN apk upgrade --no-cache && \
+    apk add --no-cache \
     gettext \
     nginx \
     nginx-mod-http-js \
@@ -610,9 +615,8 @@ ARG USERNAME
 # OS_REFRESH is a cache key and nothing else: release.yml sets it to the build
 # date, which re-runs this upgrade whenever the date moves.
 ARG OS_REFRESH
-RUN apk upgrade --no-cache
-
-RUN apk add --no-cache \
+RUN apk upgrade --no-cache && \
+    apk add --no-cache \
     gettext \
     gmp \
     jq \
@@ -717,8 +721,8 @@ FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec4
 # The minirootfs lags its own package branch, so upgrade what it pre-installed.
 # OS_REFRESH keys the layer cache, as in stategraph-server-base.
 ARG OS_REFRESH
-RUN apk upgrade --no-cache
-RUN apk add --no-cache libffi gmp libretls curl brotli-libs zstd-libs libpsl libidn2 nghttp2-libs c-ares
+RUN apk upgrade --no-cache && \
+    apk add --no-cache libffi gmp libretls curl brotli-libs zstd-libs libpsl libidn2 nghttp2-libs c-ares
 COPY --from=stategraph-dev /tmp/mono/_build/default/code/src/sgc/sgc.exe /usr/local/bin/stategraph
 ENTRYPOINT ["/usr/local/bin/stategraph"]
 
@@ -793,15 +797,15 @@ ENTRYPOINT ["/usr/local/bin/ttm"]
 
 # Shared runtime base for the terrat-ee / terrat-oss server images
 FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS terrat-final-base
-# The minirootfs lags its own package branch, so upgrade what it pre-installed.
-# OS_REFRESH keys the layer cache, as in stategraph-server-base.
-ARG OS_REFRESH
-RUN apk upgrade --no-cache
 # These are the Terrateam-branded images, so a repository whose configuration
 # names no brand gets Terrateam comments and check names. The unified
 # stategraph image leaves this unset and gets the stategraph default.
 ENV TERRAT_BRAND=terrateam
-RUN apk add --no-cache \
+# The minirootfs lags its own package branch, so upgrade what it pre-installed.
+# OS_REFRESH keys the layer cache, as in stategraph-server-base.
+ARG OS_REFRESH
+RUN apk upgrade --no-cache && \
+    apk add --no-cache \
     bash \
     ca-certificates \
     curl \

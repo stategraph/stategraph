@@ -9,6 +9,9 @@ module Type_ : sig
 
   (** Inverse of {!to_string}; [None] for any unrecognised string. *)
   val of_string : string -> t option
+
+  val to_api : t -> Sgs_api_components.User_type.t
+  val of_api : Sgs_api_components.User_type.t -> t
 end
 
 type enrich_err =

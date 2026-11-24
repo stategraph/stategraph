@@ -644,7 +644,7 @@ module Make (S : Terrat_vcs_provider2.S) = struct
         |> Keys.Key.add Keys.run_id run_id
       in
       with_conn storage ~f:(fun db ->
-          S.Work_manifest.query_by_run_id ~request_id db run_id
+          S.Work_manifest.query_by_run_id ~request_id db account run_id
           >>= fun work_manifest ->
           Pgsql_io.tx db ~f:(fun () ->
               let open Abb.Future.Infix_monad in

@@ -1,16 +1,3 @@
-module Rt = struct
-  let api_v1 () = Brtl_rtng.Route.(rel / "api" / "v1")
-
-  let tenant () =
-    Brtl_rtng.Route.(
-      api_v1 ()
-      / "tenants"
-      /% Path.ud CCFun.(Uuidm.of_string %> CCOption.map (fun id -> Sgs_tenant.make ~id ())))
-
-  let tenant_caps_group_rules () = Brtl_rtng.Route.(tenant () / "caps" / "group-rules")
-  let tenant_caps_group_rule () = Brtl_rtng.Route.(tenant () / "caps" / "group-rules" /% Path.uuid)
-end
-
 type t = {
   config : Sgs_config.t;
   storage : Sgs_storage.t;
@@ -38,6 +25,7 @@ let start mgr =
   >>| fun (config, storage) -> { config; storage }
 
 let routes { config; storage } =
+  let with_tenant run tenant_id = run config storage (Sgs_tenant.make ~id:tenant_id ()) in
   Brtl_rtng.Route.
     [
       ( `GET,
@@ -45,13 +33,17 @@ let routes { config; storage } =
       ( `PUT,
         Sgs_api_caps.Set_default.route () --> Sgs_service_caps_ep_default_set.run config storage );
       ( `GET,
-        Rt.tenant_caps_group_rules () --> Sgs_service_caps_ep_group_rules_list.run config storage );
+        Sgs_api_caps.List_group_rules.route ()
+        --> with_tenant Sgs_service_caps_ep_group_rules_list.run );
       ( `POST,
-        Rt.tenant_caps_group_rules () --> Sgs_service_caps_ep_group_rule_create.run config storage
+        Sgs_api_caps.Create_group_rule.route ()
+        --> with_tenant Sgs_service_caps_ep_group_rule_create.run );
+      ( `GET,
+        Sgs_api_caps.Get_group_rule.route () --> with_tenant Sgs_service_caps_ep_group_rule_get.run
       );
-      (`GET, Rt.tenant_caps_group_rule () --> Sgs_service_caps_ep_group_rule_get.run config storage);
       ( `DELETE,
-        Rt.tenant_caps_group_rule () --> Sgs_service_caps_ep_group_rule_delete.run config storage );
+        Sgs_api_caps.Delete_group_rule.route ()
+        --> with_tenant Sgs_service_caps_ep_group_rule_delete.run );
     ]
 
 let wrap _ = CCFun.id

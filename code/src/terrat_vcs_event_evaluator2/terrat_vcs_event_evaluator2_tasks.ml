@@ -3404,13 +3404,14 @@ struct
 
     let eval_work_manifest_failure =
       let module Wm = Terrat_work_manifest3 in
-      let query_work_manifest_by_run_id s run_id =
+      let query_work_manifest_by_run_id s account run_id =
         Builder.run_db s ~f:(fun db ->
             time_it
               s
               (fun m log_id time ->
                 m "%s : WORK_MANIFEST : QUERY_BY_RUN_ID : run_id = %s : time=%f" log_id run_id time)
-              (fun () -> S.Work_manifest.query_by_run_id ~request_id:(Builder.log_id s) db run_id))
+              (fun () ->
+                S.Work_manifest.query_by_run_id ~request_id:(Builder.log_id s) db account run_id))
       in
       let query_job_by_work_manifest s work_manifest_id =
         Builder.run_db s ~f:(fun db ->
@@ -3487,7 +3488,9 @@ struct
           let open Irm in
           fetch Keys.run_id
           >>= fun run_id ->
-          query_work_manifest_by_run_id s run_id
+          fetch Keys.account
+          >>= fun account ->
+          query_work_manifest_by_run_id s account run_id
           >>= function
           | None ->
               Logs.info (fun m ->

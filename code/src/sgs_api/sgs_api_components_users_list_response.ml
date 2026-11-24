@@ -8,7 +8,7 @@ module Users = struct
       email : string option; [@default None]
       id : string;
       name : string;
-      type_ : string; [@key "type"]
+      type_ : Sgs_api_components_user_type.t; [@key "type"]
     }
     [@@deriving yojson { strict = false; meta = true }, show, eq]
   end

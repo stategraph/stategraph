@@ -15,6 +15,16 @@ module Type_ = struct
     | "api" -> Some Api
     | "system" -> Some System
     | _ -> None
+
+  let to_api = function
+    | User -> `User
+    | Api -> `Api
+    | System -> `System
+
+  let of_api = function
+    | `User -> User
+    | `Api -> Api
+    | `System -> System
 end
 
 type enrich_err =

@@ -1,57 +1,6 @@
 module Rt = struct
   let api_v1 () = Brtl_rtng.Route.(rel / "api" / "v1")
 
-  let tenant () =
-    Brtl_rtng.Route.(
-      api_v1 ()
-      / "tenants"
-      /% Path.ud CCFun.(Uuidm.of_string %> CCOption.map (fun id -> Sgs_tenant.make ~id ())))
-
-  let tenant_vcs_installations () = Brtl_rtng.Route.(tenant () / "vcs-installations")
-
-  let tenant_gitlab_provision () =
-    Brtl_rtng.Route.(
-      tenant ()
-      / "vcs-installations"
-      / "gitlab"
-      /* Body.decode ~json:Sgs_api_tenants.Provision_gitlab_installation.Request_body.of_yojson ())
-
-  let tenant_gitlab_rotate () =
-    Brtl_rtng.Route.(
-      tenant ()
-      / "vcs-installations"
-      / "gitlab"
-      /% Path.int
-      /* Body.decode ~json:Sgs_api_tenants.Rotate_gitlab_installation.Request_body.of_yojson ())
-
-  let tenant_gitlab_uninstall () =
-    Brtl_rtng.Route.(tenant () / "vcs-installations" / "gitlab" /% Path.int / "uninstall")
-
-  let tenant_gitlab_restore () =
-    Brtl_rtng.Route.(tenant () / "vcs-installations" / "gitlab" /% Path.int / "restore")
-
-  (* GitHub identity claim (#1795): start the handshake, take GitHub's answer,
-     list what was proven, spend the proof. The callback is not tenant-scoped
-     because GitHub redirects to a fixed URL; the tenant rides in the signed
-     state. *)
-  let tenant_github_claim_start () =
-    Brtl_rtng.Route.(
-      tenant () / "vcs-installations" / "github" / "claim" / "start" /? Query.(option (string "rd")))
-
-  let tenant_github_claimable () =
-    Brtl_rtng.Route.(tenant () / "vcs-installations" / "github" / "claimable")
-
-  let tenant_github_claim () =
-    Brtl_rtng.Route.(
-      tenant ()
-      / "vcs-installations"
-      / "github"
-      / "claim"
-      /* Body.decode ~json:Sgs_api_components_github_claim_request.of_yojson ())
-
-  let tenant_vcs_installation () =
-    Brtl_rtng.Route.(tenant () / "vcs-installations" /% Path.string /% Path.uuid)
-
   (* GitHub App creation: the manifest form, and GitHub's return with the code
      of the created App. Both optional on the callback, so a mangled return is
      redirected rather than answered with a 404. *)
@@ -104,6 +53,7 @@ let start mgr =
   >>| fun (config, storage) -> { config; storage }
 
 let routes { config; storage } =
+  let with_tenant run tenant_id = run config storage (Sgs_tenant.make ~id:tenant_id ()) in
   Brtl_rtng.Route.
     [
       ( `GET,
@@ -115,38 +65,45 @@ let routes { config; storage } =
           config
           storage );
       ( `GET,
-        Rt.tenant_vcs_installations ()
-        --> Sgs_service_orchestration_ep_vcs_installation_list.run config storage );
+        Sgs_api_tenants.List_vcs_installations.route ()
+        --> with_tenant Sgs_service_orchestration_ep_vcs_installation_list.run );
       ( `POST,
-        Rt.tenant_gitlab_provision ()
-        --> Sgs_service_orchestration_ep_gitlab_provision.run config storage );
+        Sgs_api_tenants.Provision_gitlab_installation.route ()
+        /* Body.decode ~json:Sgs_api_tenants.Provision_gitlab_installation.Request_body.of_yojson ()
+        --> with_tenant Sgs_service_orchestration_ep_gitlab_provision.run );
       ( `PUT,
-        Rt.tenant_gitlab_rotate () --> Sgs_service_orchestration_ep_gitlab_rotate.run config storage
-      );
+        Sgs_api_tenants.Rotate_gitlab_installation.route ()
+        /* Body.decode ~json:Sgs_api_tenants.Rotate_gitlab_installation.Request_body.of_yojson ()
+        --> with_tenant Sgs_service_orchestration_ep_gitlab_rotate.run );
       ( `POST,
-        Rt.tenant_gitlab_uninstall ()
-        --> Sgs_service_orchestration_ep_gitlab_installation_state.uninstall config storage );
+        Sgs_api_tenants.Uninstall_gitlab_installation.route ()
+        --> with_tenant Sgs_service_orchestration_ep_gitlab_installation_state.uninstall );
       ( `POST,
-        Rt.tenant_gitlab_restore ()
-        --> Sgs_service_orchestration_ep_gitlab_installation_state.restore config storage );
+        Sgs_api_tenants.Restore_gitlab_installation.route ()
+        --> with_tenant Sgs_service_orchestration_ep_gitlab_installation_state.restore );
       ( `PUT,
-        Rt.tenant_vcs_installation ()
-        --> Sgs_service_orchestration_ep_vcs_installation_put.run config storage );
+        Sgs_api_tenants.Link_vcs_installation.route ()
+        --> with_tenant Sgs_service_orchestration_ep_vcs_installation_put.run );
+      (* GitHub identity claim (#1795): start the handshake, take GitHub's answer,
+         list what was proven, spend the proof. The callback is not tenant-scoped
+         because GitHub redirects to a fixed URL; the tenant rides in the signed
+         state. *)
       ( `GET,
-        Rt.tenant_github_claim_start ()
-        --> Sgs_service_orchestration_ep_github_claim_start.run config storage );
+        Sgs_api_tenants.Start_github_claim.route ()
+        --> with_tenant Sgs_service_orchestration_ep_github_claim_start.run );
       ( `GET,
         Sgs_api_vcs_installations.Github_claim_callback.route ()
         --> Sgs_service_orchestration_ep_github_claim_callback.run config storage );
       ( `GET,
-        Rt.tenant_github_claimable ()
-        --> Sgs_service_orchestration_ep_github_claimable_list.run config storage );
+        Sgs_api_tenants.List_claimable_github_installations.route ()
+        --> with_tenant Sgs_service_orchestration_ep_github_claimable_list.run );
       ( `POST,
-        Rt.tenant_github_claim () --> Sgs_service_orchestration_ep_github_claim.run config storage
-      );
+        Sgs_api_tenants.Claim_github_installation.route ()
+        /* Body.decode ~json:Sgs_api_components_github_claim_request.of_yojson ()
+        --> with_tenant Sgs_service_orchestration_ep_github_claim.run );
       ( `DELETE,
-        Rt.tenant_vcs_installation ()
-        --> Sgs_service_orchestration_ep_vcs_installation_delete.run config storage );
+        Sgs_api_tenants.Unlink_vcs_installation.route ()
+        --> with_tenant Sgs_service_orchestration_ep_vcs_installation_delete.run );
       ( `POST,
         Rt.setup_github_app_manifest ()
         --> Sgs_service_orchestration_ep_github_app_manifest.run config storage );
