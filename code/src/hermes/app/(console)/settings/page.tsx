@@ -25,7 +25,7 @@ import { GithubAppPanel } from "@/components/settings/GithubAppPanel";
 import { showGithubAppPanel } from "@/lib/getting-started/github-app-panel";
 import { MembersPanel } from "@/components/members";
 import { tenantCreatedButUnlistedMessage, tenantNameErrorMessage } from "@/lib/api/tenantNameErrors";
-import { TenantRename } from "@/components/tenant";
+import { ClosedTenants, TenantClose, TenantRename } from "@/components/tenant";
 import { PlanSection } from "./PlanSection";
 import { track } from "@/lib/analytics";
 
@@ -942,6 +942,25 @@ function SettingsPageContent() {
               </dl>
             </PageSurface>
           </PageSection>
+          {mode === "COMMUNISM" && isTenantAdmin(user?.capabilities, currentTenant.id) && (
+            <PageSection title="Close tenant">
+              <PageSurface>
+                <div className="flex items-center justify-between gap-4">
+                  <p className="text-sm text-[var(--sg-text-muted)]">
+                    Members lose access. The data is deleted 30 days after the close.
+                  </p>
+                  <TenantClose tenantId={currentTenant.id} tenantName={currentTenant.name} />
+                </div>
+              </PageSurface>
+            </PageSection>
+          )}
+          {mode === "COMMUNISM" && (
+            <PageSection title="Closed tenants">
+              <PageSurface>
+                <ClosedTenants />
+              </PageSurface>
+            </PageSection>
+          )}
 
           {tenants.length > 1 && (
             <PageSection title="Switch tenant">

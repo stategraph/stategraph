@@ -55,6 +55,19 @@ let run config storage tenant body =
                        ~id:"GITLAB_ALREADY_PROVISIONED"
                        ~data:"This GitLab group already has an installation."
                        ctx)
+              | Error `Uninstalled_err ->
+                  Logs.warn (fun m ->
+                      m
+                        "%s : GITLAB_PROVISION_UNINSTALLED : group_id=%d"
+                        (Brtl_ctx.token ctx)
+                        group_id);
+                  Abb.Future.return
+                    (Sgs_eplib.respond_error
+                       ~status:`Conflict
+                       ~id:"GITLAB_INSTALLATION_UNINSTALLED"
+                       ~data:
+                         "This GitLab group's installation is uninstalled. Restore it to use it."
+                       ctx)
               | Error `Tenant_not_found_err ->
                   Logs.warn (fun m ->
                       m "%s : GITLAB_PROVISION_TENANT_NOT_FOUND" (Brtl_ctx.token ctx));

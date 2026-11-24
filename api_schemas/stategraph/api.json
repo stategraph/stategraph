@@ -883,6 +883,30 @@
         ],
         "type": "object"
       },
+      "closed-tenant": {
+        "additionalProperties": false,
+        "description": "A tenant that its administrator closed.",
+        "properties": {
+          "ended_at": {
+            "description": "When the tenant was closed, as an RFC 3339 timestamp.",
+            "type": "string"
+          },
+          "id": {
+            "description": "The id of the tenant.",
+            "type": "string"
+          },
+          "name": {
+            "description": "The name of the tenant.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ended_at",
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
       "commit-response": {
         "additionalProperties": false,
         "properties": {
@@ -1768,6 +1792,30 @@
           "results",
           "limit",
           "has_more"
+        ],
+        "type": "object"
+      },
+      "gitlab-installation-state": {
+        "additionalProperties": false,
+        "description": "A GitLab group installation after an uninstall or a restore. An uninstalled installation ignores its webhooks. A restored installation is \"pending\" until its next webhook arrives.",
+        "properties": {
+          "group_id": {
+            "description": "GitLab group id (the installation id).",
+            "type": "integer"
+          },
+          "name": {
+            "description": "Display name of the GitLab group, as stored.",
+            "type": "string"
+          },
+          "state": {
+            "description": "Installation state on the orchestration side: \"uninstalled\" after an uninstall, \"pending\" after a restore until a webhook arrives, \"installed\" after it.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_id",
+          "name",
+          "state"
         ],
         "type": "object"
       },
@@ -5987,6 +6035,23 @@
         ],
         "type": "object"
       },
+      "user-closed-tenants": {
+        "additionalProperties": false,
+        "description": "The closed tenants of the user.",
+        "properties": {
+          "results": {
+            "description": "The closed tenants, the most recently closed first.",
+            "items": {
+              "$ref": "#/components/schemas/closed-tenant"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "results"
+        ],
+        "type": "object"
+      },
       "user-create-request": {
         "additionalProperties": false,
         "properties": {
@@ -9395,6 +9460,56 @@
         }
       }
     },
+    "/api/v1/tenants/{tenant_id}/close": {
+      "post": {
+        "description": "Closes the tenant. A closed tenant refuses every request except its reopen, and its data is deleted 30 days after it was closed. Requires tenant administrator and membership. Only in Stategraph Cloud: elsewhere the route answers 404. Returns 204 on success; 409 when the tenant is closed already.",
+        "operationId": "tenants/close",
+        "parameters": [
+          {
+            "description": "The tenant to close or reopen.",
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "401": {},
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "capability-denied.json#/definitions/response"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-response"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-response"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Close a tenant"
+      }
+    },
     "/api/v1/tenants/{tenant_id}/costs": {
       "get": {
         "description": "Current cost rollup for a tenant in one call: totals, coverage, breakdowns by provider / resource type / (when ?tag_key is given) tag value, and a per-state list. Replaces the frontend fanning out one call per state. Soft-deleted states are excluded.",
@@ -10366,6 +10481,56 @@
         "summary": "Change a member's role"
       }
     },
+    "/api/v1/tenants/{tenant_id}/reopen": {
+      "post": {
+        "description": "Reopens a closed tenant and cancels the deletion of its data. Requires tenant administrator and membership. Only in Stategraph Cloud: elsewhere the route answers 404. Returns 204 on success; 404 when the tenant does not exist; 409 when the tenant is not closed.",
+        "operationId": "tenants/reopen",
+        "parameters": [
+          {
+            "description": "The tenant to close or reopen.",
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "401": {},
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "capability-denied.json#/definitions/response"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-response"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-response"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reopen a tenant"
+      }
+    },
     "/api/v1/tenants/{tenant_id}/resource-types": {
       "get": {
         "description": "Returns the tenant's resource-type breakdown: per state and resource type, how many resources are declared and how many instances of them are deployed, with the tenant totals. Reads the state tables directly, so it needs neither the pricing service nor a cost snapshot. Not paginated -- every entry is in the one response. `state_id` narrows the result to a single state. Soft-deleted states are excluded, as is any resource type with no instances. Both resource modes count, so a data source is a resource of its type here. Requires membership of the tenant.",
@@ -11189,6 +11354,136 @@
             }
           },
           "404": {},
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-response"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant_id}/vcs-installations/gitlab/{group_id}/restore": {
+      "post": {
+        "operationId": "tenants/restore-gitlab-installation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/gitlab-installation-state"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-response"
+                }
+              }
+            }
+          },
+          "401": {},
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "capability-denied.json#/definitions/response"
+                }
+              }
+            }
+          },
+          "404": {},
+          "500": {},
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-response"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant_id}/vcs-installations/gitlab/{group_id}/uninstall": {
+      "post": {
+        "operationId": "tenants/uninstall-gitlab-installation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/gitlab-installation-state"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-response"
+                }
+              }
+            }
+          },
+          "401": {},
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "capability-denied.json#/definitions/response"
+                }
+              }
+            }
+          },
+          "404": {},
+          "500": {},
           "503": {
             "content": {
               "application/json": {
@@ -12100,6 +12395,27 @@
           "403": {},
           "404": {}
         }
+      }
+    },
+    "/api/v1/user/closed-tenants": {
+      "get": {
+        "description": "The closed tenants the user is a member of, with the time each was closed. Only in Stategraph Cloud: elsewhere the route answers 404.",
+        "operationId": "user/closed-tenants",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/user-closed-tenants"
+                }
+              }
+            }
+          },
+          "401": {},
+          "404": {}
+        },
+        "summary": "List closed tenants"
       }
     },
     "/api/v1/user/tenants": {

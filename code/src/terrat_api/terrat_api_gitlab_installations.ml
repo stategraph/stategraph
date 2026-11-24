@@ -260,6 +260,108 @@ module List_work_manifests = struct
       `Get
 end
 
+module Uninstall = struct
+  module Parameters = struct
+    type t = { installation_id : string } [@@deriving make, show, eq]
+  end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "gitlab" / "installations" /% Path.string / "uninstall"
+
+  module Responses = struct
+    module OK = struct
+      type t = Terrat_api_components.Gitlab_installation_state.t
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
+    module Forbidden = struct end
+    module Not_found = struct end
+    module Internal_server_error = struct end
+
+    type t =
+      [ `OK of OK.t
+      | `Forbidden
+      | `Not_found
+      | `Internal_server_error
+      ]
+    [@@deriving show, eq]
+
+    let t =
+      [
+        ("200", Openapi.of_json_body (fun v -> `OK v) OK.of_yojson);
+        ("403", fun _ -> Ok `Forbidden);
+        ("404", fun _ -> Ok `Not_found);
+        ("500", fun _ -> Ok `Internal_server_error);
+      ]
+  end
+
+  let url = "/api/v1/gitlab/installations/{installation_id}/uninstall"
+
+  let make params =
+    Openapi.Request.make
+      ~headers:[]
+      ~url_params:
+        (let open Openapi.Request.Var in
+         let open Parameters in
+         [ ("installation_id", Var (params.installation_id, String)) ])
+      ~query_params:[]
+      ~url
+      ~responses:Responses.t
+      `Post
+end
+
+module Restore = struct
+  module Parameters = struct
+    type t = { installation_id : string } [@@deriving make, show, eq]
+  end
+
+  let route () =
+    let open Brtl_rtng.Route in
+    rel / "api" / "v1" / "gitlab" / "installations" /% Path.string / "restore"
+
+  module Responses = struct
+    module OK = struct
+      type t = Terrat_api_components.Gitlab_installation_state.t
+      [@@deriving yojson { strict = false; meta = false }, show, eq]
+    end
+
+    module Forbidden = struct end
+    module Not_found = struct end
+    module Internal_server_error = struct end
+
+    type t =
+      [ `OK of OK.t
+      | `Forbidden
+      | `Not_found
+      | `Internal_server_error
+      ]
+    [@@deriving show, eq]
+
+    let t =
+      [
+        ("200", Openapi.of_json_body (fun v -> `OK v) OK.of_yojson);
+        ("403", fun _ -> Ok `Forbidden);
+        ("404", fun _ -> Ok `Not_found);
+        ("500", fun _ -> Ok `Internal_server_error);
+      ]
+  end
+
+  let url = "/api/v1/gitlab/installations/{installation_id}/restore"
+
+  let make params =
+    Openapi.Request.make
+      ~headers:[]
+      ~url_params:
+        (let open Openapi.Request.Var in
+         let open Parameters in
+         [ ("installation_id", Var (params.installation_id, String)) ])
+      ~query_params:[]
+      ~url
+      ~responses:Responses.t
+      `Post
+end
+
 module Delete_repo = struct
   module Parameters = struct
     type t = {

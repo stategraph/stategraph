@@ -208,7 +208,9 @@ create foreign table terrateam.gitlab_installations (
   name text,
   state text,
   tier text,
-  trial_ends_at timestamptz
+  trial_ends_at timestamptz,
+  uninstalled_by text,
+  uninstalled_at timestamptz
 ) server terrateam_fdw options (schema_name 'public', table_name 'gitlab_installations');
 
 -- provider: gitlab

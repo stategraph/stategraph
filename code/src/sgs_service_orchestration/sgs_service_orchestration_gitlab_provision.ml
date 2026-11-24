@@ -9,6 +9,19 @@ type t = {
 }
 
 module Sql = struct
+  let select_tenant_state_sql =
+    Mql_sql.read [%blob "sql/select_tenant_gitlab_installation_state.sql"]
+
+  let select_tenant_state () =
+    Pgsql_io.Typed_sql.(
+      sql
+      //
+      (* state *)
+      Ret.text
+      /^ select_tenant_state_sql
+      /% Var.uuid "tenant_id"
+      /% Var.bigint "group_id")
+
   let insert_installation_sql = Mql_sql.read [%blob "sql/insert_gitlab_installation.sql"]
 
   let insert_installation () =
@@ -40,6 +53,7 @@ end
 type provision_err =
   [ Pgsql_io.err
   | `Already_provisioned_err
+  | `Uninstalled_err
   | `Tenant_not_found_err
   | `Provisioned_row_missing_err
   ]
@@ -48,41 +62,51 @@ let provision ~tenant_id ~group_id ~name ~access_token db =
   let open Abb.Future.Infix_monad in
   Pgsql_io.tx db ~f:(fun () ->
       let open Abbs_fc.Infix_result_monad in
-      Pgsql_io.Prepared_stmt.execute
-        db
-        (Sql.insert_installation ())
-        (Int64.of_int group_id)
-        name
-        access_token
-      >>= fun () ->
       Pgsql_io.Prepared_stmt.fetch
         db
-        (Sql.select_provisioned ())
-        ~f:(fun webhook_secret state core_id -> (webhook_secret, state, core_id))
+        (Sql.select_tenant_state ())
+        ~f:CCFun.id
+        tenant_id
         (Int64.of_int group_id)
-      >>= fun provisioned ->
-      match provisioned with
-      | [] ->
-          (* The row (and its trigger-written map row) was just inserted in this
-             remote transaction, so this shouldn' happen. *)
-          Abb.Future.return (Error `Provisioned_row_missing_err)
-      | (webhook_secret, state, core_id) :: _ ->
-          Sgs_service_orchestration_tenant_vcs_installations.upsert
-            ~tenant_id
-            ~provider:"gitlab"
-            ~installation_core_id:core_id
+      >>= function
+      | "uninstalled" :: _ -> Abbs_fc.return_err `Uninstalled_err
+      | _ -> (
+          Pgsql_io.Prepared_stmt.execute
             db
-          >>= fun link ->
-          (* Roll the whole provision back if the tenant vanished between the
+            (Sql.insert_installation ())
+            (Int64.of_int group_id)
+            name
+            access_token
+          >>= fun () ->
+          Pgsql_io.Prepared_stmt.fetch
+            db
+            (Sql.select_provisioned ())
+            ~f:(fun webhook_secret state core_id -> (webhook_secret, state, core_id))
+            (Int64.of_int group_id)
+          >>= fun provisioned ->
+          match provisioned with
+          | [] ->
+              (* The row (and its trigger-written map row) was just inserted in this
+             remote transaction, so this shouldn' happen. *)
+              Abbs_fc.return_err `Provisioned_row_missing_err
+          | (webhook_secret, state, core_id) :: _ ->
+              Sgs_service_orchestration_tenant_vcs_installations.upsert
+                ~tenant_id
+                ~provider:"gitlab"
+                ~installation_core_id:core_id
+                db
+              >>= fun link ->
+              (* Roll the whole provision back if the tenant vanished between the
              capability check and here — never leave an orphaned installation. *)
-          Abb.Future.return
-            (match link with
-            | `Linked _ ->
-                Ok { group_id; name; webhook_secret; state; installation_core_id = core_id }
-            | `Tenant_not_found -> Error `Tenant_not_found_err))
+              Abb.Future.return
+                (match link with
+                | `Linked _ ->
+                    Ok { group_id; name; webhook_secret; state; installation_core_id = core_id }
+                | `Tenant_not_found -> Error `Tenant_not_found_err)))
   >>| function
   | Ok t -> Ok t
-  | Error ((`Tenant_not_found_err | `Provisioned_row_missing_err) as err) -> Error err
+  | Error ((`Uninstalled_err | `Tenant_not_found_err | `Provisioned_row_missing_err) as err) ->
+      Error err
   | Error (`Unique_violation_err _) -> Error `Already_provisioned_err
   | Error (#Pgsql_io.err as err) -> Error err
 

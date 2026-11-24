@@ -751,6 +751,21 @@ CREATE TABLE public.tasks (
 
 
 --
+-- Name: tenant_deletions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.tenant_deletions (
+    tenant_id uuid NOT NULL,
+    ended_at timestamp with time zone NOT NULL,
+    scheduled_at timestamp with time zone DEFAULT now() NOT NULL,
+    delete_after timestamp with time zone NOT NULL,
+    hold text,
+    deleted_at timestamp with time zone,
+    deleted_rows jsonb
+);
+
+
+--
 -- Name: tenant_invitation_roles; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -831,7 +846,8 @@ CREATE TABLE public.tenant_vcs_installations (
 CREATE TABLE public.tenants (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     id uuid DEFAULT gen_random_uuid() NOT NULL,
-    name text NOT NULL
+    name text NOT NULL,
+    ended_at timestamp with time zone
 );
 
 
@@ -1539,6 +1555,14 @@ ALTER TABLE ONLY public.tasks
 
 
 --
+-- Name: tenant_deletions tenant_deletions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tenant_deletions
+    ADD CONSTRAINT tenant_deletions_pkey PRIMARY KEY (tenant_id);
+
+
+--
 -- Name: tenant_invitation_roles tenant_invitation_roles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2068,6 +2092,20 @@ CREATE INDEX security_scans_tx_id_idx ON public.security_scans USING btree (tx_i
 --
 
 CREATE INDEX states_group_id_workspace_idx ON public.states USING btree (group_id, workspace);
+
+
+--
+-- Name: tenant_deletions_deleted_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX tenant_deletions_deleted_at_idx ON public.tenant_deletions USING btree (deleted_at) WHERE (deleted_at IS NOT NULL);
+
+
+--
+-- Name: tenant_deletions_due_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX tenant_deletions_due_idx ON public.tenant_deletions USING btree (delete_after) WHERE (deleted_at IS NULL);
 
 
 --

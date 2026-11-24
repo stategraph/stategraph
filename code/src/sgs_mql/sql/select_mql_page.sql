@@ -35,7 +35,7 @@ tenants as (
   from tenants as t
   inner join tenant_users as tu
     on tu.tenant_id = t.id
-  where tu.user_id = $user_id
+  where tu.user_id = $user_id and t.ended_at is null
 ),
 tenant_users as (
   select

@@ -111,6 +111,15 @@ type t = {
   magic_link_secret : string option;
   (* STATEGRAPH_INVITATION_TTL_HOURS: how long a tenant invitation link stays valid. *)
   invitation_ttl_hours : int;
+  (* STATEGRAPH_TENANT_RETENTION: [off] runs no task, [schedule] puts each closed tenant on the
+     deletion schedule and deletes nothing, [delete] also deletes the tenants whose deletion is
+     due. *)
+  tenant_retention_mode : [ `Off | `Schedule | `Delete ];
+  (* STATEGRAPH_TENANT_RETENTION_DAYS: the days a closed tenant is kept. *)
+  tenant_retention_days : int;
+  (* STATEGRAPH_TENANT_RETENTION_NOTICE_DAYS: the days a deletion is on the schedule before it is
+     due, at the least. *)
+  tenant_retention_notice_days : int;
   (* GITHUB_APP_CLIENT_ID / GITHUB_APP_CLIENT_SECRET: the orchestration GitHub App's OAuth client,
      used to prove which GitHub user is asking to claim an installation (#1795).  Both or neither;
      the engine already requires the same pair whenever GITHUB_APP_ID is set, so in the unified
@@ -349,6 +358,12 @@ let create ?(github_app_managed = false) () =
     (`Key_error "STATEGRAPH_PORT")
     (CCInt.of_string (CCOption.get_or ~default:"8080" (Sys.getenv_opt "STATEGRAPH_PORT")))
   >>= fun port ->
+  (match Sys.getenv_opt "STATEGRAPH_TENANT_RETENTION" with
+    | None | Some "" | Some "off" -> Ok `Off
+    | Some "schedule" -> Ok `Schedule
+    | Some "delete" -> Ok `Delete
+    | Some _ -> Error (`Key_error "STATEGRAPH_TENANT_RETENTION: must be off, schedule or delete"))
+  >>= fun tenant_retention_mode ->
   let statement_timeout =
     CCOption.get_or ~default:"30s" (Sys.getenv_opt "STATEGRAPH_DB_STATEMENT_TIMEOUT")
   in
@@ -448,6 +463,10 @@ let create ?(github_app_managed = false) () =
   let aegis_service_token = env_str_opt "STATEGRAPH_AEGIS_SERVICE_TOKEN" in
   let magic_link_secret = env_str_opt "STATEGRAPH_MAGIC_LINK_SECRET" in
   let invitation_ttl_hours = env_int_default "STATEGRAPH_INVITATION_TTL_HOURS" 168 in
+  let tenant_retention_days = max 1 (env_int_default "STATEGRAPH_TENANT_RETENTION_DAYS" 30) in
+  let tenant_retention_notice_days =
+    max 0 (env_int_default "STATEGRAPH_TENANT_RETENTION_NOTICE_DAYS" 7)
+  in
   (* Both-or-neither: a client id without its secret cannot complete a code exchange, and silently
      half-configuring the flow would surface as an opaque GitHub error at the end of a redirect
      chain rather than as "not configured" up front. *)
@@ -526,6 +545,9 @@ let create ?(github_app_managed = false) () =
       github_web_base;
       magic_link_secret;
       invitation_ttl_hours;
+      tenant_retention_mode;
+      tenant_retention_days;
+      tenant_retention_notice_days;
       license_key;
       secure_cookies;
       statement_timeout;
@@ -593,6 +615,9 @@ let aegis_api_base t = t.aegis_api_base
 let aegis_service_token t = t.aegis_service_token
 let magic_link_secret t = t.magic_link_secret
 let invitation_ttl_hours t = t.invitation_ttl_hours
+let tenant_retention_mode t = t.tenant_retention_mode
+let tenant_retention_days t = t.tenant_retention_days
+let tenant_retention_notice_days t = t.tenant_retention_notice_days
 let license_key t = t.license_key
 let statement_timeout t = t.statement_timeout
 let ui_base t = t.ui_base

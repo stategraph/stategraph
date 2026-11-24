@@ -12,6 +12,7 @@ module Gate = Terrat_api_components_gate
 module Github_user = Terrat_api_components_github_user
 module Gitlab_access_token = Terrat_api_components_gitlab_access_token
 module Gitlab_group = Terrat_api_components_gitlab_group
+module Gitlab_installation_state = Terrat_api_components_gitlab_installation_state
 module Gitlab_user = Terrat_api_components_gitlab_user
 module Gitlab_webhook = Terrat_api_components_gitlab_webhook
 module Gitlab_whoareyou = Terrat_api_components_gitlab_whoareyou

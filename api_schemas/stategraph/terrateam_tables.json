@@ -581,6 +581,14 @@
         {
           "name": "trial_ends_at",
           "type": "timestamptz"
+        },
+        {
+          "name": "uninstalled_by",
+          "type": "text"
+        },
+        {
+          "name": "uninstalled_at",
+          "type": "timestamptz"
         }
       ],
       "name": "gitlab_installations",

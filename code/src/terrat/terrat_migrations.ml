@@ -389,6 +389,10 @@ let migrations =
       run_sql [%blob "migrations/2026-11-06-add-drift-schedule-restart-on-change.sql"] );
     ("add-repo-tree-partitions", add_repo_tree_partitions);
     ("add-broadcasts", run_sql [%blob "migrations/2026-11-17-add-broadcasts.sql"]);
+    ( "add-installation-deletions",
+      run_sql [%blob "migrations/2026-11-19-add-installation-deletions.sql"] );
+    ( "add-gitlab-installation-uninstalled",
+      run_sql [%blob "migrations/2026-11-23-add-gitlab-installation-uninstalled.sql"] );
   ]
 
 let run config storage = Mig.run { Migrate.config; storage; tx = () } migrations

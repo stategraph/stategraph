@@ -12,6 +12,26 @@ let default_terrateam_web_base_url = base_url_of_string "https://app.terrateam.i
 let default_vcs_call_timeout = 20.0
 let default_repo_tree_retention_days = 7
 
+module Installation_retention = struct
+  type mode =
+    | Off
+    | Schedule
+    | Delete
+  [@@deriving show]
+
+  type t = {
+    mode : mode;
+    days : int;
+    notice_days : int;
+  }
+  [@@deriving show]
+
+  let default = { mode = Off; days = 30; notice_days = 7 }
+  let mode t = t.mode
+  let days t = t.days
+  let notice_days t = t.notice_days
+end
+
 module Github = struct
   let default_github_api_base_url = Uri.of_string "https://api.github.com"
   let default_github_app_url = Uri.of_string "https://github.com/apps/terrateam-action"
@@ -133,6 +153,7 @@ type t = {
   github : Github.t option;
   gitlab : Gitlab.t option;
   infracost : Infracost.t option;
+  installation_retention : Installation_retention.t; [@default Installation_retention.default]
   nginx_status_uri : Uri.t option;
   port : int;
   python_exec : string;
@@ -294,6 +315,7 @@ let github_of_stored ~app_id ~pem ~client_id ~client_secret ~webhook_secret ~app
     ~app_url:(Uri.of_string app_url)
 
 let with_github t github = { t with github = Some github }
+let with_installation_retention t installation_retention = { t with installation_retention }
 
 let load_gitlab ~getenv =
   let open CCResult.Infix in
@@ -343,6 +365,33 @@ let load_repo_tree_retention_days ~getenv =
       of_opt
         (`Key_error "TERRAT_REPO_TREE_RETENTION_DAYS: must be an integer of at least 1")
         (if days >= 1 then Some days else None)
+
+let load_days ~getenv ~key ~min ~default =
+  match getenv key with
+  | None | Some "" -> Ok default
+  | Some days ->
+      let fail = `Key_error (Printf.sprintf "%s: must be an integer of at least %d" key min) in
+      let open CCResult.Infix in
+      of_opt fail (CCInt.of_string days)
+      >>= fun days -> of_opt fail (if days >= min then Some days else None)
+
+let load_installation_retention ~getenv =
+  let module R = Installation_retention in
+  let open CCResult.Infix in
+  (match getenv "TERRAT_INSTALLATION_RETENTION" with
+    | None | Some "" | Some "off" -> Ok R.Off
+    | Some "schedule" -> Ok R.Schedule
+    | Some "delete" -> Ok R.Delete
+    | Some _ -> Error (`Key_error "TERRAT_INSTALLATION_RETENTION: must be off, schedule or delete"))
+  >>= fun mode ->
+  load_days ~getenv ~key:"TERRAT_INSTALLATION_RETENTION_DAYS" ~min:1 ~default:R.default.R.days
+  >>= fun days ->
+  load_days
+    ~getenv
+    ~key:"TERRAT_INSTALLATION_RETENTION_NOTICE_DAYS"
+    ~min:0
+    ~default:R.default.R.notice_days
+  >|= fun notice_days -> { R.mode; days; notice_days }
 
 let load_gc ~getenv =
   let dynamic_gc' () =
@@ -427,6 +476,8 @@ let of_env getenv =
   >>= fun event_evaluator_slots ->
   load_repo_tree_retention_days ~getenv
   >>= fun repo_tree_retention_days ->
+  load_installation_retention ~getenv
+  >>= fun installation_retention ->
   infracost ~getenv
   >>= fun infracost ->
   let nginx_status_uri = CCOption.map Uri.of_string (getenv "NGINX_STATUS_URI") in
@@ -477,6 +528,7 @@ let of_env getenv =
       github;
       gitlab;
       infracost;
+      installation_retention;
       nginx_status_uri;
       port;
       python_exec;
@@ -507,6 +559,7 @@ let gc t = t.gc
 let github t = t.github
 let gitlab t = t.gitlab
 let infracost t = t.infracost
+let installation_retention t = t.installation_retention
 let nginx_status_uri t = t.nginx_status_uri
 let port t = t.port
 let python_exec t = t.python_exec

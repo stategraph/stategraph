@@ -1549,4 +1549,172 @@ module Make (S : S with type Account_id.t = int) = struct
               Abbs_fc.return_ok
                 (Brtl_ctx.set_response (Brtl_rspnc.create ~status:`Internal_server_error "") ctx))
   end
+
+  module Installation_state = struct
+    module Sql = struct
+      let update_uninstalled_sql = Mql_sql.read [%blob "sql/update_installation_uninstalled.sql"]
+
+      let update_uninstalled () =
+        Pgsql_io.Typed_sql.(
+          sql
+          //
+          (* state *)
+          Ret.text
+          /^ update_uninstalled_sql
+          /% Var.uuid "user_id"
+          /% Var.bigint "installation_id")
+
+      let update_restored_sql = Mql_sql.read [%blob "sql/update_installation_restored.sql"]
+
+      let update_restored () =
+        Pgsql_io.Typed_sql.(
+          sql
+          //
+          (* state *)
+          Ret.text
+          /^ update_restored_sql
+          /% Var.bigint "installation_id")
+    end
+
+    let op_name = function
+      | `Uninstall -> "UNINSTALL"
+      | `Restore -> "RESTORE"
+
+    (* The state changes only after the user passes the group admin check. *)
+    let change' config storage user installation_id op =
+      let open Abbs_fc.Infix_result_monad in
+      let module Oauth = Terrat_vcs_service_gitlab_user.Oauth in
+      let vcs_config = Terrat_vcs_service_gitlab_provider.Api.Config.vcs_config config in
+      Pgsql_pool.with_conn storage ~f:(fun db -> Oauth.access_token ~config:vcs_config db user)
+      >>= fun token ->
+      let client =
+        Openapic_abb.create
+          ~base_url:(Terrat_config.Gitlab.api_base_url vcs_config)
+          ~user_agent:"Terrateam"
+          (`Bearer token)
+      in
+      Pgsql_pool.with_conn storage ~f:(fun db -> User.query_user_id db user)
+      >>= fun user_id ->
+      Webhook.affirm_is_admin client installation_id user_id
+      >>= fun () ->
+      Pgsql_pool.with_conn storage ~f:(fun db ->
+          match op with
+          | `Uninstall ->
+              Pgsql_io.Prepared_stmt.fetch
+                db
+                (Sql.update_uninstalled ())
+                ~f:CCFun.id
+                (Terrat_user.id user)
+                (CCInt64.of_int installation_id)
+          | `Restore ->
+              Pgsql_io.Prepared_stmt.fetch
+                db
+                (Sql.update_restored ())
+                ~f:CCFun.id
+                (CCInt64.of_int installation_id))
+
+    let run op config storage installation_id =
+      let module Oauth = Terrat_vcs_service_gitlab_user.Oauth in
+      Brtl_ep.run_result_json ~f:(fun ctx ->
+          let open Abbs_fc.Infix_result_monad in
+          Terrat_session.with_session ctx
+          >>= fun user ->
+          let open Abb.Future.Infix_monad in
+          let op_name = op_name op in
+          change' config storage user installation_id op
+          >>= function
+          | Ok (state :: _) ->
+              Logs.info (fun m ->
+                  m
+                    "%s : %s : installation_id=%d : state=%s"
+                    (Brtl_ctx.token ctx)
+                    op_name
+                    installation_id
+                    state);
+              let module S = Terrat_api_components.Gitlab_installation_state in
+              let body =
+                { S.id = CCInt.to_string installation_id; state }
+                |> S.to_yojson
+                |> Yojson.Safe.to_string
+              in
+              Abbs_fc.return_ok (Brtl_ctx.set_response (Brtl_rspnc.create ~status:`OK body) ctx)
+          | Ok [] ->
+              Logs.warn (fun m ->
+                  m
+                    "%s : %s : NOT_FOUND : installation_id=%d"
+                    (Brtl_ctx.token ctx)
+                    op_name
+                    installation_id);
+              Abbs_fc.return_ok
+                (Brtl_ctx.set_response (Brtl_rspnc.create ~status:`Not_found "") ctx)
+          | Error (`Access_level_err access_level) ->
+              Logs.warn (fun m ->
+                  m
+                    "%s : %s : ACCESS_LEVEL : installation_id=%d : level=%d"
+                    (Brtl_ctx.token ctx)
+                    op_name
+                    installation_id
+                    access_level);
+              Abbs_fc.return_ok
+                (Brtl_ctx.set_response (Brtl_rspnc.create ~status:`Forbidden "") ctx)
+          | Error `User_not_found_in_group_err ->
+              Logs.warn (fun m ->
+                  m
+                    "%s : %s : USER_NOT_FOUND_IN_GROUP : installation_id=%d"
+                    (Brtl_ctx.token ctx)
+                    op_name
+                    installation_id);
+              Abbs_fc.return_ok
+                (Brtl_ctx.set_response (Brtl_rspnc.create ~status:`Forbidden "") ctx)
+          | Error (#Oauth.access_token_err as err) ->
+              Logs.warn (fun m ->
+                  m
+                    "%s : %s : ACCESS_TOKEN : installation_id=%d : %a"
+                    (Brtl_ctx.token ctx)
+                    op_name
+                    installation_id
+                    Oauth.pp_access_token_err
+                    err);
+              Abbs_fc.return_ok
+                (Brtl_ctx.set_response (Brtl_rspnc.create ~status:`Forbidden "") ctx)
+          | Error (#Openapic_abb.call_err as err) ->
+              Logs.err (fun m ->
+                  m
+                    "%s : %s : GITLAB_API : installation_id=%d : %a"
+                    (Brtl_ctx.token ctx)
+                    op_name
+                    installation_id
+                    Openapic_abb.pp_call_err
+                    err);
+              Abbs_fc.return_ok
+                (Brtl_ctx.set_response (Brtl_rspnc.create ~status:`Internal_server_error "") ctx)
+          | Error (#Pgsql_pool.err as err) ->
+              Logs.err (fun m ->
+                  m
+                    "%s : %s : DB : installation_id=%d : %a"
+                    (Brtl_ctx.token ctx)
+                    op_name
+                    installation_id
+                    Pgsql_pool.pp_err
+                    err);
+              Abbs_fc.return_ok
+                (Brtl_ctx.set_response (Brtl_rspnc.create ~status:`Internal_server_error "") ctx)
+          | Error (#User.query_user_id_err as err) ->
+              Logs.err (fun m ->
+                  m
+                    "%s : %s : USER_ID : installation_id=%d : %a"
+                    (Brtl_ctx.token ctx)
+                    op_name
+                    installation_id
+                    User.pp_query_user_id_err
+                    err);
+              Abbs_fc.return_ok
+                (Brtl_ctx.set_response (Brtl_rspnc.create ~status:`Internal_server_error "") ctx))
+
+    (* POST /api/v1/gitlab/installations/{installation_id}/uninstall *)
+    let uninstall config storage installation_id = run `Uninstall config storage installation_id
+
+    (* POST /api/v1/gitlab/installations/{installation_id}/restore *)
+    let restore config storage installation_id = run `Restore config storage installation_id
+  end
 end

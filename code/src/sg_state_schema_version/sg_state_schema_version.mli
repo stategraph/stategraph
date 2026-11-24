@@ -260,5 +260,17 @@
     and a source. Thus the bump is the only repair, and a state that stands at 18 with the shape is
     behind once this build runs, which is what makes the same upgrade repair it.
 
-    A state that holds each body that its calls name upgrades with no download, as before. *)
+    A state that holds each body that its calls name upgrades with no download, as before.
+
+    Version 20: the address of an [import] block, [import.<to>=<id>] (#3363). Ingest derives the
+    [fq_address] of an [hcl] row from the block ({!Sg_node.Fq_address.of_hcl}), and before #3363 an
+    [import] block took the catch-all [import]. Its node id did not change. So a state committed
+    before then holds the old address under the id a newer plan stages with the new one, and a
+    statement that pairs the staged and the committed row of a node by address sees two nodes: the
+    hint expansion ([sql/hints/select_hints_expansion_inputs.sql]) answered the id twice, and its
+    copy into [transaction_hints] failed on the primary key (#3690).
+
+    No migration can write the address: it is computed from the block's AST by OCaml, and a SQL copy
+    of that derivation would drift from it. The upgrade this counter forces re-ingests the stored
+    configuration, which writes the current address on every [import] row. *)
 val version : int

@@ -123,6 +123,23 @@ val count_admins : 'a t -> Pgsql_io.t -> (int, [> err ]) result Abb.Future.t
     existence check and the update run under a row lock. *)
 val rename : name:string -> 'a t -> Pgsql_io.t -> (stored t, [> rename_err ]) result Abb.Future.t
 
-(** Succeed if a user is part of a tenant. *)
+(** Succeed if a user is part of a tenant that is not closed. *)
 val enforce_user :
   'a Sgs_user.t -> minted t -> Pgsql_io.t -> (unit, [> enforce_user_err ]) result Abb.Future.t
+
+(** Succeed if a user is part of a tenant, closed or not: the check of a reopen. *)
+val enforce_member :
+  'a Sgs_user.t -> minted t -> Pgsql_io.t -> (unit, [> enforce_user_err ]) result Abb.Future.t
+
+(** Close a tenant: from now on it refuses every request but its reopen. [`Already_closed]: it was
+    closed, or does not exist. *)
+val close : 'a t -> Pgsql_io.t -> ([ `Closed | `Already_closed ], [> err ]) result Abb.Future.t
+
+(** Reopen a closed tenant and take it off the deletion schedule. [`Not_closed]: it was not closed,
+    or does not exist. *)
+val reopen : 'a t -> Pgsql_io.t -> ([ `Reopened | `Not_closed ], [> err ]) result Abb.Future.t
+
+(** The closed tenants of a user, the most recently closed first: id, name, and the time it was
+    closed as an RFC 3339 timestamp. *)
+val list_closed_by_user :
+  'a Sgs_user.t -> Pgsql_io.t -> ((Uuidm.t * string * string) list, [> err ]) result Abb.Future.t

@@ -26,7 +26,7 @@ grant select (repository_id, core_id) on github_repositories_map to stategraph_m
 grant select (base_sha, completed_at, created_at, id, pull_number, repository, run_id, run_type, sha, state, tag_query, username, dirspaces, run_kind, environment, runs_on, installation_id, repo_owner, repo_name, branch) on github_work_manifests to stategraph_mql;
 grant select (base_sha, path, repository, sha, workspace, lock_policy, branch_target) on gitlab_change_dirspaces to stategraph_mql;
 grant select (created_at, id, installation_id, name, owner, updated_at, setup) on gitlab_installation_repositories to stategraph_mql;
-grant select (account_status, created_at, id, name, state, tier, trial_ends_at) on gitlab_installations to stategraph_mql;
+grant select (account_status, created_at, id, name, state, tier, trial_ends_at, uninstalled_by, uninstalled_at) on gitlab_installations to stategraph_mql;
 grant select (installation_id, core_id) on gitlab_installations_map to stategraph_mql;
 grant select (repository, pull_number, unlocked_at) on gitlab_pull_request_latest_unlocks to stategraph_mql;
 grant select (base_branch, base_sha, branch, merged_at, merged_sha, pull_number, repository, sha, state, title, username) on gitlab_pull_requests to stategraph_mql;

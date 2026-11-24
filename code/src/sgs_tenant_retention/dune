@@ -1,0 +1,18 @@
+(library
+ (name sgs_tenant_retention)
+ (libraries
+  abb
+  abbs
+  containers
+  logs
+  mql_sql
+  pgsql_io
+  pgsql_pool
+  sgs_config
+  sgs_storage
+  uuidm
+  yojson)
+ (preprocessor_deps
+  (glob_files sql/*.sql))
+ (preprocess
+  (pps ppx_blob)))
