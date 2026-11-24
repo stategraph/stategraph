@@ -50,6 +50,17 @@ module Sql = struct
   let insert_installation_repository_sql =
     Mql_sql.read [%blob "sql/insert_installation_repository.sql"]
 
+  let select_repo_installation_sql = Mql_sql.read [%blob "sql/select_repo_installation.sql"]
+
+  let select_repo_installation () =
+    Pgsql_io.Typed_sql.(
+      sql
+      //
+      (* installation_id *)
+      Ret.bigint
+      /^ select_repo_installation_sql
+      /% Var.bigint "id")
+
   let insert_installation_repository () =
     Pgsql_io.Typed_sql.(
       sql
@@ -65,10 +76,16 @@ module Make (P : Terrat_vcs_provider2_gitlab.S) = struct
 
   let decode ctx = Gitlab_webhooks_decoder.run @@ Brtl_ctx.body ctx
 
+  (* [path_with_namespace] is the full GitLab project path, for example
+     [group/project] or, for a project in nested subgroups,
+     [group/subgroup/project].  Splitting on the first [/] puts the top-level
+     group in [owner] and the remainder in [name], which is what
+     [Terrat_vcs_api_gitlab] does when it decodes a remote repo, so the two
+     agree.  [Repo.to_string] joins them back with a [/], so deeply nested
+     projects round-trip unchanged.  A path with no [/] at all is not something
+     GitLab produces, so it is treated as undecodable rather than fatal. *)
   let parse_path_with_namespace path_with_namespace =
-    match CCString.Split.left ~by:"/" path_with_namespace with
-    | Some (owner, name) -> (owner, name)
-    | None -> raise (Failure "nyi")
+    CCString.Split.left ~by:"/" path_with_namespace
 
   (* Parse the bare branch name from a push-event ref. Tag refs and other
      non-branch refs parse to [None], as does the empty bare name — [""] is
@@ -79,7 +96,52 @@ module Make (P : Terrat_vcs_provider2_gitlab.S) = struct
     | Some branch when not (CCString.equal branch "") -> Some branch
     | _ -> None
 
-  let upsert_installation_repo _config storage installation_id =
+  (* Run [f] with the owner and name decoded from [path_with_namespace],
+     logging a NOOP if the path cannot be decoded.
+
+     The installation is authenticated, because it comes from looking up the
+     webhook secret the request presented, but the repository comes from the
+     payload, so the two have to be checked against each other.  A repository id
+     already owned by a different installation means the event names someone
+     else's repository and is dropped.  An id no installation owns yet is a
+     genuine first touch and is allowed through, which is how onboarding records
+     repositories. *)
+  let with_repo request_id storage installation_id repo_id path_with_namespace f =
+    match parse_path_with_namespace path_with_namespace with
+    | None ->
+        Logs.warn (fun m ->
+            m
+              "%s : NOOP : MALFORMED_PATH_WITH_NAMESPACE : path_with_namespace=%s"
+              request_id
+              path_with_namespace);
+        Abb.Future.return (Ok ())
+    | Some (owner, name) -> (
+        let (* The pgsql error propagates rather than collapsing to [`Error]: [post] logs
+           [#Pgsql_pool.err] and [#Pgsql_io.err] with their detail, while its [`Error] handler
+           logs an empty line, so collapsing here makes a failure of this check invisible. *)
+          open
+          Abbs_fc.Infix_result_monad
+        in
+        Pgsql_pool.with_conn storage ~f:(fun db ->
+            Pgsql_io.Prepared_stmt.fetch
+              db
+              (Sql.select_repo_installation ())
+              ~f:CCFun.id
+              (CCInt64.of_int repo_id))
+        >>= function
+        | owning :: _ when CCInt64.to_int owning <> installation_id ->
+            Logs.warn (fun m ->
+                m
+                  "%s : NOOP : REPO_OWNED_BY_OTHER_INSTALLATION : repo_id=%d : installation_id=%d \
+                   : owning_installation_id=%Ld"
+                  request_id
+                  repo_id
+                  installation_id
+                  owning);
+            Abbs_fc.return_ok ()
+        | [] | _ :: _ -> f owner name)
+
+  let upsert_installation_repo request_id _config storage installation_id =
     let module E = Gitlab_webhooks.Event in
     let module Pe = Gitlab_webhooks_push_event in
     let module Mre = Gitlab_webhooks_merge_request_event in
@@ -94,7 +156,8 @@ module Make (P : Terrat_vcs_provider2_gitlab.S) = struct
     | E.Job_event { Je.project; _ } ->
         let module P = Gitlab_webhooks_project in
         let { P.id; path_with_namespace; _ } = project in
-        let owner, name = parse_path_with_namespace path_with_namespace in
+        with_repo request_id storage (CCInt64.to_int installation_id) id path_with_namespace
+        @@ fun owner name ->
         Pgsql_pool.with_conn storage ~f:(fun db ->
             Pgsql_io.Prepared_stmt.execute
               db
@@ -120,7 +183,8 @@ module Make (P : Terrat_vcs_provider2_gitlab.S) = struct
         { Pe.project = { Pr.id = repo_id; path_with_namespace; _ }; ref_; user_username; _ } -> (
         match branch_of_ref ref_ with
         | Some branch ->
-            let owner, name = parse_path_with_namespace path_with_namespace in
+            with_repo request_id storage installation_id repo_id path_with_namespace
+            @@ fun owner name ->
             let account = P.Api.Account.make installation_id in
             let repo = P.Api.Repo.make ~id:repo_id ~name ~owner () in
             let user = P.Api.User.make user_username in
@@ -149,7 +213,8 @@ module Make (P : Terrat_vcs_provider2_gitlab.S) = struct
           merge_request = { Mr.iid = Some pull_request_id; _ };
           _;
         } -> (
-        let owner, name = parse_path_with_namespace path_with_namespace in
+        with_repo request_id storage installation_id repo_id path_with_namespace
+        @@ fun owner name ->
         let account = P.Api.Account.make installation_id in
         let repo = P.Api.Repo.make ~id:repo_id ~name ~owner () in
         let user = P.Api.User.make username in
@@ -184,7 +249,8 @@ module Make (P : Terrat_vcs_provider2_gitlab.S) = struct
           object_attributes = { Mreoa.action; iid = pull_request_id; _ };
           _;
         } -> (
-        let owner, name = parse_path_with_namespace path_with_namespace in
+        with_repo request_id storage installation_id repo_id path_with_namespace
+        @@ fun owner name ->
         let account = P.Api.Account.make installation_id in
         let repo = P.Api.Repo.make ~id:repo_id ~name ~owner () in
         let user = P.Api.User.make username in
@@ -247,7 +313,23 @@ module Make (P : Terrat_vcs_provider2_gitlab.S) = struct
               ~pull_request_id
               ~user
               Evaluator2.Pull_request_event.Close
-        | _ -> raise (Failure "nyi"))
+        (* Approval state is re-read from GitLab when apply requirements are
+           evaluated, so approval events do not need to trigger any work of
+           their own.  They are matched explicitly rather than with a wildcard
+           so that a new action added to the webhook type is a compile error
+           instead of a dropped event. *)
+        | `Approval ->
+            Logs.debug (fun m -> m "%s : NOOP : MERGE_REQUEST_APPROVAL" request_id);
+            Abbs_fc.return_ok ()
+        | `Approved ->
+            Logs.debug (fun m -> m "%s : NOOP : MERGE_REQUEST_APPROVED" request_id);
+            Abbs_fc.return_ok ()
+        | `Unapproval ->
+            Logs.debug (fun m -> m "%s : NOOP : MERGE_REQUEST_UNAPPROVAL" request_id);
+            Abbs_fc.return_ok ()
+        | `Unapproved ->
+            Logs.debug (fun m -> m "%s : NOOP : MERGE_REQUEST_UNAPPROVED" request_id);
+            Abbs_fc.return_ok ())
     | E.Pipeline_event _ -> Abbs_fc.return_ok ()
     (* A canceled job posts no result either, so it leaves the same dead work
        manifest behind as a failed one. *)
@@ -258,7 +340,8 @@ module Make (P : Terrat_vcs_provider2_gitlab.S) = struct
           project = { Pr.id = repo_id; path_with_namespace; _ };
           _;
         } ->
-        let owner, name = parse_path_with_namespace path_with_namespace in
+        with_repo request_id storage installation_id repo_id path_with_namespace
+        @@ fun owner name ->
         let account = P.Api.Account.make installation_id in
         let repo = P.Api.Repo.make ~id:repo_id ~name ~owner () in
         Evaluator2.work_manifest_job_failed
@@ -306,7 +389,7 @@ module Make (P : Terrat_vcs_provider2_gitlab.S) = struct
             >>= fun event ->
             (* We insert the repository here so that during onboarding we can verify
                to the user that the webhook was successfully received *)
-            upsert_installation_repo config storage installation_id event)
+            upsert_installation_repo (Brtl_ctx.token ctx) config storage installation_id event)
     | (installation_id, "uninstalled") :: _ ->
         Logs.info (fun m ->
             m

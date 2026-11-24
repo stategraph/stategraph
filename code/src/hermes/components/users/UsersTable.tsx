@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { listUsers, type UsersListResponse } from '@/lib/api/client';
+import { listUsers, type UserType, type UsersListResponse } from '@/lib/api/client';
 import { useUrlSyncedNullable } from '@/hooks';
 import { ChangePasswordDialog } from './ChangePasswordDialog';
 import { DeleteUserDialog } from './DeleteUserDialog';
@@ -45,7 +45,7 @@ export function UsersTable() {
 
   // Filters
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<UserType | 'all'>('all');
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [limit, setLimit] = useState(25);
 
@@ -197,7 +197,7 @@ export function UsersTable() {
         <Select
           value={typeFilter}
           onValueChange={(value) => {
-            setTypeFilter(value);
+            setTypeFilter(value === 'user' ? value : 'all');
             setCursor(undefined);
           }}
         >

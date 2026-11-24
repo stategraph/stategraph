@@ -6,7 +6,7 @@
 val run :
   Sgs_config.t ->
   Sgs_storage.t ->
-  string option ->
+  Sgs_api_components.User_type.t option ->
   string option ->
   string option ->
   int ->

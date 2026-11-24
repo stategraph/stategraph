@@ -1,80 +1,3 @@
-module Rt = struct
-  let api_v1 () = Brtl_rtng.Route.(rel / "api" / "v1")
-
-  let tenants_create () =
-    Brtl_rtng.Route.(
-      api_v1 ()
-      / "tenants"
-      /* Body.decode ~json:Sgs_api_components_tenant_create_request.of_yojson ())
-
-  let tenant () =
-    Brtl_rtng.Route.(
-      api_v1 ()
-      / "tenants"
-      /% Path.ud CCFun.(Uuidm.of_string %> CCOption.map (fun id -> Sgs_tenant.make ~id ())))
-
-  let tenant_update () =
-    Brtl_rtng.Route.(
-      tenant () /* Body.decode ~json:Sgs_api_components_tenant_update_request.of_yojson ())
-
-  let tenant_close () = Brtl_rtng.Route.(tenant () / "close")
-  let tenant_reopen () = Brtl_rtng.Route.(tenant () / "reopen")
-  let user_closed_tenants () = Brtl_rtng.Route.(api_v1 () / "user" / "closed-tenants")
-
-  let tenant_members () =
-    Brtl_rtng.Route.(
-      tenant ()
-      / "members"
-      /? Query.(option (string "cursor"))
-      /? Query.(option_default 25 (int "limit")))
-
-  (* The target user is a query parameter rather than a path segment, matching the existing
-     /users/update?user_id= convention. *)
-  let tenant_members_remove () = Brtl_rtng.Route.(tenant () / "members" /? Query.string "user_id")
-
-  let tenant_members_add () =
-    Brtl_rtng.Route.(
-      tenant ()
-      / "members"
-      /* Body.decode ~json:Sgs_api_components_tenant_member_add_request.of_yojson ())
-
-  let tenant_members_set_role () =
-    Brtl_rtng.Route.(
-      tenant ()
-      / "members"
-      / "set-role"
-      /? Query.string "user_id"
-      /* Body.decode ~json:Sgs_api_components_tenant_member_set_role_request.of_yojson ())
-
-  let tenant_invitations () =
-    Brtl_rtng.Route.(
-      tenant ()
-      / "invitations"
-      /? Query.(option (string "cursor"))
-      /? Query.(option_default 25 (int "limit")))
-
-  let tenant_invitation_create () =
-    Brtl_rtng.Route.(
-      tenant ()
-      / "invitations"
-      /* Body.decode ~json:Sgs_api_components_invitation_create_request.of_yojson ())
-
-  (* Re-issue and revoke take the invitation id as a query parameter, matching the
-     /users/update?user_id= convention for a mutation's target. *)
-  let tenant_invitation_reissue () =
-    Brtl_rtng.Route.(tenant () / "invitations" / "reissue" /? Query.string "id")
-
-  let tenant_invitation_revoke () =
-    Brtl_rtng.Route.(tenant () / "invitations" / "revoke" /? Query.string "id")
-
-  let invitation_accept () =
-    Brtl_rtng.Route.(
-      api_v1 ()
-      / "invitations"
-      / "accept"
-      /* Body.decode ~json:Sgs_api_components_invitation_accept_request.of_yojson ())
-end
-
 module Make (Cloud : Sgs_cloud.S) = struct
   module Ep_invitation_create = Sgs_service_tenants_ep_invitation_create.Make (Cloud)
   module Ep_invitation_reissue = Sgs_service_tenants_ep_invitation_reissue.Make (Cloud)
@@ -105,23 +28,24 @@ module Make (Cloud : Sgs_cloud.S) = struct
       (Sgs_svc_mngr.load ~name:Sgs_service_storage.name Sgs_service_storage.Ty mgr)
     >>| fun (config, storage) -> { config; storage }
 
-  (* Closing a tenant exists only where each user gets a tenant of their own: elsewhere the routes
-     are absent, so they answer 404. *)
-  let retention_routes config storage =
-    match Cloud.new_user_tenant () with
-    | `Personal_tenant ->
-        Brtl_rtng.Route.
-          [
-            (`POST, Rt.tenant_close () --> Sgs_service_tenants_ep_close.run config storage);
-            (`POST, Rt.tenant_reopen () --> Sgs_service_tenants_ep_reopen.run config storage);
-            ( `GET,
-              Rt.user_closed_tenants () --> Sgs_service_tenants_ep_closed_tenants.run config storage
-            );
-          ]
-    | `Default_tenant -> []
-
   let routes { config; storage } =
-    retention_routes config storage
+    let with_tenant run tenant_id = run config storage (Sgs_tenant.make ~id:tenant_id ()) in
+    let retention_routes =
+      match Cloud.new_user_tenant () with
+      | `Personal_tenant ->
+          Brtl_rtng.Route.
+            [
+              ( `POST,
+                Sgs_api_tenants.Close.route () --> with_tenant Sgs_service_tenants_ep_close.run );
+              ( `POST,
+                Sgs_api_tenants.Reopen.route () --> with_tenant Sgs_service_tenants_ep_reopen.run );
+              ( `GET,
+                Sgs_api_user.Closed_tenants.route ()
+                --> Sgs_service_tenants_ep_closed_tenants.run config storage );
+            ]
+      | `Default_tenant -> []
+    in
+    retention_routes
     @ Brtl_rtng.Route.
         [
           ( `GET,
@@ -129,33 +53,54 @@ module Make (Cloud : Sgs_cloud.S) = struct
           );
           (* Members before the bare tenant route: /members and /members/set-role are more specific
          than the tenant path they hang off, and the router matches in order. *)
-          (`POST, Rt.tenants_create () --> Sgs_service_tenants_ep_create.run config storage);
-          (`GET, Rt.tenant_members () --> Sgs_service_tenants_ep_members_list.run config storage);
-          (`POST, Rt.tenant_members_add () --> Sgs_service_tenants_ep_members_add.run config storage);
           ( `POST,
-            Rt.tenant_members_set_role ()
-            --> Sgs_service_tenants_ep_members_set_role.run config storage );
-          ( `DELETE,
-            Rt.tenant_members_remove () --> Sgs_service_tenants_ep_members_remove.run config storage
-          );
-          (`PUT, Rt.tenant_update () --> Sgs_service_tenants_ep_update.run config storage);
-          (* Invitations.  The two-segment routes come before the one-segment /invitations pair. *)
-          (`POST, Rt.tenant_invitation_reissue () --> Ep_invitation_reissue.run config storage);
-          ( `POST,
-            Rt.tenant_invitation_revoke ()
-            --> Sgs_service_tenants_ep_invitation_revoke.run config storage );
+            Sgs_api_tenants.Create.route ()
+            /* Body.decode ~json:Sgs_api_components_tenant_create_request.of_yojson ()
+            --> Sgs_service_tenants_ep_create.run config storage );
           ( `GET,
-            Rt.tenant_invitations () --> Sgs_service_tenants_ep_invitation_list.run config storage
-          );
-          (`POST, Rt.tenant_invitation_create () --> Ep_invitation_create.run config storage);
+            Sgs_api_tenants.List_members.route ()
+            --> with_tenant Sgs_service_tenants_ep_members_list.run );
+          ( `POST,
+            Sgs_api_tenants.Add_member.route ()
+            /* Body.decode ~json:Sgs_api_components_tenant_member_add_request.of_yojson ()
+            --> with_tenant Sgs_service_tenants_ep_members_add.run );
+          (* The target user is a query parameter rather than a path segment, matching the existing
+             /users/update?user_id= convention. *)
+          ( `POST,
+            Sgs_api_tenants.Set_member_role.route ()
+            /* Body.decode ~json:Sgs_api_components_tenant_member_set_role_request.of_yojson ()
+            --> with_tenant Sgs_service_tenants_ep_members_set_role.run );
+          ( `DELETE,
+            Sgs_api_tenants.Remove_member.route ()
+            --> with_tenant Sgs_service_tenants_ep_members_remove.run );
+          ( `PUT,
+            Sgs_api_tenants.Update.route ()
+            /* Body.decode ~json:Sgs_api_components_tenant_update_request.of_yojson ()
+            --> with_tenant Sgs_service_tenants_ep_update.run );
+          (* Invitations.  The two-segment routes come before the one-segment /invitations pair.
+             Re-issue and revoke take the invitation id as a query parameter, matching the
+             /users/update?user_id= convention for a mutation's target. *)
+          ( `POST,
+            Sgs_api_tenants.Reissue_invitation.route () --> with_tenant Ep_invitation_reissue.run );
+          ( `POST,
+            Sgs_api_tenants.Revoke_invitation.route ()
+            --> with_tenant Sgs_service_tenants_ep_invitation_revoke.run );
+          ( `GET,
+            Sgs_api_tenants.List_invitations.route ()
+            --> with_tenant Sgs_service_tenants_ep_invitation_list.run );
+          ( `POST,
+            Sgs_api_tenants.Create_invitation.route ()
+            /* Body.decode ~json:Sgs_api_components_invitation_create_request.of_yojson ()
+            --> with_tenant Ep_invitation_create.run );
           (* Unauthenticated: the invitation token is the credential, so this sits outside the tenant
            path. *)
           ( `GET,
             Sgs_api_invitations.Preview.route ()
             --> Sgs_service_tenants_ep_invitation_preview.run config storage );
           ( `POST,
-            Rt.invitation_accept () --> Sgs_service_tenants_ep_invitation_accept.run config storage
-          );
+            Sgs_api_invitations.Accept.route ()
+            /* Body.decode ~json:Sgs_api_components_invitation_accept_request.of_yojson ()
+            --> Sgs_service_tenants_ep_invitation_accept.run config storage );
         ]
 
   let wrap _ = CCFun.id

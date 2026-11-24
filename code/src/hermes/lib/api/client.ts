@@ -27,6 +27,7 @@ export type InstanceAttributes = {
 };
 
 export type User = components["schemas"]["user"];
+export type UserType = components["schemas"]["user-type"];
 export type Tenant = components["schemas"]["tenant"];
 export type State = components["schemas"]["state"] & {
   updated_at?: string;
@@ -1575,7 +1576,7 @@ export async function createApiUser(options: { name: string; tenant_id: string }
  * GET /api/v1/users - List all users (admin only)
  */
 export async function listUsers(params?: {
-  type?: string;
+  type?: UserType;
   search?: string;
   cursor?: string;
   limit?: number;

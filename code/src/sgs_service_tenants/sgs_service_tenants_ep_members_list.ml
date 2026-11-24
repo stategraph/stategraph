@@ -10,7 +10,9 @@ let encode_cursor tenant_member =
     ~timestamp:tenant_member.Sgs_tenant.Member.joined_at
     ~id:tenant_member.Sgs_tenant.Member.id
 
-let run _config storage tenant cursor limit =
+(* TODO: filter the members by [search] (name or email) and [role]; the API reserves both
+   parameters, and they are ignored until then. *)
+let run _config storage tenant _search _role cursor limit =
   Sgs_user_session.with_user
     ~caps:(Sgs_user_session.Caps.manages_tenant_members (Uuidm.to_string (Sgs_tenant.id tenant)))
     ~f:(fun user ->

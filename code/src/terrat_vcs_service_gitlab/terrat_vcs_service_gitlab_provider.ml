@@ -6044,9 +6044,14 @@ module Work_manifest = struct
 
     let select_work_manifest_by_run_id_sql =
       Mql_sql.read
-        "select id from work_manifests where run_id = $run_id order by state in ('queued', \
-         'running') desc, created_at desc limit 1"
+        "select id from gitlab_work_manifests where run_id = $run_id and installation_id = \
+         $installation_id order by state in ('queued', 'running') desc, created_at desc limit 1"
 
+    (* Scoped to the installation.  [run_id] comes from a webhook payload and
+       [work_manifests] is shared by every installation and both VCS providers,
+       so an unscoped lookup lets any sender who can guess a run id reach
+       another installation's work manifest.  GitLab CI job ids are small
+       sequential integers, which makes guessing trivial. *)
     let select_work_manifest_by_run_id () =
       Pgsql_io.Typed_sql.(
         sql
@@ -6056,7 +6061,8 @@ module Work_manifest = struct
         (* One run can operate several work manifests of a node.  The one the run
            operated when it failed is the live one, thus it comes first. *)
         /^ select_work_manifest_by_run_id_sql
-        /% Var.text "run_id")
+        /% Var.text "run_id"
+        /% Var.bigint "installation_id")
   end
 
   let run ~request_id ~compute_node_id config client work_manifest =
@@ -6314,10 +6320,15 @@ module Work_manifest = struct
   let query' = Db.query_work_manifests
   let query = Db.query_work_manifest
 
-  let query_by_run_id ~request_id db run_id =
+  let query_by_run_id ~request_id db account run_id =
     let run =
       let open Abbs_fc.Infix_result_monad in
-      Pgsql_io.Prepared_stmt.fetch db (Sql.select_work_manifest_by_run_id ()) ~f:CCFun.id run_id
+      Pgsql_io.Prepared_stmt.fetch
+        db
+        (Sql.select_work_manifest_by_run_id ())
+        ~f:CCFun.id
+        run_id
+        (CCInt64.of_int (Api.Account.id account))
       >>= function
       | [] -> Abbs_fc.return_ok None
       | id :: _ -> query ~request_id db id

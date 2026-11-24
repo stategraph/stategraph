@@ -16,17 +16,32 @@ let match_users_detail =
   match_query Brtl_rtng.Route.(Sgs_api_users.Detail.route () --> CCOption.return)
 
 (* [Sgs_service_users_ep_list.run] takes [type_ search cursor limit]. The handler gets the query
-   parameters in the order of the parameters in api.json, and the first three are all
-   [string option]: if api.json changes their order, this test fails instead of the handler
+   parameters in the order of the parameters in api.json: [type_] is the user-type enum and the next
+   two are [string option]. If api.json changes their order, this test fails instead of the handler
    silently getting them swapped. *)
 let test_list_params_order =
   Oth.test ~name:"Users list query parameters keep the order of the handler arguments" (fun _ ->
       let type_, search, cursor, _ =
-        Oth.Assert.some (match_users_list "/api/v1/users?type=t&search=s&cursor=c")
+        Oth.Assert.some (match_users_list "/api/v1/users?type=user&search=s&cursor=c")
       in
-      Oth.Assert.Eq.string_option ~expected:(Some "t") ~actual:type_;
+      Oth.Assert.Eq.option
+        ~eq:Sgs_api_components.User_type.equal
+        ~pp:Sgs_api_components.User_type.pp
+        ~expected:(Some `User)
+        ~actual:type_;
       Oth.Assert.Eq.string_option ~expected:(Some "s") ~actual:search;
       Oth.Assert.Eq.string_option ~expected:(Some "c") ~actual:cursor)
+
+let test_list_type_accepts_only_user_type_enum =
+  Oth.test ~name:"Users list route accepts only declared user types" (fun _ ->
+      Oth.Assert.none (match_users_list "/api/v1/users?type=usr");
+      Oth.Assert.none (match_users_list "/api/v1/users?type=User");
+      let type_, _, _, _ = Oth.Assert.some (match_users_list "/api/v1/users?type=api") in
+      Oth.Assert.Eq.option
+        ~eq:Sgs_api_components.User_type.equal
+        ~pp:Sgs_api_components.User_type.pp
+        ~expected:(Some `Api)
+        ~actual:type_)
 
 let test_list_limit_default =
   Oth.test ~name:"Users list limit is 25 when it is absent" (fun _ ->
@@ -74,6 +89,7 @@ let () =
       Oth.parallel
         [
           test_list_params_order;
+          test_list_type_accepts_only_user_type_enum;
           test_list_limit_default;
           test_detail_user_id_is_a_uuid;
           test_tenant_members_tenant_id_is_a_uuid;

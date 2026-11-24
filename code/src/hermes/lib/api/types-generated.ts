@@ -2116,8 +2116,7 @@ export interface components {
             name: string;
             owner_id: string;
             owner_name: string;
-            /** @enum {string} */
-            owner_type: "api" | "system" | "user";
+            owner_type: components["schemas"]["user-type"];
         };
         "actuator-bundle-cursors-page": {
             cursor?: string;
@@ -3990,8 +3989,7 @@ export interface components {
             email?: string;
             id: string;
             name: string;
-            /** @enum {string} */
-            type: "api" | "system" | "user";
+            type: components["schemas"]["user-type"];
         };
         "user-change-password-request": {
             current_password?: string;
@@ -4052,6 +4050,11 @@ export interface components {
         "user-tenants": {
             results: components["schemas"]["tenant"][];
         };
+        /**
+         * @description The kind of identity: `api` for an access-token identity, `system` for an internal identity, or `user` for a person.
+         * @enum {string}
+         */
+        "user-type": "api" | "system" | "user";
         "user-update-request": {
             avatar_url?: string;
             email?: string;
@@ -4087,7 +4090,7 @@ export interface components {
                 email?: string;
                 id: string;
                 name: string;
-                type: string;
+                type: components["schemas"]["user-type"];
             }[];
         };
         /** @description A VCS installation (GitHub/GitLab) owned by a Stategraph tenant. This mapping is what scopes per-tenant MQL reads of the orchestration engine's tables: a terrateam row is visible to a tenant iff it reaches an installation mapped here. */
@@ -10105,7 +10108,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Filter to users of this type: `user` for people, `api` for access-token identities, `system` for internal ones. Omit to list every type. */
-                type?: string;
+                type?: components["schemas"]["user-type"];
                 /** @description Case-insensitive substring match against a user's name or email. Omit for no filtering. */
                 search?: string;
                 /** @description Opaque pagination cursor from a previous response's `next_cursor`. Omit for the first page. */

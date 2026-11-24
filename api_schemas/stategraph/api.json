@@ -93,12 +93,7 @@
             "type": "string"
           },
           "owner_type": {
-            "enum": [
-              "api",
-              "system",
-              "user"
-            ],
-            "type": "string"
+            "$ref": "#/components/schemas/user-type"
           }
         },
         "required": [
@@ -5988,12 +5983,7 @@
             "type": "string"
           },
           "type": {
-            "enum": [
-              "api",
-              "system",
-              "user"
-            ],
-            "type": "string"
+            "$ref": "#/components/schemas/user-type"
           }
         },
         "required": [
@@ -6214,6 +6204,15 @@
         ],
         "type": "object"
       },
+      "user-type": {
+        "description": "The kind of identity: `api` for an access-token identity, `system` for an internal identity, or `user` for a person.",
+        "enum": [
+          "api",
+          "system",
+          "user"
+        ],
+        "type": "string"
+      },
       "user-update-request": {
         "additionalProperties": false,
         "properties": {
@@ -6328,7 +6327,7 @@
                   "type": "string"
                 },
                 "type": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/user-type"
                 }
               },
               "required": [
@@ -12446,7 +12445,7 @@
             "name": "type",
             "required": false,
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/user-type"
             }
           },
           {

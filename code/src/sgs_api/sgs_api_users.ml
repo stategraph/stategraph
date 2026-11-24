@@ -475,7 +475,7 @@ module List = struct
       cursor : string option; [@default None]
       limit : int; [@default 25]
       search : string option; [@default None]
-      type_ : string option; [@default None] [@key "type"]
+      type_ : Sgs_api_components.User_type.t option; [@default None] [@key "type"]
     }
     [@@deriving make, show, eq]
   end
@@ -487,7 +487,9 @@ module List = struct
     / "api"
     / "v1"
     / "users"
-    /? option (string "type")
+    /? option
+         (ud "type" (fun value ->
+              CCResult.to_opt (Sgs_api_components.User_type.t_of_yojson (`String value))))
     /? option (string "search")
     /? option (string "cursor")
     /? option_default 25 (int "limit")
@@ -539,7 +541,7 @@ module List = struct
         (let open Openapi.Request.Var in
          let open Parameters in
          [
-           ("type", Var (params.type_, Option String));
+           ("type", Var (params.type_, Option (Enum Sgs_api_components.User_type.t_to_yojson)));
            ("search", Var (params.search, Option String));
            ("cursor", Var (params.cursor, Option String));
            ("limit", Var (params.limit, Int));
