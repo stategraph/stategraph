@@ -1,21 +1,3 @@
-module Rt = struct
-  let api_v1 () = Brtl_rtng.Route.(rel / "api" / "v1")
-
-  (* Users *)
-  let user_access_tokens_create () =
-    Brtl_rtng.Route.(
-      api_v1 ()
-      / "user"
-      / "access-tokens"
-      /* Body.decode ~json:Sgs_api_components_access_token_create_request.of_yojson ())
-
-  let api_users_create () =
-    Brtl_rtng.Route.(
-      api_v1 ()
-      / "api-users"
-      /* Body.decode ~json:Sgs_api_components_api_user_create_request.of_yojson ())
-end
-
 type t = {
   config : Sgs_config.t;
   storage : Sgs_storage.t;
@@ -52,9 +34,13 @@ let routes { config; storage } =
         Sgs_api_user.Access_tokens_revoke.route ()
         --> Sgs_service_users_ep_access_token_revoke.run config storage );
       ( `POST,
-        Rt.user_access_tokens_create ()
+        Sgs_api_user.Access_tokens_create.route ()
+        /* Body.decode ~json:Sgs_api_components_access_token_create_request.of_yojson ()
         --> Sgs_service_users_ep_access_token_create.run config storage );
-      (`POST, Rt.api_users_create () --> Sgs_service_users_ep_api_user_create.run config storage);
+      ( `POST,
+        Sgs_api_api_users.Create.route ()
+        /* Body.decode ~json:Sgs_api_components_api_user_create_request.of_yojson ()
+        --> Sgs_service_users_ep_api_user_create.run config storage );
       (* User Management *)
       (`GET, Sgs_api_users.List.route () --> Sgs_service_users_ep_list.run config storage);
       (`GET, Sgs_api_users.Detail.route () --> Sgs_service_users_ep_detail.run config storage);

@@ -1573,7 +1573,9 @@ export async function createApiUser(options: { name: string; tenant_id: string }
 // ============================================================================
 
 /**
- * GET /api/v1/users - List all users (admin only)
+ * GET /api/v1/users - List the users the caller manages, one page per call. An admin or
+ * users-manage grant that reaches every tenant lists every user; one scoped to tenants lists the
+ * members of those tenants. `has_more` and `next_cursor` say whether another page follows.
  */
 export async function listUsers(params?: {
   type?: UserType;

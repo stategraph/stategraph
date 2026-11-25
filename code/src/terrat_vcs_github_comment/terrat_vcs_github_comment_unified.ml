@@ -275,19 +275,21 @@ module S = struct
        the plan it applies is already in the comment and the reader is waiting on the change, not
        on the plan. *)
     let in_flight = if active_apply then St.Apply_running else St.Plan_running in
+    (* A run in flight wins over every earlier result: the reader waits on that run, and the summary
+       published when it starts must say so. *)
     match (active, CCOption.flat_map summary_status_of_string summary_state) with
+    | true, _ -> in_flight
     | false, Some status -> status
-    | true, _ | false, None -> (
-        match (apply_success, active, plan_success) with
-        | Some true, _, _ -> St.Applied
-        | Some false, _, _ -> St.Failed
-        | None, true, _ -> in_flight
+    | false, None -> (
+        match (apply_success, plan_success) with
+        | Some true, _ -> St.Applied
+        | Some false, _ -> St.Failed
+        | None, Some false -> St.Failed
+        | None, Some true -> St.Planned
         (* Nothing in flight and no plan either: the dirspace belongs to the pull request and nothing
-       has run for it -- the state a run-start publish leaves every dirspace the run does not
-       cover in. *)
-        | None, false, Some false -> St.Failed
-        | None, false, Some true -> St.Planned
-        | None, false, None -> if aborted then St.Failed else St.Pending)
+           has run for it -- the state a run-start publish leaves every dirspace the run does not
+           cover in. *)
+        | None, None -> if aborted then St.Failed else St.Pending)
 
   let query_comment_id t = Abbs_fc.return_ok t.comment_id
 

@@ -55,6 +55,11 @@ type authority =
     at the same scope, so a tenant's administrator outranks a users-manage holder confined to it. *)
 val authority_over : actor:Sg_caps.t -> target:Sg_caps.t -> target_tenants:string list -> authority
 
+(** [users_reach caps] is the tenants whose users [caps] reaches: administering a tenant reaches its
+    users, and so does managing them, so it is the union of the [admin] and [users-manage] scopes.
+*)
+val users_reach : Sg_caps.t -> Sg_caps_trie_scope.t
+
 (** [reaches_user_tenant ~actor ~tenant] is true when [actor] reaches that tenant's users, with
     either grant that answers user questions: [admin] or [users-manage]. *)
 val reaches_user_tenant : actor:Sg_caps.t -> tenant:string -> bool
@@ -115,14 +120,23 @@ val reaches_tenant : Sg_caps_reach.t -> tenant:string -> bool
 val reaches_every_address : Sg_caps_reach.t -> tenant:string -> bool
 
 module Db_checks : sig
-  (** One rule as the refusal queries take it: the state it applies to, whether it refuses, and the
-      literal it compares an address against, as a prefix or in full. No character of [pat] means
-      anything to the query -- ['*'] and ['!'] are gone by the time it gets there. *)
+  module Scope_rule : sig
+    (** One rule of a scope as a query takes it: whether it refuses, and the literal it compares a
+        string against, as a prefix or in full. No character of [pat] means anything to the query --
+        ['*'] and ['!'] are gone by the time it gets there. *)
+    type t = {
+      neg : bool;
+      prefix : bool;
+      pat : string;
+    }
+    [@@deriving show, eq]
+  end
+
+  (** One rule as the refusal queries take it: the state it applies to, and the rule over the
+      addresses of that state. *)
   type rule = {
     state : string;
-    neg : bool;
-    prefix : bool;
-    pat : string;
+    address : Scope_rule.t;
   }
   [@@deriving show, eq]
 
@@ -131,6 +145,19 @@ module Db_checks : sig
     rules : rule list;
   }
   [@@deriving show, eq]
+
+  (** [scope_rules scope] is [scope] as rules a query evaluates without reading a pattern: a string
+      is in [scope] when the most specific rule matching it -- the longest [pat], a literal before a
+      prefix of the same length -- does not refuse. Every string matches one rule, since the refusal
+      of everything is written down when [scope] leaves it implicit:
+
+      {v
+      scope_rules (of_strings [ "t1"; "a*" ]) =
+        { neg = true;  prefix = true;  pat = "" }     (every string, refused...)
+        { neg = false; prefix = true;  pat = "a" }    (...but those starting with a)
+        { neg = false; prefix = false; pat = "t1" }   (...and t1)
+      v} *)
+  val scope_rules : Sg_caps_trie_scope.t -> Scope_rule.t list
 
   (** [encode reach ~tenant] is the state rules of that tenant, as the columns of the refusal
       queries. [governed] is the states that reach at least one address, which is what tells a

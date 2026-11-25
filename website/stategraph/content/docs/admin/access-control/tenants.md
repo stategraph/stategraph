@@ -14,7 +14,7 @@ A self-hosted install starts with one tenant that all users share. It is named `
 The `admin` capability has two scopes:
 
 - Instance admin (`{"admin": {}}`, no tenants named) administers the whole installation: all tenants, the global user list, and installation settings. The first user to complete setup is an instance admin.
-- Tenant admin (`{"admin": {"tenants": ["<tenant-id>"]}}`) administers only those tenants: their membership, invitations, [group rules](/docs/admin/access-control/group-rules), and settings, including deleting states in them. A tenant admin cannot see the installation-wide user list or other tenants.
+- Tenant admin (`{"admin": {"tenants": ["<tenant-id>"]}}`) administers only those tenants: their membership, invitations, [group rules](/docs/admin/access-control/group-rules), and settings, including deleting states in them. A tenant admin cannot see other tenants, and the user list shows it only the members of its tenants.
 
 `users-manage` is a separate, narrower right:
 

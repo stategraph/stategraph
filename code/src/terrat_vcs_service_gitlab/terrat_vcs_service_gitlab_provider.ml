@@ -634,6 +634,12 @@ module Db = struct
         //
         (* the time of that plan's work manifest *)
         Ret.(option text)
+        //
+        (* the newest plan *)
+        Ret.(option uuid)
+        //
+        (* the newest apply *)
+        Ret.(option uuid)
         /^ select_dirspace_runs_for_context_sql
         /% Var.uuid "context_id"
         /% Var.(str_array (text "dirs"))
@@ -2287,11 +2293,15 @@ module Db = struct
               apply_failed
               in_progress_sha
               in_progress_created_at
+              plan_work_manifest
+              apply_work_manifest
             ->
             let module Dr = Terrat_vcs_provider2.Dirspace_runs in
             {
               Dr.plan_failed;
               apply_failed;
+              plan_work_manifest;
+              apply_work_manifest;
               (* A plan that is running has no result yet, thus it carries no pair of heads that
                  moved while it operated. *)
               in_progress_plan =
@@ -5896,6 +5906,7 @@ module Commit_check = struct
 
   let make_dirspace
       ?work_manifest
+      ?work_manifest_id:_
       ?resource_summary
       ~config
       ~description
@@ -6987,6 +6998,18 @@ module Job_context = struct
         /^ select_explicit_plan_job_sql
         /% Var.uuid "context_id")
 
+    let select_jobs_with_queued_work_manifests_sql =
+      Mql_sql.read [%blob "sql/select_jobs_with_queued_work_manifests.sql"]
+
+    let select_jobs_with_queued_work_manifests =
+      Pgsql_io.Typed_sql.(
+        sql
+        //
+        (* id *)
+        Ret.uuid
+        /^ select_jobs_with_queued_work_manifests_sql
+        /% Var.uuid "context_id")
+
     let select_job_by_work_manifest_id_sql =
       Mql_sql.read [%blob "sql/select_job_by_work_manifest_id.sql"]
 
@@ -7427,6 +7450,20 @@ module Job_context = struct
       | Error (#Pgsql_io.err as err) ->
           Logs.err (fun m ->
               m "%s : JOB : QUERY_EXPLICIT_PLAN_EXISTS : %a" request_id Pgsql_io.pp_err err);
+          Abbs_fc.return_err `Error
+
+    let query_with_queued_work_manifests ~request_id db ~context_id () =
+      let open Abb.Future.Infix_monad in
+      Pgsql_io.Prepared_stmt.fetch
+        db
+        Sql.select_jobs_with_queued_work_manifests
+        ~f:CCFun.id
+        context_id
+      >>= function
+      | Ok _ as r -> Abb.Future.return r
+      | Error (#Pgsql_io.err as err) ->
+          Logs.err (fun m ->
+              m "%s : JOB : QUERY_WITH_QUEUED_WORK_MANIFESTS : %a" request_id Pgsql_io.pp_err err);
           Abbs_fc.return_err `Error
 
     let query_by_work_manifest_id ~request_id db ~work_manifest_id () =

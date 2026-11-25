@@ -104,6 +104,7 @@ in_progress_plans as (
 -- dirspace unapplied.
 runs as (
   select
+      wm.id as work_manifest,
       wmr.path as path,
       wmr.workspace as workspace,
       wm.run_type as run_type,
@@ -151,7 +152,10 @@ select
       newest_plan.success and newest_plan.created_at > newest_apply.created_at,
       false),
   in_progress_plans.sha,
-  to_char(in_progress_plans.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+  to_char(in_progress_plans.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+  -- The newest runs, whatever their result, are the runs a check of the dirspace links to.
+  newest_plan.work_manifest,
+  newest_apply.work_manifest
 from dirspaces as ds
 left join runs as last_plan
   on last_plan.path = ds.path

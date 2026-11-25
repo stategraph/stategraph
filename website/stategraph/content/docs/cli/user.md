@@ -16,7 +16,7 @@ The `stategraph user` commands show who you are and which tenants you belong to,
 | `stategraph user access-tokens create` | Create a capability-scoped access token |
 | `stategraph user access-tokens list` | List your access tokens |
 | `stategraph user access-tokens delete` | Delete (revoke) an access token |
-| `stategraph user list` | List the installation's users, with their IDs and admin rights |
+| `stategraph user list` | List the users you manage, with their IDs and admin rights |
 | `stategraph user set-instance-admin` | Grant or revoke installation admin |
 
 ## stategraph user whoami
@@ -163,7 +163,7 @@ stategraph user access-tokens delete --token-id f02791c8-aa63-4cdf-acae-a7c968d8
 
 ## stategraph user list
 
-Lists the users of the whole installation, with their IDs and admin rights. It requires installation admin, or the users-manage capability without a tenant restriction. A tenant admin cannot list users. See [Tenants](/docs/admin/access-control/tenants) for installation and tenant admins.
+Lists the users you manage, with their IDs and admin rights. It requires the admin or users-manage capability. When the capability covers every tenant, the list holds every user of the installation. When it is restricted to tenants, as for a tenant admin, the list holds the members of those tenants. See [Tenants](/docs/admin/access-control/tenants) for installation and tenant admins.
 
 ```bash
 stategraph user list [--search <text>] [--type user|api|system]

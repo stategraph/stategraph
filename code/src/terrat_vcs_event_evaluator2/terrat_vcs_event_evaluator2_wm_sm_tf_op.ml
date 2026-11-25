@@ -162,10 +162,12 @@ struct
      dirspaces whose result is stale.  A stale result is not valid (RFD 2356, Stale results
      considered invalid), thus a stale dirspace that succeeded gets a failed check with a stale
      description, and the dirspace must be planned again.  A dirspace that failed stays failed.
-     The threshold counts every dirspace of the result, as one set of checks would. *)
+     The threshold counts every dirspace of the result, as one set of checks would.  An apply with a
+     dirspace that failed at the head also fails the combined apply check of the head. *)
   let create_op_commit_checks_of_result
       ?stale
       ~fail_if_set
+      ~apply_requirements
       create_commit_checks
       status_checks_enabled
       config
@@ -200,6 +202,21 @@ struct
       | step :: _ -> step
     in
     let run_type = Wm.Step.to_string step in
+    let apply_checks =
+      let failed_at_head (dirspace, success) =
+        (not (Terrat_data.Dirspace_set.mem dirspace stale_dirspaces))
+        &&
+        match fst (status_of dirspace success) with
+        | Terrat_commit_check.Status.Failed -> true
+        | Terrat_commit_check.Status.(Queued | Running | Completed | Canceled) -> false
+      in
+      match (work_manifest.Wm.target, step) with
+      | P2.Target.Pr _, Wm.Step.(Apply | Unsafe_apply)
+        when CCList.exists failed_at_head result.Wmr.dirspaces_success ->
+          Tasks_base.failed_apply_check ~config ~account ~repo ~apply_requirements
+      | ( P2.Target.(Pr _ | Drift _),
+          Wm.Step.(Apply | Unsafe_apply | Build_config | Build_tree | Index | Plan) ) -> []
+    in
     let dirspace_checks =
       if status_checks_enabled ~run:(notifications_run step) then
         CCList.map
@@ -226,26 +243,35 @@ struct
     in
     let open Irm in
     CCOption.map_lazy
-      (fun () -> create_commit_checks' create_commit_checks ref_ (CCList.map snd dirspace_checks))
+      (fun () ->
+        create_commit_checks'
+          create_commit_checks
+          ref_
+          (apply_checks @ CCList.map snd dirspace_checks))
       (fun (stale_ref, stale_dirspaces) ->
         let stale_checks, fresh_checks =
           CCList.partition
             (fun (dirspace, _) -> Terrat_data.Dirspace_set.mem dirspace stale_dirspaces)
             dirspace_checks
         in
-        create_commit_checks' create_commit_checks ref_ (CCList.map snd fresh_checks)
+        create_commit_checks' create_commit_checks ref_ (apply_checks @ CCList.map snd fresh_checks)
         >>= fun () ->
         create_commit_checks' create_commit_checks stale_ref (CCList.map snd stale_checks))
       stale
 
+  (* The waiting apply check of a dirspace is for the dirspaces left to apply: a push keeps a dirspace
+     that it did not change applied, and the check of a kept dirspace that is waiting is never
+     written again, because it looks like the check of a run in flight. *)
   let maybe_create_pending_apply_commit_checks
+      ~replace_failed
       create_commit_checks
       status_checks_enabled
       config
       account
       repo
       ref_
-      all_matches
+      ~all_matches
+      ~unapplied_matches
       apply_requirements
       commit_checks =
     let module Ar = Terrat_base_repo_config_v1.Apply_requirements in
@@ -258,7 +284,7 @@ struct
       let missing_commit_checks =
         if not (status_checks_enabled ~run:`Apply) then []
         else
-          all_matches
+          unapplied_matches
           |> CCList.filter_map
                (fun
                  {
@@ -287,6 +313,7 @@ struct
           ~account
           ~repo
           ~apply_requirements
+          ~replace_failed
           ~commit_checks
           all_matches
       in
@@ -509,13 +536,18 @@ struct
     fetch Keys.commit_checks
     >>= fun commit_checks ->
     maybe_create_pending_apply_commit_checks
+      ~replace_failed:
+        (match op with
+        | `Apply -> true
+        | `Plan -> false)
       create_commit_checks
       status_checks_enabled
       (Builder.State.config s)
       account
       repo
       branch_ref
-      (CCList.flatten matches.Keys.Matches.all_matches)
+      ~all_matches:(CCList.flatten matches.Keys.Matches.all_matches)
+      ~unapplied_matches:(CCList.flatten matches.Keys.Matches.all_unapplied_matches)
       (Terrat_base_repo_config_v1.apply_requirements repo_config)
       commit_checks
     >>| fun () -> work_manifests
@@ -949,10 +981,39 @@ struct
   let never_superseded _ _ _ = Abbs_fc.return_ok false
 
   module Plan = struct
+    (* The dirspaces that the new plans do not run keep their state at the head.  The evaluation that
+       makes the plans publishes the summary comment when it ends, long before a plan result stores
+       those states, thus they are stored now: an applied dirspace that a push did not change would
+       otherwise show as pending until the result. *)
+    let store_kept_states s fetcher work_manifests =
+      match work_manifests with
+      | [] -> Abbs_fc.return_ok ()
+      | work_manifest :: _ -> (
+          match work_manifest.Wm.target with
+          | P2.Target.Drift _ -> Abbs_fc.return_ok ()
+          | P2.Target.Pr _ -> (
+              let also_in_job =
+                CCList.flat_map
+                  (fun wm -> CCList.map Terrat_change.Dirspaceflow.to_dirspace wm.Wm.changes)
+                  work_manifests
+              in
+              or_default s work_manifest ~what:"KEPT_STATES_ERR" ~default:()
+              @@
+              let open Irm in
+              Tasks_base.Kept.query ~also_in_job s fetcher
+              >>= function
+              | None -> Abbs_fc.return_ok ()
+              | Some kept ->
+                  live_check_ref fetcher work_manifest
+                  >>= fun check_ref -> Tasks_base.Kept.store s fetcher kept ~sha:check_ref))
+
     let create ~dest_branch_ref ~branch_ref ~branch s ({ Bs.Fetcher.fetch } as fetcher) =
       let open Irm in
       fetch Keys.can_run_plan
-      >>= fun () -> create ~dest_branch_ref ~branch_ref ~branch `Plan s fetcher
+      >>= fun () ->
+      create ~dest_branch_ref ~branch_ref ~branch `Plan s fetcher
+      >>= fun work_manifests ->
+      store_kept_states s fetcher work_manifests >>| fun () -> work_manifests
 
     let initiate work_manifest s ({ Bs.Fetcher.fetch } as fetcher) =
       let id = work_manifest.Wm.id in
@@ -1254,6 +1315,8 @@ struct
                        plan_failed = _;
                        apply_failed = _;
                        in_progress_plan = _;
+                       plan_work_manifest = _;
+                       apply_work_manifest = _;
                      }
                    ->
                      CCOption.return_if
@@ -1342,9 +1405,12 @@ struct
             >>= fun create_commit_checks ->
             fetch Keys.status_checks_enabled
             >>= fun status_checks_enabled ->
+            fetch Keys.repo_config
+            >>= fun repo_config ->
             create_op_commit_checks_of_result
               ~fail_if_set
               ?stale
+              ~apply_requirements:(Terrat_base_repo_config_v1.apply_requirements repo_config)
               create_commit_checks
               status_checks_enabled
               (Builder.State.config s)
@@ -1488,6 +1554,7 @@ struct
             >>= fun status_checks_enabled ->
             create_op_commit_checks_of_result
               ~fail_if_set
+              ~apply_requirements:(Terrat_base_repo_config_v1.apply_requirements repo_config)
               create_commit_checks
               status_checks_enabled
               (Builder.State.config s)
@@ -1775,6 +1842,23 @@ struct
         work_manifest
         "Failed"
         Status.Failed
+      >>= fun () ->
+      (* An apply that failed to run fails the combined apply check of its commit, as a failed result
+         does.  A push that moved the head since gave the new head a check of its own. *)
+      (match work_manifest.Wm.target with
+        | P2.Target.Pr _
+          when CCString.equal work_manifest.Wm.branch_ref (S.Api.Ref.to_string branch_ref) ->
+            fetch Keys.repo_config
+            >>= fun repo_config ->
+            create_commit_checks'
+              create_commit_checks
+              branch_ref
+              (Tasks_base.failed_apply_check
+                 ~config:(Builder.State.config s)
+                 ~account
+                 ~repo
+                 ~apply_requirements:(Terrat_base_repo_config_v1.apply_requirements repo_config))
+        | P2.Target.Pr _ | P2.Target.Drift _ -> Abbs_fc.return_ok ())
       >>= fun () -> complete_stale_failure work_manifest s fetcher
 
     let result = Plan.result

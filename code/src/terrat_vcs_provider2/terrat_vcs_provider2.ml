@@ -38,6 +38,9 @@ type run_work_manifest_err =
   [ `Failed_to_start_with_msg_err of string
   | `Failed_to_start
   | `Missing_workflow
+    (* The branch to run on is gone: the pull request is merged or closed, and the work manifest
+       can never start. *)
+  | `Ref_not_found
   | `Job_failed of string
     (* Handling a work manifest result failed.  Whoever produced this has
        already told the user, so do not comment again. *)
@@ -414,6 +417,12 @@ module Dirspace_runs = struct
         (** The plan of this pull request that is running now for the dirspace, if any. A dirspace
             that one covers needs no new plan while its files do not change, thus a second
             [terrateam plan] is a noop for it. *)
+    plan_work_manifest : Uuidm.t option;
+        (** The newest plan of the dirspace, whatever its result: the run its plan check links to.
+        *)
+    apply_work_manifest : Uuidm.t option;
+        (** The newest apply of the dirspace, whatever its result: the run its apply check links to.
+        *)
   }
 end
 
@@ -1456,8 +1465,11 @@ module type Shared = sig
   module Commit_check : sig
     val make_dirspace_title : run_type:string -> Terrat_dirspace.t -> string
 
+    (** The check links to the run of [work_manifest], or to the run [work_manifest_id] for a caller
+        that has only the id of the run. *)
     val make_dirspace :
       ?work_manifest:('a, 'b) Terrat_work_manifest3.Existing.t ->
+      ?work_manifest_id:Uuidm.t ->
       ?resource_summary:Resource_summary.t ->
       config:Api.Config.t ->
       description:string ->
@@ -1718,6 +1730,15 @@ module type Shared = sig
         context_id:Uuidm.t ->
         unit ->
         (bool, [> `Error ]) result Abb.Future.t
+
+      (** The running jobs of the context [context_id] that own a work manifest that is still
+          queued. Making such a job terminal aborts that work manifest ({!update_state}). *)
+      val query_with_queued_work_manifests :
+        request_id:string ->
+        Db.t ->
+        context_id:Uuidm.t ->
+        unit ->
+        (Uuidm.t list, [> `Error ]) result Abb.Future.t
 
       val query_by_work_manifest_id :
         request_id:string ->

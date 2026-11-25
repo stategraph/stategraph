@@ -9,7 +9,7 @@ These endpoints list, create, update, and delete users, change their passwords, 
 
 ## Permissions
 
-- Each endpoint requires an `admin` or `users-manage` grant of any scope. List users requires one that is not scoped to tenants.
+- Each endpoint requires an `admin` or `users-manage` grant of any scope.
 - Update, delete, and change password also require strictly more authority than the target user, who must belong only to tenants that your grant reaches. Otherwise the answer is `403 CAPABILITY_UNAUTHORIZED`.
 - Get user details requires only that the user belongs to tenants that your grant reaches.
 
@@ -23,7 +23,7 @@ See [Tenants](/docs/admin/access-control/tenants) for who can act on whom.
 GET /api/v1/users
 ```
 
-Returns users, with cursor-based pagination and filters.
+Returns the users that your grant reaches, newest first, with cursor-based pagination and filters. When your `admin` or `users-manage` grant covers every tenant, the list holds every user of the installation, including users who belong to no tenant. When your grant is scoped to tenants, the list holds the members of those tenants.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -64,6 +64,12 @@ Response:
 | `auth_origin` | string | Authentication origin (for example `local`, `google`, `oidc`) |
 | `admin_rights.is_instance_admin` | boolean | Whether the user administers the whole installation |
 | `admin_rights.is_tenant_admin` | boolean | Whether the user administers named tenants rather than the installation. Never true at the same time as `is_instance_admin` |
+
+While more users follow, the response carries a `Link` header with `rel="next"`. Its URL asks for the next page, with your `type`, `search`, and `limit`. The last page has no `Link` header.
+
+```text
+Link: <https://stategraph.example.com/api/v1/users?limit=25&cursor=...>; rel="next"
+```
 
 ### Get user details
 

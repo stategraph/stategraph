@@ -10,7 +10,8 @@
 
 (** The state of one dirspace in the comment. [active] is a run of the dirspace in flight on the
     head, [aborted] an aborted run of it on the head without results, and [summary_state] the state
-    stored for the head. A run in flight decides the state over any aborted run. *)
+    stored for the head. A run in flight decides the state over any earlier result, stored state or
+    aborted run. *)
 val status_of_row :
   plan_success:bool option ->
   apply_success:bool option ->

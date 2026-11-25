@@ -3496,16 +3496,32 @@ struct
               Logs.info (fun m ->
                   m "%s : WORK_MANIFEST_NOT_FOUND : run_id = %s" (Builder.log_id s) run_id);
               Abbs_fc.return_err `Noop
-          | Some { Wm.state = Wm.State.Aborted; id = work_manifest_id; _ } ->
-              bail_out_aborted s work_manifest_id run_id
-          | Some work_manifest ->
-              (* Abort before the event is dispatched, not after: the dispatch
-                 publishes the failure and then suspends, so there is no "after"
-                 to run in. *)
-              abort_dead_work_manifest s work_manifest.Wm.id
-              >>= fun () ->
-              abort_work_of_the_node_of_work_manifest s work_manifest.Wm.id
-              >>= fun () -> dispatch_fail_event s work_manifest run_id)
+          | Some work_manifest -> (
+              match work_manifest.Wm.state with
+              | Wm.State.Aborted -> bail_out_aborted s work_manifest.Wm.id run_id
+              | Wm.State.Completed ->
+                  (* The live work manifest of a run comes first, thus the run has none: its job
+                     died after it reported every result, for example because a user cancelled it.
+                     The result already set the checks and told the user, thus only the work the
+                     node still owes is released. *)
+                  Logs.info (fun m ->
+                      m
+                        "%s : WORK_MANIFEST_FAILURE_IGNORED_COMPLETED : work_manifest_id = %a : \
+                         run_id = %s"
+                        (Builder.log_id s)
+                        Uuidm.pp
+                        work_manifest.Wm.id
+                        run_id);
+                  abort_work_of_the_node_of_work_manifest s work_manifest.Wm.id
+                  >>= fun () -> Abbs_fc.return_err `Noop
+              | Wm.State.(Queued | Running) ->
+                  (* Abort before the event is dispatched, not after: the dispatch
+                     publishes the failure and then suspends, so there is no "after"
+                     to run in. *)
+                  abort_dead_work_manifest s work_manifest.Wm.id
+                  >>= fun () ->
+                  abort_work_of_the_node_of_work_manifest s work_manifest.Wm.id
+                  >>= fun () -> dispatch_fail_event s work_manifest run_id))
 
     let eval_push_event =
       let module V1 = Terrat_base_repo_config_v1 in
@@ -3991,13 +4007,31 @@ struct
       run ~name:"finalize_unfinished_terrateam_checks" (fun _s { Bs.Fetcher.fetch } ->
           let module Ch = Terrat_commit_check in
           let module Status = Ch.Status in
+          let module Runs = Terrat_vcs_provider2.Dirspace_runs in
           let open Irm in
           fetch Keys.commit_checks
           >>= fun commit_checks ->
+          fetch Keys.matched_dirspace_runs
+          >>= fun runs ->
+          (* The check of a plan still queued or running is not finished: that plan has not run
+             yet, and its own result completes the check. *)
+          let in_flight_plan_checks =
+            CCList.filter_map
+              (fun runs ->
+                CCOption.map
+                  (fun _ ->
+                    S.Commit_check.make_dirspace_title
+                      ~run_type:"plan"
+                      runs.Runs.state.Terrat_intra_pr_hash.Dirspace_state.dirspace)
+                  runs.Runs.in_progress_plan)
+              runs
+          in
           let unfinished =
             CCList.filter_map
               (function
                 | { Ch.status = Status.(Completed | Failed | Canceled); _ } -> None
+                | { Ch.status = Status.(Queued | Running); title; _ }
+                  when Sln_list.String.mem title in_flight_plan_checks -> None
                 | { Ch.status = Status.(Queued | Running); title; _ } as c
                   when CCString.prefix ~pre:"terrateam plan" title
                        || CCString.prefix ~pre:"terrateam apply" title -> Some c
@@ -4464,6 +4498,7 @@ struct
                         else (Status.Completed, completed dirspace)
                       in
                       S.Commit_check.make_dirspace
+                        ?work_manifest_id:(K.work_manifest kept step dirspace)
                         ~config:(Builder.State.config s)
                         ~description
                         ~run_type:(Wm.Step.to_string step)
@@ -4541,17 +4576,48 @@ struct
               match CCList.flatten all_unapplied_matches with
               | [] -> fetch Keys.maybe_create_completed_apply_check
               | _ :: _ as unapplied_matches ->
+                  let apply_requirements =
+                    Terrat_base_repo_config_v1.apply_requirements repo_config
+                  in
+                  let apply_check_failed =
+                    CCList.exists
+                      (function
+                        | {
+                            Terrat_commit_check.title;
+                            status = Status.Failed;
+                            details_url = _;
+                            description = _;
+                          } -> CCString.equal title "terrateam apply"
+                        | {
+                            Terrat_commit_check.status =
+                              Status.(Queued | Running | Completed | Canceled);
+                            title = _;
+                            details_url = _;
+                            description = _;
+                          } -> false)
+                      commit_checks
+                  in
+                  (* A kept dirspace whose newest apply failed is still failed at the head, thus so
+                     is the combined apply check. *)
                   create_commit_checks'
                     create_commit_checks
                     branch_ref
-                    (Tasks_base.pending_apply_check
-                       ~config:(Builder.State.config s)
-                       ~account
-                       ~repo
-                       ~apply_requirements:
-                         (Terrat_base_repo_config_v1.apply_requirements repo_config)
-                       ~commit_checks
-                       unapplied_matches)))
+                    (if Terrat_data.Dirspace_set.is_empty failed_applies then
+                       Tasks_base.pending_apply_check
+                         ~config:(Builder.State.config s)
+                         ~account
+                         ~repo
+                         ~apply_requirements
+                         ~replace_failed:false
+                         ~commit_checks
+                         unapplied_matches
+                     else if apply_check_failed then []
+                     else
+                       Tasks_base.failed_apply_check
+                         ~config:(Builder.State.config s)
+                         ~account
+                         ~repo
+                         ~apply_requirements)))
   end
 
   let default_tasks () =

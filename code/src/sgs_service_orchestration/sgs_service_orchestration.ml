@@ -1,31 +1,3 @@
-module Rt = struct
-  let api_v1 () = Brtl_rtng.Route.(rel / "api" / "v1")
-
-  (* GitHub App creation: the manifest form, and GitHub's return with the code
-     of the created App. Both optional on the callback, so a mangled return is
-     redirected rather than answered with a 404. *)
-  let setup_github_app_manifest () =
-    Brtl_rtng.Route.(
-      api_v1 ()
-      / "setup"
-      / "github-app"
-      / "manifest"
-      /* Body.decode ~json:Sgs_api_components_github_app_manifest_request.of_yojson ())
-
-  let setup_github_app () = Brtl_rtng.Route.(api_v1 () / "setup" / "github-app")
-
-  let setup_github_app_delete () =
-    Brtl_rtng.Route.(
-      setup_github_app ()
-      /* Body.decode ~json:Sgs_api_components_github_app_delete_request.of_yojson ())
-
-  let setup_github_app_credentials () =
-    Brtl_rtng.Route.(
-      setup_github_app ()
-      / "credentials"
-      /* Body.decode ~json:Sgs_api_components_github_app_credentials_request.of_yojson ())
-end
-
 type t = {
   config : Sgs_config.t;
   storage : Sgs_storage.t;
@@ -104,8 +76,12 @@ let routes { config; storage } =
       ( `DELETE,
         Sgs_api_tenants.Unlink_vcs_installation.route ()
         --> with_tenant Sgs_service_orchestration_ep_vcs_installation_delete.run );
+      (* GitHub App creation: the manifest form, and GitHub's return with the code
+         of the created App. Both optional on the callback, so a mangled return is
+         redirected rather than answered with a 404. *)
       ( `POST,
-        Rt.setup_github_app_manifest ()
+        Sgs_api_setup.Github_app_manifest.route ()
+        /* Body.decode ~json:Sgs_api_components_github_app_manifest_request.of_yojson ()
         --> Sgs_service_orchestration_ep_github_app_manifest.run config storage );
       ( `GET,
         Sgs_api_setup.Github_app_callback.route ()
@@ -114,10 +90,12 @@ let routes { config; storage } =
         Sgs_api_setup.Github_app_get.route ()
         --> Sgs_service_orchestration_ep_github_app_get.run config storage );
       ( `DELETE,
-        Rt.setup_github_app_delete ()
+        Sgs_api_setup.Github_app_delete.route ()
+        /* Body.decode ~json:Sgs_api_components_github_app_delete_request.of_yojson ()
         --> Sgs_service_orchestration_ep_github_app_delete.run config storage );
       ( `PUT,
-        Rt.setup_github_app_credentials ()
+        Sgs_api_setup.Github_app_set_credentials.route ()
+        /* Body.decode ~json:Sgs_api_components_github_app_credentials_request.of_yojson ()
         --> Sgs_service_orchestration_ep_github_app_credentials_put.run config storage );
     ]
 

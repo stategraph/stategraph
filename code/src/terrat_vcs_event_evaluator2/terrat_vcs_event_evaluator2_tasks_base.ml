@@ -442,6 +442,7 @@ struct
       plan_changes : [ `Changes | `No_changes ] Terrat_data.Dirspace_map.t;
       plan_in_flight : Terrat_data.Dirspace_set.t;
       summaries : (Terrat_dirspace.t * Terrat_vcs_provider2.Dirspace_summary.t) list;
+      runs : Terrat_vcs_provider2.Dirspace_runs.t Terrat_data.Dirspace_map.t;
     }
 
     let kept_planned { kept_planned; _ } = kept_planned
@@ -451,11 +452,34 @@ struct
     let plan_changes { plan_changes; _ } = plan_changes
     let plan_in_flight { plan_in_flight; _ } = plan_in_flight
 
+    let work_manifest { runs; _ } step dirspace =
+      let module Dr = Terrat_vcs_provider2.Dirspace_runs in
+      let module Step = Terrat_work_manifest3.Step in
+      CCOption.flat_map
+        (fun {
+               Dr.plan_work_manifest;
+               apply_work_manifest;
+               state = _;
+               plan_failed = _;
+               apply_failed = _;
+               in_progress_plan = _;
+             }
+           ->
+          match step with
+          | Step.Plan -> plan_work_manifest
+          (* A dirspace whose plan found no changes is applied with no apply run. *)
+          | Step.(Apply | Unsafe_apply) ->
+              CCOption.or_ ~else_:plan_work_manifest apply_work_manifest
+          | Step.(Build_config | Build_tree | Index) -> None)
+        (Terrat_data.Dirspace_map.find_opt dirspace runs)
+
     (* [not_in_job] is what keeps the dirspaces this job runs out of the answer: they have their own
        state, written from their own result.  A dirspace whose plan is in flight lands in
        [kept_planned] too, because the job that runs it has not stored its state yet, and the
-       summary must show it as planned while the plan runs. *)
-    let query s { Builder.Bs.Fetcher.fetch } =
+       summary must show it as planned while the plan runs.  [also_in_job] are the dirspaces of the
+       work manifests that the job is making now, which [Keys.work_manifests_for_job] does not hold
+       yet. *)
+    let query ?(also_in_job = []) s { Builder.Bs.Fetcher.fetch } =
       let module Wm = Terrat_work_manifest3 in
       let module Dc = Terrat_change_match3.Dirspace_config in
       let module Ds = Terrat_intra_pr_hash.Dirspace_state in
@@ -478,6 +502,7 @@ struct
                 work_manifests
                 |> CCList.flat_map (fun wm ->
                     CCList.map Terrat_change.Dirspaceflow.to_dirspace wm.Wm.changes)
+                |> CCList.append also_in_job
                 |> Terrat_data.Dirspace_set.of_list
               in
               let not_in_job dirspace = not (Terrat_data.Dirspace_set.mem dirspace job_dirspaces) in
@@ -589,6 +614,11 @@ struct
                      plan_changes;
                      plan_in_flight;
                      summaries;
+                     runs =
+                       runs
+                       |> CCList.map (fun runs ->
+                           (runs.Terrat_vcs_provider2.Dirspace_runs.state.Ds.dirspace, runs))
+                       |> Terrat_data.Dirspace_map.of_list;
                    }))
 
     let store s ({ Builder.Bs.Fetcher.fetch } as _fetcher) (kept : t) ~sha =
@@ -606,11 +636,24 @@ struct
             summaries)
   end
 
-  let pending_apply_check ~config ~account ~repo ~apply_requirements ~commit_checks matches =
+  let pending_apply_check
+      ~config
+      ~account
+      ~repo
+      ~apply_requirements
+      ~replace_failed
+      ~commit_checks
+      matches =
     let module Ar = Terrat_base_repo_config_v1.Apply_requirements in
+    let module Ch = Terrat_commit_check in
     let apply_check_exists =
       CCList.exists
-        (fun check -> CCString.equal check.Terrat_commit_check.title "terrateam apply")
+        (fun { Ch.title; status; details_url = _; description = _ } ->
+          CCString.equal title "terrateam apply"
+          &&
+          match status with
+          | Ch.Status.Failed -> not replace_failed
+          | Ch.Status.(Queued | Running | Completed | Canceled) -> true)
         commit_checks
     in
     match matches with
@@ -625,6 +668,20 @@ struct
             "terrateam apply";
         ]
     | [] | _ :: _ -> []
+
+  let failed_apply_check ~config ~account ~repo ~apply_requirements =
+    let module Ar = Terrat_base_repo_config_v1.Apply_requirements in
+    if apply_requirements.Ar.create_pending_apply_check then
+      [
+        S.Commit_check.make_str
+          ~config
+          ~description:"Failed"
+          ~status:Terrat_commit_check.Status.Failed
+          ~repo
+          ~account
+          "terrateam apply";
+      ]
+    else []
 
   let apply_check_description = function
     | `Changes | `Not_run -> "Completed"

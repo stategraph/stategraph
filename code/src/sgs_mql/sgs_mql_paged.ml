@@ -554,25 +554,7 @@ let reads_foreign_tables config query =
        (fun t -> CCList.mem ~eq:CCString.equal t terrateam_table_names)
        (Mql_to_pgsql.tables query)
 
-let encode_link rel uri = Printf.sprintf "<%s>; rel=\"%s\"" (Uri.to_string uri) rel
-
-let update_page_param uri cursor =
-  uri
-  |> CCFun.flip Uri.remove_query_param "page"
-  |> fun uri -> Uri.add_query_param' uri ("page", cursor)
-
-let mk_pagination_headers ~prev ~next ctx =
-  let merged_uri_base = Brtl_uri.merge_base ~base:(Brtl_ctx.uri_base ctx) (Brtl_ctx.uri ctx) in
-  let next_uri = CCOption.map (update_page_param merged_uri_base) next in
-  let prev_uri = CCOption.map (update_page_param merged_uri_base) prev in
-  let link =
-    CCString.concat
-      ", "
-      (CCOption.to_list (CCOption.map (encode_link "next") next_uri)
-      @ CCOption.to_list (CCOption.map (encode_link "prev") prev_uri))
-  in
-  let headers = Cohttp.Header.of_list [ ("link", link) ] in
-  headers
+let mk_pagination_headers ~prev ~next ctx = Sgs_eplib.pagination_links ~param:"page" ~next ~prev ctx
 
 (* Apply the requested page (if any) to an MQL AST and compile to pgsql.
    Returns the compiled query plus the effective row limit.

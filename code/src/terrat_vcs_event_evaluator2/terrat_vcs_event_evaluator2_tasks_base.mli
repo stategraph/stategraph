@@ -168,8 +168,13 @@ module Make
   module Kept : sig
     type t
 
+    (** [also_in_job] are the dirspaces of work manifests that the job makes now, and that the work
+        manifests of the job do not hold yet: they are run, thus not kept. *)
     val query :
-      Builder.Bs.state -> Builder.Bs.Fetcher.t -> (t option, Builder.err) result Abb.Future.t
+      ?also_in_job:Terrat_dirspace.t list ->
+      Builder.Bs.state ->
+      Builder.Bs.Fetcher.t ->
+      (t option, Builder.err) result Abb.Future.t
 
     (** Write the states of the dirspaces at [sha], the head of the pull request. A state which is
         already there keeps it, thus two callers of one head agree. *)
@@ -196,20 +201,41 @@ module Make
 
     (** The dirspaces with a plan that is queued or running now. *)
     val plan_in_flight : t -> Terrat_data.Dirspace_set.t
+
+    (** [work_manifest t step dirspace] is the newest run of [dirspace] that its check of [step]
+        links to: its newest plan, or its newest apply, or for an applied dirspace with no apply
+        run, the plan that found no changes. *)
+    val work_manifest : t -> Terrat_work_manifest3.Step.t -> Terrat_dirspace.t -> Uuidm.t option
   end
 
-  (** [pending_apply_check ~config ~account ~repo ~apply_requirements ~commit_checks matches] is the
-      waiting [terrateam apply] check, when the repository asks for one and [commit_checks] has no
-      [terrateam apply] check yet. The check holds the pull request until it is applied. A run that
-      matches no dirspace gets none: it has nothing to wait for, and its apply check is created
-      completed when the run finishes. *)
+  (** [pending_apply_check ~config ~account ~repo ~apply_requirements ~replace_failed ~commit_checks
+       matches] is the waiting [terrateam apply] check, when the repository asks for one and
+      [commit_checks] has no [terrateam apply] check yet. The check holds the pull request until it
+      is applied. A run that matches no dirspace gets none: it has nothing to wait for, and its
+      apply check is created completed when the run finishes.
+
+      With [replace_failed], a failed [terrateam apply] check counts as none, thus it waits again:
+      the caller makes an apply, whose result decides the check. A plan leaves a failed check as it
+      is. *)
   val pending_apply_check :
     config:S.Api.Config.t ->
     account:S.Api.Account.t ->
     repo:S.Api.Repo.t ->
     apply_requirements:Terrat_base_repo_config_v1.Apply_requirements.t ->
+    replace_failed:bool ->
     commit_checks:Terrat_commit_check.t list ->
     'a list ->
+    Terrat_commit_check.t list
+
+  (** [failed_apply_check ~config ~account ~repo ~apply_requirements] is the failed
+      [terrateam apply] check of a pull request whose apply failed, when the repository asks for a
+      waiting one: the check that holds the pull request until it is applied says that the apply
+      failed. The next apply writes it as waiting again ({!pending_apply_check}). *)
+  val failed_apply_check :
+    config:S.Api.Config.t ->
+    account:S.Api.Account.t ->
+    repo:S.Api.Repo.t ->
+    apply_requirements:Terrat_base_repo_config_v1.Apply_requirements.t ->
     Terrat_commit_check.t list
 
   (** Create the completed [terrateam apply] commit check at the head of the pull request.

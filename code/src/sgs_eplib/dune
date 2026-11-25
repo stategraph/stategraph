@@ -10,5 +10,6 @@
   pgsql_pool
   sgs_api
   sgs_tenant
+  uri
   uuidm
   yojson))

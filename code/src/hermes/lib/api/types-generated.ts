@@ -1937,6 +1937,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description Lists the active users the caller manages, newest first. Requires an `admin` or `users-manage` grant: one that reaches every tenant lists every user of the installation, users in no tenant included; one scoped to tenants lists the members of the open tenants it reaches. Paginated via Link header (RFC 5988): while more users follow, the response carries `Link: <url>; rel="next"`, where `url` asks for the next page; the last page has no `Link` header. The body's `has_more` and `next_cursor` say the same. */
         get: operations["users/list"];
         put?: never;
         post: operations["users/create"];

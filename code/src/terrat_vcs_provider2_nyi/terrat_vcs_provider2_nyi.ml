@@ -210,6 +210,7 @@ module Commit_check = struct
 
   let make_dirspace
       ?work_manifest
+      ?work_manifest_id
       ?resource_summary
       ~config
       ~description
@@ -294,6 +295,7 @@ module Job_context = struct
     let query_all_by_context_id ~request_id db ~context_id () = raise (Failure "nyi")
     let query_pending_by_context_id ~request_id db ~context_id () = raise (Failure "nyi")
     let query_explicit_plan_exists ~request_id db ~context_id () = raise (Failure "nyi")
+    let query_with_queued_work_manifests ~request_id db ~context_id () = raise (Failure "nyi")
     let query_by_work_manifest_id ~request_id db ~work_manifest_id () = raise (Failure "nyi")
     let update_state ~request_id db ~job_id state = raise (Failure "nyi")
     let set_force_fail ~request_id:_ _db ~job_id:_ ~force_fail:_ = raise (Failure "nyi")
