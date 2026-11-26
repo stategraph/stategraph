@@ -124,3 +124,12 @@ module Cursor : sig
       first page" rather than an error -- the cursor is the client's to lose. *)
   val decode : string -> (string * Uuidm.t) option
 end
+
+(** [pagination_links ~param ~next ~prev ctx] is the [Link] header of a page of a list: a
+    [rel="next"] link when [next] is [Some cursor], then a [rel="prev"] link when [prev] is, each to
+    the request's URL on the server's public base with the query parameter [param] set to that
+    cursor. For [GET /api/v1/users?limit=2&cursor=a] and
+    [pagination_links ~param:"cursor" ~next:(Some "b") ~prev:None]:
+    {v link: <https://sg.example.com/api/v1/users?limit=2&cursor=b>; rel="next" v} *)
+val pagination_links :
+  param:string -> next:string option -> prev:string option -> ('a, 'b) Brtl_ctx.t -> Cohttp.Header.t

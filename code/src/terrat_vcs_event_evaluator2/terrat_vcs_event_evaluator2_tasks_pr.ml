@@ -869,6 +869,8 @@ struct
                            plan_failed = _;
                            apply_failed = _;
                            in_progress_plan;
+                           plan_work_manifest = _;
+                           apply_work_manifest = _;
                          }
                        ->
                          CCOption.map
@@ -2554,8 +2556,109 @@ struct
               | None -> assert false)
           | _ -> assert false)
 
+    let is_live_work_manifest work_manifest =
+      let module Wm = Terrat_work_manifest3 in
+      match work_manifest.Wm.state with
+      | Wm.State.(Queued | Running) -> true
+      | Wm.State.(Completed | Aborted) -> false
+
+    (* The checks of the dirspaces of [work_manifest], canceled because its pull request was merged,
+       as the checks of a closed pull request are. *)
+    let merge_canceled_checks s ~account ~repo ~status_checks_enabled work_manifest =
+      let module Wm = Terrat_work_manifest3 in
+      match CCList.last_opt work_manifest.Wm.steps with
+      | None -> []
+      | Some step ->
+          let run =
+            match step with
+            | Wm.Step.Plan -> `Plan
+            | Wm.Step.(Apply | Unsafe_apply) -> `Apply
+            | Wm.Step.(Build_config | Build_tree | Index) -> `Other
+          in
+          if status_checks_enabled ~run then
+            CCList.map
+              (fun change ->
+                S.Commit_check.make_dirspace
+                  ~work_manifest
+                  ~config:(Builder.State.config s)
+                  ~description:"Canceled: the pull request was merged"
+                  ~run_type:(Wm.Step.to_string step)
+                  ~dirspace:(Terrat_change.Dirspaceflow.to_dirspace change)
+                  ~status:Terrat_commit_check.Status.Canceled
+                  ~repo
+                  ~account
+                  ())
+              work_manifest.Wm.changes
+          else []
+
+    (* End the job [job_id].  Making it terminal aborts its live work manifests, whose reservations
+       are released here.  The answer is their checks, canceled. *)
+    let end_queued_job s ~account ~repo ~status_checks_enabled job_id =
+      let module Wm = Terrat_work_manifest3 in
+      let open Irm in
+      let request_id = Builder.log_id s in
+      Logs.info (fun m -> m "%s : AUTOMERGE : END_QUEUED_JOB : job=%a" request_id Uuidm.pp job_id);
+      Builder.run_db s ~f:(fun db ->
+          S.Job_context.Job.query_work_manifests ~request_id db ~job_id ()
+          >>= fun work_manifests ->
+          S.Job_context.Job.update_state ~request_id db ~job_id Tjc.Job.State.Failed
+          >>= fun () ->
+          let live = CCList.filter is_live_work_manifest work_manifests in
+          Abbs_fc.List_result.iter
+            ~f:(fun work_manifest ->
+              Abbs_fc.to_result
+                (Tasks_base.release_stategraph_reservation ~request_id db work_manifest.Wm.id))
+            live
+          >>| fun () ->
+          CCList.flat_map (merge_canceled_checks s ~account ~repo ~status_checks_enabled) live)
+
+    (* The jobs of the context of [job], other than [job], that own a work manifest still queued. *)
+    let other_jobs_with_queued_work_manifests s { Bs.Fetcher.fetch } job =
+      let open Irm in
+      fetch Keys.context
+      >>= fun context ->
+      Builder.run_db s ~f:(fun db ->
+          S.Job_context.Job.query_with_queued_work_manifests
+            ~request_id:(Builder.log_id s)
+            db
+            ~context_id:context.Tjc.Context.id
+            ())
+      >>| CCList.filter (fun job_id -> not (Uuidm.equal job_id job.Tjc.Job.id))
+
+    (* The pull request is merged, thus a work manifest still queued for it, for example a plan that
+       was queued behind the apply, would run on a merged branch, or on none once the branch is
+       deleted.  Its job is ended, and the checks of its work manifests are canceled.  Best effort:
+       the merge is done, and the branch is still deleted when this fails. *)
+    let end_jobs_with_queued_work_manifests s ({ Bs.Fetcher.fetch } as fetcher) job =
+      let end_jobs =
+        let open Irm in
+        fetch Keys.account
+        >>= fun account ->
+        fetch Keys.repo
+        >>= fun repo ->
+        fetch Keys.status_checks_enabled
+        >>= fun status_checks_enabled ->
+        other_jobs_with_queued_work_manifests s fetcher job
+        >>= fun job_ids ->
+        Abbs_fc.List_result.map ~f:(end_queued_job s ~account ~repo ~status_checks_enabled) job_ids
+        >>= fun checks ->
+        fetch Keys.branch_ref
+        >>= fun branch_ref ->
+        fetch Keys.create_commit_checks
+        >>= fun create_commit_checks ->
+        create_commit_checks' create_commit_checks branch_ref (CCList.flatten checks)
+      in
+      let open Abb.Future.Infix_monad in
+      end_jobs
+      >>= function
+      | Ok () -> Abbs_fc.return_ok ()
+      | Error err ->
+          Logs.err (fun m ->
+              m "%s : AUTOMERGE : END_QUEUED_JOBS_ERR : %a" (Builder.log_id s) Builder.pp_err err);
+          Abbs_fc.return_ok ()
+
     let maybe_automerge =
-      run ~name:"maybe_automerge" (fun s { Bs.Fetcher.fetch } ->
+      run ~name:"maybe_automerge" (fun s ({ Bs.Fetcher.fetch } as fetcher) ->
           let module V1 = Terrat_base_repo_config_v1 in
           let module Am = V1.Automerge in
           let open Irm in
@@ -2635,6 +2738,10 @@ struct
                   merge_strategy
                 >>= function
                 | Ok () ->
+                    let open Irm in
+                    end_jobs_with_queued_work_manifests s fetcher job
+                    >>= fun () ->
+                    let open Abb.Future.Infix_monad in
                     if delete_branch' then (
                       let repo = S.Api.Pull_request.repo pull_request in
                       let branch =

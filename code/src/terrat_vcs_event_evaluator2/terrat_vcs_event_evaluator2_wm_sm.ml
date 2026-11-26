@@ -392,6 +392,10 @@ struct
     | `Result_handling_err ->
         (* The evaluation that failed has already published its own message. *)
         Abbs_fc.return_ok ()
+    | `Ref_not_found ->
+        (* The branch is gone, thus the pull request is merged or closed, and nobody waits on a
+           comment. *)
+        Abbs_fc.return_ok ()
     | `Error ->
         (* Dispatching the work manifest failed, so nothing has run and nothing
            else has spoken to the user. *)

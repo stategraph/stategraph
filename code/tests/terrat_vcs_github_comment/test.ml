@@ -175,6 +175,29 @@ let test =
           assert_status
             ~expected:St.Pending
             (status ~active:false ~active_apply:false ~aborted:false ()));
+      (* Field report (issue #3681): a dirspace whose last apply failed is planned or applied again.
+         The summary published when the run starts must say the run is in flight; it said
+         "Failed" until the run finished. *)
+      Oth.test ~name:"an apply in flight shows as running over a failed apply" (fun _ ->
+          assert_status
+            ~expected:St.Apply_running
+            (Terrat_vcs_github_comment_unified.status_of_row
+               ~plan_success:(Some true)
+               ~apply_success:(Some false)
+               ~active:true
+               ~active_apply:true
+               ~aborted:false
+               ~summary_state:(Some "failed")));
+      Oth.test ~name:"a plan in flight shows as running over a failed apply" (fun _ ->
+          assert_status
+            ~expected:St.Plan_running
+            (Terrat_vcs_github_comment_unified.status_of_row
+               ~plan_success:(Some true)
+               ~apply_success:(Some false)
+               ~active:true
+               ~active_apply:false
+               ~aborted:false
+               ~summary_state:(Some "failed")));
     ]
 
 let () = Oth.run ~file:__FILE__ ~setup:(fun () -> Ok ()) ~teardown:(fun _ -> ()) (fun _ -> test)

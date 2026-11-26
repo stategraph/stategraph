@@ -57,8 +57,6 @@ type authority =
   | Tenant_out_of_scope of string
 [@@deriving show, eq]
 
-(* The tenants a user is reached in, by either grant: administering a tenant reaches its users, and
-   so does managing them. *)
 let users_reach caps = Scope.union caps.Sg_caps.admin caps.Sg_caps.users_manage
 
 (* The one-tenant half of [users_reach] *)
@@ -194,11 +192,18 @@ let states_denial reach ~tenant ~state_id ~fq_address =
   else Some Resource_not_granted
 
 module Db_checks = struct
+  module Scope_rule = struct
+    type t = {
+      neg : bool;
+      prefix : bool;
+      pat : string;
+    }
+    [@@deriving show, eq]
+  end
+
   type rule = {
     state : string;
-    neg : bool;
-    prefix : bool;
-    pat : string;
+    address : Scope_rule.t;
   }
   [@@deriving show, eq]
 
@@ -208,23 +213,28 @@ module Db_checks = struct
   }
   [@@deriving show, eq]
 
-  (* The rules of one scope, as the query takes them, with its catch-all spelled out.
-     [Scope.to_rules] leaves the rule matching everything out when it refuses, because reading the
-     rules back refuses what no rule names; the query has no such default -- an address that matches
-     no rule joins nothing and is judged allowed -- so the refusal that every other rule is an
-     exception to has to be written down here. *)
-  let address_rules ~state addresses =
+  (* [Scope.to_rules] leaves the rule matching everything out when it refuses, because reading the
+     rules back refuses what no rule names; a query has no such default, so the refusal that every
+     other rule is an exception to is written down here. *)
+  let scope_rules scope =
     let encoded =
       CCList.map
         (fun (p, allowed) ->
           match p with
-          | Sg_caps_trie.Pattern.Prefix pat -> { state; neg = not allowed; prefix = true; pat }
-          | Sg_caps_trie.Pattern.Literal pat -> { state; neg = not allowed; prefix = false; pat })
-        (Scope.to_rules addresses)
+          | Sg_caps_trie.Pattern.Prefix pat -> { Scope_rule.neg = not allowed; prefix = true; pat }
+          | Sg_caps_trie.Pattern.Literal pat ->
+              { Scope_rule.neg = not allowed; prefix = false; pat })
+        (Scope.to_rules scope)
     in
     match encoded with
-    | { prefix = true; pat = ""; _ } :: _ -> encoded
-    | _ :: _ | [] -> { state; neg = true; prefix = true; pat = "" } :: encoded
+    | { Scope_rule.prefix = true; pat = ""; neg = _ } :: _ -> encoded
+    | _ :: _ | [] -> { Scope_rule.neg = true; prefix = true; pat = "" } :: encoded
+
+  (* The rules of one scope of addresses, as the refusal queries take them: an address that matches
+     no rule joins nothing and is judged allowed there, which the catch-all refusal of [scope_rules]
+     prevents. *)
+  let address_rules ~state addresses =
+    CCList.map (fun address -> { state; address }) (scope_rules addresses)
 
   (* The state rules of one tenant, as the columns of the refusal queries. A state rule is a state
      id, or ["*"] for the states no rule names; a rule that names a family of states has no

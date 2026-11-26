@@ -121,3 +121,19 @@ module Cursor = struct
     | Some (timestamp, id) -> CCOption.map (fun id -> (timestamp, id)) (Uuidm.of_string id)
     | None -> None
 end
+
+let pagination_links ~param ~next ~prev ctx =
+  let uri = Brtl_uri.merge_base ~base:(Brtl_ctx.uri_base ctx) (Brtl_ctx.uri ctx) in
+  let link rel cursor =
+    let uri =
+      uri
+      |> CCFun.flip Uri.remove_query_param param
+      |> CCFun.flip Uri.add_query_param' (param, cursor)
+    in
+    Printf.sprintf "<%s>; rel=\"%s\"" (Uri.to_string uri) rel
+  in
+  let links =
+    CCOption.to_list (CCOption.map (link "next") next)
+    @ CCOption.to_list (CCOption.map (link "prev") prev)
+  in
+  Cohttp.Header.of_list [ ("link", CCString.concat ", " links) ]
