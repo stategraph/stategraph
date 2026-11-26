@@ -38,6 +38,14 @@ module Start : sig
 
   val decide : t -> decision
 
+  (** [decide_drift_plan ~restart_on_change impact] is what the start of a drift plan does. A drift
+      plan changes no infrastructure and plans the commit that the runner checked out, and its
+      result compares that commit with the head. Thus only a proven impact restarts it, and only
+      when its schedule sets [restart_on_change: true]. An unknown impact runs: with a config
+      builder the config of a new head is not built when the start arrives, and a restart then plans
+      each dirspace of the drift again. *)
+  val decide_drift_plan : restart_on_change:bool -> t -> decision
+
   (** [uncovered_dirspaces ~live aborted] is the dirspaces of the [aborted] work manifests of a slot
       that no work covers yet, thus the slot makes work again. A live work manifest covers an
       aborted one when it has its dirspaces, or when it was made after the aborted one. The work

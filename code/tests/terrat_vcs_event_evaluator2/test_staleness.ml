@@ -63,6 +63,32 @@ let test_start_restarts_unless_not_impacted =
       check "impacted restarts" St.Start.Restart (St.Impacted [ tf ]);
       ())
 
+let test_drift_plan_start_restarts_only_on_impact =
+  Oth.test ~name:"a drift plan start restarts only on a proven impact" (fun _ ->
+      let check name expected ~restart_on_change impact =
+        assert_eq
+          ~eq:St.Start.equal_decision
+          ~pp:St.Start.pp_decision
+          name
+          expected
+          (St.Start.decide_drift_plan ~restart_on_change impact)
+      in
+      check "not impacted runs" St.Start.Run ~restart_on_change:true St.Not_impacted;
+      check "unknown runs" St.Start.Run ~restart_on_change:true St.Unknown;
+      check "impacted restarts" St.Start.Restart ~restart_on_change:true (St.Impacted [ tf ]);
+      check
+        "restart_on_change off, not impacted runs"
+        St.Start.Run
+        ~restart_on_change:false
+        St.Not_impacted;
+      check "restart_on_change off, unknown runs" St.Start.Run ~restart_on_change:false St.Unknown;
+      check
+        "restart_on_change off, impacted runs"
+        St.Start.Run
+        ~restart_on_change:false
+        (St.Impacted [ tf ]);
+      ())
+
 let test_pr_result_warns_on_unknown =
   Oth.test ~name:"a pull request result warns when the impact is unknown" (fun _ ->
       let check name expected impact =
@@ -305,6 +331,7 @@ let test =
       test_changed_dirspaces_are_impacted;
       test_missing_tree_is_unknown;
       test_start_restarts_unless_not_impacted;
+      test_drift_plan_start_restarts_only_on_impact;
       test_start_uncovered_dirspaces;
       test_pr_result_warns_on_unknown;
       test_drift_result_reconciles_on_unknown;

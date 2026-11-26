@@ -157,11 +157,15 @@ http {
             # scripts are written <script src=...> and do not match. The document is no-store,
             # so a nonce is never served twice. sub_filter does not rescan its own output, so
             # the GTM snippet of STATEGRAPH_GTM_SUB_FILTER carries the nonce itself.
+            # style-src allows the same nonce: the console reads it from these scripts and
+            # gives it to the <style> elements it creates at runtime. img-src lists the GitHub
+            # and Google avatar hosts and the GTM beacon hosts; an avatar on any other host
+            # shows the identicon.
             set $cspNonce $request_id;
             sub_filter_once off;
             sub_filter '<script>' '<script nonce="$cspNonce">';
 
-            add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'nonce-$cspNonce' https://www.googletagmanager.com https://eu-assets.i.posthog.com https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.github.com https://*.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://www.google.com https://*.doubleclick.net https://px.ads.linkedin.com https://eu.i.posthog.com https://eu-assets.i.posthog.com; worker-src 'self' blob:; frame-src https://www.googletagmanager.com https://js.stripe.com; object-src 'none'; base-uri 'self'; form-action 'self' ${STATEGRAPH_GITHUB_WEB_BASE}; frame-ancestors 'none'; manifest-src 'self'; upgrade-insecure-requests;" always;
+            add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'nonce-$cspNonce' https://www.googletagmanager.com https://eu-assets.i.posthog.com https://js.stripe.com; style-src 'self' 'nonce-$cspNonce'; img-src 'self' data: https://avatars.githubusercontent.com https://*.googleusercontent.com https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://www.google.com https://googleads.g.doubleclick.net https://www.googleadservices.com https://px.ads.linkedin.com; font-src 'self' data:; connect-src 'self' https://api.github.com https://*.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://www.google.com https://*.doubleclick.net https://px.ads.linkedin.com https://eu.i.posthog.com https://eu-assets.i.posthog.com; worker-src 'self' blob:; frame-src https://www.googletagmanager.com https://js.stripe.com; object-src 'none'; base-uri 'self'; form-action 'self' ${STATEGRAPH_GITHUB_WEB_BASE}; frame-ancestors 'none'; manifest-src 'self'; upgrade-insecure-requests;" always;
             add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
             add_header X-Frame-Options "DENY" always;
             add_header X-Content-Type-Options "nosniff" always;

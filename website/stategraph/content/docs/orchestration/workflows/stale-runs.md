@@ -35,6 +35,8 @@ When the runner asks for its work, nothing has run yet. Orchestration compares:
 
 If the files of a dirspace changed in either range, Orchestration aborts the run and evaluates the pull request again at the new head. You see a new plan for the new head, and the old commit is never applied.
 
+A drift plan plans the commit that the runner checked out, and its result compares that commit with the head. Thus a drift plan restarts here only when the files of a dirspace changed and the schedule sets `restart_on_change: true`. When Orchestration cannot compare the files yet, for example because the config builder has not built the new head, the drift plan runs.
+
 A job that aborts or restarts more than 10 runs stops with an error, so that a branch that keeps moving does not restart work without end.
 
 ## When the result arrives
