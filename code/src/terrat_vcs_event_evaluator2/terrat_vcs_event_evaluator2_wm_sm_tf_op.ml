@@ -671,7 +671,7 @@ struct
      not happen.  The destination head is read from the cache too: the runner merges the destination
      head of now, which the server cannot know exactly.  An older destination head makes the
      recorded start older, which widens the range that the result compares. *)
-  let start ~sha work_manifest s fetcher =
+  let start_with ~decide ~sha work_manifest s fetcher =
     let open Irm in
     current_head ~read:`Cached s fetcher work_manifest
     >>= (fun head ->
@@ -691,11 +691,14 @@ struct
       (fun head -> impact_since s fetcher ~from_ref:sha ~to_ref:head work_manifest)
       head
     >>= fun moved ->
-    match Staleness.Start.decide (Staleness.union checked_out moved) with
+    match decide (Staleness.union checked_out moved) with
     | Staleness.Start.Run ->
         current_dest_head ~read:`Cached s fetcher work_manifest
         >>| fun dest_head -> Wm_sm.Run { head = Some sha; dest_head }
     | Staleness.Start.Restart -> Abbs_fc.return_ok Wm_sm.Restart
+
+  let start ~sha work_manifest s fetcher =
+    start_with ~decide:Staleness.Start.decide ~sha work_manifest s fetcher
 
   (* The heads that a result is compared with: the head of the branch of the run and, for an open
      pull request, the head of the destination branch, both read now. *)
@@ -1569,6 +1572,49 @@ struct
       | Wmr.Work_manifest_build_config_result _ -> assert false
       | Wmr.Work_manifest_build_result_failure _ -> assert false
       | Wmr.Work_manifest_build_tree_result _ -> assert false
+
+    let start ~sha work_manifest s ({ Bs.Fetcher.fetch } as fetcher) =
+      let module Tjc = Terrat_job_context in
+      let open Irm in
+      match work_manifest.Wm.target with
+      | P2.Target.Pr _ -> start ~sha work_manifest s fetcher
+      | P2.Target.Drift _ ->
+          fetch Keys.job
+          >>= fun job ->
+          let restart_on_change =
+            match job.Tjc.Job.type_ with
+            | Tjc.Job.Type_.(
+                ( Plan
+                    {
+                      kind = Some (Kind.Drift { restart_on_change; reconcile = _ });
+                      tag_query = _;
+                      parameters = _;
+                    }
+                | Apply
+                    {
+                      kind = Some (Kind.Drift { restart_on_change; reconcile = _ });
+                      tag_query = _;
+                      force = _;
+                      parameters = _;
+                    } )) -> restart_on_change
+            | Tjc.Job.Type_.(
+                ( Plan { kind = None; tag_query = _; parameters = _ }
+                | Apply { kind = None; tag_query = _; force = _; parameters = _ }
+                | Autoapply
+                | Autoplan
+                | Gate_approval _
+                | Help
+                | Index
+                | Push
+                | Repo_config
+                | Unlock _ )) -> true
+          in
+          start_with
+            ~decide:(Staleness.Start.decide_drift_plan ~restart_on_change)
+            ~sha
+            work_manifest
+            s
+            fetcher
 
     let run ~dest_branch_ref ~branch_ref ~branch ~name s fetcher =
       Wm_sm.run

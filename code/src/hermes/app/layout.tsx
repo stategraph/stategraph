@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/contexts";
 import { AnalyticsBoot } from "@/components/analytics/AnalyticsBoot";
+import { CspNonceBoot } from "@/components/boot/CspNonceBoot";
 import { CHUNK_ERROR, RELOAD_GUARD_KEY, RELOAD_GUARD_MS, RELOAD_MARK } from "@/lib/boot/chunkReload";
 
 export const metadata: Metadata = {
@@ -72,13 +73,20 @@ export default function RootLayout({
                   // error boundary owns its failures), so never wipe what it
                   // rendered or the state it holds.
                   if (!document.body || window.next) return;
-                  document.body.innerHTML =
-                    '<div style="font:14px system-ui,sans-serif;display:flex;flex-direction:column;' +
-                    'align-items:center;justify-content:center;min-height:100vh;gap:12px">' +
-                    '<div>The console could not finish loading.</div>' +
-                    '<button id="sg-retry" style="padding:6px 14px;border-radius:6px;cursor:pointer">Retry</button></div>';
-                  var b = document.getElementById('sg-retry');
-                  if (b) b.onclick = function() { location.reload(); };
+                  // Styles go through the CSSOM: style-src refuses style attributes.
+                  var box = document.createElement('div');
+                  box.style.cssText = 'font:14px system-ui,sans-serif;display:flex;flex-direction:column;' +
+                    'align-items:center;justify-content:center;min-height:100vh;gap:12px';
+                  var msg = document.createElement('div');
+                  msg.textContent = 'The console could not finish loading.';
+                  var b = document.createElement('button');
+                  b.style.cssText = 'padding:6px 14px;border-radius:6px;cursor:pointer';
+                  b.textContent = 'Retry';
+                  b.onclick = function() { location.reload(); };
+                  box.appendChild(msg);
+                  box.appendChild(b);
+                  document.body.innerHTML = '';
+                  document.body.appendChild(box);
                 }
 
                 function recover() {
@@ -137,6 +145,7 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased" suppressHydrationWarning>
+        <CspNonceBoot />
         <AnalyticsBoot />
         <ThemeProvider>
           {children}

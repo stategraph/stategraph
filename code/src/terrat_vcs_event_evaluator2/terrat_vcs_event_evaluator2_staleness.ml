@@ -34,6 +34,10 @@ module Start = struct
     | Impacted _ | Unknown -> Restart
     | Not_impacted -> Run
 
+  let decide_drift_plan ~restart_on_change = function
+    | Impacted _ when restart_on_change -> Restart
+    | Impacted _ | Unknown | Not_impacted -> Run
+
   (* [created_at] has a fixed width, thus the order of two strings is the order of two times.  The work
      manifests of one creation have the same time, thus only the dirspaces can cover an abort among
      them. *)
