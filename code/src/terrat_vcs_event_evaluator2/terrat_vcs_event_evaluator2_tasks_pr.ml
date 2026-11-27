@@ -601,9 +601,10 @@ struct
           >>| fun outputs dirspace ->
           (* Every dirspace asked for is applied, so no row means the plan of that dirspace had
              no changes: it recorded no outputs, and none of them changed. *)
-          match CCList.assoc_opt ~eq:Terrat_dirspace.equal dirspace outputs with
-          | Some diff -> `Diff diff
-          | None -> `Unchanged)
+          CCOption.map_or
+            ~default:`Unchanged
+            (fun diff -> `Diff diff)
+            (CCList.assoc_opt ~eq:Terrat_dirspace.equal dirspace outputs))
 
     let intra_pr_selection =
       run ~name:"intra_pr_selection" (fun s { Bs.Fetcher.fetch } ->
@@ -614,6 +615,10 @@ struct
           >>= fun context ->
           fetch Keys.account
           >>= fun account ->
+          fetch Keys.client
+          >>= fun client ->
+          fetch Keys.repo
+          >>= fun repo ->
           fetch Keys.synthesized_config
           >>= fun config ->
           fetch Keys.repo_config
@@ -644,19 +649,30 @@ struct
           >>| fun dest_head ->
           (* The comparison of two trees is the expensive part of this rule: the database reads
              both trees whole, thus its cost follows the size of the repository and not the number
-             of paths which moved.  The answer is a function of the two commits and of nothing
-             else, thus the pair is the whole key.  The apply path asks for the selection a second
-             time over the same layers, and without this cache it would pay for every comparison
-             again.
+             of paths which moved.  The apply path asks for the selection a second time over the
+             same layers, and without this cache it would pay for every comparison again.
 
-             [None] is a pair that could not be compared: a tree that is not stored, or, with the
-             config builder on, a config of the newer commit that is not built.  It cannot hold the
-             dirspaces of that case, because which dirspaces those are is a question about
-             [layers] and the cache outlives one call. *)
+             The pair of commits is the whole key.  The answer does depend on which trees are
+             stored when the call runs, but every call from this rule passes
+             [~missing_tree:`Unknown], and under that policy a missing tree is not read, thus no
+             call inside one evaluation can store a tree, and the answer for a pair cannot change
+             under the key.
+
+             [None] is a pair that could not be compared: the tree of one of the two commits is not
+             stored.  It cannot hold the dirspaces of that case, because which dirspaces those are
+             is a question about [layers] and the cache outlives one call. *)
           let changed_cache = ref [] in
           let equal_pair (a_from, a_to) (b_from, b_to) =
             CCString.equal a_from b_from && CCString.equal a_to b_to
           in
+          (* Every input of one selection, one log line each, so an occasional
+             widening of the run set can be replayed from the log of one run
+             alone (#3741). *)
+          let short_sha sha = CCString.sub sha 0 (min 7 (CCString.length sha)) in
+          let dirspace_set_str set =
+            Tasks_base.dirspaces_str (Terrat_data.Dirspace_set.elements set)
+          in
+          let pair_str (from_sha, to_sha) = short_sha from_sha ^ ".." ^ short_sha to_sha in
           let branch_ref_str = S.Api.Ref.to_string branch_ref in
           let is_pr_head sha = CCString.equal sha branch_ref_str in
           fun ~dirspaces ~force ->
@@ -678,6 +694,27 @@ struct
                 Tasks_base.query_dirspace_runs_for_context s db context dirspaces)
             >>= fun runs ->
             let states = CCList.map (fun runs -> runs.P2.Dirspace_runs.state) runs in
+            let () =
+              Logs.info (fun m ->
+                  m
+                    "%s : INTRA_PR_RUN_STATES : %s"
+                    (Builder.log_id s)
+                    (states
+                    |> CCList.map (fun { Ipr.Dirspace_state.dirspace; last_plan; last_apply } ->
+                        let run_str =
+                          CCOption.map_or ~default:"none" (fun { Ipr.Run.sha; created_at; _ } ->
+                              short_sha sha ^ "@" ^ created_at)
+                        in
+                        let plan_str { Ipr.Plan.run; has_changes } =
+                          run_str (Some run) ^ "/has_changes=" ^ string_of_bool has_changes
+                        in
+                        Tasks_base.dirspace_str dirspace
+                        ^ " plan="
+                        ^ CCOption.map_or ~default:"none" plan_str last_plan
+                        ^ " apply="
+                        ^ run_str last_apply)
+                    |> String.concat ","))
+            in
             (* Two things the file test cannot see, because no file of this branch moves for
               either of them, and the runs the selection is given carry neither.  The apply gate
               asks this query and refuses on both, thus the selection has to ask it too or the two
@@ -721,6 +758,15 @@ struct
                   (Builder.log_id s)
                   (Terrat_data.Dirspace_set.cardinal superseded)
                   (Terrat_data.Dirspace_set.cardinal last_run_failed));
+            Logs.info (fun m ->
+                m
+                  "%s : INTRA_PR_SELECTION_INPUTS : dirspaces=%s : superseded=%s : \
+                   last_run_failed=%s : force=%s"
+                  (Builder.log_id s)
+                  (Tasks_base.dirspaces_str dirspaces)
+                  (dirspace_set_str superseded)
+                  (dirspace_set_str last_run_failed)
+                  (dirspace_set_str force));
             Builder.run_db s ~f:(fun db ->
                 S.Db.query_repo_tree_built
                   ~request_id:(Builder.log_id s)
@@ -785,6 +831,8 @@ struct
                   | None ->
                       Tasks_base.changed_between
                         s
+                        ~client
+                        ~repo
                         ~missing_tree:`Unknown
                         ~config
                         ~repo_config_raw
@@ -792,6 +840,21 @@ struct
                         ~from_ref:(S.Api.Ref.of_string from_sha)
                         ~to_ref:(S.Api.Ref.of_string to_sha)
                       >>| fun changed ->
+                      let () =
+                        Logs.info (fun m ->
+                            m
+                              "%s : INTRA_PR_PAIR_ANSWER : pair=%s : %s"
+                              (Builder.log_id s)
+                              (pair_str pair)
+                              (CCOption.map_or
+                                 ~default:"uncompared"
+                                 (fun changed ->
+                                   "changed="
+                                   ^ string_of_int (Terrat_data.Dirspace_set.cardinal changed)
+                                   ^ ":"
+                                   ^ dirspace_set_str changed)
+                                 changed))
+                      in
                       changed_cache := (pair, changed) :: !changed_cache;
                       changed
                 in
@@ -800,32 +863,57 @@ struct
                   against now.  A push that changed the files of its dirspace makes it stale, and
                   then the dirspace is planned again.  A plan that started at the head compares a
                   commit with itself and holds no change. *)
-                let in_progress_pairs =
+                let in_progress_pair_owners =
                   runs
-                  |> CCList.filter_map (fun { P2.Dirspace_runs.in_progress_plan; _ } ->
-                      CCOption.bind in_progress_plan (since_pair Ipr.Kind.Plan))
-                  |> CCList.filter (fun (from_sha, to_sha) -> not (CCString.equal from_sha to_sha))
+                  |> CCList.filter_map
+                       (fun
+                         {
+                           P2.Dirspace_runs.state;
+                           plan_failed = _;
+                           apply_failed = _;
+                           in_progress_plan;
+                           plan_work_manifest = _;
+                           apply_work_manifest = _;
+                         }
+                       ->
+                         CCOption.map
+                           (fun pair -> (pair, state.Ipr.Dirspace_state.dirspace))
+                           (CCOption.bind in_progress_plan (since_pair Ipr.Kind.Plan)))
+                  |> CCList.filter (fun ((from_sha, to_sha), _) ->
+                      not (CCString.equal from_sha to_sha))
                 in
-                (* The pairs of the runs, and not the dirspaces: two dirspaces which ran together
-                  share their pairs, thus one comparison of trees answers for both of them. *)
-                let pairs =
+                let compare_pair (a_from, a_to) (b_from, b_to) =
+                  match CCString.compare a_from b_from with
+                  | 0 -> CCString.compare a_to b_to
+                  | order -> order
+                in
+                (* Which dirspaces each pair answers for.  A pair is a run's own [since_pair] or
+                   one of its [during] pairs, thus a pair belongs to the dirspaces whose runs are
+                   judged over it and to no other dirspace.  The pair is the whole key of the
+                   cache above, and the owners are a property of the states of one call, thus they
+                   stay outside the cache. *)
+                let pair_owners =
                   (states
-                  |> CCList.flat_map
-                       (fun { Ipr.Dirspace_state.dirspace = _; last_plan; last_apply } ->
-                         let pairs_of kind ({ Ipr.Run.sha = _; created_at = _; during } as run) =
-                           CCOption.to_list (since_pair kind run) @ during
-                         in
-                         CCOption.map_or
-                           ~default:[]
-                           (fun { Ipr.Plan.run; has_changes = _ } -> pairs_of Ipr.Kind.Plan run)
-                           last_plan
-                         @ CCOption.map_or ~default:[] (pairs_of Ipr.Kind.Apply) last_apply))
-                  @ in_progress_pairs
-                  |> CCList.sort_uniq ~cmp:(fun (a_from, a_to) (b_from, b_to) ->
-                      match CCString.compare a_from b_from with
-                      | 0 -> CCString.compare a_to b_to
-                      | order -> order)
+                  |> CCList.flat_map (fun { Ipr.Dirspace_state.dirspace; last_plan; last_apply } ->
+                      let pairs_of kind ({ Ipr.Run.sha = _; created_at = _; during } as run) =
+                        CCOption.to_list (since_pair kind run) @ during
+                      in
+                      let pairs =
+                        CCOption.map_or
+                          ~default:[]
+                          (fun { Ipr.Plan.run; has_changes = _ } -> pairs_of Ipr.Kind.Plan run)
+                          last_plan
+                        @ CCOption.map_or ~default:[] (pairs_of Ipr.Kind.Apply) last_apply
+                      in
+                      CCList.map (fun pair -> (pair, dirspace)) pairs))
+                  @ in_progress_pair_owners
                 in
+                let pairs = pair_owners |> CCList.map fst |> CCList.sort_uniq ~cmp:compare_pair in
+                Logs.info (fun m ->
+                    m
+                      "%s : INTRA_PR_PAIRS : %s"
+                      (Builder.log_id s)
+                      (String.concat "," (CCList.map pair_str pairs)));
                 Abbs_fc.List_result.fold_left
                   ~init:[]
                   ~f:(fun acc pair ->
@@ -835,7 +923,24 @@ struct
                 let changed_between from_sha to_sha =
                   match CCList.assoc_opt ~eq:equal_pair (from_sha, to_sha) changed with
                   | Some (Some changed) -> changed
-                  | Some None -> Terrat_data.Dirspace_set.of_list dirspaces
+                  | Some None ->
+                      (* The pair could not be compared: its own dirspaces are stale, and the
+                         dirspaces of the other pairs are not.  One tree which is not stored must
+                         not replan a whole pull request. *)
+                      Logs.info (fun m ->
+                          m
+                            "%s : INTRA_PR_UNCOMPARED_PAIR : pair=%s : dirspaces=%s"
+                            (Builder.log_id s)
+                            (pair_str (from_sha, to_sha))
+                            (Tasks_base.dirspaces_str
+                               (pair_owners
+                               |> CCList.filter_map (fun (pair, dirspace) ->
+                                   CCOption.return_if (equal_pair pair (from_sha, to_sha)) dirspace)
+                               )));
+                      pair_owners
+                      |> CCList.filter_map (fun (pair, dirspace) ->
+                          CCOption.return_if (equal_pair pair (from_sha, to_sha)) dirspace)
+                      |> Terrat_data.Dirspace_set.of_list
                   | None -> Terrat_data.Dirspace_set.empty
                 in
                 let changed_since kind run =
@@ -877,6 +982,23 @@ struct
                            (fun run ->
                              (state.Ipr.Dirspace_state.dirspace, changed_since Ipr.Kind.Plan run))
                            in_progress_plan)
+                in
+                let () =
+                  Logs.info (fun m ->
+                      m
+                        "%s : INTRA_PR_SELECTION_RESULT : to_run=%s : out_of_order=%s : applied=%s \
+                         : in_progress=%s"
+                        (Builder.log_id s)
+                        (Tasks_base.dirspaces_str selection.Ipr.Selection.to_run)
+                        (Tasks_base.dirspaces_str selection.Ipr.Selection.out_of_order)
+                        (Tasks_base.dirspaces_str selection.Ipr.Selection.applied)
+                        (in_progress
+                        |> CCList.map (fun (dirspace, changed) ->
+                            Tasks_base.dirspace_str dirspace
+                            ^ "("
+                            ^ string_of_int (Terrat_data.Dirspace_set.cardinal changed)
+                            ^ ")")
+                        |> String.concat ","))
                 in
                 (selection, in_progress))
 
@@ -1116,7 +1238,7 @@ struct
            state of this branch at all. *)
         (let open Irm in
          S.Api.fetch_branch_commits ~request_id:(Builder.log_id s) client repo dest_branch_name
-         >>= fun shas ->
+         >>= fun commits ->
          Builder.run_db s ~f:(fun db ->
              S.Db.query_recent_derived_repo_config
                ~request_id:(Builder.log_id s)
@@ -1124,7 +1246,7 @@ struct
                account
                repo
                ~branch:dest_branch_name
-               ~shas
+               ~shas:commits
                ~stale_min:stale_config_min))
         >>= function
         | Error _ ->
@@ -1935,6 +2057,13 @@ struct
                     | true, [], [], [] ->
                         fetch Keys.publish_comment
                         >>= fun publish_comment ->
+                        (* A push puts every kept dirspace on a new head which has no checks, and
+                           no run of this job writes them (RFD 2356).  A later evaluation is where
+                           a stale run is found good again, thus its checks are written here.
+                           [kept_dirspace_checks] also creates the completed apply check, because
+                           the unapplied list of this arm is empty. *)
+                        fetch Keys.kept_dirspace_checks
+                        >>= fun () ->
                         publish_comment' publish_comment Msg.Plan_all_changes_applied
                         >>? fun () -> Error `Noop
                     | _ -> Abbs_fc.return_ok ()))

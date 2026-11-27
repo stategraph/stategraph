@@ -4,6 +4,7 @@
   test_comment_resolve
   test_ee2_fc
   test_force_fail
+  test_repo_tree_gate
   test_status_checks
   test_staleness
   test_wake_pending_compute

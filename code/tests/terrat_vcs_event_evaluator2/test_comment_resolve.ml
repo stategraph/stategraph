@@ -44,7 +44,7 @@ let assert_plan ~expected_parameters result =
       let bindings map =
         map |> Sln_map.String.to_list |> CCList.map (fun (name, value) -> name ^ "=" ^ value)
       in
-      Oth.Assert.Eq.string_list
+      Oth.Assert.String_list.eq
         ~expected:(bindings expected_parameters)
         ~actual:(bindings parameters)
   | _ -> Oth.Assert.false_ "expected the plan job"
@@ -61,7 +61,7 @@ let assert_reply ~expected ~actual =
       | `Value_not_allowed (expected_name, expected_value, expected_allowed) ->
           Oth.Assert.Eq.string ~expected:expected_name ~actual:actual_name;
           Oth.Assert.Eq.string ~expected:expected_value ~actual:actual_value;
-          Oth.Assert.Eq.string_list ~expected:expected_allowed ~actual:actual_allowed
+          Oth.Assert.String_list.eq ~expected:expected_allowed ~actual:actual_allowed
       | _ -> Oth.Assert.false_ "expected a value-not-allowed reply")
   | Error (`Parameter_err (`Duplicate actual_name)) -> (
       match expected with

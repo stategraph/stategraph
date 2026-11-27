@@ -639,7 +639,9 @@ struct
     >>= fun (_, repo_config_raw) ->
     Tasks_base.changed_between
       s
-      ~missing_tree:(`Fetch (client, repo))
+      ~client
+      ~repo
+      ~missing_tree:`Fetch
       ~config
       ~repo_config_raw
       ~account
@@ -877,7 +879,7 @@ struct
         Staleness.Pr_result.stale_dirspaces decision (dirspaces_of_wm work_manifest)
         |> Terrat_data.Dirspace_set.to_list
         |> CCList.map (fun dirspace -> dirspace.Terrat_dirspace.dir)
-        |> CCList.sort_uniq ~cmp:CCString.compare;
+        |> Sln_list.String.sort_uniq;
     }
 
   (* A drift reconcile whose files changed while it ran reconciles again with a new drift plan job

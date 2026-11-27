@@ -241,20 +241,20 @@ module Trie_structure = struct
   let to_rules_examples =
     Oth.test ~name:"to_rules_examples" (fun _ ->
         let rules_of t = render_int_rules (T.to_rules ~equal:CCInt.equal t) in
-        Oth.Assert.Eq.string_list
+        Oth.Assert.String_list.eq
           ~expected:[ "* -> 0"; "a.* -> 1"; "a.b -> 2" ]
           ~actual:(rules_of (pairs_to_trie ~default:0 [ ("a.*", 1); ("a.b", 2); ("a.b.c", 1) ]));
-        Oth.Assert.Eq.string_list
+        Oth.Assert.String_list.eq
           ~expected:[ "* -> 0"; "ab* -> 1"; "ab -> 2" ]
           ~actual:(rules_of (pairs_to_trie ~default:0 [ ("ab", 2); ("ab*", 1) ]));
-        Oth.Assert.Eq.string_list ~expected:[ "* -> 5" ] ~actual:(rules_of (T.const 5));
+        Oth.Assert.String_list.eq ~expected:[ "* -> 5" ] ~actual:(rules_of (T.const 5));
         (* With a default, the [*] rule is left out when it answers that default. *)
         let rules_over default t = render_int_rules (T.to_rules ~equal:CCInt.equal ~default t) in
         let one_rule = pairs_to_trie ~default:0 [ ("a.*", 1) ] in
-        Oth.Assert.Eq.string_list ~expected:[ "a.* -> 1" ] ~actual:(rules_over 0 one_rule);
-        Oth.Assert.Eq.string_list ~expected:[ "* -> 0"; "a.* -> 1" ] ~actual:(rules_over 7 one_rule);
-        Oth.Assert.Eq.string_list ~expected:[] ~actual:(rules_over 5 (T.const 5));
-        Oth.Assert.Eq.string_list ~expected:[ "* -> 5" ] ~actual:(rules_over 0 (T.const 5));
+        Oth.Assert.String_list.eq ~expected:[ "a.* -> 1" ] ~actual:(rules_over 0 one_rule);
+        Oth.Assert.String_list.eq ~expected:[ "* -> 0"; "a.* -> 1" ] ~actual:(rules_over 7 one_rule);
+        Oth.Assert.String_list.eq ~expected:[] ~actual:(rules_over 5 (T.const 5));
+        Oth.Assert.String_list.eq ~expected:[ "* -> 5" ] ~actual:(rules_over 0 (T.const 5));
         (* Reading the rules back gives the same trie, whatever the default. *)
         let t = pairs_to_trie ~default:0 [ ("a.*", 1); ("a.b", 2) ] in
         eq_int_tries t (T.of_rules ~equal:CCInt.equal ~default:7 (T.to_rules ~equal:CCInt.equal t));
@@ -494,7 +494,7 @@ module Trie_semantics = struct
   let same_answers a b = Sln_list.String.equal (answers_of a) (answers_of b)
 
   let check_same_answers ~expected ~actual =
-    Oth.Assert.Eq.string_list ~expected:(answers_of expected) ~actual:(answers_of actual)
+    Oth.Assert.String_list.eq ~expected:(answers_of expected) ~actual:(answers_of actual)
 
   let commutative_operators = [ ("x + y", ( + )); ("max x y", CCInt.max) ]
 
@@ -956,7 +956,7 @@ module Scope_semantics = struct
   let same_members a b = Sln_list.String.equal (members_of a) (members_of b)
 
   let check_same_members ~expected ~actual =
-    Oth.Assert.Eq.string_list ~expected:(members_of expected) ~actual:(members_of actual)
+    Oth.Assert.String_list.eq ~expected:(members_of expected) ~actual:(members_of actual)
 
   let lattice_laws_examples =
     Oth.test ~name:"lattice_laws_examples" (fun _ ->

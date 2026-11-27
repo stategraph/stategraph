@@ -122,18 +122,6 @@ module type ASSERT = sig
       expected:'a list ->
       actual:'a list ->
       unit
-
-    (** Asserts that two string lists are equal. *)
-    val string_list : expected:string list -> actual:string list -> unit
-
-    (** Asserts that two int lists are equal. *)
-    val int_list : expected:int list -> actual:int list -> unit
-
-    (** Asserts that two bool lists are equal. *)
-    val bool_list : expected:bool list -> actual:bool list -> unit
-
-    (** Asserts that two UUID lists are equal. *)
-    val uuidm_list : expected:Uuidm.t list -> actual:Uuidm.t list -> unit
   end
 
   module String : sig
@@ -143,18 +131,49 @@ module type ASSERT = sig
     (** Asserts that [haystack] contains the substring [needle], otherwise fails the test. *)
     val contains : haystack:string -> needle:string -> unit
 
-    (** Asserts that [haystack] contains every substring in [needles], otherwise fails the test on
-        the first one that is missing. *)
+    (** Asserts that [haystack] contains every substring in [needles]. *)
     val contains_all : haystack:string -> needles:string list -> unit
 
     (** Asserts that [haystack] does not contain the substring [needle], otherwise fails the test.
     *)
     val doesnt_contain : haystack:string -> needle:string -> unit
 
-    (** Asserts that [haystack] does not contain any member of [needles], otherwise fails the test.
-    *)
+    (** Asserts that [haystack] does not contain any substring in [needles]. *)
     val doesnt_contain_any : haystack:string -> needles:string list -> unit
   end
+
+  module type Generic_list = sig
+    type elem
+
+    (** Asserts that two lists are equal, element by element. On failure, reports each differing
+        item with its index, and flags extra or missing items, making it easy to spot which element
+        is wrong. *)
+    val eq : expected:elem list -> actual:elem list -> unit
+
+    (** Asserts that [elem] is in the list, otherwise fails the test. *)
+    val mem : elem -> elem list -> unit
+
+    (** Asserts that [elem] is not in the list, otherwise fails the test. *)
+    val not_mem : elem -> elem list -> unit
+
+    (** Asserts that [haystack] contains every member of [needles], otherwise fails the test on the
+        first one that is missing. Membership uses element equality and ignores multiplicity. *)
+    val all_mem : haystack:elem list -> needles:elem list -> unit
+
+    (** Asserts that [haystack] contains no member of [needles], otherwise fails the test on the
+        first one that is present. Membership uses element equality. *)
+    val none_mem : haystack:elem list -> needles:elem list -> unit
+  end
+
+  (** Create list assertions using the element equality function and pretty-printer. *)
+  module Make (Element : sig
+    type t [@@deriving eq, show]
+  end) : Generic_list with type elem = Element.t
+
+  module String_list : Generic_list with type elem = string
+  module Int_list : Generic_list with type elem = int
+  module Bool_list : Generic_list with type elem = bool
+  module Uuidm_list : Generic_list with type elem = Uuidm.t
 end
 
 module Assert : ASSERT

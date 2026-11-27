@@ -230,7 +230,7 @@ let drift = Terrat_vcs_provider2.Target.Drift { repo = (); branch = "" }
    This is the publisher-layer regression the template tests cannot catch. *)
 let test_work_manifest_unlock_ids_dedupes_pull_requests =
   Oth.test ~name:"work_manifest_unlock_ids dedupes pull request numbers" (fun _ ->
-      Oth.Assert.Eq.string_list
+      Oth.Assert.String_list.eq
         ~expected:[ "123" ]
         ~actual:
           (Terrat_vcs_provider2.work_manifest_unlock_ids
@@ -240,7 +240,7 @@ let test_work_manifest_unlock_ids_dedupes_pull_requests =
 
 let test_work_manifest_unlock_ids_collapses_drift =
   Oth.test ~name:"work_manifest_unlock_ids collapses drift targets" (fun _ ->
-      Oth.Assert.Eq.string_list
+      Oth.Assert.String_list.eq
         ~expected:[ "drift" ]
         ~actual:
           (Terrat_vcs_provider2.work_manifest_unlock_ids
@@ -250,7 +250,7 @@ let test_work_manifest_unlock_ids_collapses_drift =
 
 let test_work_manifest_unlock_ids_mixed_list =
   Oth.test ~name:"work_manifest_unlock_ids mixed list sorts lexicographically" (fun _ ->
-      Oth.Assert.Eq.string_list
+      Oth.Assert.String_list.eq
         ~expected:[ "123"; "45"; "drift" ]
         ~actual:
           (Terrat_vcs_provider2.work_manifest_unlock_ids
@@ -266,13 +266,13 @@ let test_work_manifest_unlock_ids_mixed_list =
 
 let test_work_manifest_unlock_ids_singletons =
   Oth.test ~name:"work_manifest_unlock_ids singletons pass through" (fun _ ->
-      Oth.Assert.Eq.string_list
+      Oth.Assert.String_list.eq
         ~expected:[ "123" ]
         ~actual:
           (Terrat_vcs_provider2.work_manifest_unlock_ids
              ~pull_request_id:CCFun.id
              [ wm ~target:(pr 123) ]);
-      Oth.Assert.Eq.string_list
+      Oth.Assert.String_list.eq
         ~expected:[ "drift" ]
         ~actual:
           (Terrat_vcs_provider2.work_manifest_unlock_ids
@@ -282,7 +282,7 @@ let test_work_manifest_unlock_ids_singletons =
 
 let test_work_manifest_unlock_ids_empty =
   Oth.test ~name:"work_manifest_unlock_ids empty list" (fun _ ->
-      Oth.Assert.Eq.string_list
+      Oth.Assert.String_list.eq
         ~expected:[]
         ~actual:(Terrat_vcs_provider2.work_manifest_unlock_ids ~pull_request_id:CCFun.id []);
       ())

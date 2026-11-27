@@ -383,11 +383,7 @@ module Make (Abb : Abb_intf.S) = struct
         >>= fun () ->
         b
         >>| fun () ->
-        Oth.Assert.Eq.list
-          ~eq:CCInt.equal
-          ~pp:Format.pp_print_int
-          ~expected:(CCList.init n (fun i -> i))
-          ~actual:!collected)
+        Oth.Assert.Int_list.eq ~expected:(CCList.init n (fun i -> i)) ~actual:!collected)
 
   (* ---- I. Stress / fuzz ---- *)
 

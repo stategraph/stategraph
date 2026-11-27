@@ -876,7 +876,8 @@ module type Shared = sig
 
     (** The fully-derived configuration of the commit of [branch] that is nearest to its head, out
         of [shas], if that configuration is younger than [stale_min] minutes. [shas] is the lineage
-        of [branch], newest first, as {!Terrat_vcs_api.S.fetch_branch_commits} gives it.
+        of [branch], the newest commits of one page of {!Terrat_vcs_api.S.fetch_branch_commits},
+        newest first.
 
         The lineage is what makes the answer safe. A repository holds a derived configuration for
         many branches, and the newest of them can belong to a branch that changed the dirs

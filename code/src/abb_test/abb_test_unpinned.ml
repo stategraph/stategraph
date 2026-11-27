@@ -43,9 +43,7 @@ module Make (Abb : Abb_intf.S) = struct
         in
         Fut_comb.List.map ~f:make_one (CCList.init n (fun i -> i))
         >>| fun results ->
-        Oth.Assert.Eq.list
-          ~eq:CCInt.equal
-          ~pp:Format.pp_print_int
+        Oth.Assert.Int_list.eq
           ~expected:(CCList.init n (fun i -> i))
           ~actual:(CCList.sort CCInt.compare results))
 

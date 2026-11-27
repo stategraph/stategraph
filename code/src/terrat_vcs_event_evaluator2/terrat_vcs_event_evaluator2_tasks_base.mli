@@ -65,6 +65,14 @@ module Make
   val abort_work_manifest :
     Builder.Bs.state -> S.Db.t -> Uuidm.t -> string -> (unit, [> `Error ]) result Abb.Future.t
 
+  (** The log form of a dirspace, [dir] and [workspace] joined by a colon. This is the string every
+      staleness and selection log line carries, so it is written once: a replay of a log depends on
+      it. It is {b not} {!Terrat_dirspace.show}, which is the derived record printer. *)
+  val dirspace_str : Terrat_dirspace.t -> string
+
+  (** {!dirspace_str} over a list, joined by [","]. *)
+  val dirspaces_str : Terrat_dirspace.t list -> string
+
   (** The dirspaces of [config] that the given paths change. It uses the change match of a pull
       request diff, thus the file patterns and the dependencies of a dirspace count. *)
   val dirspaces_of_paths :
@@ -135,18 +143,29 @@ module Make
     S.Api.Ref.t -> Terrat_base_repo_config_v1.raw Terrat_base_repo_config_v1.t -> S.Api.Ref.t
 
   (** [changed_between ~from_ref ~to_ref] is the set of dirspaces of [config] with a file that
-      changed between the two commits, or [None] when the two commits cannot be compared: the tree
-      of one commit is not stored, or the config builder is on and the config of [to_ref] is not
-      built yet.
+      changed between the two commits, or [None] when the two commits cannot be compared.
 
       A commit can move while a run operates, and only a change to the files of a dirspace makes the
-      run stale (RFD 2356). [missing_tree] says what to do with a tree that is not stored. With
-      [`Fetch], and the tree builder off, the tree is read from the forge and stored. With
-      [`Unknown], or with the tree builder on, the answer is [None]. The call never waits for a tree
-      build or a config build: a caller that must answer now gets [None] instead. *)
+      run stale (RFD 2356). The comparison reads the stored trees of the two commits and nothing
+      else: a built config is not one of its inputs, and neither commit is replaced by another one.
+      The answer is the answer of that exact pair, because a difference of content between two trees
+      is not monotone in the commits between them: a push and its revert give the same content
+      again, thus a wider range can report fewer changes and a narrower range can miss one. An
+      answer that is not exact would therefore be able to hide a change.
+
+      [missing_tree] says what to do with a tree that is not stored. With [`Fetch], and the tree
+      builder off, the tree is read from the forge and stored. With [`Unknown], or with the tree
+      builder on, no tree is read.
+
+      A tree that is not stored answers [None], and every caller turns [None] into a stale verdict.
+      A later plan or apply builds the tree, and a comparison after that can prove the change fresh
+      again. The call never waits for a tree build or a config build: a caller that must answer now
+      gets [None] instead. *)
   val changed_between :
     Builder.Bs.state ->
-    missing_tree:[ `Fetch of S.Api.Client.t * S.Api.Repo.t | `Unknown ] ->
+    client:S.Api.Client.t ->
+    repo:S.Api.Repo.t ->
+    missing_tree:[ `Fetch | `Unknown ] ->
     config:Terrat_change_match3.Config.t ->
     repo_config_raw:Terrat_base_repo_config_v1.raw Terrat_base_repo_config_v1.t ->
     account:S.Api.Account.t ->

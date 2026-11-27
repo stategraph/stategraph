@@ -82,7 +82,7 @@ let test =
           let config = Oth.Assert.ok_pp ~pp:Sgs_config.pp_err (Sgs_config.create ()) in
           match CCOption.map (fun c -> c.Sgs_config.oauth2_provider) (Sgs_config.oauth2 config) with
           | Some (Sgs_config.Github { github_orgs }) ->
-              Oth.Assert.Eq.string_list
+              Oth.Assert.String_list.eq
                 ~expected:[ "acme"; "acme-labs" ]
                 ~actual:(Sln_list.Non_empty.to_list github_orgs)
           | Some (Sgs_config.Google _ | Sgs_config.Oidc _) | None ->

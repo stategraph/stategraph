@@ -32,7 +32,7 @@ module Config = struct
     provider : provider;
     client_id : string;
     client_secret : string;
-    scope : string;
+    scope : string list;
     login_params : (string * string) list;
     redirect_url : string;
     whitelist_domains : string list;
@@ -43,7 +43,7 @@ module Config = struct
 
   let default_scope = function
     | Github _ -> Oauth2_htp_github.scope
-    | Google _ | Oidc _ -> "openid email profile"
+    | Google _ | Oidc _ -> [ "openid"; "email"; "profile" ]
 
   let make
       ?scope
@@ -142,7 +142,7 @@ let login_url t ~state ~screen_hint =
       @ CCOption.map_or ~default:[] (fun hint -> [ ("screen_hint", hint) ]) screen_hint
       @ [
           ("redirect_uri", t.config.Config.redirect_url);
-          ("scope", t.config.Config.scope);
+          ("scope", CCString.concat " " t.config.Config.scope);
           ("client_id", t.config.Config.client_id);
           ("response_type", "code");
           ("state", state);

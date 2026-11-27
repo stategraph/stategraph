@@ -211,7 +211,7 @@ let github_groups_test =
       let module Groups = Oauth2_htp_github.Groups in
       let module Tests = Oauth2_htp_github.Tests in
       (* The prefix on each, the organizations first, and the logins as GitHub spells them. *)
-      Oth_abb.Assert.Eq.string_list
+      Oth_abb.Assert.String_list.eq
         ~expected:[ "github:Acme"; "github:Other"; "github:Acme/platform"; "github:Acme/k8s" ]
         ~actual:
           (Groups.to_github_prefixed_list

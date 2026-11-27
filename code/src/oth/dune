@@ -1,3 +1,5 @@
 (library
  (name oth)
- (libraries containers duration logs unix uuidm))
+ (libraries containers duration logs unix uuidm)
+ (preprocess
+  (pps ppx_deriving.eq ppx_deriving.show)))

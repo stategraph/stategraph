@@ -1007,16 +1007,11 @@ let references_test =
    the contract that matters most is that a folded map key stays ONE segment even
    when the key itself contains a ".". *)
 
-let pp_strs fmt l = Format.fprintf fmt "[%s]" (CCString.concat "; " l)
-
-let assert_path expected actual =
-  Oth.Assert.eq ~eq:(CCList.equal CCString.equal) ~pp:pp_strs expected actual
-
 let attr_path_local_tail =
   Oth.test ~name:"attr_path_local_tail" (fun _ ->
-      assert_path
-        [ "x"; "z" ]
-        (Sg_tf_references.attr_path_of_reference [ "local"; "config"; "x"; "z" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "x"; "z" ]
+        ~actual:(Sg_tf_references.attr_path_of_reference [ "local"; "config"; "x"; "z" ]);
       ())
 
 (* A forward-guard, not a live regression: reference segments cannot contain a "."
@@ -1026,43 +1021,51 @@ let attr_path_local_tail =
    that key. *)
 let attr_path_dotted_key_is_one_segment =
   Oth.test ~name:"attr_path_dotted_key_is_one_segment" (fun _ ->
-      assert_path
-        [ "example.com" ]
-        (Sg_tf_references.attr_path_of_reference [ "local"; "config"; "example.com" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "example.com" ]
+        ~actual:(Sg_tf_references.attr_path_of_reference [ "local"; "config"; "example.com" ]);
       ())
 
 let attr_path_var_dotted_key =
   Oth.test ~name:"attr_path_var_dotted_key" (fun _ ->
-      assert_path [ "1.2.3" ] (Sg_tf_references.attr_path_of_reference [ "var"; "cfg"; "1.2.3" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "1.2.3" ]
+        ~actual:(Sg_tf_references.attr_path_of_reference [ "var"; "cfg"; "1.2.3" ]);
       ())
 
 let attr_path_no_tail =
   Oth.test ~name:"attr_path_no_tail" (fun _ ->
-      assert_path [] (Sg_tf_references.attr_path_of_reference [ "local"; "config" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[]
+        ~actual:(Sg_tf_references.attr_path_of_reference [ "local"; "config" ]);
       ())
 
 let attr_path_data_consumes_three =
   Oth.test ~name:"attr_path_data_consumes_three" (fun _ ->
-      assert_path
-        [ "id" ]
-        (Sg_tf_references.attr_path_of_reference [ "data"; "aws_ami"; "ubuntu"; "id" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "id" ]
+        ~actual:(Sg_tf_references.attr_path_of_reference [ "data"; "aws_ami"; "ubuntu"; "id" ]);
       ())
 
 let attr_path_ephemeral_consumes_three =
   Oth.test ~name:"attr_path_ephemeral_consumes_three" (fun _ ->
-      assert_path
-        [ "value" ]
-        (Sg_tf_references.attr_path_of_reference [ "ephemeral"; "t"; "n"; "value" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "value" ]
+        ~actual:(Sg_tf_references.attr_path_of_reference [ "ephemeral"; "t"; "n"; "value" ]);
       ())
 
 let attr_path_action_consumes_three =
   Oth.test ~name:"attr_path_action_consumes_three" (fun _ ->
-      assert_path [] (Sg_tf_references.attr_path_of_reference [ "action"; "local_command"; "a" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[]
+        ~actual:(Sg_tf_references.attr_path_of_reference [ "action"; "local_command"; "a" ]);
       ())
 
 let attr_path_resource_consumes_two =
   Oth.test ~name:"attr_path_resource_consumes_two" (fun _ ->
-      assert_path [ "id" ] (Sg_tf_references.attr_path_of_reference [ "aws_instance"; "foo"; "id" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "id" ]
+        ~actual:(Sg_tf_references.attr_path_of_reference [ "aws_instance"; "foo"; "id" ]);
       ())
 
 (* [outputs.X] and [module.X.attr] resolve to REWRITTEN addresses ([output.X],
@@ -1070,12 +1073,16 @@ let attr_path_resource_consumes_two =
    tail can be attributed to them. *)
 let attr_path_outputs_is_empty =
   Oth.test ~name:"attr_path_outputs_is_empty" (fun _ ->
-      assert_path [] (Sg_tf_references.attr_path_of_reference [ "outputs"; "name"; "x" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[]
+        ~actual:(Sg_tf_references.attr_path_of_reference [ "outputs"; "name"; "x" ]);
       ())
 
 let attr_path_module_is_empty =
   Oth.test ~name:"attr_path_module_is_empty" (fun _ ->
-      assert_path [] (Sg_tf_references.attr_path_of_reference [ "module"; "m"; "out"; "sub" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[]
+        ~actual:(Sg_tf_references.attr_path_of_reference [ "module"; "m"; "out"; "sub" ]);
       ())
 
 (* The shape where a structural derivation and a textual one part company: an
@@ -1088,14 +1095,16 @@ let attr_path_module_is_empty =
    in code/tests/sgs_tx_log/test.ml, which pins the same case end-to-end. *)
 let attr_path_module_output_named_output =
   Oth.test ~name:"attr_path_module_output_named_output" (fun _ ->
-      assert_path
-        []
-        (Sg_tf_references.attr_path_of_reference [ "module"; "m"; "output"; "output"; "x" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[]
+        ~actual:(Sg_tf_references.attr_path_of_reference [ "module"; "m"; "output"; "output"; "x" ]);
       ())
 
 let attr_path_singleton_is_empty =
   Oth.test ~name:"attr_path_singleton_is_empty" (fun _ ->
-      assert_path [] (Sg_tf_references.attr_path_of_reference [ "local" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[]
+        ~actual:(Sg_tf_references.attr_path_of_reference [ "local" ]);
       ())
 
 let attr_path_of_reference_test =
@@ -1468,7 +1477,7 @@ let selectors_test =
         let actual =
           CCList.sort CCString.compare (CCList.map show_selector (selectors_of_string hcl))
         in
-        Oth.Assert.Eq.string_list ~expected:(CCList.sort CCString.compare expected) ~actual;
+        Oth.Assert.String_list.eq ~expected:(CCList.sort CCString.compare expected) ~actual;
         ())
   in
   Oth.serial

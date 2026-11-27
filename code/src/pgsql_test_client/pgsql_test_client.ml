@@ -47,10 +47,6 @@ let pp_pgsql_combined_err fmt = function
   | #Pgsql_io.err as err -> pp_pgsql_err fmt err
 
 let pp_unit fmt () = Format.pp_print_string fmt "()"
-
-let pp_string_list fmt l =
-  Format.fprintf fmt "[%s]" (String.concat "; " (List.map (fun s -> Printf.sprintf "%S" s) l))
-
 let pp_int = Format.pp_print_int
 let pp_string = Format.pp_print_string
 
@@ -162,7 +158,7 @@ let test_fetch_row =
       with_conn f
       >>= function
       | Ok r ->
-          Oth.Assert.eq ~eq:( = ) ~pp:pp_string_list [ "Testy McTestface" ] r;
+          Oth.Assert.String_list.eq ~expected:[ "Testy McTestface" ] ~actual:r;
           Abb.Future.return ()
       | Error #Pgsql_io.create_err -> Oth.Assert.false_ "unexpected create error"
       | Error #Pgsql_io.err -> Oth.Assert.false_ "unexpected pgsql error")
@@ -2167,7 +2163,7 @@ let test_get_notification =
       >>= function
       | Ok (empty_before, notifs, empty_after) ->
           Oth.Assert.Eq.string_option ~expected:None ~actual:(notification_payload empty_before);
-          Oth.Assert.Eq.string_list
+          Oth.Assert.String_list.eq
             ~expected:[ "first"; "second" ]
             ~actual:(CCList.map (fun n -> n.Pgsql_io.payload) notifs);
           Oth.Assert.Eq.string_option ~expected:None ~actual:(notification_payload empty_after);

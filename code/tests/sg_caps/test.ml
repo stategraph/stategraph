@@ -351,7 +351,7 @@ let state_rules_examples =
        (Sg_caps_trie.Pattern.Prefix "", every_other_state);
        (Sg_caps_trie.Pattern.Literal "s1", refused);
       ] ->
-          Oth.Assert.Eq.string_list
+          Oth.Assert.String_list.eq
             ~expected:[ "aws_instance.*" ]
             ~actual:(Scope.to_strings every_other_state);
           Oth.Assert.true_ (Scope.is_empty refused)

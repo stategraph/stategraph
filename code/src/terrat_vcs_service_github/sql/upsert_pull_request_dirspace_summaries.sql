@@ -37,6 +37,9 @@ stored as (
   select c.repository, c.pull_number, $sha, s.path, s.workspace, s.state, $work_manifest
   from summaries as s
   cross join context as c
+  -- One fixed order for every caller: the rows of the conflict resolution are the rows of this
+  -- select, and two writers which take the same rows in opposite orders deadlock (40P01).
+  order by s.path, s.workspace
   on conflict (repository, pull_number, sha, path, workspace)
   do update set
     state = excluded.state,

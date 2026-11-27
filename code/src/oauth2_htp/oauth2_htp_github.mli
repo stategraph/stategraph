@@ -8,8 +8,8 @@ type err =
   ]
 [@@deriving show]
 
-(** The scopes a sign-in asks for: [read:user user:email read:org]. *)
-val scope : string
+(** The scopes a sign-in asks for. *)
+val scope : string list
 
 (** The GitHub hosts the provider calls: for GitHub itself [https://github.com] and
     [https://api.github.com], for a GitHub Enterprise Server [https://<host>] and

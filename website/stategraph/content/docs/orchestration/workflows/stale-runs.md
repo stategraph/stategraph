@@ -22,7 +22,7 @@ A push that changes only other files, for example documentation, does not make t
 
 ### When Orchestration cannot compare
 
-Orchestration compares the stored trees of two commits. With the [tree builder](/docs/orchestration/workflows/advanced/tree-builder-setup) or a config builder turned on, the tree or the built config of a commit can be missing when the result arrives. Orchestration does not wait for a build. It treats every dirspace of the run as stale, and the warning says that it cannot compare the files yet.
+Orchestration compares the stored trees of two commits. It does not read a built config, and it does not wait for a build. With the [tree builder](/docs/orchestration/workflows/advanced/tree-builder-setup) turned on, the tree of a commit can be missing when the result arrives. Orchestration then reads no other commit in place of that one: the answer must be the one of those two trees, because a comparison of content between two other commits can hide a change. It treats every dirspace of the run as stale, and the warning says that it cannot compare the files yet.
 
 This fails safe. A later `stategraph plan` or `stategraph apply` builds the tree of the head and compares again. When the comparison then proves that the files did not change, the earlier result is valid again: Orchestration does not run the dirspace again, and it sets its checks from the earlier result.
 
@@ -75,5 +75,5 @@ GitHub removes the checks of the old head when you push to a pull request. When 
 
 ## Limitations
 
-- The runner merges the head of the destination branch when it starts. Orchestration does not know that exact commit, thus a merge in the first seconds of a run can cause a stale warning that is not necessary. Orchestration never hides a real change.
+- The runner merges the head of the destination branch when it starts. Orchestration does not know that exact commit, thus a merge in the first seconds of a run can cause a stale warning that is not necessary, and never a missing one. Orchestration matches the changed files against the configuration of the run, thus a dirspace that only the newer commit names is not found, and the run keeps it.
 - A push directly to the destination branch, not through a pull request, is not compared. The required `stategraph apply` check makes sure that each pull request runs on its dirspaces before it merges.

@@ -11,13 +11,9 @@ let assert_force_fail name expected actual =
   if not (Bool.equal expected actual) then Format.eprintf "%s@." name;
   Oth.Assert.Eq.bool ~expected ~actual
 
-let pp_names fmt = function
-  | [] -> Format.pp_print_string fmt "[]"
-  | names -> Format.pp_print_string fmt ("[" ^ CCString.concat "; " names ^ "]")
-
 let assert_names name expected actual =
   if not (CCList.equal CCString.equal expected actual) then Format.eprintf "%s@." name;
-  Oth.Assert.eq ~eq:(CCList.equal CCString.equal) ~pp:pp_names expected actual
+  Oth.Assert.String_list.eq ~expected ~actual
 
 (* Fixtures.  A section declares names only: the rule reads [fail_if_set] and never [values], so
    no fixture needs one. *)
@@ -120,7 +116,7 @@ let test_force_fail_result_forges_every_dirspace =
       let forced = Ff.force_fail_result result in
       let module Wmr = Terrat_vcs_provider2.Work_manifest_result in
       Oth.Assert.Eq.bool ~expected:false ~actual:forced.Wmr.overall_success;
-      Oth.Assert.Eq.bool_list
+      Oth.Assert.Bool_list.eq
         ~expected:[ false; false ]
         ~actual:(CCList.map snd forced.Wmr.dirspaces_success);
       Oth.Assert.List.length

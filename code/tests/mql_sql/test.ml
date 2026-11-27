@@ -35,7 +35,7 @@ let test =
           assert_read_fails "select from where";
           ());
       Oth.test ~name:"Read many statements" (fun _ ->
-          Oth.Assert.Eq.string_list
+          Oth.Assert.String_list.eq
             ~expected:[ "truncate t"; "analyze t" ]
             ~actual:(Mql_sql.read_multi "truncate t;\nanalyze t;\n");
           ());

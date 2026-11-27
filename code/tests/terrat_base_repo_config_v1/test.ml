@@ -1694,7 +1694,7 @@ let test_prechecks_globs_are_repo_paths =
           ]
       in
       let wm = V1.when_modified (config_of_json json) in
-      Oth.Assert.Eq.string_list
+      Oth.Assert.String_list.eq
         ~expected:[ "${DIR}/*.tf" ]
         ~actual:(CCList.map V1.File_pattern.file_pattern wm.V1.When_modified.file_patterns);
       match wm.V1.When_modified.prechecks with
@@ -1946,7 +1946,7 @@ let test_parameters_names_values_and_fail_if_set =
       match Sln_map.String.find_opt "mode" (parameters_of_json json).V1.Parameters.names with
       | Some p ->
           Oth.Assert.Eq.bool ~expected:true ~actual:p.V1.Parameters.Parameter.fail_if_set;
-          Oth.Assert.Eq.string_list
+          Oth.Assert.String_list.eq
             ~expected:[ "DEBUG"; "RELEASE" ]
             ~actual:
               (match p.V1.Parameters.Parameter.values with

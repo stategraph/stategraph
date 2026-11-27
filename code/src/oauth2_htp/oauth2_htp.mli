@@ -40,10 +40,9 @@ module Config : sig
       [whitelist_domains] are the hosts, with an optional [:port] or [:*], a sign-in may return to
       by absolute URL. [email_domains] are the domains that may sign in, [*] for any. [login_params]
       are added to the provider's sign-in URL. [cookie_secret] is 16, 24 or 32 bytes, or their URL
-      safe base64 encoding. [scope] defaults to [read:user user:email read:org] for GitHub and to
-      [openid email profile] otherwise. *)
+      safe base64 encoding. [scope] is defaulted according to [provider]. *)
   val make :
-    ?scope:string ->
+    ?scope:string list ->
     ?login_params:(string * string) list ->
     provider:provider ->
     client_id:string ->

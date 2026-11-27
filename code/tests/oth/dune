@@ -1,7 +1,7 @@
 (tests
  (names assert_test phases_test tags_test)
  (modules assert_test phases_test tags_test)
- (libraries containers oth unix))
+ (libraries containers oth unix uuidm))
 
 ; [run_groups] needs the async backend to show that two groups overlap.
 
