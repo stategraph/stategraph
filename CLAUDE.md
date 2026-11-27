@@ -4,6 +4,7 @@
 - When you don't know how to do something, you consult the existing code in the project and match it.
 
 # Development conventions
+
 The `agent_docs/` folder holds the development conventions. Before starting work, decide which of them are relevant to your task and read them:
 
 | File | When to read |
