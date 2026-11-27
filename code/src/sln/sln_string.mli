@@ -32,3 +32,12 @@ val words : string -> string list
     - [take_words ~max_nb_words:5 "a b"] = [["a"; "b"]]
     - [take_words ~max_nb_words:0 "anything"] = [[]] *)
 val take_words : max_nb_words:int -> string -> string list
+
+(** Split [s] on every [by], trim each piece with [CCString.trim], and return the non-empty pieces
+    in order.
+
+    Examples:
+    - [separated ~by:',' " acme, ,acme-labs "] = [["acme"; "acme-labs"]]
+    - [separated ~by:' ' " openid  email "] = [["openid"; "email"]]
+    - [separated ~by:',' " , "] = [[]] *)
+val separated : by:char -> string -> string list

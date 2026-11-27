@@ -259,21 +259,10 @@ RUN eval $(opam env) && opam pin add -y ocamlformat 0.29.0
 
 FROM ocaml-sandbox-development-or-devcontainer AS ocaml-sandbox-devcontainer
 
-# Containerized development: install LSP, claude, depot, and ytt
-RUN eval $(opam env) && opam install -y ocaml-lsp-server.1.27.0 dot-merlin-reader.5.8.1-505
+# Containerized development: install LSP, depot, and ytt
+RUN eval $(opam env) && opam install -y ocaml-lsp-server.1.28.1 dot-merlin-reader.5.8.1-505
 # Keep the version in sync with COGAPP_VERSION in .github/workflows/actionlint.yml.
 RUN python3 -m pip install --user --break-system-packages --no-cache-dir "cogapp==3.6.0"
-RUN bash -c "curl -fsSL https://claude.ai/install.sh | bash" && \
-      mkdir -p "$HOME/.claude" && \
-      cat > "$HOME/.claude/settings.json" <<'EOF'
-{
-  "skipDangerousModePermissionPrompt": true,
-  "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
-  }
-}
-EOF
-
 RUN DEPOT_INSTALL_DIR="$HOME/.local/bin" bash -c "curl -fsSL https://depot.dev/install-cli.sh | sh" && \
       "$HOME/.local/bin/depot" --version
 

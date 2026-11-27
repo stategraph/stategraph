@@ -52,7 +52,7 @@ let test_idempotent =
 
 let test_directory =
   Oth.test ~tags:[ "brand" ] ~name:"directory names the configuration directory" (fun _ ->
-      Oth.Assert.Eq.string_list
+      Oth.Assert.String_list.eq
         ~expected:[ ".stategraph"; ".terrateam" ]
         ~actual:(CCList.map Terrat_brand.directory Terrat_brand.all);
       ())

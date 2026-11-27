@@ -608,7 +608,7 @@ struct
               ~index:_
               () =
             let module Dc = Terrat_change_match3.Dirspace_config in
-            let module Dir_set = CCSet.Make (CCString) in
+            let module Dir_set = Sln_set.String in
             let open Irm in
             fetch Keys.synthesized_config
             >>= fun config ->
@@ -669,6 +669,11 @@ struct
                dirspace of the run and nothing counts as applied, and [Work_set.make] below puts
                the run back together from its first layer.  The comment names no dirspace, thus
                [force] is empty and this is not the force path. *)
+            (* An empty [to_run] while a plan of the pull request is in flight is a wait, not
+               a nothing-to-run: the running plan will publish the comment and its dirspaces
+               keep the plans they hold.  A reset there re-plans the dirspaces whose plans
+               stand and duplicates the in-flight one (#3741: a [terrateam plan] three seconds
+               behind a push's autoplan re-planned a dirspace the autoplan had kept). *)
             (* A continuation of a layered run is a [Plan] with the empty query too, so this arm
                could fire for it.  It cannot: [reset] needs an empty [to_run], and this job exists
                only because [Work_set.next_round_ready] answered true -- the head of
@@ -679,7 +684,9 @@ struct
             let reset =
               match job.Tjc.Job.type_ with
               | Tjc.Job.Type_.Plan { tag_query; kind = None; parameters = _ }
-                when Terrat_tag_query.is_empty tag_query && CCList.is_empty to_run -> true
+                when Terrat_tag_query.is_empty tag_query
+                     && CCList.is_empty to_run
+                     && CCList.is_empty in_progress -> true
               | Tjc.Job.Type_.Plan _
               | Tjc.Job.Type_.Apply _
               | Tjc.Job.Type_.Autoapply
@@ -692,6 +699,14 @@ struct
               | Tjc.Job.Type_.Push -> false
             in
             let to_run_list, applied = if reset then (dirspaces, []) else (to_run, applied) in
+            Logs.info (fun m ->
+                m
+                  "%s : RFD2108_RESET : reset=%B : to_run=%s : in_progress=%s : dirspaces=%s"
+                  (Builder.log_id s)
+                  reset
+                  (Tasks_base.dirspaces_str to_run)
+                  (Tasks_base.dirspaces_str (CCList.map fst in_progress))
+                  (Tasks_base.dirspaces_str dirspaces));
             (* The files of a dirspace decide whether it is still applied, and no longer the sha of
                the work manifest.  Thus a push which does not touch a dirspace keeps it applied and
                the evaluation stays at the layer it reached. *)
@@ -1168,7 +1183,7 @@ struct
             fetcher)
 
     let compute_data_cache_key tree =
-      let sorted_tree = CCList.sort CCString.compare tree in
+      let sorted_tree = Sln_list.String.sort tree in
       let tree_str = CCString.concat "," sorted_tree in
       let sha256_hex = Sha256.(to_hex (string tree_str)) in
       (("cache2.repo_tree.data", sha256_hex), sha256_hex)

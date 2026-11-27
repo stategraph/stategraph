@@ -33,12 +33,6 @@ let non_empty = function
   | Some s when not (CCString.is_empty (CCString.trim s)) -> Some s
   | Some _ | None -> None
 
-(* A comma-separated setting: its non-empty values, trimmed. *)
-let split_list value =
-  CCList.filter
-    (fun v -> not (CCString.is_empty v))
-    (CCList.map CCString.trim (CCString.split_on_char ',' value))
-
 (* A group lookup goes through the Admin SDK as the admin, with the service account's key. *)
 let google_group_of_provider = function
   | Sgs_config.Oidc _ | Sgs_config.Github _ -> Ok None
@@ -52,7 +46,8 @@ let google_group_of_provider = function
             (fun service_account_json ->
               Some
                 {
-                  Oauth2_htp_google.Group.groups = CCOption.map_or ~default:[] split_list group;
+                  Oauth2_htp_google.Group.groups =
+                    CCOption.map_or ~default:[] (Sln_string.separated ~by:',') group;
                   admin_email;
                   service_account_json;
                 })
@@ -65,7 +60,7 @@ let google_group_of_provider = function
                 STATEGRAPH_OAUTH_GOOGLE_GROUP needs both"))
 
 let email_domains_of_config oauth2_config =
-  match split_list oauth2_config.Sgs_config.oauth2_email_domain with
+  match Sln_string.separated ~by:',' oauth2_config.Sgs_config.oauth2_email_domain with
   | [] ->
       Error
         (`Invalid_config

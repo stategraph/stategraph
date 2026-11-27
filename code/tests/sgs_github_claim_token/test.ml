@@ -63,7 +63,7 @@ let test_proof_round_trip =
       in
       Oth.Assert.Eq.string ~expected:"u-1" ~actual:user_id;
       Oth.Assert.Eq.string ~expected:"t-1" ~actual:tenant_id;
-      Oth.Assert.Eq.string_list ~expected:[ "i-1"; "i-2" ] ~actual:installation_core_ids;
+      Oth.Assert.String_list.eq ~expected:[ "i-1"; "i-2" ] ~actual:installation_core_ids;
       Oth.Assert.true_ (covered proof "i-2");
       Oth.Assert.not_true (covered proof "i-3"))
 

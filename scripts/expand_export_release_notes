@@ -4,14 +4,16 @@ set -euf -o pipefail
 # Expand the monorepo export entries of a GitHub release body (stdin -> stdout).
 #
 # GitHub builds the "## What's Changed" list from the titles of the PRs merged since the
-# previous release. Every one of those is a copybara export PR, and they all share the same
+# previous release. Most of those are copybara export PRs, and they all share the same
 # interchangeable title ("monorepo->OSS export <timestamp>"), which tells a reader nothing
-# about what shipped. Each export PR's body instead carries one line per monorepo PR it
-# publishes -- that PR's "Public OSS release note", or its title when it wrote none -- in an
-# `exported-changes` block written by the monorepo's .github/workflows/copybara.yml.
-# This replaces every such entry with that block's changes,
-# each still pointing at the export PR it came from. Every other line passes through untouched:
-# other headings, entries for PRs opened directly on this repo, and the Full Changelog footer.
+# about what shipped. Each export PR's body instead carries the "Public OSS release note" of
+# every monorepo PR it publishes that has one, in an `exported-changes` block written by the
+# monorepo's .github/workflows/copybara.yml.
+# This replaces every such entry with that block's changes, each still pointing at the export
+# PR it came from, and drops an export PR that has no block: none of its changes has a note.
+# Every other line passes through untouched: other headings, entries for PRs opened directly
+# on this repo, and the Full Changelog footer. The "## What's Changed" heading is dropped when
+# no entry is left under it.
 #
 # Environment variables:
 #   GITHUB_TOKEN - GitHub token for authentication
@@ -21,17 +23,29 @@ set -euf -o pipefail
 # Only entries under "## What's Changed" are expanded: the "## New Contributors" list links
 # PRs the same way, and its entries are about people, not changes.
 in_whats_changed=false
+# The "## What's Changed" heading, held back until an entry is printed under it.
+pending_heading=""
+
+# Print an entry of "## What's Changed", after its heading if that is still held back.
+print_entry() {
+  if [ -n "${pending_heading}" ]; then
+    printf '%s\n' "${pending_heading}"
+    pending_heading=""
+  fi
+  printf '%s\n' "$1"
+}
 
 # `|| [ -n "${line}" ]` so a final line with no trailing newline is still processed.
 while IFS= read -r line || [ -n "${line}" ]; do
   case "${line}" in
     "## What's Changed")
       in_whats_changed=true
-      printf '%s\n' "${line}"
+      pending_heading="${line}"
       continue
       ;;
     '## '*)
       in_whats_changed=false
+      pending_heading=""
       printf '%s\n' "${line}"
       continue
       ;;
@@ -50,24 +64,31 @@ while IFS= read -r line || [ -n "${line}" ]; do
   # REST rather than `gh pr view`: it is reachable with the release job's GITHUB_TOKEN, which
   # is scoped to `contents`. </dev/null so gh cannot consume the body this loop is reading.
   pr_api=$(sed -E 's#https://[^/]+/([^/]+)/([^/]+)/pull/([0-9]+)$#repos/\1/\2/pulls/\3#' <<< "${pr_url}")
-  if ! pr_body=$(gh api "${pr_api}" --jq '.body // ""' </dev/null 2>/dev/null); then
+  if ! pr_json=$(gh api "${pr_api}" </dev/null 2>/dev/null); then
     # Loud, not silent: an unreadable PR degrades the notes back to the generic export title.
     echo "::warning title=Release notes::Could not read ${pr_url}; keeping its raw title" >&2
-    pr_body=""
+    pr_json='{}'
   fi
-  # Keep the markers in sync with .github/workflows/copybara.yml, which writes them.
-  # Each change keeps an `in <pr url>` tail -- the same shape GitHub gives its own entries --
-  # so the export PR behind a one-line summary stays one click away.
-  exported=$(awk '/<!-- exported-changes:begin -->/ { inside = 1; next }
-                  /<!-- exported-changes:end -->/   { inside = 0 }
-                  inside' <<< "${pr_body}" \
-    | sed -E -e '/^[[:space:]]*$/d' -e 's/^-[[:space:]]*/* /' -e "s|\$| in ${pr_url}|" || true)
+  pr_body=$(jq -r '.body // ""' <<< "${pr_json}")
+  # The head branch is what identifies the monorepo's exports (oss-export-<run id>).
+  pr_head=$(jq -r '.head.ref // ""' <<< "${pr_json}")
+  # Keep the markers and the entry shape in sync with .github/workflows/copybara.yml, which
+  # writes them: an entry is a "- " line, then the note's further lines indented by two spaces.
+  # The first line of each change gets an `in <pr url>` tail -- the same shape GitHub gives its
+  # own entries -- so the export PR behind a change stays one click away. Blank lines are
+  # dropped: a blank line ends the "What's Changed" list for scripts/notify_slack.
+  exported=$(awk -v pr_url="${pr_url}" '
+    /<!-- exported-changes:begin -->/ { inside = 1; next }
+    /<!-- exported-changes:end -->/   { inside = 0 }
+    !inside || /^[[:space:]]*$/       { next }
+    /^-/                              { sub(/^-[[:space:]]*/, "* "); print $0 " in " pr_url; next }
+                                      { print }' <<< "${pr_body}")
 
-  # No block (a PR opened directly on this repo, or an export from before the block existed):
-  # the entry's own title is the best available description, so keep it.
   if [ -n "${exported}" ]; then
-    printf '%s\n' "${exported}"
-  else
-    printf '%s\n' "${line}"
+    print_entry "${exported}"
+  elif [[ "${pr_head}" != oss-export-* ]]; then
+    # A PR opened directly on this repo, or one that could not be read: the entry's own title
+    # is the best available description, so keep it.
+    print_entry "${line}"
   fi
 done

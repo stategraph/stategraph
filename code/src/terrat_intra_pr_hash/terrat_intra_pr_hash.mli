@@ -84,8 +84,9 @@ end
     the number of files which changed and not of the number of files in the repository.
 
     [changed_between from to] is the set of dirspaces with a file that changed between the two
-    commits of a pair of {!Run.during}. A commit whose tree is not stored gives every dirspace: the
-    rules fail safe. Once the tree is stored, the same pair can give a smaller set, and a run which
+    commits of a pair of {!Run.during}. A commit whose tree is not stored gives the dirspaces whose
+    runs are judged over that pair, and no other dirspace: the rules fail safe for the pair, not for
+    the pull request. Once the tree is stored, the same pair can give a smaller set, and a run which
     was stale becomes good again (RFD 2356, Retroactive freshness).
 
     [force] is the set of dirspaces which a tag query of an explicit [terrateam plan] comment

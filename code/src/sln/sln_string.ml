@@ -22,3 +22,11 @@ let take_words ~max_nb_words s =
     collect [] 0 0
 
 let words = take_words ~max_nb_words:Int.max_int
+
+let separated ~by s =
+  CCList.filter_map
+    (fun v ->
+      match CCString.trim v with
+      | "" -> None
+      | v -> Some v)
+    (CCString.split_on_char by s)

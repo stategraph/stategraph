@@ -374,7 +374,7 @@ let test =
           in
           let ast = Oth.Assert.ok_pp ~pp:Mql.Ast.pp_err @@ Mql.Ast.of_string query in
           let q = Oth.Assert.ok_pp ~pp:Mql_to_pgsql.pp_err @@ of_mql ~schema ast in
-          Oth.Assert.Eq.string_list
+          Oth.Assert.String_list.eq
             ~expected:[ "test"; "test2"; "test3" ]
             ~actual:(Mql_to_pgsql.tables q));
       Oth.test ~name:"Success 6" (fun _ ->

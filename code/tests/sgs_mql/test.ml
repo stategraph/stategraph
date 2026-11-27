@@ -248,12 +248,12 @@ let parity_tests =
            Oth.test
              ~name:("Parity: CTE columns equal schema columns (" ^ variant ^ ")")
              (fun _ ->
-               Oth.Assert.Eq.string_list ~expected:[] ~actual:(parity_diff ~orchestration schema);
+               Oth.Assert.String_list.eq ~expected:[] ~actual:(parity_diff ~orchestration schema);
                ());
            Oth.test
              ~name:("Parity: no star or whole-row in a CTE select list (" ^ variant ^ ")")
              (fun _ ->
-               Oth.Assert.Eq.string_list
+               Oth.Assert.String_list.eq
                  ~expected:[]
                  ~actual:
                    (CCList.flat_map
@@ -327,7 +327,7 @@ let parity_tests =
                  ~actual:(CCList.last_opt names |> CCOption.get_or ~default:"");
                Oth.Assert.Eq.int ~expected:1 ~actual:(CCList.count (CCString.equal "q") names);
                (* The other CTEs are the tenant-scoped CTEs of the template. *)
-               Oth.Assert.Eq.string_list
+               Oth.Assert.String_list.eq
                  ~expected:
                    (CCList.map fst (top_level_ctes (page_ast ~orchestration))
                    |> CCList.filter (fun n -> not (CCString.equal n "q")))
@@ -363,7 +363,7 @@ let parity_tests =
                      CCList.map (fun c -> table ^ "." ^ c) (columns_of_schema_table schema table))
                    (schema_tables schema)
                in
-               Oth.Assert.Eq.string_list ~expected:(sorted expected) ~actual:(sorted advertised);
+               Oth.Assert.String_list.eq ~expected:(sorted expected) ~actual:(sorted advertised);
                ());
          ])
        variants
@@ -375,7 +375,7 @@ let parity_tests =
               Mql_sql.read_ast
                 "with c as (select t.id, to_jsonb(t) as j, t.* from states as t) select 1 as x"
             in
-            Oth.Assert.Eq.string_list
+            Oth.Assert.String_list.eq
               ~expected:[ "t"; "*" ]
               ~actual:
                 (CCList.flat_map (fun (_, c) -> cte_star_and_whole_rows c) (top_level_ctes cte));
@@ -439,7 +439,7 @@ let test =
             |> CCList.map (CCString.take_while is_ident)
             |> Sln_list.String.sort_uniq
           in
-          Oth.Assert.Eq.string_list
+          Oth.Assert.String_list.eq
             ~expected:(CCList.sort CCString.compare ("work_manifests" :: terrateam_tables))
             ~actual:referenced);
       (* #1061: the schema endpoint body must conform to [mql-schema-response] and
@@ -471,7 +471,7 @@ let test =
             | `Assoc fields -> CCList.sort CCString.compare (CCList.map fst fields)
             | _ -> Oth.Assert.false_ "schema body is not a JSON object"
           in
-          Oth.Assert.Eq.string_list
+          Oth.Assert.String_list.eq
             ~expected:[ "default_limit"; "max_limit"; "tables" ]
             ~actual:keys);
       (* [Schema.run] picks the body per config flag: the orchestration body
@@ -542,7 +542,7 @@ module Adversarial = struct
   (* Fails the test with each case whose outcome [expected] refuses, thus one
      run shows each bad case. *)
   let assert_cases ~schema cases =
-    Oth.Assert.Eq.string_list
+    Oth.Assert.String_list.eq
       ~expected:[]
       ~actual:
         (CCList.filter_map

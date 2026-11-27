@@ -504,11 +504,7 @@ let test_spread_over_nodes_is_even =
       in
       CCList.iter
         (fun (max_per_node, count, expected) ->
-          Oth.Assert.eq
-            ~eq:(CCList.equal CCInt.equal)
-            ~pp:(CCList.pp CCInt.pp)
-            expected
-            (sizes ~max_per_node count))
+          Oth.Assert.Int_list.eq ~expected ~actual:(sizes ~max_per_node count))
         [
           (9, 10, [ 5; 5 ]);
           (9, 19, [ 7; 6; 6 ]);

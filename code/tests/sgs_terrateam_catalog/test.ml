@@ -304,7 +304,7 @@ let test =
                        "sentinel table %s missing from the catalog -- the deny test must not be \
                         satisfied by dropping the table"
                        table)
-              | Some columns -> Oth.Assert.not_true (Sln_list.String.mem column columns))
+              | Some columns -> Oth.Assert.String_list.not_mem column columns)
             sentinels;
           ());
     ]

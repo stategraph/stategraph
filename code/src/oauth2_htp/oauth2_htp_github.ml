@@ -10,7 +10,7 @@ type err =
   ]
 [@@deriving show]
 
-let scope = "read:user user:email read:org"
+let scope = [ "read:user"; "user:email"; "read:org" ]
 
 type t = {
   client_id : string;

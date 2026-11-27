@@ -21,6 +21,7 @@ struct
 
   module Logs = (val Logs.src_log src : Logs.LOG)
   module Builder = Terrat_vcs_event_evaluator2_builder.Make (S)
+  module Repo_tree_gate = Terrat_vcs_event_evaluator2_repo_tree_gate
 
   let run ~name f path s fetcher =
     Abb.Future.await_bind (function
@@ -177,6 +178,12 @@ struct
   let build_config_cache_ref ref_ repo_config =
     S.Api.Ref.of_string (S.Api.Ref.to_string ref_ ^ ":" ^ repo_config_hash repo_config)
 
+  (* The log form of a dirspace, joined by [","].  Log output of this kind is replayed and parsed
+     (#3741), thus it is written once.  [Terrat_dirspace.show] is the derived record printer and a
+     different string, so it cannot substitute. *)
+  let dirspace_str { Terrat_dirspace.dir; workspace } = dir ^ ":" ^ workspace
+  let dirspaces_str dirspaces = CCString.concat "," (CCList.map dirspace_str dirspaces)
+
   let dirspaces_of_paths config paths =
     paths
     |> CCList.map (fun filename -> Terrat_change.Diff.Change { filename })
@@ -188,10 +195,9 @@ struct
   let stategraph_parallel_apply repo_config workflow =
     let module R = Terrat_base_repo_config_v1 in
     let module E = R.Workflows.Entry in
+    (* [~default] is evaluated eagerly, so it stays a total projection of [repo_config]. *)
     let engine =
-      match workflow with
-      | Some { E.engine; _ } -> engine
-      | None -> R.engine repo_config
+      CCOption.map_or ~default:(R.engine repo_config) (fun { E.engine; _ } -> engine) workflow
     in
     S.stategraph_parallel_applies
     &&
@@ -352,7 +358,7 @@ struct
   (* With the tree builder off, the server reads a tree from the forge and stores it, as the
      [repo_tree_branch] task does.  With it on, only a tree build work manifest stores a tree, and
      starting one here would make the caller wait, which it must not. *)
-  let ensure_repo_tree s ~missing_tree ~tree_builder ~account ref_ =
+  let ensure_repo_tree s ~client ~repo ~missing_tree ~tree_builder ~account ref_ =
     let open Abbs_fc.Infix_result_monad in
     Builder.run_db s ~f:(fun db ->
         S.Db.query_repo_tree_built
@@ -363,75 +369,84 @@ struct
           db
           account
           ref_)
-    >>= function
-    | true -> Abbs_fc.return_ok true
-    | false -> (
-        match missing_tree with
-        | `Unknown -> Abbs_fc.return_ok false
-        | `Fetch _ when tree_builder -> Abbs_fc.return_ok false
-        | `Fetch (client, repo) ->
-            time_it
-              s
-              (fun m log_id time ->
-                m
-                  "%s : STALENESS : FETCH_TREE : repo = %s : ref = %s : time=%f"
-                  log_id
-                  (S.Api.Repo.to_string repo)
-                  (S.Api.Ref.to_string ref_)
-                  time)
-              (fun () -> S.Api.fetch_tree ~request_id:(Builder.log_id s) client repo ref_)
-            >>= fun files ->
-            Builder.run_db s ~f:(fun db ->
-                S.Db.store_repo_tree
-                  ~request_id:(Builder.log_id s)
-                  ~built_by_script:false
-                  db
-                  account
-                  ref_
-                  files)
-            >>| fun () -> true)
+    >>= fun built ->
+    match Repo_tree_gate.decide ~missing_tree ~tree_builder ~built with
+    | Repo_tree_gate.Use -> Abbs_fc.return_ok Repo_tree_gate.Use
+    | Repo_tree_gate.Give_up -> Abbs_fc.return_ok Repo_tree_gate.Give_up
+    | Repo_tree_gate.Fetch ->
+        time_it
+          s
+          (fun m log_id time ->
+            m
+              "%s : STALENESS : FETCH_TREE : repo = %s : ref = %s : time=%f"
+              log_id
+              (S.Api.Repo.to_string repo)
+              (S.Api.Ref.to_string ref_)
+              time)
+          (fun () -> S.Api.fetch_tree ~request_id:(Builder.log_id s) client repo ref_)
+        >>= fun files ->
+        Builder.run_db s ~f:(fun db ->
+            S.Db.store_repo_tree
+              ~request_id:(Builder.log_id s)
+              ~built_by_script:false
+              db
+              account
+              ref_
+              files)
+        >>| fun () -> Repo_tree_gate.Use
 
-  (* The config is tested first, then both trees: [query_repo_tree_changes] against a tree that is
-     not stored gives back every path of the other tree, which is a walk of the whole repository
-     through the change match to reach an answer that is only "unknown". *)
-  let changed_between s ~missing_tree ~config ~repo_config_raw ~account ~from_ref ~to_ref =
+  (* The trees of the two commits are the whole input of the comparison, and they are tested first:
+     [query_repo_tree_changes] against a tree that is not stored gives back every path of the other
+     tree, which is a walk of the whole repository through the change match to reach an answer that
+     is only "unknown".  A tree that is not stored therefore answers [None] here, which every caller
+     turns into a stale verdict.
+
+     Neither commit is replaced by another one.  The comparison underneath is a diff of content ids
+     between two stored trees, which is not monotone in the range of commits between them: a push
+     and its revert give the same content again, thus a wider range can report fewer changes, and a
+     narrower range can miss one.  No substitution of either end is therefore sound, and the answer
+     is the one of the exact pair or nothing. *)
+  let changed_between
+      s
+      ~client
+      ~repo
+      ~missing_tree
+      ~config
+      ~repo_config_raw
+      ~account
+      ~from_ref
+      ~to_ref =
     let module V1 = Terrat_base_repo_config_v1 in
     let open Abbs_fc.Infix_result_monad in
     let tree_builder = (V1.tree_builder repo_config_raw).V1.Tree_builder.enabled in
-    let config_builder = (V1.config_builder repo_config_raw).V1.Config_builder.enabled in
+    let not_compared side =
+      Logs.info (fun m ->
+          m
+            "%s : STALENESS : NOT_COMPARED : side = %s : from_ref = %s : to_ref = %s"
+            (Builder.log_id s)
+            side
+            (S.Api.Ref.to_string from_ref)
+            (S.Api.Ref.to_string to_ref));
+      Abbs_fc.return_ok None
+    in
     if S.Api.Ref.equal from_ref to_ref then Abbs_fc.return_ok (Some Terrat_data.Dirspace_set.empty)
     else
-      (if config_builder then
-         Builder.run_db s ~f:(fun db ->
-             S.Db.query_repo_config_json
-               ~request_id:(Builder.log_id s)
-               db
-               account
-               (build_config_cache_ref to_ref repo_config_raw))
-         >>| CCOption.is_some
-       else Abbs_fc.return_ok true)
-      >>= fun config_built ->
-      (if config_built then ensure_repo_tree s ~missing_tree ~tree_builder ~account from_ref
-       else Abbs_fc.return_ok false)
-      >>= fun from_stored ->
-      (if from_stored then ensure_repo_tree s ~missing_tree ~tree_builder ~account to_ref
-       else Abbs_fc.return_ok false)
-      >>= fun to_stored ->
-      if to_stored then
-        Builder.run_db s ~f:(fun db ->
-            query_repo_tree_changes ~base_ref:from_ref s db account to_ref)
-        >>| fun paths -> Some (dirspaces_of_paths config paths)
-      else (
-        Logs.info (fun m ->
-            m
-              "%s : STALENESS : NOT_COMPARED : from_ref = %s : to_ref = %s : config_built = %b : \
-               from_stored = %b"
-              (Builder.log_id s)
-              (S.Api.Ref.to_string from_ref)
-              (S.Api.Ref.to_string to_ref)
-              config_built
-              from_stored);
-        Abbs_fc.return_ok None)
+      ensure_repo_tree s ~client ~repo ~missing_tree ~tree_builder ~account from_ref
+      >>= function
+      | Repo_tree_gate.Give_up -> not_compared "from"
+      (* [ensure_repo_tree] answers [Use] once a fetch has stored the tree, thus it never answers
+         [Fetch]: the arm names the constructor and asserts the invariant instead of hiding it
+         under [_]. *)
+      | Repo_tree_gate.Fetch -> assert false
+      | Repo_tree_gate.Use -> (
+          ensure_repo_tree s ~client ~repo ~missing_tree ~tree_builder ~account to_ref
+          >>= function
+          | Repo_tree_gate.Give_up -> not_compared "to"
+          | Repo_tree_gate.Fetch -> assert false
+          | Repo_tree_gate.Use ->
+              Builder.run_db s ~f:(fun db ->
+                  query_repo_tree_changes ~base_ref:from_ref s db account to_ref)
+              >>| fun paths -> Some (dirspaces_of_paths config paths))
 
   module Kept = struct
     type t = {

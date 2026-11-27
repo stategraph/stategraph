@@ -34,7 +34,7 @@ let test_move_to_and_from_config_file =
    as the expectation, not as a fixture. *)
 let test_list_covers_both_spellings_and_extensions =
   Oth.test ~name:"the matcher list covers both spellings in both extensions" (fun _ ->
-      Oth.Assert.Eq.string_list
+      Oth.Assert.String_list.eq
         ~expected:
           [
             ".stategraph/config.yaml";

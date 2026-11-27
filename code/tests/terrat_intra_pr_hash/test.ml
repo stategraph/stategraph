@@ -91,17 +91,17 @@ let select
     states
 
 let assert_to_run ~expected { Ipr.Selection.to_run; out_of_order = _; applied = _ } =
-  Oth.Assert.Eq.string_list ~expected ~actual:(dirs_of to_run)
+  Oth.Assert.String_list.eq ~expected ~actual:(dirs_of to_run)
 
 let assert_out_of_order ~expected { Ipr.Selection.to_run = _; out_of_order; applied = _ } =
-  Oth.Assert.Eq.string_list ~expected ~actual:(dirs_of out_of_order)
+  Oth.Assert.String_list.eq ~expected ~actual:(dirs_of out_of_order)
 
 let assert_applied ~expected { Ipr.Selection.to_run = _; out_of_order = _; applied } =
-  Oth.Assert.Eq.string_list ~expected ~actual:(dirs_of applied)
+  Oth.Assert.String_list.eq ~expected ~actual:(dirs_of applied)
 
 (* The answer of [without_in_progress] is the dirspaces to plan, not a selection. *)
 let assert_planned ~expected planned =
-  Oth.Assert.Eq.string_list ~expected ~actual:(dirs_of (Terrat_data.Dirspace_set.elements planned))
+  Oth.Assert.String_list.eq ~expected ~actual:(dirs_of (Terrat_data.Dirspace_set.elements planned))
 
 (* -- Autoplan filtering -- *)
 

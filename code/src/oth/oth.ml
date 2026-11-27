@@ -183,11 +183,6 @@ module Assert = struct
           done);
         Format.pp_print_flush fmt ();
         raise (Assert_failure_msg (Buffer.contents buf)))
-
-    let string_list = list ~eq:CCString.equal ~pp:Format.pp_print_string
-    let int_list = list ~eq:Int.equal ~pp:Format.pp_print_int
-    let bool_list = list ~eq:Bool.equal ~pp:Format.pp_print_bool
-    let uuidm_list = list ~eq:Uuidm.equal ~pp:Uuidm.pp
   end
 
   module String = struct
@@ -221,6 +216,52 @@ module Assert = struct
     let doesnt_contain_any ~haystack ~needles =
       CCList.iter (fun needle -> doesnt_contain ~haystack ~needle) needles
   end
+
+  module type Generic_list = sig
+    type elem
+
+    val eq : expected:elem list -> actual:elem list -> unit
+    val mem : elem -> elem list -> unit
+    val not_mem : elem -> elem list -> unit
+    val all_mem : haystack:elem list -> needles:elem list -> unit
+    val none_mem : haystack:elem list -> needles:elem list -> unit
+  end
+
+  module Make (Element : sig
+    type t [@@deriving eq, show]
+  end) =
+  struct
+    type elem = Element.t
+
+    let eq = Eq.list ~eq:Element.equal ~pp:Element.pp
+
+    let mem elem haystack =
+      if not (CCList.mem ~eq:Element.equal elem haystack) then
+        false_ (Format.asprintf "Expected list to contain: %a" Element.pp elem)
+
+    let not_mem elem haystack =
+      if CCList.mem ~eq:Element.equal elem haystack then
+        false_ (Format.asprintf "Expected list not to contain: %a" Element.pp elem)
+
+    let all_mem ~haystack ~needles = CCList.iter (fun needle -> mem needle haystack) needles
+    let none_mem ~haystack ~needles = CCList.iter (fun needle -> not_mem needle haystack) needles
+  end
+
+  module String_list = Make (struct
+    type t = string [@@deriving eq, show]
+  end)
+
+  module Int_list = Make (struct
+    type t = int [@@deriving eq, show]
+  end)
+
+  module Bool_list = Make (struct
+    type t = bool [@@deriving eq, show]
+  end)
+
+  module Uuidm_list = Make (struct
+    type t = Uuidm.t [@@deriving eq, show]
+  end)
 end
 
 module type ASSERT = module type of Assert

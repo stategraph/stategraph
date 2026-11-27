@@ -21,7 +21,7 @@ let sorted = CCList.sort CCString.compare
 (* Each query must give an error that [expected] accepts.  The failure names
    each query that does not. *)
 let assert_refused ~func_allow_list ~cast_allow_list ~expected queries =
-  Oth.Assert.Eq.string_list
+  Oth.Assert.String_list.eq
     ~expected:[]
     ~actual:
       (CCList.filter_map
@@ -36,17 +36,17 @@ let test =
   Oth.parallel
     [
       Oth.test ~name:"Allow list: the default function list is the fixed list" (fun _ ->
-          Oth.Assert.Eq.string_list
+          Oth.Assert.String_list.eq
             ~expected:(sorted Mql_adversarial_corpus.default_func_allow_list)
             ~actual:(sorted Mql_to_pgsql.default_func_allow_list);
           ());
       Oth.test ~name:"Allow list: the default cast list is the fixed list" (fun _ ->
-          Oth.Assert.Eq.string_list
+          Oth.Assert.String_list.eq
             ~expected:(sorted Mql_adversarial_corpus.default_cast_allow_list)
             ~actual:(sorted Mql_to_pgsql.default_cast_allow_list);
           ());
       Oth.test ~name:"Allow list: each default function has an adversarial test" (fun _ ->
-          Oth.Assert.Eq.string_list
+          Oth.Assert.String_list.eq
             ~expected:(sorted Mql_to_pgsql.default_func_allow_list)
             ~actual:(sorted (CCList.map fst Mql_adversarial_corpus.allowed_function_cases));
           ());

@@ -53,7 +53,7 @@ let test_select_error =
           Abb.Future.return (Error name))
       >>= function
       | Error "stategraph" ->
-          Oth_abb.Assert.Eq.string_list ~expected:[ "stategraph" ] ~actual:!asked;
+          Oth_abb.Assert.String_list.eq ~expected:[ "stategraph" ] ~actual:!asked;
           Abb.Future.return ()
       | Error name -> failwith (Printf.sprintf "error from %s" name)
       | Ok _ -> failwith "select did not fail")

@@ -54,11 +54,7 @@ module Make (Abb : Abb_intf.S) = struct
         Fut_comb.List.map ~f:make_task (CCList.init n CCFun.id)
         >>| fun results ->
         let expected = CCList.init n CCFun.id in
-        Oth.Assert.Eq.list
-          ~eq:CCInt.equal
-          ~pp:Format.pp_print_int
-          ~expected
-          ~actual:(CCList.sort CCInt.compare results))
+        Oth.Assert.Int_list.eq ~expected ~actual:(CCList.sort CCInt.compare results))
 
   (* Scenario 2: launch N tasks, abort a random subset mid-flight, let
      the rest complete.  Confirms aborted tasks land in [`Aborted] and
@@ -164,7 +160,7 @@ module Make (Abb : Abb_intf.S) = struct
         >>| fun nested ->
         let flat = CCList.sort CCInt.compare (CCList.flatten nested) in
         let expected = CCList.init (n_outer * n_inner) CCFun.id in
-        Oth.Assert.Eq.list ~eq:CCInt.equal ~pp:Format.pp_print_int ~expected ~actual:flat)
+        Oth.Assert.Int_list.eq ~expected ~actual:flat)
 
   (* Scenario 5: a single shared bounded Chan, many concurrent unpinned
      producers, one scheduler-domain consumer — the Chan stress test
@@ -200,11 +196,7 @@ module Make (Abb : Abb_intf.S) = struct
         consumer_fut
         >>| fun received ->
         let sorted = CCList.sort CCInt.compare received in
-        Oth.Assert.Eq.list
-          ~eq:CCInt.equal
-          ~pp:Format.pp_print_int
-          ~expected:(CCList.init n CCFun.id)
-          ~actual:sorted)
+        Oth.Assert.Int_list.eq ~expected:(CCList.init n CCFun.id) ~actual:sorted)
 
   (* [stress_chan_through_unpinned] is intermittently flaky — under
      enough concurrent unpinned producers parked on a shared [Chan]

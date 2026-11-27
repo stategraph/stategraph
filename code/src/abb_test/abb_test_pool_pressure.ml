@@ -73,9 +73,7 @@ module Make (Abb : Abb_intf.S) = struct
                 >>= fun fut -> fut)
               (CCList.init n CCFun.id)
             >>= fun results ->
-            Oth.Assert.Eq.list
-              ~eq:CCInt.equal
-              ~pp:Format.pp_print_int
+            Oth.Assert.Int_list.eq
               ~expected:(CCList.init n CCFun.id)
               ~actual:(CCList.sort CCInt.compare results);
             Mutex.unlock mu;
@@ -113,9 +111,7 @@ module Make (Abb : Abb_intf.S) = struct
                 >>= fun fut -> fut)
               (CCList.init n CCFun.id)
             >>= fun results ->
-            Oth.Assert.Eq.list
-              ~eq:CCInt.equal
-              ~pp:Format.pp_print_int
+            Oth.Assert.Int_list.eq
               ~expected:(CCList.init n CCFun.id)
               ~actual:(CCList.sort CCInt.compare results);
             Mutex.unlock mu;

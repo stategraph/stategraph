@@ -1,86 +1,141 @@
-let assert_bool expected actual = Oth.Assert.Eq.bool ~expected ~actual
-let assert_list expected actual = Oth.Assert.Eq.string_list ~expected ~actual
-
 let matches_positive =
   Oth.test ~name:"matches_positive" (fun _ ->
-      assert_bool true (Sg_caps_match.matches ~patterns:[ "module.foo.*" ] "module.foo.bar");
-      assert_bool false (Sg_caps_match.matches ~patterns:[ "module.foo.*" ] "module.bar.baz");
+      Oth.Assert.Eq.bool
+        ~expected:true
+        ~actual:(Sg_caps_match.matches ~patterns:[ "module.foo.*" ] "module.foo.bar");
+      Oth.Assert.Eq.bool
+        ~expected:false
+        ~actual:(Sg_caps_match.matches ~patterns:[ "module.foo.*" ] "module.bar.baz");
       ())
 
 let matches_star_all =
   Oth.test ~name:"matches_star_all" (fun _ ->
-      assert_bool true (Sg_caps_match.matches ~patterns:[ "*" ] "anything.at.all");
+      Oth.Assert.Eq.bool
+        ~expected:true
+        ~actual:(Sg_caps_match.matches ~patterns:[ "*" ] "anything.at.all");
       ())
 
 let matches_negation =
   Oth.test ~name:"matches_negation" (fun _ ->
       (* allow everything under module.foo except its outputs *)
       let pats = [ "module.foo.*"; "!module.foo.output.*" ] in
-      assert_bool true (Sg_caps_match.matches ~patterns:pats "module.foo.aws_s3_bucket.b");
-      assert_bool false (Sg_caps_match.matches ~patterns:pats "module.foo.output.url");
+      Oth.Assert.Eq.bool
+        ~expected:true
+        ~actual:(Sg_caps_match.matches ~patterns:pats "module.foo.aws_s3_bucket.b");
+      Oth.Assert.Eq.bool
+        ~expected:false
+        ~actual:(Sg_caps_match.matches ~patterns:pats "module.foo.output.url");
       ())
 
 let matches_implicit_star =
   Oth.test ~name:"matches_implicit_star" (fun _ ->
       (* an all-negation list implies a leading "*" *)
       let pats = [ "!module.foo.*" ] in
-      assert_bool true (Sg_caps_match.matches ~patterns:pats "module.bar.baz");
-      assert_bool false (Sg_caps_match.matches ~patterns:pats "module.foo.bar");
+      Oth.Assert.Eq.bool
+        ~expected:true
+        ~actual:(Sg_caps_match.matches ~patterns:pats "module.bar.baz");
+      Oth.Assert.Eq.bool
+        ~expected:false
+        ~actual:(Sg_caps_match.matches ~patterns:pats "module.foo.bar");
       ())
 
 let matches_empty_denies =
   Oth.test ~name:"matches_empty_denies" (fun _ ->
-      assert_bool false (Sg_caps_match.matches ~patterns:[] "anything");
+      Oth.Assert.Eq.bool ~expected:false ~actual:(Sg_caps_match.matches ~patterns:[] "anything");
       (* [] is equivalent to ["!*"] *)
-      assert_bool false (Sg_caps_match.matches ~patterns:[ "!*" ] "anything");
+      Oth.Assert.Eq.bool
+        ~expected:false
+        ~actual:(Sg_caps_match.matches ~patterns:[ "!*" ] "anything");
       ())
 
 let matches_glob_negation =
   Oth.test ~name:"matches_glob_negation" (fun _ ->
       (* negations may themselves be globs *)
       let pats = [ "*"; "!aws_*" ] in
-      assert_bool true (Sg_caps_match.matches ~patterns:pats "google_storage.b");
-      assert_bool false (Sg_caps_match.matches ~patterns:pats "aws_instance.web");
+      Oth.Assert.Eq.bool
+        ~expected:true
+        ~actual:(Sg_caps_match.matches ~patterns:pats "google_storage.b");
+      Oth.Assert.Eq.bool
+        ~expected:false
+        ~actual:(Sg_caps_match.matches ~patterns:pats "aws_instance.web");
       ())
 
 let normalize_list_cases =
   Oth.test ~name:"normalize_list_cases" (fun _ ->
-      assert_list [] (Sg_caps_match.normalize_list []);
-      assert_list [ "*"; "!a" ] (Sg_caps_match.normalize_list [ "!a" ]);
-      assert_list [ "a"; "b" ] (Sg_caps_match.normalize_list [ "a"; "b" ]);
-      assert_list [ "a"; "!b" ] (Sg_caps_match.normalize_list [ "a"; "!b" ]);
+      Oth.Assert.String_list.eq ~expected:[] ~actual:(Sg_caps_match.normalize_list []);
+      Oth.Assert.String_list.eq
+        ~expected:[ "*"; "!a" ]
+        ~actual:(Sg_caps_match.normalize_list [ "!a" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "a"; "b" ]
+        ~actual:(Sg_caps_match.normalize_list [ "a"; "b" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "a"; "!b" ]
+        ~actual:(Sg_caps_match.normalize_list [ "a"; "!b" ]);
       ())
 
 let canonicalize_list_cases =
   Oth.test ~name:"canonicalize_list_cases" (fun _ ->
-      assert_list [ "!*" ] (Sg_caps_match.canonicalize_list []);
-      assert_list [ "*" ] (Sg_caps_match.canonicalize_list [ "foo.bar"; "baz.zoom"; "*" ]);
-      assert_list [ "*"; "!a" ] (Sg_caps_match.canonicalize_list [ "!a" ]);
-      assert_list [ "!*" ] (Sg_caps_match.canonicalize_list [ "*"; "!*" ]);
-      assert_list [ "!*" ] (Sg_caps_match.canonicalize_list [ "foo"; "!*" ]);
-      assert_list [ "a"; "b" ] (Sg_caps_match.canonicalize_list [ "a"; "b"; "a" ]);
-      assert_list [ "*"; "!bar" ] (Sg_caps_match.canonicalize_list [ "*"; "foo"; "!bar" ]);
+      Oth.Assert.String_list.eq ~expected:[ "!*" ] ~actual:(Sg_caps_match.canonicalize_list []);
+      Oth.Assert.String_list.eq
+        ~expected:[ "*" ]
+        ~actual:(Sg_caps_match.canonicalize_list [ "foo.bar"; "baz.zoom"; "*" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "*"; "!a" ]
+        ~actual:(Sg_caps_match.canonicalize_list [ "!a" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "!*" ]
+        ~actual:(Sg_caps_match.canonicalize_list [ "*"; "!*" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "!*" ]
+        ~actual:(Sg_caps_match.canonicalize_list [ "foo"; "!*" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "a"; "b" ]
+        ~actual:(Sg_caps_match.canonicalize_list [ "a"; "b"; "a" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "*"; "!bar" ]
+        ~actual:(Sg_caps_match.canonicalize_list [ "*"; "foo"; "!bar" ]);
       (* same-polarity superset absorbs subsets *)
-      assert_list [ "foo.bar.*" ] (Sg_caps_match.canonicalize_list [ "foo.bar.*"; "foo.bar.baz.*" ]);
-      assert_list [ "a.*" ] (Sg_caps_match.canonicalize_list [ "a.*"; "a.b"; "a.b.c" ]);
-      assert_list [ "*"; "!a.*" ] (Sg_caps_match.canonicalize_list [ "*"; "!a.*"; "!a.b.*" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "foo.bar.*" ]
+        ~actual:(Sg_caps_match.canonicalize_list [ "foo.bar.*"; "foo.bar.baz.*" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "a.*" ]
+        ~actual:(Sg_caps_match.canonicalize_list [ "a.*"; "a.b"; "a.b.c" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "*"; "!a.*" ]
+        ~actual:(Sg_caps_match.canonicalize_list [ "*"; "!a.*"; "!a.b.*" ]);
       (* cross-polarity: a negation removes a positive it covers; the negation is then dead against
          the remaining positive and is itself dropped *)
-      assert_list [ "x.*" ] (Sg_caps_match.canonicalize_list [ "a.b.*"; "x.*"; "!a.*" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "x.*" ]
+        ~actual:(Sg_caps_match.canonicalize_list [ "a.b.*"; "x.*"; "!a.*" ]);
       (* a negation is kept when it still excludes part of a surviving positive *)
-      assert_list [ "a.*"; "!a.b.*" ] (Sg_caps_match.canonicalize_list [ "a.*"; "a.c.*"; "!a.b.*" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "a.*"; "!a.b.*" ]
+        ~actual:(Sg_caps_match.canonicalize_list [ "a.*"; "a.c.*"; "!a.b.*" ]);
       (* landmine: emptying the positives is deny-all, NOT allow-all-except *)
-      assert_list [ "!*" ] (Sg_caps_match.canonicalize_list [ "a.*"; "!a.*" ]);
-      assert_list [ "!*" ] (Sg_caps_match.canonicalize_list [ "a.b.*"; "!a.*" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "!*" ]
+        ~actual:(Sg_caps_match.canonicalize_list [ "a.*"; "!a.*" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "!*" ]
+        ~actual:(Sg_caps_match.canonicalize_list [ "a.b.*"; "!a.*" ]);
       (* cross-polarity: a negation disjoint from every positive is dropped *)
-      assert_list [ "a.*" ] (Sg_caps_match.canonicalize_list [ "a.*"; "!b.*" ]);
-      assert_list [ "a.*"; "!a.b.*" ] (Sg_caps_match.canonicalize_list [ "a.*"; "!a.b.*" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "a.*" ]
+        ~actual:(Sg_caps_match.canonicalize_list [ "a.*"; "!b.*" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "a.*"; "!a.b.*" ]
+        ~actual:(Sg_caps_match.canonicalize_list [ "a.*"; "!a.b.*" ]);
       (* unrelated positives are untouched *)
-      assert_list [ "a.*"; "b.*" ] (Sg_caps_match.canonicalize_list [ "a.*"; "b.*" ]);
+      Oth.Assert.String_list.eq
+        ~expected:[ "a.*"; "b.*" ]
+        ~actual:(Sg_caps_match.canonicalize_list [ "a.*"; "b.*" ]);
       (* result is independent of input order *)
-      assert_list
-        (Sg_caps_match.canonicalize_list [ "foo.bar.*"; "foo.bar.baz.*" ])
-        (Sg_caps_match.canonicalize_list [ "foo.bar.baz.*"; "foo.bar.*" ]);
+      Oth.Assert.String_list.eq
+        ~expected:(Sg_caps_match.canonicalize_list [ "foo.bar.*"; "foo.bar.baz.*" ])
+        ~actual:(Sg_caps_match.canonicalize_list [ "foo.bar.baz.*"; "foo.bar.*" ]);
       ())
 
 (* canonicalize preserves the meaning evaluated by [matches] *)
@@ -93,20 +148,20 @@ let canonicalize_preserves_matches =
           let canon = Sg_caps_match.canonicalize_list pats in
           CCList.iter
             (fun v ->
-              assert_bool
-                (Sg_caps_match.matches ~patterns:pats v)
-                (Sg_caps_match.matches ~patterns:canon v))
+              Oth.Assert.Eq.bool
+                ~expected:(Sg_caps_match.matches ~patterns:pats v)
+                ~actual:(Sg_caps_match.matches ~patterns:canon v))
             values)
         inputs;
       ())
 
 let grants_all_cases =
   Oth.test ~name:"grants_all_cases" (fun _ ->
-      assert_bool true (Sg_caps_match.grants_all [ "*" ]);
-      assert_bool false (Sg_caps_match.grants_all []);
-      assert_bool false (Sg_caps_match.grants_all [ "!*" ]);
-      assert_bool false (Sg_caps_match.grants_all [ "*"; "!a" ]);
-      assert_bool false (Sg_caps_match.grants_all [ "a" ]);
+      Oth.Assert.Eq.bool ~expected:true ~actual:(Sg_caps_match.grants_all [ "*" ]);
+      Oth.Assert.Eq.bool ~expected:false ~actual:(Sg_caps_match.grants_all []);
+      Oth.Assert.Eq.bool ~expected:false ~actual:(Sg_caps_match.grants_all [ "!*" ]);
+      Oth.Assert.Eq.bool ~expected:false ~actual:(Sg_caps_match.grants_all [ "*"; "!a" ]);
+      Oth.Assert.Eq.bool ~expected:false ~actual:(Sg_caps_match.grants_all [ "a" ]);
       ())
 
 let lookup_cases =
@@ -127,60 +182,68 @@ let lookup_cases =
 
 let is_negation_cases =
   Oth.test ~name:"is_negation_cases" (fun _ ->
-      assert_bool true (Sg_caps_match.is_negation "!a");
-      assert_bool false (Sg_caps_match.is_negation "a");
+      Oth.Assert.Eq.bool ~expected:true ~actual:(Sg_caps_match.is_negation "!a");
+      Oth.Assert.Eq.bool ~expected:false ~actual:(Sg_caps_match.is_negation "a");
       ())
 
 let is_valid_pattern_cases =
   Oth.test ~name:"is_valid_pattern_cases" (fun _ ->
       (* prefix-globs, including partial-segment prefixes *)
-      assert_bool true (Sg_caps_match.is_valid_pattern "aws_*");
-      assert_bool true (Sg_caps_match.is_valid_pattern "foo*");
-      assert_bool true (Sg_caps_match.is_valid_pattern "foo.bar.*");
-      assert_bool true (Sg_caps_match.is_valid_pattern "foo.bar");
-      assert_bool true (Sg_caps_match.is_valid_pattern "*");
-      assert_bool true (Sg_caps_match.is_valid_pattern "!a.*");
-      assert_bool true (Sg_caps_match.is_valid_pattern "");
+      Oth.Assert.Eq.bool ~expected:true ~actual:(Sg_caps_match.is_valid_pattern "aws_*");
+      Oth.Assert.Eq.bool ~expected:true ~actual:(Sg_caps_match.is_valid_pattern "foo*");
+      Oth.Assert.Eq.bool ~expected:true ~actual:(Sg_caps_match.is_valid_pattern "foo.bar.*");
+      Oth.Assert.Eq.bool ~expected:true ~actual:(Sg_caps_match.is_valid_pattern "foo.bar");
+      Oth.Assert.Eq.bool ~expected:true ~actual:(Sg_caps_match.is_valid_pattern "*");
+      Oth.Assert.Eq.bool ~expected:true ~actual:(Sg_caps_match.is_valid_pattern "!a.*");
+      Oth.Assert.Eq.bool ~expected:true ~actual:(Sg_caps_match.is_valid_pattern "");
       (* mid-string stars are rejected *)
-      assert_bool false (Sg_caps_match.is_valid_pattern "a*b");
-      assert_bool false (Sg_caps_match.is_valid_pattern "*.foo");
-      assert_bool false (Sg_caps_match.is_valid_pattern "foo.*.bar");
-      assert_bool false (Sg_caps_match.is_valid_pattern "!a*b");
+      Oth.Assert.Eq.bool ~expected:false ~actual:(Sg_caps_match.is_valid_pattern "a*b");
+      Oth.Assert.Eq.bool ~expected:false ~actual:(Sg_caps_match.is_valid_pattern "*.foo");
+      Oth.Assert.Eq.bool ~expected:false ~actual:(Sg_caps_match.is_valid_pattern "foo.*.bar");
+      Oth.Assert.Eq.bool ~expected:false ~actual:(Sg_caps_match.is_valid_pattern "!a*b");
       (* repeated stars are rejected *)
-      assert_bool false (Sg_caps_match.is_valid_pattern "a**");
-      assert_bool false (Sg_caps_match.is_valid_pattern "**");
+      Oth.Assert.Eq.bool ~expected:false ~actual:(Sg_caps_match.is_valid_pattern "a**");
+      Oth.Assert.Eq.bool ~expected:false ~actual:(Sg_caps_match.is_valid_pattern "**");
       (* over-length is rejected *)
-      assert_bool
-        false
-        (Sg_caps_match.is_valid_pattern (CCString.make (Sg_caps_match.max_pattern_length + 1) 'a'));
+      Oth.Assert.Eq.bool
+        ~expected:false
+        ~actual:
+          (Sg_caps_match.is_valid_pattern
+             (CCString.make (Sg_caps_match.max_pattern_length + 1) 'a'));
       ())
 
 let subsumes_cases =
   Oth.test ~name:"subsumes_cases" (fun _ ->
-      assert_bool true (Sg_caps_match.subsumes "*" "x");
-      assert_bool true (Sg_caps_match.subsumes "aws_*" "aws_s3.*");
-      assert_bool true (Sg_caps_match.subsumes "foo.bar.*" "foo.bar.baz.*");
-      assert_bool true (Sg_caps_match.subsumes "a.*" "a.b");
-      assert_bool true (Sg_caps_match.subsumes "a" "a");
-      assert_bool false (Sg_caps_match.subsumes "foo.bar.baz.*" "foo.bar.*");
-      assert_bool false (Sg_caps_match.subsumes "aws_*" "gcp_*");
-      assert_bool false (Sg_caps_match.subsumes "a" "b");
-      assert_bool false (Sg_caps_match.subsumes "a" "ab");
-      assert_bool false (Sg_caps_match.subsumes "a.b.*" "a.*");
+      Oth.Assert.Eq.bool ~expected:true ~actual:(Sg_caps_match.subsumes "*" "x");
+      Oth.Assert.Eq.bool ~expected:true ~actual:(Sg_caps_match.subsumes "aws_*" "aws_s3.*");
+      Oth.Assert.Eq.bool ~expected:true ~actual:(Sg_caps_match.subsumes "foo.bar.*" "foo.bar.baz.*");
+      Oth.Assert.Eq.bool ~expected:true ~actual:(Sg_caps_match.subsumes "a.*" "a.b");
+      Oth.Assert.Eq.bool ~expected:true ~actual:(Sg_caps_match.subsumes "a" "a");
+      Oth.Assert.Eq.bool
+        ~expected:false
+        ~actual:(Sg_caps_match.subsumes "foo.bar.baz.*" "foo.bar.*");
+      Oth.Assert.Eq.bool ~expected:false ~actual:(Sg_caps_match.subsumes "aws_*" "gcp_*");
+      Oth.Assert.Eq.bool ~expected:false ~actual:(Sg_caps_match.subsumes "a" "b");
+      Oth.Assert.Eq.bool ~expected:false ~actual:(Sg_caps_match.subsumes "a" "ab");
+      Oth.Assert.Eq.bool ~expected:false ~actual:(Sg_caps_match.subsumes "a.b.*" "a.*");
       ())
 
 let intersects_cases =
   Oth.test ~name:"intersects_cases" (fun _ ->
-      assert_bool true (Sg_caps_match.intersects "a.*" "a.b.*");
-      assert_bool true (Sg_caps_match.intersects "a.*" "*");
-      assert_bool true (Sg_caps_match.intersects "a.b" "a.*");
-      assert_bool true (Sg_caps_match.intersects "a" "a");
-      assert_bool false (Sg_caps_match.intersects "a.*" "b.*");
-      assert_bool false (Sg_caps_match.intersects "a" "b");
-      assert_bool false (Sg_caps_match.intersects "a.b" "a.c");
+      Oth.Assert.Eq.bool ~expected:true ~actual:(Sg_caps_match.intersects "a.*" "a.b.*");
+      Oth.Assert.Eq.bool ~expected:true ~actual:(Sg_caps_match.intersects "a.*" "*");
+      Oth.Assert.Eq.bool ~expected:true ~actual:(Sg_caps_match.intersects "a.b" "a.*");
+      Oth.Assert.Eq.bool ~expected:true ~actual:(Sg_caps_match.intersects "a" "a");
+      Oth.Assert.Eq.bool ~expected:false ~actual:(Sg_caps_match.intersects "a.*" "b.*");
+      Oth.Assert.Eq.bool ~expected:false ~actual:(Sg_caps_match.intersects "a" "b");
+      Oth.Assert.Eq.bool ~expected:false ~actual:(Sg_caps_match.intersects "a.b" "a.c");
       (* symmetry *)
-      assert_bool (Sg_caps_match.intersects "a.b" "a.*") (Sg_caps_match.intersects "a.*" "a.b");
-      assert_bool (Sg_caps_match.intersects "a.*" "b.*") (Sg_caps_match.intersects "b.*" "a.*");
+      Oth.Assert.Eq.bool
+        ~expected:(Sg_caps_match.intersects "a.b" "a.*")
+        ~actual:(Sg_caps_match.intersects "a.*" "a.b");
+      Oth.Assert.Eq.bool
+        ~expected:(Sg_caps_match.intersects "a.*" "b.*")
+        ~actual:(Sg_caps_match.intersects "b.*" "a.*");
       ())
 
 module Q = QCheck2

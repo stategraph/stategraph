@@ -54,11 +54,7 @@ module Make (Abb : Abb_intf.S) = struct
         >>= fun () ->
         Fut_comb.List.map ~f:(fun _ -> recv_ok ch) (CCList.init n (fun _ -> ()))
         >>| fun received ->
-        Oth.Assert.Eq.list
-          ~eq:CCInt.equal
-          ~pp:Format.pp_print_int
-          ~expected:(CCList.init n (fun i -> i))
-          ~actual:received)
+        Oth.Assert.Int_list.eq ~expected:(CCList.init n (fun i -> i)) ~actual:received)
 
   (* Empty channel: recv parks until a producer sends. *)
   let recv_parks =
@@ -173,11 +169,7 @@ module Make (Abb : Abb_intf.S) = struct
         consumer_fut
         >>| fun received ->
         let sorted = CCList.sort CCInt.compare received in
-        Oth.Assert.Eq.list
-          ~eq:CCInt.equal
-          ~pp:Format.pp_print_int
-          ~expected:(CCList.init total (fun i -> i))
-          ~actual:sorted)
+        Oth.Assert.Int_list.eq ~expected:(CCList.init total (fun i -> i)) ~actual:sorted)
 
   (* Smaller buffer, more concurrency: the channel is full most of the
      time, forcing producer parking; the consumer also blocks
@@ -203,11 +195,7 @@ module Make (Abb : Abb_intf.S) = struct
         >>| fun received ->
         let expected = CCList.init n (fun i -> i * i) in
         let sorted = CCList.sort CCInt.compare received in
-        Oth.Assert.Eq.list
-          ~eq:CCInt.equal
-          ~pp:Format.pp_print_int
-          ~expected:(CCList.sort CCInt.compare expected)
-          ~actual:sorted)
+        Oth.Assert.Int_list.eq ~expected:(CCList.sort CCInt.compare expected) ~actual:sorted)
 
   (* Regression: a parked consumer must NOT spuriously receive
      [Chan_closed] when the buffer is drained by a racing fast-path

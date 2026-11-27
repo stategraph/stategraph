@@ -2,10 +2,11 @@
 set -euf -o pipefail
 
 if [ "${TERRATEAM_ENVIRONMENT}" == "production" ]; then
-  # The "What's Changed" entries of the release notes, one per line, turned into Slack
-  # bullets. scripts/create_release has already expanded the monorepo export entries into the
-  # changes they publish, each tailed with "in <pr url>"; an entry for a PR opened directly on
-  # this repo reads "* <title> by <author> in <pr url>". Both tails are peeled off here, each
+  # The "What's Changed" entries of the release notes, turned into Slack bullets.
+  # scripts/create_release has already expanded the monorepo export entries into the release
+  # notes they publish, the first line of each tailed with "in <pr url>" and its further lines
+  # indented; an entry for a PR opened directly on this repo reads
+  # "* <title> by <author> in <pr url>". Both tails are peeled off here, each
   # anchored on the trailing URL so a title of its own ("Sort by name", "Fix a crash in
   # production") survives intact.
   RELEASE_NOTES=$(gh release view --repo "${GITHUB_REPOSITORY}" --json body | jq -r '.body' \

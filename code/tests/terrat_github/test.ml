@@ -166,10 +166,7 @@ let declared_of_yaml yaml =
   | Ok json -> CCList.map Di.name (Di.declared json)
   | Error (`Yaml_decode_err err) -> Oth.Assert.false_ ("yaml did not decode: " ^ err)
 
-let assert_names ~expected actual =
-  Oth.Assert.true_
-    ~fail_msg:(Printf.sprintf "got [%s]" (CCString.concat "; " actual))
-    (CCList.equal CCString.equal expected actual)
+let assert_names ~expected actual = Oth.Assert.String_list.eq ~expected ~actual
 
 let workflow_with_inputs =
   {|name: 'Terrateam Workflow'

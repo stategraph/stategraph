@@ -235,7 +235,7 @@ let test_fixture_api_golden ~name ~input_file ~output_name ~files =
   Oth.test ~name (fun _ ->
       with_output_dir (fun dir ->
           convert ~input_file ~output_name ~output_dir:dir;
-          Oth.Assert.Eq.string_list
+          Oth.Assert.String_list.eq
             ~expected:files
             ~actual:(CCList.sort CCString.compare (CCArray.to_list (Sys.readdir dir)));
           CCList.iter

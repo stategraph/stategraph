@@ -138,12 +138,12 @@ let scoped_to_tenant_examples =
       in
       let states caps = Oth.Assert.ok (Ops.scoped_to_tenant ~tenant:"t1" caps) in
       (* Bounded by the tenant it names: nothing for the caller to confirm. *)
-      Oth.Assert.Eq.string_list ~expected:[] ~actual:(states (admin [ "t1" ]));
-      Oth.Assert.Eq.string_list
+      Oth.Assert.String_list.eq ~expected:[] ~actual:(states (admin [ "t1" ]));
+      Oth.Assert.String_list.eq
         ~expected:[]
         ~actual:(states (previewing (reach ~tenants:[ "t1" ] ~states:[ "*" ] ~addresses:[ "*" ])));
       (* Naming no tenant but naming states: the caller confirms those states are this tenant's. *)
-      Oth.Assert.Eq.string_list
+      Oth.Assert.String_list.eq
         ~expected:[ "s1"; "s1" ]
         ~actual:(states (previewing (reach ~tenants:[ "*" ] ~states:[ "s1" ] ~addresses:[ "*" ])));
       (* Reaching past the tenant: admin over another one, or over every one. *)

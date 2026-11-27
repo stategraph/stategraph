@@ -3,6 +3,7 @@ module Comment_resolve = Terrat_vcs_event_evaluator2_comment_resolve
 module Compute_node = Terrat_vcs_event_evaluator2_compute_node
 module Work_set = Terrat_vcs_event_evaluator2_work_set
 module Staleness = Terrat_vcs_event_evaluator2_staleness
+module Repo_tree_gate = Terrat_vcs_event_evaluator2_repo_tree_gate
 module Force_fail = Terrat_vcs_event_evaluator2_force_fail
 module Ee2_fc = Terrat_vcs_event_evaluator2_fc
 module Fc = Abbs_fc

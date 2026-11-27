@@ -3,6 +3,7 @@ module Comment_resolve : module type of Terrat_vcs_event_evaluator2_comment_reso
 module Compute_node : module type of Terrat_vcs_event_evaluator2_compute_node
 module Work_set : module type of Terrat_vcs_event_evaluator2_work_set
 module Staleness : module type of Terrat_vcs_event_evaluator2_staleness
+module Repo_tree_gate : module type of Terrat_vcs_event_evaluator2_repo_tree_gate
 module Force_fail : module type of Terrat_vcs_event_evaluator2_force_fail
 module Ee2_fc : module type of Terrat_vcs_event_evaluator2_fc
 module Merge_steps : module type of Terrat_vcs_event_evaluator2_merge_steps

@@ -151,15 +151,6 @@ let of_opt fail = function
 
 let env_str key = of_opt (`Key_error key) (Sys.getenv_opt key)
 
-(* The non-empty values of a comma-separated setting, trimmed. *)
-let comma_separated value =
-  CCList.filter_map
-    (fun v ->
-      match CCString.trim v with
-      | "" -> None
-      | v -> Some v)
-    (CCString.split_on_char ',' value)
-
 (* A STATEGRAPH boolean env var is on iff it is exactly "true" or "1"; any
    other value is off. Unset or empty is off, or [default] for
    [env_bool_default]. *)
@@ -224,7 +215,7 @@ let parse_oauth2_config () =
             >>= fun github_org ->
             of_opt
               (`Key_error "STATEGRAPH_OAUTH_GITHUB_ORG: set at least one GitHub organization")
-              (Sln_list.Non_empty.of_list (comma_separated github_org))
+              (Sln_list.Non_empty.of_list (Sln_string.separated ~by:',' github_org))
             >>= fun github_orgs ->
             let config_hash =
               compute_oauth2_config_hash

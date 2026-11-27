@@ -37,7 +37,7 @@ cat code/opam.pins code/transitive.pins | xargs opam install -j$(nproc --all) -y
 For an IDE-friendly setup, also install the LSP server and formatter:
 
 ```shell
-opam install -y ocaml-lsp-server.1.27.0 ocamlformat.0.29.0
+opam install -y ocaml-lsp-server.1.28.1 ocamlformat.0.29.0
 ```
 
 You can now build:

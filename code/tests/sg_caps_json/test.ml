@@ -200,23 +200,23 @@ let scope_rules scope =
 let to_rules_examples =
   Oth.test ~name:"to_rules_examples" (fun _ ->
       (* Every reach of [C.empty], and of [scopes_only]. *)
-      Oth.Assert.Eq.string_list ~expected:[] ~actual:(reach_rules C.empty.C.commit.C.modified);
-      Oth.Assert.Eq.string_list ~expected:[ "t1 -> [* -> a.*]" ] ~actual:(reach_rules doc_reach);
-      Oth.Assert.Eq.string_list
+      Oth.Assert.String_list.eq ~expected:[] ~actual:(reach_rules C.empty.C.commit.C.modified);
+      Oth.Assert.String_list.eq ~expected:[ "t1 -> [* -> a.*]" ] ~actual:(reach_rules doc_reach);
+      Oth.Assert.String_list.eq
         ~expected:[ "t1 -> [s1 -> a.*, !a.b]" ]
         ~actual:(reach_rules one_state.C.preview.C.modified);
-      Oth.Assert.Eq.string_list
+      Oth.Assert.String_list.eq
         ~expected:[ "* -> [* -> *]" ]
         ~actual:(reach_rules one_state.C.preview.C.pulled_in);
-      Oth.Assert.Eq.string_list
+      Oth.Assert.String_list.eq
         ~expected:[ "prod-*"; "!prod-secret" ]
         ~actual:(scope_rules scopes_only.C.admin);
-      Oth.Assert.Eq.string_list ~expected:[ "t1" ] ~actual:(scope_rules scopes_only.C.users_manage);
-      Oth.Assert.Eq.string_list ~expected:[ "svc-*" ] ~actual:(scope_rules scopes_only.C.sudo);
-      Oth.Assert.Eq.string_list
+      Oth.Assert.String_list.eq ~expected:[ "t1" ] ~actual:(scope_rules scopes_only.C.users_manage);
+      Oth.Assert.String_list.eq ~expected:[ "svc-*" ] ~actual:(scope_rules scopes_only.C.sudo);
+      Oth.Assert.String_list.eq
         ~expected:[ "prod-* -> [* -> *]"; "prod-secret -> []"; "t1 -> [s1 -> a.*]" ]
         ~actual:(reach_rules two_grants.C.commit.C.modified);
-      Oth.Assert.Eq.string_list
+      Oth.Assert.String_list.eq
         ~expected:[ "* -> [* -> *]" ]
         ~actual:(reach_rules two_grants.C.commit.C.pulled_in);
       ())
