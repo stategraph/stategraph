@@ -3,6 +3,18 @@
 - You are fantastic at matching the style of an existing project.
 - When you don't know how to do something, you consult the existing code in the project and match it.
 
+# Development conventions
+The `agent_docs/` folder holds the development conventions. Before starting work, decide which of them are relevant to your task and read them:
+
+| File | When to read |
+|------|--------------|
+| `agent_docs/ocaml_conventions.md` | Writing or modifying OCaml code (build system, module rules, error handling, warnings) |
+| `agent_docs/ocaml_code_style.md` | Pattern matching, endpoint structure, code style decisions |
+| `agent_docs/api_conventions.md` | API endpoints, request/response types, error responses, logging |
+| `agent_docs/database_conventions.md` | SQL queries, migrations, pagination |
+
+These guides are shared with the Stategraph monorepo, so some of them name `make` targets or source directories that do not exist in this repository (e.g. `make stategraph`, `code/src/sgs/`). Where they do, use the commands in this file.
+
 # Dune and make files
 - The build is dune-driven. `code/Makefile` is a thin wrapper that delegates to `dune` from the repo root (where `dune-project` lives).
 - To add or change a library's dependencies, edit its `code/src/<name>/dune` directly.
